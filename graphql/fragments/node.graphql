@@ -1,0 +1,14 @@
+fragment Node on Node {
+  name
+  interface
+  package
+  description
+  kind
+  id
+  args {
+    ...ArgPort
+  }
+  returns {
+    ...ReturnPort
+  }
+}
