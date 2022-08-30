@@ -87,7 +87,7 @@ class DefinitionRegistry(KoiledModel):
 
     def register(
         self,
-        function,
+        function_or_actor,
         builder: ActorBuilder = None,
         package=None,
         interface=None,
@@ -105,29 +105,45 @@ class DefinitionRegistry(KoiledModel):
             or get_current_structure_registry()
         )
 
-        if builder:
-            assert hasattr(builder, "actify"), "Build needs to provide actify attr"
-            assert hasattr(builder, "define"), "Builder needs to provide define attr"
+        if hasattr(function_or_actor, "assign"):
+            actor = function_or_actor
+            actorBuilder = actor
+            definition = prepare_definition(
+                actor.assign,
+                omitfirst=1,  # we are ommiting the self parameter
+                widgets=widgets,
+                interface=interface or actor.__name__,
+                interfaces=interfaces,
+                structure_registry=structure_registry,
+            )
+
         else:
-            builder = self.defaultActorBuilder
 
-        actorBuilder = builder.actify(
-            function,
-            builder=builder,
-            on_provide=on_provide,
-            on_unprovide=on_unprovide,
-            structure_registry=structure_registry,
-            **actorparams,
-        )
+            if builder:
+                assert hasattr(builder, "actify"), "Build needs to provide actify attr"
+                assert hasattr(
+                    builder, "define"
+                ), "Builder needs to provide define attr"
+            else:
+                builder = self.defaultActorBuilder
 
-        definition = builder.define(
-            function=function,
-            widgets=widgets,
-            package=package,
-            interface=interface,
-            interfaces=interfaces,
-            structure_registry=structure_registry,
-        )
+            actorBuilder = builder.actify(
+                function_or_actor,
+                builder=builder,
+                on_provide=on_provide,
+                on_unprovide=on_unprovide,
+                structure_registry=structure_registry,
+                **actorparams,
+            )
+
+            definition = builder.define(
+                function=function_or_actor,
+                widgets=widgets,
+                package=package,
+                interface=interface,
+                interfaces=interfaces,
+                structure_registry=structure_registry,
+            )
 
         self.register_actor_with_defintion(actorBuilder, definition, **actorparams)
 

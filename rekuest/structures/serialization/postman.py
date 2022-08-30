@@ -1,4 +1,4 @@
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 from rekuest.api.schema import NodeFragment
 import asyncio
 from rekuest.structures.errors import ExpandingError, ShrinkingError
@@ -85,7 +85,7 @@ async def expand_outputs(
     returns: List[Any],
     structure_registry: StructureRegistry,
     skip_expanding: bool = False,
-) -> List[Any]:
+) -> Optional[List[Any]]:
     """Expands Returns
 
     Expands the Returns according to the Node definition
@@ -130,4 +130,9 @@ async def expand_outputs(
         if len(returns) == 0:
             return None
 
-        return [val for port, val in zip(node.returns, returns)]
+        returns = tuple(val for port, val in zip(node.returns, returns))
+
+        if len(returns) == 1:
+            return returns[0]  # We are dealing with a single output, just cast back
+        else:
+            return returns

@@ -61,21 +61,23 @@ class ArkitektMockResolver(AsyncMockResolver):
             "package": "rath",
             "interface": "mock",
             "description": "hallo",
-            "type": NodeKind.FUNCTION,
+            "kind": NodeKind.FUNCTION,
             "id": "1",
             "name": "mock",
             "args": [
                 {
                     "__typename": "KwargPort",
-                    "type": PortKind.INT,
+                    "kind": PortKind.INT,
                     "key": "a",
                     "default": 0,
+                    "nullable": True,
                 },
                 {
                     "__typename": "KwargPort",
-                    "type": PortKind.INT,
+                    "kind": PortKind.INT,
                     "key": "b",
                     "default": 1,
+                    "nullable": True,
                 },
             ],
             "returns": [],
@@ -91,12 +93,9 @@ class ArkitektMockResolver(AsyncMockResolver):
             "interface": operation.variables["definition"]["interface"],
             "package": operation.variables["definition"]["package"] or "@mock",
             "description": operation.variables["definition"]["description"],
-            "type": operation.variables["definition"]["type"],
+            "kind": operation.variables["definition"]["kind"],
             "args": replace_keys(
                 operation.variables["definition"]["args"], {"typename": "__typename"}
-            ),
-            "kwargs": replace_keys(
-                operation.variables["definition"]["kwargs"], {"typename": "__typename"}
             ),
             "returns": replace_keys(
                 operation.variables["definition"]["returns"], {"typename": "__typename"}

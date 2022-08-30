@@ -2,14 +2,11 @@ from graphql import OperationType
 from pydantic import Field
 from rath import rath
 import contextvars
-from rath.contrib.fakts.links.aiohttp import FaktsAIOHttpLink
-from rath.contrib.fakts.links.websocket import FaktsWebsocketLink
-from rath.contrib.herre.links.auth import HerreAuthLink
 from rath.links.aiohttp import AIOHttpLink
 from rath.links.auth import AuthTokenLink
 
 from rath.links.base import TerminatingLink
-from rath.links.compose import compose
+from rath.links.compose import TypedComposedLink, compose
 from rath.links.dictinglink import DictingLink
 from rath.links.shrink import ShrinkingLink
 from rath.links.split import SplitLink
@@ -19,20 +16,16 @@ from rath.links.websockets import WebSocketLink
 current_rekuest_rath = contextvars.ContextVar("current_rekuest_rath", default=None)
 
 
+class RekuestLinkComposition(TypedComposedLink):
+    shrink: ShrinkingLink = Field(default_factory=ShrinkingLink)
+    dicting: DictingLink = Field(default_factory=DictingLink)
+    auth: AuthTokenLink
+    retry: SubscriptionRetry = Field(default_factory=SubscriptionRetry)
+    split: SplitLink
+
+
 class RekuestRath(rath.Rath):
-    link: TerminatingLink = Field(
-        default_factory=lambda: compose(
-            ShrinkingLink(),
-            DictingLink(),
-            HerreAuthLink(),
-            SubscriptionRetry(),
-            SplitLink(
-                left=FaktsAIOHttpLink(fakts_group="arkitekt"),
-                right=FaktsWebsocketLink(fakts_group="arkitekt"),
-                split=lambda o: o.node.operation != OperationType.SUBSCRIPTION,
-            ),
-        )
-    )
+    link: RekuestLinkComposition = Field(default_factory=RekuestLinkComposition)
 
     async def __aenter__(self):
         await super().__aenter__()

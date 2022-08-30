@@ -1,18 +1,10 @@
 import pytest
-from fakts import Fakts
-from fakts.grants import YamlGrant
-from herre.fakts import FaktsHerre
 from rekuest.api.schema import adefine
-from herre.fakts.herre import FaktsHerre
 from .integration.utils import wait_for_http_response
 from .utils import build_relative
 from testcontainers.compose import DockerCompose
-from rekuest.app import ArkitektApp
 from rekuest.definition.define import prepare_definition
 from .funcs import complex_karl
-from herre.fakts import FaktsHerre
-from fakts.grants.remote.claim import ClaimGrant
-from fakts.grants.remote.base import StaticDiscovery
 
 
 @pytest.mark.integration
@@ -30,8 +22,14 @@ def environment():
 @pytest.mark.integration
 @pytest.fixture
 def app():
+    from herre.fakts import FaktsHerre
+    from fakts.grants.remote.claim import ClaimGrant
+    from fakts.grants.remote.base import StaticDiscovery
+    from arkitekt.apps.rekuest import RekuestApp
+    from fakts.fakts import Fakts
 
-    return ArkitektApp(
+
+    return RekuestApp(
         fakts=Fakts(
             grant=ClaimGrant(
                 client_id="DSNwVKbSmvKuIUln36FmpWNVE2KrbS2oRX0ke8PJ",
@@ -46,7 +44,7 @@ def app():
 
 
 @pytest.mark.integration
-async def test_definining(app: ArkitektApp, environment):
+async def test_definining(app, environment):
 
     async with app:
         functional_definition = prepare_definition(

@@ -78,4 +78,4 @@ async def shrink_outputs(
         except Exception as e:
             raise ShrinkingError(f"Couldn't shrink Returns {returns}") from e
     else:
-        return [vale for port, vale in zip(node.returns, returns)]
+        return [val for port, val in zip(node.returns, returns)]

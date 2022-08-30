@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "rekuest"
-version = "0.0.1"
+version = "0.0.8"
 description = "rpc and node backbone"
 authors = ["jhnnsrs <jhnnsrs@gmail.com>"]
 license = "CC BY-NC 3.0"
@@ -11,10 +11,8 @@ python = "^3.7"
 docstring-parser = ">=0.11"
 inflection = "^0.5.1"
 websockets = "^10.0"
-watchdog = "^2.1.6"
-herre = "^0.2.5"
-rath = "^0.2.5"
-fakts = "^0.2.5"
+rath = "^0.2.8"
+koil = "^0.2.6"
 pytest-qt = "^4.0.2"
 pydantic = "1.9.0"
 

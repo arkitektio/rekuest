@@ -13,8 +13,8 @@ def simple_registry():
 
     registry = StructureRegistry()
 
-    register_structure(identifier="test", registry=registry)(SerializableObject)
-    register_structure(identifier="karl", registry=registry)(SecondSerializableObject)
+    register_structure(identifier="hm/test", registry=registry)(SerializableObject)
+    register_structure(identifier="ha/karl", registry=registry)(SecondSerializableObject)
 
     return registry
 
@@ -41,25 +41,25 @@ async def test_define_complex(simple_registry):
     assert (
         functional_definition.name == "Complex Karl"
     ), "Doesnt conform to standard Naming Scheme"
-    assert len(functional_definition.args) == 2, "Wrong amount of Arguments"
+    assert len(functional_definition.args) == 3, "Wrong amount of Arguments"
     assert (
-        functional_definition.args[0].type == PortKind.LIST
+        functional_definition.args[0].kind == PortKind.LIST
     ), "Wasn't defined as a List"
     assert (
-        functional_definition.args[1].type == PortKind.DICT
+        functional_definition.args[1].kind == PortKind.DICT
     ), "Wasn't defined as a Dict"
     assert (
-        functional_definition.args[1].child.type == PortKind.INT
+        functional_definition.args[1].child.kind == PortKind.INT
     ), "Child of List is not of type IntArgPort"
     assert (
-        functional_definition.args[0].child.type == PortKind.STRING
+        functional_definition.args[0].child.kind == PortKind.STRING
     ), "Child of Dict is not of type StringArgPort"
     assert (
-        functional_definition.kwargs[0].type == PortKind.STRING
+        functional_definition.args[2].kind == PortKind.STRING
     ), "Kwarg wasn't defined as a StringKwargPort"
     assert len(functional_definition.returns) == 2, "Wrong amount of Returns"
     assert (
-        functional_definition.returns[0].type == PortKind.LIST
+        functional_definition.returns[0].kind == PortKind.LIST
     ), "Needs to Return List"
 
 
@@ -109,12 +109,11 @@ async def test_define_to_node_gen(simple_registry, arkitekt_rath):
         assert (
             node.name == "Structured Karl"
         ), "Doesnt conform to standard Naming Scheme"
-        assert len(node.args) == 1, "Wrong amount of Arguments"
-        assert len(node.kwargs) == 1, "Wrong amount of Kwargs"
+        assert len(node.args) == 2, "Wrong amount of Arguments"
         assert len(node.returns) == 2, "Wrong amount of Returns"
-        assert node.args[0].type == PortKind.LIST, "Wasn't defined as a List"
-        assert node.args[0].child.type == PortKind.STRUCTURE, "Wasn't defined as a List"
-        assert node.args[0].child.identifier == "test", "Wasn't indtifier on test"
+        assert node.args[0].kind == PortKind.LIST, "Wasn't defined as a List"
+        assert node.args[0].child.kind == PortKind.STRUCTURE, "Wasn't defined as a List"
+        assert node.args[0].child.identifier == "hm/test", "Wasn't indtifier on test"
 
 
 async def test_define_to_node_complex(simple_registry, arkitekt_rath):
@@ -129,20 +128,20 @@ async def test_define_to_node_complex(simple_registry, arkitekt_rath):
 
         assert isinstance(node, NodeFragment), "Node is not Node"
         assert node.name == "Complex Karl", "Doesnt conform to standard Naming Scheme"
-        assert len(node.args) == 2, "Wrong amount of Arguments"
-        assert node.args[0].type == PortKind.LIST, "Wasn't defined as a List"
-        assert node.args[1].type == PortKind.DICT, "Wasn't defined as a Dict"
+        assert len(node.args) == 3, "Wrong amount of Arguments"
+        assert node.args[0].kind == PortKind.LIST, "Wasn't defined as a List"
+        assert node.args[1].kind == PortKind.DICT, "Wasn't defined as a Dict"
         assert (
-            node.args[1].child.type == PortKind.INT
+            node.args[1].child.kind == PortKind.INT
         ), "Child of List is not of type IntArgPort"
         assert (
-            node.args[0].child.type == PortKind.STRING
+            node.args[0].child.kind == PortKind.STRING
         ), "Child of Dict is not of type StringArgPort"
         assert (
-            node.kwargs[0].type == PortKind.STRING
+            node.args[2].kind == PortKind.STRING
         ), "Kwarg wasn't defined as a StringKwargPort"
         assert len(functional_definition.returns) == 2, "Wrong amount of Returns"
-        assert node.returns[0].type == PortKind.LIST, "Needs to Return List"
+        assert node.returns[0].kind == PortKind.LIST, "Needs to Return List"
 
 
 async def test_define_node_has_nested_type(simple_registry, arkitekt_rath):

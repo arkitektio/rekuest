@@ -245,6 +245,92 @@ class ThreadedFuncActor(Actor):
             )
 
 
+class CompletlyThreadedActor(ThreadedFuncActor):
+    executor: ThreadPoolExecutor = Field(default_factory=lambda: ThreadPoolExecutor(4))
+
+    def provide(self, provision: ProvisionFragment):
+        return None
+
+    def unprovide(self):
+        return None
+
+    async def on_provide(self, *args, **kwargs):
+        return await run_spawned(
+            self.provide, *args, **kwargs, executor=self.executor, pass_context=True
+        )
+
+    async def on_unprovide(self, *args, **kwargs):
+        return await run_spawned(
+            self.unprovide, *args, **kwargs, executor=self.executor, pass_context=True
+        )
+
+    async def on_assign(self, assignation: Assignation):
+
+        try:
+            logger.info("Assigning Number two")
+            params = await expand_inputs(
+                self.provision.template.node,
+                assignation.args,
+                structure_registry=self.structure_registry,
+                skip_expanding=not self.expand_inputs,
+            )
+
+            await self.transport.change_assignation(
+                assignation.assignation,
+                status=AssignationStatus.ASSIGNED,
+            )
+
+            current_assignation_helper.set(
+                ThreadedAssignationHelper(
+                    actor=self, assignation=assignation, provision=self.provision
+                )
+            )
+
+            returns = await run_spawned(
+                self.assign, **params, executor=self.executor, pass_context=True
+            )
+
+            current_assignation_helper.set(None)
+            returns = await shrink_outputs(
+                self.provision.template.node,
+                returns,
+                structure_registry=self.structure_registry,
+                skip_shrinking=not self.shrink_outputs,
+            )
+
+            await self.transport.change_assignation(
+                assignation.assignation,
+                status=AssignationStatus.RETURNED,
+                returns=returns,
+            )
+
+        except asyncio.CancelledError as e:
+            logger.info("Actor Cancelled")
+
+            await self.transport.change_assignation(
+                assignation.assignation,
+                status=AssignationStatus.CANCELLED,
+                message=str(e),
+            )
+
+        except AssertionError as ex:
+            print("Assertion Error", ex)
+            await self.transport.change_assignation(
+                assignation.assignation,
+                status=AssignationStatus.ERROR,
+                message=str(ex),
+            )
+
+        except Exception as e:
+            print("OINOINOINOIN")
+            logger.error("Error in actor", exc_info=True)
+            await self.transport.change_assignation(
+                assignation.assignation,
+                status=AssignationStatus.CRITICAL,
+                message=str(e),
+            )
+
+
 class ThreadedGenActor(Actor):
     executor: ThreadPoolExecutor = Field(default_factory=lambda: ThreadPoolExecutor(4))
 

@@ -2,8 +2,6 @@ from typing import Optional
 
 from pydantic import Field
 
-from rekuest.postmans.transport.base import PostmanTransport
-from rekuest.postmans.transport.fakts import FaktsWebsocketPostmanTransport
 from rekuest.postmans.vars import current_postman
 from koil.composition import KoiledModel
 

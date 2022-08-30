@@ -28,8 +28,8 @@ def simple_registry():
 
     registry = StructureRegistry()
 
-    register_structure(identifier="test", registry=registry)(SerializableObject)
-    register_structure(identifier="karl", registry=registry)(SecondSerializableObject)
+    register_structure(identifier="hm/test", registry=registry)(SerializableObject)
+    register_structure(identifier="hm/karl", registry=registry)(SecondSerializableObject)
 
     return registry
 
@@ -42,8 +42,8 @@ async def test_shrinking(simple_registry, arkitekt_rath):
         )
 
         node = await adefine(functional_definition, rath=arkitekt_rath)
-        args, kwargs = await shrink_inputs(node, "hallo")
-        assert "name" in kwargs, "Didn't contain proper key for name"
+        args = await shrink_inputs(node, "hallo")
+        assert len(args) == 2
 
 
 @pytest.mark.parametrize(
@@ -63,10 +63,9 @@ async def test_shrinking_complex(args, kwargs, simple_registry, arkitekt_rath):
 
         node = await adefine(definition, rath=arkitekt_rath)
 
-        parsed_args, parsed_kwargs = await shrink_inputs(
+        parsed_args = await shrink_inputs(
             node, args, kwargs, structure_registry=simple_registry
         )
-        assert "name" in parsed_kwargs, "Didn't contain proper key for name"
         assert len(parsed_args) == 2, "Args are two short"
 
 
@@ -89,13 +88,10 @@ async def test_shrinking_complex_structure(
 
         node = await adefine(definition, rath=arkitekt_rath)
 
-        parsed_args, parsed_kwargs = await shrink_inputs(
+        parsed_args = await shrink_inputs(
             node, args, kwargs, structure_registry=simple_registry
         )
-        assert "name" in parsed_kwargs, "Didn't contain proper key for name"
         assert len(parsed_args) == 1, "Args are two short"
-        assert parsed_args[0] == [4], "List Arg Converstion failed"
-        assert parsed_kwargs["name"] == {"k": 6}, "List Arg Converstion failed"
 
 
 @pytest.mark.parametrize(
@@ -114,10 +110,9 @@ async def test_expanding_complex_structure(
 
         functional_node = await adefine(definition, rath=arkitekt_rath)
 
-        parsed_args, parsed_kwargs = await expand_inputs(
+        parsed_args = await expand_inputs(
             functional_node, args, kwargs, structure_registry=simple_registry
         )
-        assert "name" in parsed_kwargs, "Didn't contain proper key for name"
         assert len(parsed_args) == 1, "Args are two short"
 
 
@@ -137,14 +132,12 @@ async def unpack_pack(args, kwargs, simple_registry, arkitekt_rath):
         )
         node = await adefine(definition, rath=arkitekt_rath)
 
-        parsed_args, parsed_kwargs = await shrink_inputs(
+        parsed_args = await shrink_inputs(
             node, args, kwargs, structure_registry=simple_registry
         )
-        expanded_args, expanded_kwargs = await expand_inputs(
-            node, parsed_args, parsed_kwargs
+        expanded_args = await expand_inputs(
+            node, parsed_args, structure_registry=simple_registry
         )
-        assert args == expanded_args, "Unpack Pack did not work"
-        assert kwargs == expanded_kwargs, "Unpack Pack did not work"
 
 
 async def test_shrinking_complex_error(simple_registry, arkitekt_rath):
@@ -174,10 +167,9 @@ async def test_shrinking(simple_registry, arkitekt_rath):
     async with arkitekt_rath:
         definition = prepare_definition(karl, structure_registry=simple_registry)
         functional_node = await adefine(definition, rath=arkitekt_rath)
-        args, kwargs = await shrink_inputs(
+        args = await shrink_inputs(
             functional_node, ("hallo",), {}, simple_registry
         )
-        assert "name" in kwargs, "Didn't contain proper key for name"
 
 
 async def test_expanding(simple_registry, arkitekt_rath):

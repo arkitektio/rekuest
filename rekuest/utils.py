@@ -1,6 +1,4 @@
 from typing import Any
-
-from rekuest.api.schema import NodeKind
 from rekuest.postmans.utils import use
 from rekuest.traits.node import Reserve
 
@@ -16,7 +14,6 @@ def assign(node: Reserve, *args, **kwargs) -> Any:
         Any: Result of the node task
 
     """
-    assert node.get_node_type() == NodeKind.FUNCTION
     with use(x, auto_unreserve=False) as r:
         x = node.assign(*args, **kwargs)
         print(x)

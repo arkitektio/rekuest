@@ -26,7 +26,7 @@ class IdentifiableSerializableObject(BaseModel):
 
     @classmethod
     def get_identifier(cls):
-        return "mock.identifiable"
+        return "mock/identifiable"
 
     async def ashrink(self):
         return self.number

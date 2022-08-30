@@ -15,8 +15,8 @@ class Identifier(str):
 
     @classmethod
     def validate(cls, v):
-        assert isinstance(v, str), "Identifier must be a string"
-        assert "/" in v
+        if not isinstance(v, str): raise TypeError("Identifier must be a string")
+        if not "/" in v: raise ValueError("Identifier must be a path")
         return v
 
     def __repr__(self):

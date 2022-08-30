@@ -1,11 +1,14 @@
-from typing import Any, Awaitable, Callable, Dict, Optional
-
-from pydantic import Field
-from rekuest.agents.transport.websocket import WebsocketAgentTransport
-from rekuest.messages import T
+from typing import Optional
 from fakts.fakt.base import Fakt
 from fakts.fakts import get_current_fakts
 from herre import current_herre
+from rekuest.agents.transport.websocket import WebsocketAgentTransport
+from pydantic import Field
+
+from typing import Any, Awaitable, Callable, Dict, Optional
+
+from pydantic import Field
+from rekuest.messages import T
 
 
 class WebsocketAgentTransportConfig(Fakt):

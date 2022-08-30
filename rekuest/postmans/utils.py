@@ -1,6 +1,6 @@
 from ast import Assign
 from random import Random, random
-from typing import Awaitable, Callable, Optional
+from typing import Awaitable, Callable, Optional, Union
 import uuid
 
 from pydantic import Field
@@ -101,6 +101,7 @@ class use(ReservationContract):
         *args,
         structure_registry=None,
         alog: Callable[[Assignation, AssignationLogLevel, str], Awaitable[None]] = None,
+        parent: Optional[Union[str, AssignationFragment]] = None,
         **kwargs,
     ):
         assert self._reservation, "We never entered the context manager"
@@ -119,8 +120,7 @@ class use(ReservationContract):
         )
 
         _ass_queue = await self.postman.aassign(
-            self._reservation.id,
-            inputs,
+            self._reservation.id, inputs, parent=parent
         )
         try:
             while True:  # Waiting for assignation
@@ -152,6 +152,7 @@ class use(ReservationContract):
         *args,
         structure_registry=None,
         alog: Callable[[Assignation, AssignationLogLevel, str], Awaitable[None]] = None,
+        parent: Optional[Union[str, AssignationFragment]] = None,
         **kwargs,
     ):
         assert self._reservation, "We never entered the context manager"
@@ -172,6 +173,7 @@ class use(ReservationContract):
         _ass_queue = await self.postman.aassign(
             self._reservation.id,
             inputs,
+            parent=parent,
         )
         try:
             while True:  # Waiting for assignation

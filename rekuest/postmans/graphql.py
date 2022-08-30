@@ -18,7 +18,6 @@ from rekuest.postmans.base import BasePostman
 import asyncio
 from pydantic import Field
 import logging
-from rekuest.postmans.transport.fakts import FaktsWebsocketPostmanTransport
 from .transport.base import PostmanTransport
 
 logger = logging.getLogger(__name__)
@@ -28,11 +27,11 @@ class GraphQLPostman(BasePostman):
     assignations: Dict[str, AssignationFragment] = Field(default_factory=dict)
     reservations: Dict[str, ReservationFragment] = Field(default_factory=dict)
 
-    _res_update_queues: Dict[str, asyncio.Queue[ReservationFragment]] = {}
-    _ass_update_queues: Dict[str, asyncio.Queue[AssignationFragment]] = {}
+    _res_update_queues: Dict[str, asyncio.Queue] = {}
+    _ass_update_queues: Dict[str, asyncio.Queue] = {}
 
-    _res_update_queue: asyncio.Queue[ReservationFragment] = None
-    _ass_update_queue: asyncio.Queue[AssignationFragment] = None
+    _res_update_queue: asyncio.Queue = None
+    _ass_update_queue: asyncio.Queue = None
 
     _watch_resraces_task: asyncio.Task = None
     _watch_assraces_task: asyncio.Task = None
@@ -59,7 +58,7 @@ class GraphQLPostman(BasePostman):
         params: ReserveParamsInput = None,
         provision: str = None,
         reference: str = "default",
-    ) -> asyncio.Queue[ReservationFragment]:
+    ) -> asyncio.Queue:
         async with self._lock:
             if not self._watching:
                 await self.start_watching()
@@ -89,7 +88,8 @@ class GraphQLPostman(BasePostman):
         persist=True,
         log=False,
         reference: str = None,
-    ) -> asyncio.Queue[AssignationFragment]:
+        parent: Union[AssignationFragment, str] = None,
+    ) -> asyncio.Queue:
         async with self._lock:
             if not self._watching:
                 await self.start_watching()
@@ -100,7 +100,7 @@ class GraphQLPostman(BasePostman):
         self.assignations[reference] = None
         self._ass_update_queues[reference] = asyncio.Queue()
         assignation = await aassign(
-            reservation=reservation, args=args, reference=reference
+            reservation=reservation, args=args, reference=reference, parent=parent
         )
         await self._ass_update_queue.put(assignation)
         return self._ass_update_queues[reference]
@@ -142,6 +142,7 @@ class GraphQLPostman(BasePostman):
 
         async for assignation in awatch_requests("default"):
             ass = assignation.update or assignation.create
+            print("sreocinsoien", ass)
             await self._ass_update_queue.put(ass)
 
     async def watch_resraces(self):

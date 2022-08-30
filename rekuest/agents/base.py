@@ -6,7 +6,6 @@ from rekuest.actors.base import Actor
 from rekuest.actors.transport import ActorTransport, SharedTransport
 from rekuest.actors.types import ActorBuilder
 from rekuest.agents.errors import ProvisionException
-from rekuest.agents.transport.fakts import FaktsWebsocketAgentTransport
 from rekuest.agents.transport.mock import MockAgentTransport
 from rekuest.agents.transport.websocket import WebsocketAgentTransport
 from rekuest.api.schema import (
@@ -42,9 +41,7 @@ class BaseAgent(KoiledModel):
 
     """
 
-    transport: Optional[AgentTransport] = Field(
-        default_factory=FaktsWebsocketAgentTransport
-    )
+    transport: AgentTransport
     definition_registry: Optional[DefinitionRegistry] = None
 
     provisionProvisionMap: Dict[str, ProvisionFragment] = Field(default_factory=dict)

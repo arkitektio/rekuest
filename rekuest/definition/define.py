@@ -1,7 +1,7 @@
 from contextlib import nullcontext
 from enum import Enum
 from random import choices
-from typing import Callable
+from typing import Callable, List
 import inflection
 from rekuest.api.schema import (
     ArgPortInput,
@@ -112,34 +112,39 @@ def convert_return_to_returnport(
     Convert a class to an ArgPort
     """
 
-    if hasattr(cls, "_name"):
-        # We are dealing with a Typing Var?
-        if cls._name == "Optional":
-            return convert_argument_to_port(
-                cls.__args__[0], key, registry, nullable=True
-            )
+    if cls.__module__ == "typing":
 
-        if cls._name == "List":
-            child = convert_return_to_returnport(
-                cls.__args__[0], "omit", registry, nullable=False
-            )
-            return ReturnPortInput(
-                kind=PortKindInput.LIST,
-                key=key,
-                child=child.dict(exclude={"key"}),
-                nullable=nullable,
-            )
+        if hasattr(cls, "_name"):
+            # We are dealing with a Typing Var?
+            if cls._name == "List":
+                child = convert_argument_to_port(
+                    cls.__args__[0], "omit", registry, nullable=False
+                )
+                return ReturnPortInput(
+                    kind=PortKindInput.LIST,
+                    widget=widget or child.widget,
+                    key=key,
+                    child=child.dict(exclude={"key"}),
+                    nullable=nullable,
+                )
 
-        if cls._name == "Dict":
-            child = convert_return_to_returnport(
-                cls.__args__[1], "omit", registry, nullable=False
-            )
-            return ReturnPortInput(
-                kind=PortKindInput.DICT,
-                key=key,
-                child=child.dict(exclude={"key"}),
-                nullable=nullable,
-            )
+            if cls._name == "Dict":
+                child = convert_argument_to_port(
+                    cls.__args__[1], "omit", registry, nullable=False
+                )
+                return ReturnPortInput(
+                    kind=PortKindInput.DICT,
+                    widget=widget or child.widget,
+                    key=key,
+                    child=child.dict(exclude={"key"}),
+                    nullable=nullable,
+                )
+
+        if hasattr(cls, "__args__"):
+            if cls.__args__[1] == type(None):
+                return convert_return_to_returnport(
+                    cls.__args__[0], key, registry,  nullable=True
+                )
 
     if inspect.isclass(cls):
         # Generic Cases
@@ -206,8 +211,8 @@ def prepare_definition(
     sig = inspect.signature(function)
 
     # Generate Args and Kwargs from the Annotation
-    args = []
-    returns = []
+    args: List[ArgPortInput] = []
+    returns: List[ReturnPortInput] = []
 
     function_ins_annotation = sig.parameters
 
@@ -307,25 +312,29 @@ def prepare_definition(
     doc_param_map = {
         param.arg_name: {
             "description": param.description
-            if not param.description.startswith("[")
-            else None,
         }
         for param in docstring.params
     }
 
-    if docstring.returns:
-        return_description = docstring.returns.description
-        seperated_list = return_description.split(":")[-1].split(",")
-        assert len(returns) == len(
-            seperated_list
-        ), f"Length of Description {len(seperated_list)} and Returns {len(returns)} not Equal: If you provide a Return Annotation make sure you seperate the description for each port with ',' Return Description {return_description} Returns: {returns}"
-        for index, doc in enumerate(seperated_list):
-            returns[index].description = doc
-
     # TODO: Update with documentatoin.... (Set description for portexample)
+    
+    doc_returns_map = {
+        f"return{index}": {
+            "description": param.description,
+            "label": param.return_name
+        }
+        for index, param in enumerate(docstring.many_returns)
+    }
+
+
     for port in args:
         if port.key in doc_param_map:
             updates = doc_param_map[port.key]
+            port.description = updates["description"] or port.description
+
+    for port in returns:
+        if port.key in doc_returns_map:
+            updates = doc_returns_map[port.key]
             port.description = updates["description"] or port.description
 
     x = DefinitionInput(

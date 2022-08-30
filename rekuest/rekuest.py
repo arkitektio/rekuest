@@ -52,13 +52,10 @@ class Rekuest(Composition):
         """
         structure_registry = structure_registry or self.structure_registry
 
-        def real_decorator(function):
-            # Simple bypass for now
-            def wrapped_function(*args, **kwargs):
-                return function(*args, **kwargs)
+        def real_decorator(function_or_actor):
 
             self.definition_registry.register(
-                function,
+                function_or_actor,
                 builder=builder,
                 package=package,
                 interface=interface,
@@ -70,7 +67,7 @@ class Rekuest(Composition):
                 **actorparams,
             )
 
-            wrapped_function.__arkitekt__ = self
+            return function_or_actor
 
         return real_decorator
 

@@ -6,7 +6,7 @@ from rekuest.agents.transport.protocols.agent_json import (
 )
 from rekuest.api.schema import AssignationStatus, ProvisionStatus
 from rekuest.messages import Assignation, Provision, Unassignation, Unprovision
-from tests.rekuesttest.mocks import MockRekuest
+from .mocks import MockRekuest
 from .funcs import function_with_side_register, function_with_side_register_async
 
 from rekuest.definition.registry import DefinitionRegistry
@@ -27,7 +27,7 @@ def complex_structure_registry():
         return object.id
 
     structure_registry.register_as_structure(
-        SecondObject, "second", expand_second, shrink_second
+        SecondObject, "hm/second", expand_second, shrink_second
     )
     return structure_registry
 
@@ -80,12 +80,6 @@ async def test_agent_assignation():
         await transport.adelay(Provision(provision="1", template="1"))
         await mock_agent.astep()
 
-        p = await transport.areceive(timeout=1)
-        print(p)
-        assert isinstance(p, ProvisionChangedMessage)
-        assert (
-            p.status == ProvisionStatus.PROVIDING
-        ), f"First provision should be providing {p.message}"
 
         p = await transport.areceive(timeout=1)
         assert isinstance(p, ProvisionChangedMessage)
@@ -126,12 +120,7 @@ async def test_complex_agent_gen(complex_definition_registry):
         await transport.adelay(Provision(provision="1", template="1"))
         await a.astep()
 
-        p = await transport.areceive(timeout=1)
-        assert isinstance(p, ProvisionChangedMessage)
-        assert (
-            p.status == ProvisionStatus.PROVIDING
-        ), f"First provision should be providing {p.message}"
-
+    
         p = await transport.areceive(timeout=1)
         assert isinstance(p, ProvisionChangedMessage)
         assert (
@@ -193,11 +182,6 @@ async def test_complex_agent_gen_assignation_cancellation(
         await transport.adelay(Provision(provision="1", template="1"))
         await agent.astep()
 
-        p = await transport.areceive(timeout=1)
-        assert isinstance(p, ProvisionChangedMessage)
-        assert (
-            p.status == ProvisionStatus.PROVIDING
-        ), f"First provision should be providing {p.message}"
 
         p = await transport.areceive(timeout=1)
         assert isinstance(p, ProvisionChangedMessage)
@@ -254,9 +238,7 @@ async def test_complex_agent_gen_provision_cancellation(
 ):
 
     mockapp = MockRekuest(
-        arkitekt=MockRekuest(
             definition_registry=complex_definition_registry_async,
-        )
     )
 
     transport: MockAgentTransport = mockapp.agent.transport
@@ -269,11 +251,6 @@ async def test_complex_agent_gen_provision_cancellation(
         await transport.adelay(Provision(provision="1", template="1"))
         await agent.astep()
 
-        p = await transport.areceive(timeout=1)
-        assert isinstance(p, ProvisionChangedMessage)
-        assert (
-            p.status == ProvisionStatus.PROVIDING
-        ), f"First provision should be providing {p.message}"
 
         p = await transport.areceive(timeout=1)
         assert isinstance(p, ProvisionChangedMessage)

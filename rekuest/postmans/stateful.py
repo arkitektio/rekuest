@@ -11,7 +11,6 @@ from rekuest.postmans.base import BasePostman
 import asyncio
 from pydantic import Field
 import logging
-from rekuest.postmans.transport.fakts import FaktsWebsocketPostmanTransport
 from .transport.base import PostmanTransport
 import uuid
 
@@ -20,10 +19,7 @@ logger = logging.getLogger(__name__)
 
 class StatefulPostman(BasePostman):
 
-    transport: Optional[PostmanTransport] = Field(
-        default_factory=FaktsWebsocketPostmanTransport
-    )
-
+    transport: PostmanTransport
     assignations: Dict[str, Assignation] = Field(default_factory=dict)
     reservations: Dict[str, Reservation] = Field(default_factory=dict)
 
@@ -45,7 +41,7 @@ class StatefulPostman(BasePostman):
         params: dict = None,
         provision: str = None,
         reference: str = None,
-    ) -> asyncio.Queue[ReservationFragment]:
+    ) -> asyncio.Queue:
         reservation = await self.transport.areserve(
             node, params, provision=provision, reference=reference
         )
@@ -63,9 +59,10 @@ class StatefulPostman(BasePostman):
         self,
         reservation: str,
         args: List[Any],
+        parent: Optional[str] = None,
         persist=True,
         log=False,
-    ) -> asyncio.Queue[AssignationFragment]:
+    ) -> asyncio.Queue:
         assignation = await self.transport.aassign(reservation, args, persist, log)
         self.assignations[assignation.assignation] = assignation
         return assignation
