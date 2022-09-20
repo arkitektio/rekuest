@@ -34,12 +34,12 @@ async def shrink_inputs(
     # Extract to Argslist
 
     for port in node.args:
-        if port.key in kwargs:
-            args_list.append(kwargs.get(port.key, None))
-        else:
-            try:
-                args_list.append(next(args_iterator))
-            except StopIteration as e:
+        try:
+            args_list.append(next(args_iterator))
+        except StopIteration as e:
+            if port.key in kwargs:
+                args_list.append(kwargs.get(port.key, None))
+            else:
                 if port.nullable or port.default is not None:
                     args_list.append(None)
                 else:

@@ -1,12 +1,12 @@
-from rekuest.funcs import subscribe, asubscribe, execute, aexecute
-from typing_extensions import Literal
-from typing import Dict, List, Iterator, AsyncIterator, Optional, Any
 from datetime import datetime
-from rekuest.rath import RekuestRath
-from pydantic import BaseModel, Field
-from rath.scalars import ID
 from rekuest.scalars import QString, Identifier
+from typing_extensions import Literal
+from typing import Any, Iterator, AsyncIterator, Optional, List, Dict
 from enum import Enum
+from rekuest.funcs import subscribe, execute, aexecute, asubscribe
+from pydantic import Field, BaseModel
+from rekuest.rath import RekuestRath
+from rath.scalars import ID
 from rekuest.traits.node import Reserve
 
 
@@ -509,6 +509,12 @@ class WidgetInput(BaseModel):
     "Max value for int widget"
     placeholder: Optional[str]
     "Placeholder for any widget"
+    as_paragraph: Optional[bool] = Field(alias="asParagraph")
+    "Is this a paragraph"
+    hook: Optional[str]
+    "A hook for the app to call"
+    ward: Optional[str]
+    "A ward for the app to call"
 
 
 class ChoiceInput(BaseModel):
@@ -542,6 +548,10 @@ class ReturnWidgetInput(BaseModel):
     "type"
     query: Optional[str]
     "Do we have a possible"
+    hook: Optional[str]
+    "A hook for the app to call"
+    ward: Optional[str]
+    "A hook for the app to call"
 
 
 class ReserveParamsInput(BaseModel):

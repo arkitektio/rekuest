@@ -14,6 +14,7 @@ from rekuest.api.schema import (
     AssignationStatus,
     ProvisionFragment,
     ProvisionFragmentTemplate,
+    ProvisionLogLevel,
     ProvisionMode,
     ProvisionStatus,
     aget_template,
@@ -81,7 +82,7 @@ class Actor(BaseModel):
         await self.transport.log_to_assignation(id=id, level=level, message=message)
         logging.critical(f"ASS SEND {message}")
 
-    async def aprov_log(self, message: str, level=AssignationLogLevel.INFO):
+    async def aprov_log(self, message: str, level=ProvisionLogLevel.INFO):
         logging.critical(f"PROV {self.provision.id} {message}")
         await self.transport.log_to_provision(
             id=self.provision.id, level=level, message=message
