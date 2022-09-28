@@ -66,6 +66,7 @@ class AgentTransport(KoiledModel):
         status: AssignationStatus = None,
         message: str = None,
         returns: List[Any] = None,
+        progress: int = None,
     ):
         raise NotImplementedError("This is an abstract Base Class")
 

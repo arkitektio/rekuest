@@ -71,7 +71,6 @@ class StatefulPostman(BasePostman):
         self,
         assignation: str,
     ) -> AssignationFragment:
-        print(assignation)
         unassignation = await self.transport.aunassign(assignation)
         self.assignations[
             unassignation.assignation

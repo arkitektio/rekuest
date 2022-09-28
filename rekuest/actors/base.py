@@ -112,7 +112,6 @@ class Actor(BaseModel):
                     if message.assignation in self.runningAssignments:
                         task = self.runningAssignments[message.assignation]
                         if not task.done():
-                            print("Cancelling task")
                             task.cancel()
                         else:
                             logger.error("Task was already done")

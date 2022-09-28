@@ -179,7 +179,6 @@ class use(ReservationContract):
             while True:  # Waiting for assignation
                 ass = await _ass_queue.get()
                 logger.info(f"Reservation Context: {ass}")
-                print(ass)
                 if ass.status == AssignationStatus.YIELD:
                     outputs = await expand_outputs(
                         self.node,
@@ -289,5 +288,4 @@ class mockuse(ReservationContract):
                 "Mock assignation",
             )
         await asyncio.sleep(self.random_sleep)
-        print("Assignment Done")
         return args

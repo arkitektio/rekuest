@@ -73,7 +73,6 @@ async def shrink_inputs(
                 f"Couldn't shrink Arguments {args} with {node.args}"
             ) from e
 
-        print(shrinked_args)
     else:
         shrinked_args = args_list
 

@@ -120,8 +120,6 @@ class BaseAgent(KoiledModel):
                 self._templateActorBuilderMap[arkitekt_template.id] = defined_actor
                 self._templateTemplatesMap[arkitekt_template.id] = arkitekt_template
 
-        print(self._templateTemplatesMap)
-
     async def aspawn_actor(self, message: Provision) -> Actor:
         """Spawns an Actor from a Provision"""
         prov = await aget_provision(message.provision)

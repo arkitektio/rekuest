@@ -232,9 +232,14 @@ class WebsocketAgentTransport(AgentTransport):
         status: AssignationStatus = None,
         message: str = None,
         returns: List[Any] = None,
+        progress: int = None,
     ):
         action = AssignationChangedMessage(
-            assignation=id, status=status, message=message, returns=returns
+            assignation=id,
+            status=status,
+            message=message,
+            returns=returns,
+            progress=progress,
         )
         await self.delayaction(action)
 

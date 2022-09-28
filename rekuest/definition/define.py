@@ -64,7 +64,11 @@ def convert_argument_to_port(
     if inspect.isclass(cls):
         # Generic Cases
 
-        if issubclass(cls, bool) or (default is not None and isinstance(default, bool)):
+        if (
+            not issubclass(cls, Enum)
+            and issubclass(cls, bool)
+            or (default is not None and isinstance(default, bool))
+        ):
             t = ArgPortInput(
                 kind=PortKindInput.BOOL,
                 widget=widget,
@@ -74,7 +78,11 @@ def convert_argument_to_port(
             )  # catch bool is subclass of int
             return t
 
-        if issubclass(cls, int) or (default is not None and isinstance(default, int)):
+        if (
+            not issubclass(cls, Enum)
+            and issubclass(cls, int)
+            or (default is not None and isinstance(default, int))
+        ):
             return ArgPortInput(
                 kind=PortKindInput.INT,
                 widget=widget,
@@ -82,7 +90,11 @@ def convert_argument_to_port(
                 default=default,
                 nullable=nullable,
             )
-        if issubclass(cls, str) or (default is not None and isinstance(default, str)):
+        if (
+            not issubclass(cls, Enum)
+            and issubclass(cls, str)
+            or (default is not None and isinstance(default, str))
+        ):
             return ArgPortInput(
                 kind=PortKindInput.STRING,
                 widget=widget,
@@ -143,7 +155,7 @@ def convert_return_to_returnport(
         if hasattr(cls, "__args__"):
             if cls.__args__[1] == type(None):
                 return convert_return_to_returnport(
-                    cls.__args__[0], key, registry,  nullable=True
+                    cls.__args__[0], key, registry, nullable=True
                 )
 
     if inspect.isclass(cls):
@@ -310,22 +322,15 @@ def prepare_definition(
     description = docstring.long_description or "No Description"
 
     doc_param_map = {
-        param.arg_name: {
-            "description": param.description
-        }
-        for param in docstring.params
+        param.arg_name: {"description": param.description} for param in docstring.params
     }
 
     # TODO: Update with documentatoin.... (Set description for portexample)
-    
+
     doc_returns_map = {
-        f"return{index}": {
-            "description": param.description,
-            "label": param.return_name
-        }
+        f"return{index}": {"description": param.description, "label": param.return_name}
         for index, param in enumerate(docstring.many_returns)
     }
-
 
     for port in args:
         if port.key in doc_param_map:
@@ -349,7 +354,5 @@ def prepare_definition(
             "interfaces": interfaces,
         }
     )
-
-    print(x)
 
     return x

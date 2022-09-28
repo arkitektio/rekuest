@@ -27,7 +27,6 @@ def build_enum_shrink_expand(cls: Type[Enum]):
         return s._name_
 
     async def expand(v):
-        print("Epxnaindg enum value", v)
         return cls.__members__[v].value
 
     return shrink, expand

@@ -5,6 +5,9 @@ from rekuest.api.schema import AssignationStatus, LogLevelInput, ProvisionStatus
 from typing import Any, List, Optional, Union
 import asyncio
 from koil import unkoil
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class MockAgentTransport(AgentTransport):
@@ -45,12 +48,12 @@ class MockAgentTransport(AgentTransport):
     async def log_to_assignation(
         self, id: str, level: LogLevelInput = None, message: str = None
     ):
-        print(f"{id} {level} {message}")
+        logger.info(f"{id} {level} {message}")
 
     async def log_to_provision(
         self, id: str, level: LogLevelInput = None, message: str = None
     ):
-        print(f"{id} {level} {message}")
+        logger.info(f"{id} {level} {message}")
 
     async def change_provision(
         self,

@@ -1,6 +1,7 @@
 from typing import Any
 from rekuest.postmans.utils import use
 from rekuest.traits.node import Reserve
+from rekuest.actors.vars import get_current_assignation_helper
 
 
 def assign(node: Reserve, *args, **kwargs) -> Any:
@@ -16,4 +17,25 @@ def assign(node: Reserve, *args, **kwargs) -> Any:
     """
     with use(x, auto_unreserve=False) as r:
         x = node.assign(*args, **kwargs)
-        print(x)
+
+
+def progress(percentage: int) -> None:
+    """Progress
+
+    Args:
+        percentage (int): Percentage to progress to
+    """
+
+    helper = get_current_assignation_helper()
+    helper.progress(percentage)
+
+
+async def aprogress(percentage: int) -> None:
+    """Progress
+
+    Args:
+        percentage (int): Percentage to progress to
+    """
+
+    helper = get_current_assignation_helper()
+    await helper.aprogress(percentage)

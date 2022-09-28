@@ -121,8 +121,6 @@ class AsyncGenActor(Actor):
                     skip_shrinking=not self.shrink_outputs,
                 )
 
-                print("returns", returns)
-
                 await self.transport.change_assignation(
                     assignation.assignation,
                     status=AssignationStatus.YIELD,
@@ -228,7 +226,6 @@ class ThreadedFuncActor(Actor):
             )
 
         except AssertionError as ex:
-            print("Assertion Error", ex)
             await self.transport.change_assignation(
                 assignation.assignation,
                 status=AssignationStatus.ERROR,
@@ -236,7 +233,6 @@ class ThreadedFuncActor(Actor):
             )
 
         except Exception as e:
-            print("OINOINOINOIN")
             logger.error("Error in actor", exc_info=True)
             await self.transport.change_assignation(
                 assignation.assignation,
@@ -314,7 +310,6 @@ class CompletlyThreadedActor(ThreadedFuncActor):
             )
 
         except AssertionError as ex:
-            print("Assertion Error", ex)
             await self.transport.change_assignation(
                 assignation.assignation,
                 status=AssignationStatus.ERROR,
@@ -322,7 +317,6 @@ class CompletlyThreadedActor(ThreadedFuncActor):
             )
 
         except Exception as e:
-            print("OINOINOINOIN")
             logger.error("Error in actor", exc_info=True)
             await self.transport.change_assignation(
                 assignation.assignation,

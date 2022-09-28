@@ -2,6 +2,7 @@ from pydantic import BaseModel
 from rekuest.actors.base import Actor
 from rekuest.api.schema import LogLevelInput
 from rekuest.messages import Assignation
+from koil import unkoil
 
 
 class AssignationHelper(BaseModel):
@@ -9,7 +10,15 @@ class AssignationHelper(BaseModel):
     assignation: Assignation
 
     async def alog(self, level: LogLevelInput, message: str) -> None:
-        raise NotImplementedError()
+        await self.actor.transport.log_to_assignation(
+            id=self.assignation.assignation, level=level, message=message
+        )
+
+    async def aprogress(self, progress: int) -> None:
+        print("aprogress", progress)
+        await self.actor.transport.change_assignation(
+            id=self.assignation.assignation, progress=progress
+        )
 
     class Config:
         arbitrary_types_allowed = True
@@ -23,12 +32,13 @@ class ProvisionHelper(BaseModel):
 
 
 class ThreadedAssignationHelper(AssignationHelper):
-    pass
+    def progress(self, progress: int) -> None:
+        unkoil(self.aprogress, progress=progress)
 
 
 class AsyncAssignationHelper(AssignationHelper):
     async def alog(self, message: str, level: LogLevelInput = LogLevelInput.DEBUG):
-        print("LOOOOOOOOOOOOOOOOOOOOOOOGGGGGGGGGGGGING")
+
         await self.actor.transport.log_to_assignation(
             id=self.assignation.assignation, level=level, message=message
         )

@@ -135,14 +135,12 @@ class GraphQLPostman(BasePostman):
 
         async for e in awatch_reservations("default"):
             res = e.update or e.create
-            print(res)
             await self._res_update_queue.put(res)
 
     async def watch_assignations(self):
 
         async for assignation in awatch_requests("default"):
             ass = assignation.update or assignation.create
-            print("sreocinsoien", ass)
             await self._ass_update_queue.put(ass)
 
     async def watch_resraces(self):

@@ -176,7 +176,6 @@ class MockPostmanTransport(PostmanTransport):
     async def areserve(
         self, node: str, params: ReserveParamsInput = None
     ) -> Reservation:
-        print("Called")
         reservation = Reservation(
             reservation=str(len(self.reservationState) + 1),
             node=node,
