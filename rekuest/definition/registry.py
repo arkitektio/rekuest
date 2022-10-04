@@ -69,11 +69,11 @@ class DefinitionRegistry(KoiledModel):
             self.templated_nodes = default.templated_nodes + self.templated_nodes
 
     def has_definitions(self):
-        return len(self.definedNodes) > 0 or len(self.templatedNodes) > 0
+        return len(self.defined_nodes) > 0 or len(self.templated_nodes) > 0
 
     def reset(self):
-        self.definedNodes = []  # dict are queryparams for the node
-        self.templatedNodes = []
+        self.defined_nodes = []  # dict are queryparams for the node
+        self.templated_nodes = []
 
     def register_actor_with_defintion(
         self, actorBuilder: Callable, definition: DefinitionInput, **params  # New Node
@@ -173,7 +173,7 @@ class DefinitionRegistry(KoiledModel):
             function,
             on_provide=on_provide,
             on_unprovide=on_unprovide,
-            structure_registry=structure_registry ** actorparams,
+            structure_registry=structure_registry**actorparams,
         )
 
         self.register_actor_with_template(actorBuilder, qstring, **actorparams)
