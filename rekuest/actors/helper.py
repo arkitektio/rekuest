@@ -15,7 +15,6 @@ class AssignationHelper(BaseModel):
         )
 
     async def aprogress(self, progress: int) -> None:
-        print("aprogress", progress)
         await self.actor.transport.change_assignation(
             id=self.assignation.assignation, progress=progress
         )

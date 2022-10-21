@@ -1,14 +1,16 @@
 from contextlib import nullcontext
 from enum import Enum
 from random import choices
-from typing import Callable, List
+from typing import Any, Callable, List, Tuple
 import inflection
 from rekuest.api.schema import (
     ArgPortInput,
+    ChildPortInput,
     DefinitionInput,
     NodeKindInput,
     PortKindInput,
     ReturnPortInput,
+    WidgetInput,
 )
 import inspect
 from docstring_parser import parse
@@ -17,6 +19,100 @@ from rekuest.definition.errors import DefinitionError
 from rekuest.structures.registry import (
     StructureRegistry,
 )
+
+
+def convert_child_to_childport(
+    cls, registry, nullable=False
+) -> Tuple[ChildPortInput, WidgetInput, Callable]:
+
+    if cls.__module__ == "typing":
+
+        if hasattr(cls, "_name"):
+            # We are dealing with a Typing Var?
+            if cls._name == "List":
+                child, insidewidget, nested_converter = convert_child_to_childport(
+                    cls.__args__[0], registry, nullable=False
+                )
+
+                return (
+                    ChildPortInput(
+                        kind=PortKindInput.LIST,
+                        child=child,
+                        nullable=nullable,
+                    ),
+                    insidewidget,
+                    lambda default: [nested_converter(ndefault) for ndefault in default]
+                    if default
+                    else None,
+                )
+
+            if cls._name == "Dict":
+                child, insidewidget, nested_converter = convert_child_to_childport(
+                    cls.__args__[1], "omit", registry, nullable=False
+                )
+                return (
+                    ChildPortInput(
+                        kind=PortKindInput.DICT,
+                        child=child,
+                        nullable=nullable,
+                    ),
+                    insidewidget,
+                    lambda default: {
+                        key: item in nested_converter(item)
+                        for key, item in default.items()
+                    }
+                    if default
+                    else None,
+                )
+
+        if hasattr(cls, "__args__"):
+            if cls.__args__[1] == type(None):
+                return convert_argument_to_port(
+                    cls.__args__[0], registry, nullable=True
+                )
+
+    if inspect.isclass(cls):
+        # Generic Cases
+
+        if not issubclass(cls, Enum) and issubclass(cls, bool):
+            t = ChildPortInput(
+                kind=PortKindInput.BOOL,
+                nullable=nullable,
+            )  # catch bool is subclass of int
+            return t, None, str
+
+        if not issubclass(cls, Enum) and issubclass(cls, int):
+            return (
+                ChildPortInput(
+                    kind=PortKindInput.INT,
+                    nullable=nullable,
+                ),
+                None,
+                int,
+            )
+        if not issubclass(cls, Enum) and issubclass(cls, str):
+            return (
+                ChildPortInput(
+                    kind=PortKindInput.STRING,
+                    nullable=nullable,
+                ),
+                None,
+                str,
+            )
+
+    identifier = registry.get_identifier_for_structure(cls)
+    default_converter = registry.get_default_converter_for_structure(cls)
+    widget = registry.get_widget_input(cls)
+
+    return (
+        ChildPortInput(
+            kind=PortKindInput.STRUCTURE,
+            identifier=identifier,
+            nullable=nullable,
+        ),
+        widget,
+        default_converter,
+    )
 
 
 def convert_argument_to_port(
@@ -30,28 +126,30 @@ def convert_argument_to_port(
         if hasattr(cls, "_name"):
             # We are dealing with a Typing Var?
             if cls._name == "List":
-                child = convert_argument_to_port(
-                    cls.__args__[0], "omit", registry, nullable=False
+                child, widget, converter = convert_child_to_childport(
+                    cls.__args__[0], registry, nullable=False
                 )
                 return ArgPortInput(
                     kind=PortKindInput.LIST,
-                    widget=widget or child.widget,
+                    widget=widget,
                     key=key,
                     child=child.dict(exclude={"key"}),
-                    default=default,
+                    default=[converter(item) for item in default] if default else None,
                     nullable=nullable,
                 )
 
             if cls._name == "Dict":
-                child = convert_argument_to_port(
-                    cls.__args__[1], "omit", registry, nullable=False
+                child, widget, converter = convert_argument_to_port(
+                    cls.__args__[1], registry, nullable=False
                 )
                 return ArgPortInput(
                     kind=PortKindInput.DICT,
-                    widget=widget or child.widget,
+                    widget=widget,
                     key=key,
                     child=child.dict(exclude={"key"}),
-                    default=default,
+                    default={
+                        key: item in converter(item) for key, item in default.items()
+                    },
                     nullable=nullable,
                 )
 

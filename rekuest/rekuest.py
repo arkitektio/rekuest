@@ -77,12 +77,12 @@ class Rekuest(Composition):
         """
         return unkoil(self.arun, *args, **kwargs)
 
-    async def arun(self) -> None:
+    async def arun(self, instance_id: str = "default") -> None:
         """
         Run the application.
         """
         assert self.agent.transport.connected, "Transport is not connected"
-        await self.agent.aprovide()
+        await self.agent.aprovide(instance_id=instance_id)
 
     class Config:
         arbitrary_types_allowed = True

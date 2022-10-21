@@ -34,7 +34,6 @@ class DefiniteConnectionFail(AgentTransportException):
 
 class WebsocketAgentTransport(AgentTransport):
     endpoint_url: str
-    instance_id: Optional[str]
     token_loader: Callable[[], Awaitable[str]] = Field(exclude=True)
     max_retries = 5
     time_between_retries = 3
@@ -52,11 +51,11 @@ class WebsocketAgentTransport(AgentTransport):
         self._futures = {}
         self._send_queue = asyncio.Queue()
 
-    async def aconnect(self):
-        self._connection_task = asyncio.create_task(self.websocket_loop())
+    async def aconnect(self, instance_id: str = "default"):
+        self._connection_task = asyncio.create_task(self.websocket_loop(instance_id))
         self._connected = True
 
-    async def websocket_loop(self, retry=0, reload_token=False):
+    async def websocket_loop(self, instance_id: str, retry=0, reload_token=False):
         send_task = None
         receive_task = None
         try:
@@ -64,7 +63,7 @@ class WebsocketAgentTransport(AgentTransport):
                 token = await self.token_loader(force_refresh=reload_token)
 
                 async with websockets.connect(
-                    f"{self.endpoint_url}?token={token}&instance_id={self.instance_id}"
+                    f"{self.endpoint_url}?token={token}&instance_id={instance_id}"
                 ) as client:
 
                     logger.info("Agent on Websockets connected")
@@ -109,7 +108,7 @@ class WebsocketAgentTransport(AgentTransport):
 
             await asyncio.sleep(self.time_between_retries)
             logger.info(f"Retrying to connect")
-            await self.websocket_loop(retry=retry + 1, reload_token=reload_token)
+            await self.websocket_loop(instance_id, retry=retry + 1, reload_token=reload_token)
 
         except DefiniteConnectionFail as e:
             logger.error("Websocket excepted closed definetely", exc_info=True)
@@ -275,4 +274,4 @@ class WebsocketAgentTransport(AgentTransport):
 
     async def __aexit__(self, *args, **kwargs):
         if self._connection_task:
-            self._connection_task.cancel()
+            await self.adisconnect()

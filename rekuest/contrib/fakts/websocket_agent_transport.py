@@ -26,14 +26,13 @@ class FaktsWebsocketAgentTransport(WebsocketAgentTransport):
 
     def configure(self, fakt: WebsocketAgentTransportConfig) -> None:
         self.endpoint_url = fakt.endpoint_url
-        self.instance_id = fakt.instance_id
         self.token_loader = self.token_loader or current_herre.get().aget_token
 
-    async def aconnect(self):
+    async def aconnect(self, *args, **kwargs):
         fakts = get_current_fakts()
 
         if fakts.has_changed(self._old_fakt, self.fakts_group):
             self._old_fakt = await fakts.aget(self.fakts_group)
             self.configure(WebsocketAgentTransportConfig(**self._old_fakt))
 
-        return await super().aconnect()
+        return await super().aconnect(*args, **kwargs)
