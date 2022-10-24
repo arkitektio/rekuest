@@ -188,6 +188,20 @@ def convert_argument_to_port(
                 default=default,
                 nullable=nullable,
             )
+
+        if (
+            not issubclass(cls, Enum)
+            and issubclass(cls, float)
+            or (default is not None and isinstance(default, float))
+        ):
+            return ArgPortInput(
+                kind=PortKindInput.FLOAT,
+                widget=widget,
+                key=key,
+                default=default,
+                nullable=nullable,
+            )
+
         if (
             not issubclass(cls, Enum)
             and issubclass(cls, str)

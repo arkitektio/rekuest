@@ -30,6 +30,9 @@ async def aexpand(port: ArgPortFragment, value: Any, structure_registry=None) ->
     if port.kind == PortKind.INT:
         return int(value) if value is not None else int(port.default)
 
+    if port.kind == PortKind.FLOAT:
+        return float(value) if value is not None else float(port.default)
+
     if port.kind == PortKind.STRUCTURE:
         value = value if value is not None else port.default
 

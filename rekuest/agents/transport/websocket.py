@@ -12,7 +12,8 @@ from rekuest.agents.transport.protocols.agent_json import *
 import logging
 from websockets.exceptions import ConnectionClosedError, InvalidStatusCode
 from rekuest.api.schema import LogLevelInput
-
+import ssl
+import certifi
 from koil.types import ContextBool, Contextual
 
 logger = logging.getLogger(__name__)
@@ -34,6 +35,9 @@ class DefiniteConnectionFail(AgentTransportException):
 
 class WebsocketAgentTransport(AgentTransport):
     endpoint_url: str
+    ssl_context: ssl.SSLContext = Field(
+        default_factory=lambda: ssl.create_default_context(cafile=certifi.where())
+    )
     token_loader: Callable[[], Awaitable[str]] = Field(exclude=True)
     max_retries = 5
     time_between_retries = 3
@@ -63,7 +67,10 @@ class WebsocketAgentTransport(AgentTransport):
                 token = await self.token_loader(force_refresh=reload_token)
 
                 async with websockets.connect(
-                    f"{self.endpoint_url}?token={token}&instance_id={instance_id}"
+                    f"{self.endpoint_url}?token={token}&instance_id={instance_id}",
+                    ssl=self.ssl_context
+                    if self.endpoint_url.startswith("wss")
+                    else None,
                 ) as client:
 
                     logger.info("Agent on Websockets connected")
@@ -108,7 +115,9 @@ class WebsocketAgentTransport(AgentTransport):
 
             await asyncio.sleep(self.time_between_retries)
             logger.info(f"Retrying to connect")
-            await self.websocket_loop(instance_id, retry=retry + 1, reload_token=reload_token)
+            await self.websocket_loop(
+                instance_id, retry=retry + 1, reload_token=reload_token
+            )
 
         except DefiniteConnectionFail as e:
             logger.error("Websocket excepted closed definetely", exc_info=True)
