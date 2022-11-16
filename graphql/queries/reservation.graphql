@@ -6,7 +6,8 @@ query get_reservation($id: ID!) {
       registry {
         app {
           id
-          name
+          version
+          identifier
         }
         user {
           id

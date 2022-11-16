@@ -1,13 +1,13 @@
-from typing_extensions import Literal
-from typing import Any, Dict, List, Iterator, Optional, AsyncIterator
-from rekuest.scalars import Identifier, QString
-from rekuest.funcs import execute, asubscribe, aexecute, subscribe
-from rath.scalars import ID
+from rekuest.funcs import aexecute, subscribe, asubscribe, execute
+from enum import Enum
 from pydantic import BaseModel, Field
+from typing_extensions import Literal
+from typing import Iterator, Dict, AsyncIterator, Optional, Any, List
+from rekuest.traits.node import Reserve
+from rekuest.scalars import Identifier
 from datetime import datetime
 from rekuest.rath import RekuestRath
-from enum import Enum
-from rekuest.traits.node import Reserve
+from rath.scalars import ID
 
 
 class AgentStatus(str, Enum):
@@ -19,21 +19,6 @@ class AgentStatus(str, Enum):
     "Disconnected"
     VANILLA = "VANILLA"
     "Complete Vanilla Scenario after a forced restart of"
-
-
-class LokAppGrantType(str, Enum):
-    """An enumeration."""
-
-    CLIENT_CREDENTIALS = "CLIENT_CREDENTIALS"
-    "Backend (Client Credentials)"
-    IMPLICIT = "IMPLICIT"
-    "Implicit Grant"
-    AUTHORIZATION_CODE = "AUTHORIZATION_CODE"
-    "Authorization Code"
-    PASSWORD = "PASSWORD"
-    "Password"
-    SESSION = "SESSION"
-    "Django Session"
 
 
 class NodeKind(str, Enum):
@@ -406,6 +391,7 @@ class ReservationStatusInput(str, Enum):
 class AvailableModels(str, Enum):
     LOK_LOKUSER = "LOK_LOKUSER"
     LOK_LOKAPP = "LOK_LOKAPP"
+    LOK_LOKCLIENT = "LOK_LOKCLIENT"
     FACADE_REPOSITORY = "FACADE_REPOSITORY"
     FACADE_REGISTRY = "FACADE_REGISTRY"
     FACADE_STRUCTURE = "FACADE_STRUCTURE"
@@ -434,7 +420,7 @@ class PortKindInput(str, Enum):
 
 
 class DefinitionInput(BaseModel):
-    """A definition for a node"""
+    """A definition for a template"""
 
     description: Optional[str]
     "A description for the Node"
@@ -444,16 +430,14 @@ class DefinitionInput(BaseModel):
     "The Args"
     returns: Optional[List[Optional["ReturnPortInput"]]]
     "The Returns"
+    interface: Optional[str]
+    "The interface of this template"
     interfaces: Optional[List[Optional[str]]]
     "The Interfaces this node provides makes sense of the metadata"
     kind: NodeKindInput
     "The variety"
-    interface: str
-    "The Interface"
-    package: Optional[str]
-    "The Package"
-    meta: Optional[Dict]
-    "The metadata"
+    pure: Optional[bool]
+    idempotent: Optional[bool]
 
 
 class ArgPortInput(BaseModel):
@@ -595,8 +579,7 @@ class ProvisionFragment(BaseModel):
     id: ID
     status: ProvisionStatus
     "Current lifecycle of Provision"
-    template: Optional[ProvisionFragmentTemplate]
-    "The Template for this Provision"
+    template: ProvisionFragmentTemplate
 
 
 class AssignationFragmentParent(BaseModel):
@@ -624,7 +607,8 @@ class AssignationFragment(BaseModel):
 
 class TemplateFragmentRegistryApp(BaseModel):
     typename: Optional[Literal["LokApp"]] = Field(alias="__typename")
-    name: str
+    version: str
+    identifier: str
 
 
 class TemplateFragmentRegistryUser(BaseModel):
@@ -714,10 +698,6 @@ class NodeFragment(Reserve, BaseModel):
     typename: Optional[Literal["Node"]] = Field(alias="__typename")
     name: str
     "The cleartext name of this Node"
-    interface: str
-    "Interface (think Function)"
-    package: str
-    "Package (think Module)"
     description: str
     "A description for the Node"
     kind: NodeKind
@@ -790,17 +770,16 @@ class UnassignMutation(BaseModel):
         document = "fragment Assignation on Assignation {\n  args\n  kwargs\n  id\n  parent {\n    id\n  }\n  id\n  status\n  statusmessage\n  returns\n  reference\n  updatedAt\n}\n\nmutation unassign($assignation: ID!) {\n  unassign(assignation: $assignation) {\n    ...Assignation\n  }\n}"
 
 
-class Create_templateMutation(BaseModel):
+class CreateTemplateMutation(BaseModel):
     create_template: Optional[TemplateFragment] = Field(alias="createTemplate")
 
     class Arguments(BaseModel):
-        node: ID
+        definition: DefinitionInput
         params: Optional[Dict] = None
         extensions: Optional[List[Optional[str]]] = None
-        version: Optional[str] = None
 
     class Meta:
-        document = "fragment ChildPortNested on ChildPort {\n  kind\n  child {\n    kind\n  }\n}\n\nfragment ChildPort on ChildPort {\n  kind\n  identifier\n  child {\n    ...ChildPortNested\n  }\n}\n\nfragment ReturnPort on ReturnPort {\n  __typename\n  label\n  key\n  nullable\n  description\n  identifier\n  kind\n  child {\n    ...ChildPort\n  }\n}\n\nfragment ArgPort on ArgPort {\n  __typename\n  key\n  label\n  nullable\n  description\n  default\n  kind\n  identifier\n  child {\n    ...ChildPort\n  }\n}\n\nfragment Node on Node {\n  name\n  interface\n  package\n  description\n  kind\n  id\n  args {\n    ...ArgPort\n  }\n  returns {\n    ...ReturnPort\n  }\n}\n\nfragment Template on Template {\n  id\n  registry {\n    name\n    app {\n      name\n    }\n    user {\n      username\n    }\n  }\n  node {\n    ...Node\n  }\n  params\n}\n\nmutation create_template($node: ID!, $params: GenericScalar, $extensions: [String], $version: String) {\n  createTemplate(\n    node: $node\n    params: $params\n    extensions: $extensions\n    version: $version\n  ) {\n    ...Template\n  }\n}"
+        document = "fragment ChildPortNested on ChildPort {\n  kind\n  child {\n    kind\n  }\n}\n\nfragment ChildPort on ChildPort {\n  kind\n  identifier\n  child {\n    ...ChildPortNested\n  }\n}\n\nfragment ArgPort on ArgPort {\n  __typename\n  key\n  label\n  nullable\n  description\n  default\n  kind\n  identifier\n  child {\n    ...ChildPort\n  }\n}\n\nfragment ReturnPort on ReturnPort {\n  __typename\n  label\n  key\n  nullable\n  description\n  identifier\n  kind\n  child {\n    ...ChildPort\n  }\n}\n\nfragment Node on Node {\n  name\n  description\n  kind\n  id\n  args {\n    ...ArgPort\n  }\n  returns {\n    ...ReturnPort\n  }\n}\n\nfragment Template on Template {\n  id\n  registry {\n    name\n    app {\n      version\n      identifier\n    }\n    user {\n      username\n    }\n  }\n  node {\n    ...Node\n  }\n  params\n}\n\nmutation createTemplate($definition: DefinitionInput!, $params: GenericScalar, $extensions: [String]) {\n  createTemplate(\n    definition: $definition\n    params: $params\n    extensions: $extensions\n  ) {\n    ...Template\n  }\n}"
 
 
 class SlateMutation(BaseModel):
@@ -829,17 +808,6 @@ class Reset_repositoryMutation(BaseModel):
 
     class Meta:
         document = "mutation reset_repository {\n  resetRepository {\n    ok\n  }\n}"
-
-
-class DefineMutation(BaseModel):
-    define: Optional[NodeFragment]
-    "Defines a node according to is definition"
-
-    class Arguments(BaseModel):
-        definition: DefinitionInput
-
-    class Meta:
-        document = "fragment ChildPortNested on ChildPort {\n  kind\n  child {\n    kind\n  }\n}\n\nfragment ChildPort on ChildPort {\n  kind\n  identifier\n  child {\n    ...ChildPortNested\n  }\n}\n\nfragment ReturnPort on ReturnPort {\n  __typename\n  label\n  key\n  nullable\n  description\n  identifier\n  kind\n  child {\n    ...ChildPort\n  }\n}\n\nfragment ArgPort on ArgPort {\n  __typename\n  key\n  label\n  nullable\n  description\n  default\n  kind\n  identifier\n  child {\n    ...ChildPort\n  }\n}\n\nfragment Node on Node {\n  name\n  interface\n  package\n  description\n  kind\n  id\n  args {\n    ...ArgPort\n  }\n  returns {\n    ...ReturnPort\n  }\n}\n\nmutation define($definition: DefinitionInput!) {\n  define(definition: $definition) {\n    ...Node\n  }\n}"
 
 
 class Delete_nodeMutationDeletenode(BaseModel):
@@ -901,7 +869,7 @@ class Watch_provisionSubscription(BaseModel):
         identifier: str
 
     class Meta:
-        document = "fragment ChildPortNested on ChildPort {\n  kind\n  child {\n    kind\n  }\n}\n\nfragment ChildPort on ChildPort {\n  kind\n  identifier\n  child {\n    ...ChildPortNested\n  }\n}\n\nfragment ReturnPort on ReturnPort {\n  __typename\n  label\n  key\n  nullable\n  description\n  identifier\n  kind\n  child {\n    ...ChildPort\n  }\n}\n\nfragment ArgPort on ArgPort {\n  __typename\n  key\n  label\n  nullable\n  description\n  default\n  kind\n  identifier\n  child {\n    ...ChildPort\n  }\n}\n\nfragment Node on Node {\n  name\n  interface\n  package\n  description\n  kind\n  id\n  args {\n    ...ArgPort\n  }\n  returns {\n    ...ReturnPort\n  }\n}\n\nfragment Provision on Provision {\n  id\n  status\n  template {\n    id\n    node {\n      ...Node\n    }\n    params\n  }\n}\n\nsubscription watch_provision($identifier: String!) {\n  provisions(identifier: $identifier) {\n    create {\n      ...Provision\n    }\n    delete\n    update {\n      ...Provision\n    }\n  }\n}"
+        document = "fragment ChildPortNested on ChildPort {\n  kind\n  child {\n    kind\n  }\n}\n\nfragment ChildPort on ChildPort {\n  kind\n  identifier\n  child {\n    ...ChildPortNested\n  }\n}\n\nfragment ArgPort on ArgPort {\n  __typename\n  key\n  label\n  nullable\n  description\n  default\n  kind\n  identifier\n  child {\n    ...ChildPort\n  }\n}\n\nfragment ReturnPort on ReturnPort {\n  __typename\n  label\n  key\n  nullable\n  description\n  identifier\n  kind\n  child {\n    ...ChildPort\n  }\n}\n\nfragment Node on Node {\n  name\n  description\n  kind\n  id\n  args {\n    ...ArgPort\n  }\n  returns {\n    ...ReturnPort\n  }\n}\n\nfragment Provision on Provision {\n  id\n  status\n  template {\n    id\n    node {\n      ...Node\n    }\n    params\n  }\n}\n\nsubscription watch_provision($identifier: String!) {\n  provisions(identifier: $identifier) {\n    create {\n      ...Provision\n    }\n    delete\n    update {\n      ...Provision\n    }\n  }\n}"
 
 
 class Watch_todosSubscriptionTodos(BaseModel):
@@ -962,7 +930,7 @@ class Get_provisionQuery(BaseModel):
         id: ID
 
     class Meta:
-        document = "fragment ChildPortNested on ChildPort {\n  kind\n  child {\n    kind\n  }\n}\n\nfragment ChildPort on ChildPort {\n  kind\n  identifier\n  child {\n    ...ChildPortNested\n  }\n}\n\nfragment ReturnPort on ReturnPort {\n  __typename\n  label\n  key\n  nullable\n  description\n  identifier\n  kind\n  child {\n    ...ChildPort\n  }\n}\n\nfragment ArgPort on ArgPort {\n  __typename\n  key\n  label\n  nullable\n  description\n  default\n  kind\n  identifier\n  child {\n    ...ChildPort\n  }\n}\n\nfragment Node on Node {\n  name\n  interface\n  package\n  description\n  kind\n  id\n  args {\n    ...ArgPort\n  }\n  returns {\n    ...ReturnPort\n  }\n}\n\nfragment Provision on Provision {\n  id\n  status\n  template {\n    id\n    node {\n      ...Node\n    }\n    params\n  }\n}\n\nquery get_provision($id: ID!) {\n  provision(id: $id) {\n    ...Provision\n  }\n}"
+        document = "fragment ChildPortNested on ChildPort {\n  kind\n  child {\n    kind\n  }\n}\n\nfragment ChildPort on ChildPort {\n  kind\n  identifier\n  child {\n    ...ChildPortNested\n  }\n}\n\nfragment ArgPort on ArgPort {\n  __typename\n  key\n  label\n  nullable\n  description\n  default\n  kind\n  identifier\n  child {\n    ...ChildPort\n  }\n}\n\nfragment ReturnPort on ReturnPort {\n  __typename\n  label\n  key\n  nullable\n  description\n  identifier\n  kind\n  child {\n    ...ChildPort\n  }\n}\n\nfragment Node on Node {\n  name\n  description\n  kind\n  id\n  args {\n    ...ArgPort\n  }\n  returns {\n    ...ReturnPort\n  }\n}\n\nfragment Provision on Provision {\n  id\n  status\n  template {\n    id\n    node {\n      ...Node\n    }\n    params\n  }\n}\n\nquery get_provision($id: ID!) {\n  provision(id: $id) {\n    ...Provision\n  }\n}"
 
 
 class Get_agentQueryAgentRegistry(BaseModel):
@@ -1008,7 +976,7 @@ class Get_templateQuery(BaseModel):
         id: ID
 
     class Meta:
-        document = "fragment ChildPortNested on ChildPort {\n  kind\n  child {\n    kind\n  }\n}\n\nfragment ChildPort on ChildPort {\n  kind\n  identifier\n  child {\n    ...ChildPortNested\n  }\n}\n\nfragment ReturnPort on ReturnPort {\n  __typename\n  label\n  key\n  nullable\n  description\n  identifier\n  kind\n  child {\n    ...ChildPort\n  }\n}\n\nfragment ArgPort on ArgPort {\n  __typename\n  key\n  label\n  nullable\n  description\n  default\n  kind\n  identifier\n  child {\n    ...ChildPort\n  }\n}\n\nfragment Node on Node {\n  name\n  interface\n  package\n  description\n  kind\n  id\n  args {\n    ...ArgPort\n  }\n  returns {\n    ...ReturnPort\n  }\n}\n\nfragment Template on Template {\n  id\n  registry {\n    name\n    app {\n      name\n    }\n    user {\n      username\n    }\n  }\n  node {\n    ...Node\n  }\n  params\n}\n\nquery get_template($id: ID!) {\n  template(id: $id) {\n    ...Template\n  }\n}"
+        document = "fragment ChildPortNested on ChildPort {\n  kind\n  child {\n    kind\n  }\n}\n\nfragment ChildPort on ChildPort {\n  kind\n  identifier\n  child {\n    ...ChildPortNested\n  }\n}\n\nfragment ArgPort on ArgPort {\n  __typename\n  key\n  label\n  nullable\n  description\n  default\n  kind\n  identifier\n  child {\n    ...ChildPort\n  }\n}\n\nfragment ReturnPort on ReturnPort {\n  __typename\n  label\n  key\n  nullable\n  description\n  identifier\n  kind\n  child {\n    ...ChildPort\n  }\n}\n\nfragment Node on Node {\n  name\n  description\n  kind\n  id\n  args {\n    ...ArgPort\n  }\n  returns {\n    ...ReturnPort\n  }\n}\n\nfragment Template on Template {\n  id\n  registry {\n    name\n    app {\n      version\n      identifier\n    }\n    user {\n      username\n    }\n  }\n  node {\n    ...Node\n  }\n  params\n}\n\nquery get_template($id: ID!) {\n  template(id: $id) {\n    ...Template\n  }\n}"
 
 
 class FindQuery(BaseModel):
@@ -1017,19 +985,18 @@ class FindQuery(BaseModel):
 
     class Arguments(BaseModel):
         id: Optional[ID] = None
-        package: Optional[str] = None
-        interface: Optional[str] = None
         template: Optional[ID] = None
-        q: Optional[QString] = None
+        hash: Optional[str] = None
 
     class Meta:
-        document = "fragment ChildPortNested on ChildPort {\n  kind\n  child {\n    kind\n  }\n}\n\nfragment ChildPort on ChildPort {\n  kind\n  identifier\n  child {\n    ...ChildPortNested\n  }\n}\n\nfragment ReturnPort on ReturnPort {\n  __typename\n  label\n  key\n  nullable\n  description\n  identifier\n  kind\n  child {\n    ...ChildPort\n  }\n}\n\nfragment ArgPort on ArgPort {\n  __typename\n  key\n  label\n  nullable\n  description\n  default\n  kind\n  identifier\n  child {\n    ...ChildPort\n  }\n}\n\nfragment Node on Node {\n  name\n  interface\n  package\n  description\n  kind\n  id\n  args {\n    ...ArgPort\n  }\n  returns {\n    ...ReturnPort\n  }\n}\n\nquery find($id: ID, $package: String, $interface: String, $template: ID, $q: QString) {\n  node(\n    id: $id\n    package: $package\n    interface: $interface\n    template: $template\n    q: $q\n  ) {\n    ...Node\n  }\n}"
+        document = "fragment ChildPortNested on ChildPort {\n  kind\n  child {\n    kind\n  }\n}\n\nfragment ChildPort on ChildPort {\n  kind\n  identifier\n  child {\n    ...ChildPortNested\n  }\n}\n\nfragment ArgPort on ArgPort {\n  __typename\n  key\n  label\n  nullable\n  description\n  default\n  kind\n  identifier\n  child {\n    ...ChildPort\n  }\n}\n\nfragment ReturnPort on ReturnPort {\n  __typename\n  label\n  key\n  nullable\n  description\n  identifier\n  kind\n  child {\n    ...ChildPort\n  }\n}\n\nfragment Node on Node {\n  name\n  description\n  kind\n  id\n  args {\n    ...ArgPort\n  }\n  returns {\n    ...ReturnPort\n  }\n}\n\nquery find($id: ID, $template: ID, $hash: String) {\n  node(id: $id, template: $template, hash: $hash) {\n    ...Node\n  }\n}"
 
 
 class Get_reservationQueryReservationTemplateRegistryApp(BaseModel):
     typename: Optional[Literal["LokApp"]] = Field(alias="__typename")
     id: ID
-    name: str
+    version: str
+    identifier: str
 
 
 class Get_reservationQueryReservationTemplateRegistryUser(BaseModel):
@@ -1096,7 +1063,7 @@ class Get_reservationQuery(BaseModel):
         id: ID
 
     class Meta:
-        document = "query get_reservation($id: ID!) {\n  reservation(id: $id) {\n    id\n    template {\n      id\n      registry {\n        app {\n          id\n          name\n        }\n        user {\n          id\n          email\n        }\n      }\n    }\n    provisions {\n      id\n      status\n    }\n    title\n    status\n    id\n    reference\n    node {\n      id\n      kind\n      name\n    }\n  }\n}"
+        document = "query get_reservation($id: ID!) {\n  reservation(id: $id) {\n    id\n    template {\n      id\n      registry {\n        app {\n          id\n          version\n          identifier\n        }\n        user {\n          id\n          email\n        }\n      }\n    }\n    provisions {\n      id\n      status\n    }\n    title\n    status\n    id\n    reference\n    node {\n      id\n      kind\n      name\n    }\n  }\n}"
 
 
 class ReservationsQuery(BaseModel):
@@ -1210,62 +1177,53 @@ def unassign(
 
 
 async def acreate_template(
-    node: ID,
+    definition: DefinitionInput,
     params: Optional[Dict] = None,
     extensions: Optional[List[Optional[str]]] = None,
-    version: Optional[str] = None,
     rath: RekuestRath = None,
 ) -> Optional[TemplateFragment]:
-    """create_template
+    """createTemplate
 
 
 
     Arguments:
-        node (ID): node
+        definition (DefinitionInput): definition
         params (Optional[Dict], optional): params.
         extensions (Optional[List[Optional[str]]], optional): extensions.
-        version (Optional[str], optional): version.
         rath (rekuest.rath.RekuestRath, optional): The arkitekt rath client
 
     Returns:
         Optional[TemplateFragment]"""
     return (
         await aexecute(
-            Create_templateMutation,
-            {
-                "node": node,
-                "params": params,
-                "extensions": extensions,
-                "version": version,
-            },
+            CreateTemplateMutation,
+            {"definition": definition, "params": params, "extensions": extensions},
             rath=rath,
         )
     ).create_template
 
 
 def create_template(
-    node: ID,
+    definition: DefinitionInput,
     params: Optional[Dict] = None,
     extensions: Optional[List[Optional[str]]] = None,
-    version: Optional[str] = None,
     rath: RekuestRath = None,
 ) -> Optional[TemplateFragment]:
-    """create_template
+    """createTemplate
 
 
 
     Arguments:
-        node (ID): node
+        definition (DefinitionInput): definition
         params (Optional[Dict], optional): params.
         extensions (Optional[List[Optional[str]]], optional): extensions.
-        version (Optional[str], optional): version.
         rath (rekuest.rath.RekuestRath, optional): The arkitekt rath client
 
     Returns:
         Optional[TemplateFragment]"""
     return execute(
-        Create_templateMutation,
-        {"node": node, "params": params, "extensions": extensions, "version": version},
+        CreateTemplateMutation,
+        {"definition": definition, "params": params, "extensions": extensions},
         rath=rath,
     ).create_template
 
@@ -1332,40 +1290,6 @@ def reset_repository(
     Returns:
         Optional[Reset_repositoryMutationResetrepository]"""
     return execute(Reset_repositoryMutation, {}, rath=rath).reset_repository
-
-
-async def adefine(
-    definition: DefinitionInput, rath: RekuestRath = None
-) -> Optional[NodeFragment]:
-    """define
-
-
-
-    Arguments:
-        definition (DefinitionInput): definition
-        rath (rekuest.rath.RekuestRath, optional): The arkitekt rath client
-
-    Returns:
-        Optional[NodeFragment]"""
-    return (
-        await aexecute(DefineMutation, {"definition": definition}, rath=rath)
-    ).define
-
-
-def define(
-    definition: DefinitionInput, rath: RekuestRath = None
-) -> Optional[NodeFragment]:
-    """define
-
-
-
-    Arguments:
-        definition (DefinitionInput): definition
-        rath (rekuest.rath.RekuestRath, optional): The arkitekt rath client
-
-    Returns:
-        Optional[NodeFragment]"""
-    return execute(DefineMutation, {"definition": definition}, rath=rath).define
 
 
 async def adelete_node(
@@ -1792,10 +1716,8 @@ def get_template(id: ID, rath: RekuestRath = None) -> Optional[TemplateFragment]
 
 async def afind(
     id: Optional[ID] = None,
-    package: Optional[str] = None,
-    interface: Optional[str] = None,
     template: Optional[ID] = None,
-    q: Optional[QString] = None,
+    hash: Optional[str] = None,
     rath: RekuestRath = None,
 ) -> Optional[NodeFragment]:
     """find
@@ -1804,35 +1726,23 @@ async def afind(
 
     Arguments:
         id (Optional[ID], optional): id.
-        package (Optional[str], optional): package.
-        interface (Optional[str], optional): interface.
         template (Optional[ID], optional): template.
-        q (Optional[QString], optional): q.
+        hash (Optional[str], optional): hash.
         rath (rekuest.rath.RekuestRath, optional): The arkitekt rath client
 
     Returns:
         Optional[NodeFragment]"""
     return (
         await aexecute(
-            FindQuery,
-            {
-                "id": id,
-                "package": package,
-                "interface": interface,
-                "template": template,
-                "q": q,
-            },
-            rath=rath,
+            FindQuery, {"id": id, "template": template, "hash": hash}, rath=rath
         )
     ).node
 
 
 def find(
     id: Optional[ID] = None,
-    package: Optional[str] = None,
-    interface: Optional[str] = None,
     template: Optional[ID] = None,
-    q: Optional[QString] = None,
+    hash: Optional[str] = None,
     rath: RekuestRath = None,
 ) -> Optional[NodeFragment]:
     """find
@@ -1841,24 +1751,14 @@ def find(
 
     Arguments:
         id (Optional[ID], optional): id.
-        package (Optional[str], optional): package.
-        interface (Optional[str], optional): interface.
         template (Optional[ID], optional): template.
-        q (Optional[QString], optional): q.
+        hash (Optional[str], optional): hash.
         rath (rekuest.rath.RekuestRath, optional): The arkitekt rath client
 
     Returns:
         Optional[NodeFragment]"""
     return execute(
-        FindQuery,
-        {
-            "id": id,
-            "package": package,
-            "interface": interface,
-            "template": template,
-            "q": q,
-        },
-        rath=rath,
+        FindQuery, {"id": id, "template": template, "hash": hash}, rath=rath
     ).node
 
 

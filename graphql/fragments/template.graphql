@@ -3,7 +3,8 @@ fragment Template on Template {
   registry {
     name
     app {
-      name
+      version
+      identifier
     }
     user {
       username

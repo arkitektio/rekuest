@@ -12,7 +12,6 @@ from rekuest.api.schema import (
     ProvisionFragment,
     TemplateFragment,
     acreate_template,
-    adefine,
     afind,
     aget_provision,
 )
@@ -77,20 +76,7 @@ class BaseAgent(KoiledModel):
                 actor_builder,
                 params,
             ) in self.definition_registry.templated_nodes:
-                version = params.get("version", "main")
-
-                arkitekt_node = await afind(q=q_string, rath=self.rath)
-
-                arkitekt_template = await acreate_template(
-                    node=arkitekt_node.id,
-                    params=params,
-                    version=version,
-                    rath=self.rath,
-                )
-
-                self._approved_templates.append(
-                    (arkitekt_template, actor_builder, params)
-                )
+                raise NotImplementedError("This method is not yet functional.")
 
         if self.definition_registry.defined_nodes:
             for (
@@ -100,12 +86,9 @@ class BaseAgent(KoiledModel):
             ) in self.definition_registry.defined_nodes:
                 # Defined Node are nodes that are not yet reflected on arkitekt (i.e they dont have an instance
                 # id so we are trying to send them to arkitekt)
-                arkitekt_node = await adefine(definition=definition, rath=self.rath)
-                version = params.get("version", "main")
                 arkitekt_template = await acreate_template(
-                    node=arkitekt_node.id,
+                    definition=definition,
                     params={},  # Todo really make this happen
-                    version=version,
                     rath=self.rath,
                 )
 

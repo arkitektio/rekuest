@@ -11,7 +11,7 @@ from rekuest.api.schema import WidgetInput
 from typing import Dict, List, Callable, Optional, Tuple
 from pydantic import Field
 from koil.composition import KoiledModel
-
+import json
 
 current_definition_registry = contextvars.ContextVar(
     "current_definition_registry", default=None
@@ -184,6 +184,16 @@ class DefinitionRegistry(KoiledModel):
         )
         current_definition_registry.set(self)
         return self
+
+    def dump(self):
+        print(self.defined_nodes)
+        return {
+            "definitions": [
+                json.loads(x[0].json(exclude_none=True, exclude_unset=True))
+                for x in self.defined_nodes
+            ],
+            "templates": [x[0] for x in self.templated_nodes],
+        }
 
     async def __exit__(self, *args, **kwargs):
         current_definition_registry.set(None)

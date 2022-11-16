@@ -1,14 +1,12 @@
-mutation create_template(
-  $node: ID!
+mutation createTemplate(
+  $definition: DefinitionInput!
   $params: GenericScalar
   $extensions: [String]
-  $version: String
 ) {
   createTemplate(
-    node: $node
+    definition: $definition
     params: $params
     extensions: $extensions
-    version: $version
   ) {
     ...Template
   }
