@@ -1,11 +1,12 @@
 import contextvars
 from enum import Enum
-from typing import Any, Awaitable, Callable, Dict, Optional, Type, Union
+from typing import Any, Awaitable, Callable, Dict, Optional, Type, Union, TypeVar
 
 from rekuest.api.schema import (
     ChoiceInput,
     ReturnWidgetInput,
     WidgetInput,
+    AnnotationInput,
 )
 from pydantic import BaseModel, Field
 
@@ -32,6 +33,8 @@ def build_enum_shrink_expand(cls: Type[Enum]):
     return shrink, expand
 
 
+T = TypeVar("T")
+
 Identifier = str
 """ A unique identifier of this structure on the arkitekt platform"""
 
@@ -51,6 +54,7 @@ class StructureRegistry(BaseModel):
     _structure_identifier_map: Dict[Type, str] = {}
     _structure_default_widget_map: Dict[Type, WidgetInput] = {}
     _structure_default_returnwidget_map: Dict[Type, ReturnWidgetInput] = {}
+    _structure_annotation_map: Dict[Type, Type] = {}
 
     _token: contextvars.Token = None
 
@@ -187,6 +191,25 @@ class StructureRegistry(BaseModel):
         self._structure_default_widget_map[cls] = default_widget
         self._structure_default_returnwidget_map[cls] = default_returnwidget
         self._structure_convert_default_map[cls] = convert_default
+
+    def get_converter_for_annotation(self, annotation):
+        try:
+            return self._structure_annotation_map[annotation]
+        except KeyError as e:
+            raise StructureRegistryError(f"{annotation} is not registered") from e
+
+    def register_annotation_converter(
+        self,
+        annotation: T,
+        converter: Callable[[Type[T]], AnnotationInput],
+        overwrite=False,
+    ):
+        if annotation in self._structure_annotation_map and not overwrite:
+            raise StructureRegistryError(
+                f"{annotation} is already registered: Specify overwrite=True to overwrite"
+            )
+
+        self._structure_annotation_map[annotation] = converter
 
     async def __aenter__(self):
         current_structure_registry.set(self)

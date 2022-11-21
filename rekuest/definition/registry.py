@@ -186,7 +186,6 @@ class DefinitionRegistry(KoiledModel):
         return self
 
     def dump(self):
-        print(self.defined_nodes)
         return {
             "definitions": [
                 json.loads(x[0].json(exclude_none=True, exclude_unset=True))

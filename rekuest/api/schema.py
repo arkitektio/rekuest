@@ -1,13 +1,13 @@
-from rekuest.funcs import aexecute, subscribe, asubscribe, execute
-from enum import Enum
-from pydantic import BaseModel, Field
 from typing_extensions import Literal
-from typing import Iterator, Dict, AsyncIterator, Optional, Any, List
+from typing import List, Optional, Dict, Iterator, AsyncIterator, Any
+from rath.scalars import ID
+from rekuest.funcs import execute, asubscribe, aexecute, subscribe
 from rekuest.traits.node import Reserve
-from rekuest.scalars import Identifier
+from pydantic import BaseModel, Field
 from datetime import datetime
 from rekuest.rath import RekuestRath
-from rath.scalars import ID
+from rekuest.scalars import Identifier
+from enum import Enum
 
 
 class AgentStatus(str, Enum):
@@ -419,6 +419,34 @@ class PortKindInput(str, Enum):
     FLOAT = "FLOAT"
 
 
+class WidgetKind(str, Enum):
+    """The kind of widget"""
+
+    QueryWidget = "QueryWidget"
+    IntWidget = "IntWidget"
+    StringWidget = "StringWidget"
+    SearchWidget = "SearchWidget"
+    SliderWidget = "SliderWidget"
+    LinkWidget = "LinkWidget"
+    BoolWidget = "BoolWidget"
+    ChoiceWidget = "ChoiceWidget"
+    CustomWidget = "CustomWidget"
+
+
+class AnnotationKind(str, Enum):
+    """The kind of annotation"""
+
+    ValueRange = "ValueRange"
+    CustomAnnotation = "CustomAnnotation"
+
+
+class ReturnWidgetKind(str, Enum):
+    """The kind of return widget"""
+
+    ImageReturnWidget = "ImageReturnWidget"
+    CustomReturnWidget = "CustomReturnWidget"
+
+
 class DefinitionInput(BaseModel):
     """A definition for a template"""
 
@@ -461,6 +489,8 @@ class ArgPortInput(BaseModel):
     "The key of the arg"
     nullable: bool
     "Is this argument nullable"
+    annotations: Optional[List[Optional["AnnotationInput"]]]
+    "The annotations of this argument"
 
 
 class ChildPortInput(BaseModel):
@@ -479,7 +509,7 @@ class ChildPortInput(BaseModel):
 
 
 class WidgetInput(BaseModel):
-    kind: str
+    kind: WidgetKind
     "type"
     query: Optional[str]
     "Do we have a possible"
@@ -506,6 +536,21 @@ class ChoiceInput(BaseModel):
     label: str
 
 
+class AnnotationInput(BaseModel):
+    kind: AnnotationKind
+    "The kind of annotation"
+    name: Optional[str]
+    "The name of this annotation"
+    args: Optional[str]
+    "The value of this annotation"
+    min: Optional[float]
+    "The min of this annotation (Value Range)"
+    max: Optional[float]
+    "The max of this annotation (Value Range)"
+    hook: Optional[str]
+    "A hook for the app to call"
+
+
 class ReturnPortInput(BaseModel):
     identifier: Optional[str]
     "The identifier"
@@ -525,10 +570,12 @@ class ReturnPortInput(BaseModel):
     "The child of this argument"
     nullable: bool
     "Is this argument nullable"
+    annotations: Optional[List[Optional[AnnotationInput]]]
+    "The annotations of this argument"
 
 
 class ReturnWidgetInput(BaseModel):
-    kind: str
+    kind: ReturnWidgetKind
     "type"
     query: Optional[str]
     "Do we have a possible"

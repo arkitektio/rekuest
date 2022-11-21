@@ -7,13 +7,12 @@
 [![PyPI pyversions](https://img.shields.io/pypi/pyversions/rekuest.svg)](https://pypi.python.org/pypi/rekuest/)
 [![PyPI status](https://img.shields.io/pypi/status/rekuest.svg)](https://pypi.python.org/pypi/rekuest/)
 
-self-documenting asynchronous scalable RPC based on provisionable untrusted actors 
+self-documenting asynchronous scalable RPC based on provisionable untrusted actors
 
 ## Idea
 
 rekuest is the python client for the rekuest server, it provides a simple interface both register and provide nodes (functionality)
-and call other nodes in async and synchronous manner. Contrary to most RPC services, Rekuest is focussed on providing functionaly on the Client, and is especially tailored for scenarious where apps can be developed to perform
-tasks on users behalves, therefore requiring fine grained access control. 
+and call other nodes in async and synchronous manner. Contrary to most RPC services, Rekuest is focussed on providing functionaly on the Client, and is especially tailored for scanarios where apps can be developed to perform tasks on users behalves, therefore requiring fine grained access control.
 
 ## Prerequesits
 
@@ -25,10 +24,10 @@ Requires a running instance of a rekuest server (e.g in an arkitekt deployment).
 pip install rekuest herre #herre is an authentication layer for establihing users and applications
 ```
 
-rekuest is relying heavily on asyncio patters and therefore only supports python 3.7 and above. Its api provides sync and async 
+rekuest is relying heavily on asyncio patters and therefore only supports python 3.7 and above. Its api provides sync and async
 interfaces through koil.
 
-> If you are working in image analysis checkout the mikro platform that also provides data structures for image analysis (composed in the arkitekt platform)
+> If you are working in image analysis checkout the arkitekt platform that also provides data structures for image analysis (composed in the arkitekt platform)
 
 ## Get started
 
@@ -48,8 +47,8 @@ def rpc_function(x: int, name: str) -> str
 
     ""
     print(str)
-    
-    
+
+
 with client:
   client.run()
 
@@ -75,13 +74,12 @@ auth = Herre(grant=ClientCredentialsGrant(client_id="ssss", client_secret="osins
 client = Rekuest(auth=auth)
 
 with client:
-  node = find(interface="rpc_function") # 
-  
+  node = find(interface="rpc_function") #
+
   with node:
     node.assign(4, "johannes")
 
 ```
-
 
 ## Usage with complex Datastructures
 

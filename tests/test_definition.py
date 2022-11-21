@@ -1,6 +1,6 @@
 from typing import Dict
 from rekuest.structures.registry import StructureRegistry, register_structure
-from rekuest.api.schema import DefinitionInput, NodeFragment, PortKind, adefine
+from rekuest.api.schema import DefinitionInput, NodeFragment, PortKind
 import pytest
 from .funcs import karl, complex_karl, karl_structure, structured_gen
 from .structures import SecondSerializableObject, SerializableObject
@@ -14,7 +14,9 @@ def simple_registry():
     registry = StructureRegistry()
 
     register_structure(identifier="hm/test", registry=registry)(SerializableObject)
-    register_structure(identifier="ha/karl", registry=registry)(SecondSerializableObject)
+    register_structure(identifier="ha/karl", registry=registry)(
+        SecondSerializableObject
+    )
 
     return registry
 
@@ -95,53 +97,16 @@ def arkitekt_rath():
 
 async def test_define_to_node_gen(simple_registry, arkitekt_rath):
 
-    async with arkitekt_rath:
-        functional_definition = prepare_definition(
-            structured_gen, structure_registry=simple_registry
-        )
-
-        node = await adefine(functional_definition)
-
-        assert isinstance(node, NodeFragment), "Node is not Node"
-        assert (
-            node.name == "Structured Karl"
-        ), "Doesnt conform to standard Naming Scheme"
-        assert (
-            node.name == "Structured Karl"
-        ), "Doesnt conform to standard Naming Scheme"
-        assert len(node.args) == 2, "Wrong amount of Arguments"
-        assert len(node.returns) == 2, "Wrong amount of Returns"
-        assert node.args[0].kind == PortKind.LIST, "Wasn't defined as a List"
-        assert node.args[0].child.kind == PortKind.STRUCTURE, "Wasn't defined as a List"
-        assert node.args[0].child.identifier == "hm/test", "Wasn't indtifier on test"
+    functional_definition = prepare_definition(
+        structured_gen, structure_registry=simple_registry
+    )
 
 
 async def test_define_to_node_complex(simple_registry, arkitekt_rath):
 
-    async with arkitekt_rath:
-
-        functional_definition = prepare_definition(
-            complex_karl, structure_registry=simple_registry
-        )
-
-        node = await adefine(functional_definition, rath=arkitekt_rath)
-
-        assert isinstance(node, NodeFragment), "Node is not Node"
-        assert node.name == "Complex Karl", "Doesnt conform to standard Naming Scheme"
-        assert len(node.args) == 3, "Wrong amount of Arguments"
-        assert node.args[0].kind == PortKind.LIST, "Wasn't defined as a List"
-        assert node.args[1].kind == PortKind.DICT, "Wasn't defined as a Dict"
-        assert (
-            node.args[1].child.kind == PortKind.INT
-        ), "Child of List is not of type IntArgPort"
-        assert (
-            node.args[0].child.kind == PortKind.STRING
-        ), "Child of Dict is not of type StringArgPort"
-        assert (
-            node.args[2].kind == PortKind.STRING
-        ), "Kwarg wasn't defined as a StringKwargPort"
-        assert len(functional_definition.returns) == 2, "Wrong amount of Returns"
-        assert node.returns[0].kind == PortKind.LIST, "Needs to Return List"
+    functional_definition = prepare_definition(
+        complex_karl, structure_registry=simple_registry
+    )
 
 
 async def test_define_node_has_nested_type(simple_registry, arkitekt_rath):
@@ -156,6 +121,3 @@ async def test_define_node_has_nested_type(simple_registry, arkitekt_rath):
         return 5
 
     functional_definition = prepare_definition(x, structure_registry=simple_registry)
-
-    async with arkitekt_rath:
-        node = await adefine(functional_definition, rath=arkitekt_rath)

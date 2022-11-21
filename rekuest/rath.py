@@ -10,7 +10,7 @@ from rath.links.compose import TypedComposedLink, compose
 from rath.links.dictinglink import DictingLink
 from rath.links.shrink import ShrinkingLink
 from rath.links.split import SplitLink
-from rath.links.subscription_retry import SubscriptionRetry
+from rath.links.retry import RetryLink
 from rath.links.websockets import WebSocketLink
 
 current_rekuest_rath = contextvars.ContextVar("current_rekuest_rath", default=None)
@@ -20,7 +20,7 @@ class RekuestLinkComposition(TypedComposedLink):
     shrink: ShrinkingLink = Field(default_factory=ShrinkingLink)
     dicting: DictingLink = Field(default_factory=DictingLink)
     auth: AuthTokenLink
-    retry: SubscriptionRetry = Field(default_factory=SubscriptionRetry)
+    retry: RetryLink = Field(default_factory=RetryLink)
     split: SplitLink
 
 

@@ -1,5 +1,4 @@
 import pytest
-from rekuest.api.schema import adefine
 from .integration.utils import wait_for_http_response
 from .utils import build_relative
 from testcontainers.compose import DockerCompose
@@ -23,11 +22,10 @@ def environment():
 @pytest.fixture
 def app():
     from herre.fakts import FaktsHerre
-    from fakts.grants.remote.claim import ClaimGrant
+    from fakts.grants.remote.static import ClaimGrant
     from fakts.grants.remote.base import StaticDiscovery
     from arkitekt.apps.rekuest import RekuestApp
     from fakts.fakts import Fakts
-
 
     return RekuestApp(
         fakts=Fakts(
@@ -41,16 +39,3 @@ def app():
         ),
         herre=FaktsHerre(no_temp=True),
     )
-
-
-@pytest.mark.integration
-async def test_definining(app, environment):
-
-    async with app:
-        functional_definition = prepare_definition(
-            complex_karl, structure_registry=app.structure_registry
-        )
-
-        node = await adefine(functional_definition)
-        assert node.id, "Node is None"
-        assert node.package == "tests", "Should be resolving to tests (the app name)"
