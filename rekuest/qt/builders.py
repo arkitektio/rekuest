@@ -1,14 +1,18 @@
 from typing import Any
 from qtpy import QtCore
 from rekuest.agents.transport.base import AgentTransport
-from ..definition.registry import DefaultActorBuilder
+from rekuest.api.schema import TemplateFragment
 from rekuest.messages import Provision
 from koil.qt import QtCoro
 from rekuest.actors.functional import FunctionalFuncActor
+from rekuest.rath import RekuestRath
+from qtpy import QtWidgets
+from rekuest.definition.registry import ActorBuilder
+from rekuest.definition.define import prepare_definition, DefinitionInput
 
 
 class QtInLoopBuilder(QtCore.QObject):
-    """A function that takes a provision and an agent and returns an actor.
+    """A function that takes a provision and an actor transport and returns an actor.
 
     The actor produces by this builder will be running in the same thread as the
     koil instance (aka, the thread that called the builder).
@@ -28,21 +32,27 @@ class QtInLoopBuilder(QtCore.QObject):
     async def on_assign(self, *args, **kwargs) -> None:
         return await self.coro.acall(*args, **kwargs)
 
-    def build_actor(self, provision: Provision, transport: AgentTransport) -> Any:
+    def build(
+        self,
+        provision: Provision,
+        transport: AgentTransport,
+        definition: DefinitionInput,
+    ) -> Any:
         try:
             ac = FunctionalFuncActor(
+                definition=definition,
                 provision=provision,
                 transport=transport,
                 assign=self.on_assign,
-                **self.actor_kwargs
+                **self.actor_kwargs,
             )
             return ac
         except Exception as e:
             raise e
 
 
-class QtPassFutureBuilder(QtCore.QObject):
-    """A function that takes a provision and an agent and returns an actor.
+class QtInLoopBuilder(QtCore.QObject):
+    """A function that takes a provision and an actor transport and returns an actor.
 
     The actor produces by this builder will be running in the same thread as the
     koil instance (aka, the thread that called the builder).
@@ -51,38 +61,71 @@ class QtPassFutureBuilder(QtCore.QObject):
         QtCore (_type_): _description_
     """
 
-    def __init__(self, assign=None, *args, parent=None, **actor_kwargs) -> None:
+    def __init__(
+        self, assign=None, *args, parent=None, structure_registry=None, **actor_kwargs
+    ) -> None:
         super().__init__(*args, parent=parent)
         self.coro = QtCoro(
-            lambda f, *args, **kwargs: assign(f, *args, **kwargs), autoresolve=False
+            lambda f, *args, **kwargs: assign(*args, **kwargs), autoresolve=True
         )
         self.provisions = {}
+        self.structure_registry = structure_registry
         self.actor_kwargs = actor_kwargs
 
     async def on_assign(self, *args, **kwargs) -> None:
         return await self.coro.acall(*args, **kwargs)
 
-    def build_actor(self, provision: Provision, transport: AgentTransport) -> Any:
+    async def on_provide(self, provision: Provision) -> Any:
+        return None
+
+    async def on_unprovide(self, provision: Provision) -> Any:
+        return None
+
+    def build(
+        self,
+        provision: Provision,
+        transport: AgentTransport,
+        definition: DefinitionInput,
+    ) -> Any:
         try:
             ac = FunctionalFuncActor(
+                definition=definition,
                 provision=provision,
+                structure_registry=self.structure_registry,
                 transport=transport,
                 assign=self.on_assign,
-                **self.actor_kwargs
+                on_provide=self.on_provide,
+                on_unprovide=self.on_unprovide,
             )
             return ac
         except Exception as e:
             raise e
 
 
-class QtInLoopActorBuilder(DefaultActorBuilder):
-    def actify(self, *args, **kwargs):
-        return QtInLoopBuilder(*args, **kwargs).build_actor
+def qtinloopactifier(
+    function, structure_registry, parent: QtWidgets.QWidget = None, **kwargs
+) -> ActorBuilder:
+    """Qt Actifier
 
+    The qt actifier wraps a function and returns a builder that will create an actor
+    that runs in the same thread as the Qt instance, enabling the use of Qt widgets
+    and signals.
+    """
 
-class QtPassFutureActorBuilder(DefaultActorBuilder):
-    def define(self, *args, **kwargs):
-        return super().define(*args, **kwargs, omitfirst=1)
+    in_loop_instance = QtInLoopBuilder(
+        parent=parent, assign=function, structure_registry=structure_registry
+    )
+    definition = prepare_definition(function, structure_registry)
 
-    def actify(self, *args, **kwargs):
-        return QtPassFutureBuilder(*args, **kwargs).build_actor
+    def builder(
+        provision: Provision,
+        transport: AgentTransport,
+    ) -> Any:
+
+        return in_loop_instance.build(
+            provision, transport, definition
+        )  # build an actor for this inloop instance
+
+    builder.__definition__ = definition
+
+    return builder

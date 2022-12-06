@@ -42,11 +42,9 @@ class StatefulPostman(BasePostman):
         provision: str = None,
         reference: str = None,
     ) -> asyncio.Queue:
-        reservation = await self.transport.areserve(
+        return await self.transport.areserve(
             node, params, provision=provision, reference=reference
         )
-        self.reservations[reservation.reservation] = reservation
-        return reservation
 
     async def aunreserve(self, reservation_id: str) -> ReservationFragment:
         unreservation = await self.transport.aunreserve(reservation_id)
@@ -63,9 +61,7 @@ class StatefulPostman(BasePostman):
         persist=True,
         log=False,
     ) -> asyncio.Queue:
-        assignation = await self.transport.aassign(reservation, args, persist, log)
-        self.assignations[assignation.assignation] = assignation
-        return assignation
+        return await self.transport.aassign(reservation, args, persist, log)
 
     async def aunassign(
         self,
@@ -118,8 +114,9 @@ class StatefulPostman(BasePostman):
 
     async def __aenter__(self):
         await self.transport.__aenter__()
-        return await super().__aenter__()
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         await self.transport.__aexit__(exc_type, exc_val, exc_tb)
-        return await super().__aexit__(exc_type, exc_val, exc_tb)
+
+    class Config:
+        arbitrary_types_allowed = True

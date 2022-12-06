@@ -21,6 +21,8 @@ from rekuest.postmans.base import BasePostman
 from koil import unkoil
 from koil.composition import Composition
 from koil.decorators import koilable
+from rekuest.api.schema import acreate_template
+from rekuest.actors.builder import ActorBuilder
 
 
 @koilable(fieldname="koil", add_connectors=True)
@@ -35,36 +37,21 @@ class Rekuest(Composition):
     agent: BaseAgent = Field(default_factory=StatefulAgent)
     postman: BasePostman = Field(default_factory=GraphQLPostman)
 
-    def register(
-        self,
-        builder=None,
-        widgets: Dict[str, WidgetInput] = {},
-        package=None,
-        interface=None,
-        interfaces: List[str] = [],
-        on_provide: Callable[[Provision, TemplateFragment], Awaitable[Any]] = None,
-        on_unprovide: Callable[[], Awaitable[Any]] = None,
-        structure_registry: StructureRegistry = None,
-        **actorparams,
-    ) -> None:
+    registered_templates: Dict[str, TemplateFragment] = Field(default_factory=dict)
+
+    def register(self, *args, **kwargs) -> None:
         """
         Register a new function
         """
-        structure_registry = structure_registry or self.structure_registry
+        structure_registry = kwargs.get("structure_registry", self.structure_registry)
 
         def real_decorator(function_or_actor):
 
             self.definition_registry.register(
                 function_or_actor,
-                builder=builder,
-                package=package,
-                interface=interface,
-                widgets=widgets,
-                interfaces=interfaces,
+                *args,
                 structure_registry=structure_registry,
-                on_provide=on_provide,
-                on_unprovide=on_unprovide,
-                **actorparams,
+                **kwargs
             )
 
             return function_or_actor

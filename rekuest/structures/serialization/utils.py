@@ -1,6 +1,7 @@
 import asyncio
 from typing import Any
 from rekuest.api.schema import ArgPortFragment, PortKind
+from rekuest.structures.errors import PortShrinkingError, StructureShrinkingError
 
 
 async def aexpand(port: ArgPortFragment, value: Any, structure_registry=None) -> Any:
@@ -69,36 +70,61 @@ async def ashrink(port: ArgPortFragment, value: Any, structure_registry=None) ->
         Any: Expanded value
 
     """
-    if port.kind == PortKind.DICT:
-        return {
-            key: await ashrink(port.child, value, structure_registry)
-            for key, value in value.items()
-        }
+    try:
 
-    if port.kind == PortKind.LIST:
-        return await asyncio.gather(
-            *[
-                ashrink(port.child, item, structure_registry=structure_registry)
-                for item in value
-            ]
-        )
+        if value is None:
+            if port.nullable:
+                return None
+            else:
+                raise ValueError(
+                    "{port} is not nullable (optional) but your provided None"
+                )
 
-    if port.kind == PortKind.INT:
-        return int(value) if value is not None else None
+        if port.kind == PortKind.DICT:
 
-    if port.kind == PortKind.STRUCTURE:
-        return (
-            await structure_registry.get_shrinker_for_identifier(port.identifier)(
-                value,
+            return {
+                key: await ashrink(port.child, value, structure_registry)
+                for key, value in value.items()
+            }
+
+        if port.kind == PortKind.LIST:
+            return await asyncio.gather(
+                *[
+                    ashrink(port.child, item, structure_registry=structure_registry)
+                    for item in value
+                ]
             )
-            if value is not None
-            else None
-        )
 
-    if port.kind == PortKind.BOOL:
-        return bool(value) if value is not None else None
+        if port.kind == PortKind.INT:
+            return int(value) if value is not None else None
 
-    if port.kind == PortKind.STRING:
-        return str(value) if value is not None else None
+        if port.kind == PortKind.STRUCTURE:
+            # We always convert structures returns to strings
+            try:
+                shrinker = structure_registry.get_shrinker_for_identifier(
+                    port.identifier
+                )
+            except KeyError:
+                raise StructureShrinkingError(
+                    f"Couldn't find shrinker for {port.identifier}"
+                ) from None
+            try:
+                shrink = await shrinker(value)
+                return str(shrink)
+            except Exception as e:
+                raise StructureShrinkingError(
+                    f"Error shrinking {repr(value)} with Structure {port.identifier}"
+                ) from None
 
-    raise NotImplementedError(f"Should be implemented by subclass {port}")
+        if port.kind == PortKind.BOOL:
+            return bool(value) if value is not None else None
+
+        if port.kind == PortKind.STRING:
+            return str(value) if value is not None else None
+
+        raise NotImplementedError(f"Should be implemented by subclass {port}")
+
+    except Exception as e:
+        raise PortShrinkingError(
+            f"Couldn't shrink value {value} with port {port}"
+        ) from e

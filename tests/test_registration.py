@@ -7,7 +7,7 @@ from rekuest.structures.registry import (
 import pytest
 
 
-async def test_structure_registration():
+def test_structure_registration():
     registry = StructureRegistry(allow_overwrites=False)
 
     @register_structure(identifier="test", registry=registry)

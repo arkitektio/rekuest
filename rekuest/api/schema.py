@@ -1,12 +1,18 @@
 from typing_extensions import Literal
-from typing import List, Optional, Dict, Iterator, AsyncIterator, Any
-from rath.scalars import ID
-from rekuest.funcs import execute, asubscribe, aexecute, subscribe
-from rekuest.traits.node import Reserve
-from pydantic import BaseModel, Field
-from datetime import datetime
+from typing import Any, Optional, Union, Dict, AsyncIterator, List, Tuple, Iterator
+from pydantic import Field, BaseModel
+from rekuest.funcs import aexecute, subscribe, execute, asubscribe
+from rekuest.traits.ports import (
+    AnnotationInputTrait,
+    WidgetInputTrait,
+    ReturnWidgetInputTrait,
+    PortTrait,
+)
 from rekuest.rath import RekuestRath
-from rekuest.scalars import Identifier
+from rekuest.scalars import SearchQuery, Identifier
+from rath.scalars import ID
+from rekuest.traits.node import Reserve
+from datetime import datetime
 from enum import Enum
 
 
@@ -419,6 +425,21 @@ class PortKindInput(str, Enum):
     FLOAT = "FLOAT"
 
 
+class AnnotationKind(str, Enum):
+    """The kind of annotation"""
+
+    ValueRange = "ValueRange"
+    CustomAnnotation = "CustomAnnotation"
+    IsPredicate = "IsPredicate"
+    AttributePredicate = "AttributePredicate"
+
+
+class IsPredicateType(str, Enum):
+    LOWER = "LOWER"
+    HIGHER = "HIGHER"
+    DIGIT = "DIGIT"
+
+
 class WidgetKind(str, Enum):
     """The kind of widget"""
 
@@ -433,18 +454,18 @@ class WidgetKind(str, Enum):
     CustomWidget = "CustomWidget"
 
 
-class AnnotationKind(str, Enum):
-    """The kind of annotation"""
-
-    ValueRange = "ValueRange"
-    CustomAnnotation = "CustomAnnotation"
-
-
 class ReturnWidgetKind(str, Enum):
     """The kind of return widget"""
 
     ImageReturnWidget = "ImageReturnWidget"
     CustomReturnWidget = "CustomReturnWidget"
+
+
+class MessageKind(str, Enum):
+    TERMINATE = "TERMINATE"
+    CANCEL = "CANCEL"
+    ASSIGN = "ASSIGN"
+    TELL = "TELL"
 
 
 class DefinitionInput(BaseModel):
@@ -454,22 +475,25 @@ class DefinitionInput(BaseModel):
     "A description for the Node"
     name: str
     "The name of this template"
-    args: Optional[List[Optional["ArgPortInput"]]]
+    args: Optional[Tuple[Optional["ArgPortInput"], ...]]
     "The Args"
-    returns: Optional[List[Optional["ReturnPortInput"]]]
+    returns: Optional[Tuple[Optional["ReturnPortInput"], ...]]
     "The Returns"
     interface: Optional[str]
     "The interface of this template"
-    interfaces: Optional[List[Optional[str]]]
+    interfaces: Optional[Tuple[Optional[str], ...]]
     "The Interfaces this node provides makes sense of the metadata"
     kind: NodeKindInput
     "The variety"
     pure: Optional[bool]
     idempotent: Optional[bool]
 
+    class Config:
+        frozen = True
 
-class ArgPortInput(BaseModel):
-    identifier: Optional[str]
+
+class ArgPortInput(PortTrait, BaseModel):
+    identifier: Optional[Identifier]
     "The identifier"
     key: str
     "The key of the arg"
@@ -489,12 +513,15 @@ class ArgPortInput(BaseModel):
     "The key of the arg"
     nullable: bool
     "Is this argument nullable"
-    annotations: Optional[List[Optional["AnnotationInput"]]]
+    annotations: Optional[Tuple[Optional["AnnotationInput"], ...]]
     "The annotations of this argument"
 
+    class Config:
+        frozen = True
 
-class ChildPortInput(BaseModel):
-    identifier: Optional[str]
+
+class ChildPortInput(PortTrait, BaseModel):
+    identifier: Optional[Identifier]
     "The identifier"
     name: Optional[str]
     "The name of this port"
@@ -506,16 +533,45 @@ class ChildPortInput(BaseModel):
     "The child port"
     nullable: bool
     "Is this argument nullable"
+    annotations: Optional[Tuple[Optional["AnnotationInput"], ...]]
+    "The annotations of this argument"
+
+    class Config:
+        frozen = True
 
 
-class WidgetInput(BaseModel):
+class AnnotationInput(AnnotationInputTrait, BaseModel):
+    kind: AnnotationKind
+    "The kind of annotation"
+    name: Optional[str]
+    "The name of this annotation"
+    args: Optional[str]
+    "The value of this annotation"
+    min: Optional[float]
+    "The min of this annotation (Value Range)"
+    max: Optional[float]
+    "The max of this annotation (Value Range)"
+    hook: Optional[str]
+    "A hook for the app to call"
+    predicate: Optional[IsPredicateType]
+    "The predicate of this annotation (IsPredicate)"
+    attribute: Optional[str]
+    "The attribute to check"
+    annotations: Optional[Tuple[Optional["AnnotationInput"], ...]]
+    "The annotation of this annotation"
+
+    class Config:
+        frozen = True
+
+
+class WidgetInput(WidgetInputTrait, BaseModel):
     kind: WidgetKind
     "type"
-    query: Optional[str]
+    query: Optional[SearchQuery]
     "Do we have a possible"
-    dependencies: Optional[List[Optional[str]]]
+    dependencies: Optional[Tuple[Optional[str], ...]]
     "The dependencies of this port"
-    choices: Optional[List[Optional["ChoiceInput"]]]
+    choices: Optional[Tuple[Optional["ChoiceInput"], ...]]
     "The dependencies of this port"
     max: Optional[int]
     "Max value for int widget"
@@ -530,29 +586,20 @@ class WidgetInput(BaseModel):
     ward: Optional[str]
     "A ward for the app to call"
 
+    class Config:
+        frozen = True
+
 
 class ChoiceInput(BaseModel):
     value: Any
     label: str
 
-
-class AnnotationInput(BaseModel):
-    kind: AnnotationKind
-    "The kind of annotation"
-    name: Optional[str]
-    "The name of this annotation"
-    args: Optional[str]
-    "The value of this annotation"
-    min: Optional[float]
-    "The min of this annotation (Value Range)"
-    max: Optional[float]
-    "The max of this annotation (Value Range)"
-    hook: Optional[str]
-    "A hook for the app to call"
+    class Config:
+        frozen = True
 
 
-class ReturnPortInput(BaseModel):
-    identifier: Optional[str]
+class ReturnPortInput(PortTrait, BaseModel):
+    identifier: Optional[Identifier]
     "The identifier"
     key: str
     "The key of the arg"
@@ -570,11 +617,14 @@ class ReturnPortInput(BaseModel):
     "The child of this argument"
     nullable: bool
     "Is this argument nullable"
-    annotations: Optional[List[Optional[AnnotationInput]]]
+    annotations: Optional[Tuple[Optional[AnnotationInput], ...]]
     "The annotations of this argument"
 
+    class Config:
+        frozen = True
 
-class ReturnWidgetInput(BaseModel):
+
+class ReturnWidgetInput(ReturnWidgetInputTrait, BaseModel):
     kind: ReturnWidgetKind
     "type"
     query: Optional[str]
@@ -584,33 +634,55 @@ class ReturnWidgetInput(BaseModel):
     ward: Optional[str]
     "A hook for the app to call"
 
+    class Config:
+        frozen = True
+
 
 class ReserveParamsInput(BaseModel):
     auto_provide: Optional[bool] = Field(alias="autoProvide")
     "Do you want to autoprovide"
     auto_unprovide: Optional[bool] = Field(alias="autoUnprovide")
     "Do you want to auto_unprovide"
-    registries: Optional[List[Optional[ID]]]
+    registries: Optional[Tuple[Optional[ID], ...]]
     "Registry thar are allowed"
-    agents: Optional[List[Optional[ID]]]
+    agents: Optional[Tuple[Optional[ID], ...]]
     "Agents that are allowed"
-    templates: Optional[List[Optional[ID]]]
+    templates: Optional[Tuple[Optional[ID], ...]]
     "Templates that can be selected"
     desired_instances: int = Field(alias="desiredInstances")
     "The desired amount of Instances"
     minimal_instances: int = Field(alias="minimalInstances")
     "The minimal amount of Instances"
 
+    class Config:
+        frozen = True
+
+
+class MessageInput(BaseModel):
+    kind: MessageKind
+    text: str
+    reference: str
+    data: Any
+
+    class Config:
+        frozen = True
+
 
 class GroupAssignmentInput(BaseModel):
-    permissions: List[Optional[str]]
+    permissions: Tuple[Optional[str], ...]
     group: ID
+
+    class Config:
+        frozen = True
 
 
 class UserAssignmentInput(BaseModel):
-    permissions: List[Optional[str]]
+    permissions: Tuple[Optional[str], ...]
     user: str
     "The user email"
+
+    class Config:
+        frozen = True
 
 
 class ProvisionFragmentTemplate(BaseModel):
@@ -620,6 +692,9 @@ class ProvisionFragmentTemplate(BaseModel):
     "The node this template is implementatig"
     params: Optional[Dict]
 
+    class Config:
+        frozen = True
+
 
 class ProvisionFragment(BaseModel):
     typename: Optional[Literal["Provision"]] = Field(alias="__typename")
@@ -628,15 +703,21 @@ class ProvisionFragment(BaseModel):
     "Current lifecycle of Provision"
     template: ProvisionFragmentTemplate
 
+    class Config:
+        frozen = True
+
 
 class AssignationFragmentParent(BaseModel):
     typename: Optional[Literal["Assignation"]] = Field(alias="__typename")
     id: ID
 
+    class Config:
+        frozen = True
+
 
 class AssignationFragment(BaseModel):
     typename: Optional[Literal["Assignation"]] = Field(alias="__typename")
-    args: Optional[List[Optional[Any]]]
+    args: Optional[Tuple[Optional[Any], ...]]
     kwargs: Optional[Dict]
     id: ID
     parent: Optional[AssignationFragmentParent]
@@ -646,16 +727,22 @@ class AssignationFragment(BaseModel):
     "Current lifecycle of Assignation"
     statusmessage: str
     "Clear Text status of the Assignation as for now"
-    returns: Optional[List[Optional[Any]]]
+    returns: Optional[Tuple[Optional[Any], ...]]
     reference: str
     "The Unique identifier of this Assignation"
     updated_at: datetime = Field(alias="updatedAt")
+
+    class Config:
+        frozen = True
 
 
 class TemplateFragmentRegistryApp(BaseModel):
     typename: Optional[Literal["LokApp"]] = Field(alias="__typename")
     version: str
     identifier: str
+
+    class Config:
+        frozen = True
 
 
 class TemplateFragmentRegistryUser(BaseModel):
@@ -664,6 +751,9 @@ class TemplateFragmentRegistryUser(BaseModel):
     typename: Optional[Literal["User"]] = Field(alias="__typename")
     username: str
     "Required. 150 characters or fewer. Letters, digits and @/./+/-/_ only."
+
+    class Config:
+        frozen = True
 
 
 class TemplateFragmentRegistry(BaseModel):
@@ -675,6 +765,9 @@ class TemplateFragmentRegistry(BaseModel):
     user: Optional[TemplateFragmentRegistryUser]
     "The Associated App"
 
+    class Config:
+        frozen = True
+
 
 class TemplateFragment(BaseModel):
     typename: Optional[Literal["Template"]] = Field(alias="__typename")
@@ -685,22 +778,73 @@ class TemplateFragment(BaseModel):
     "The node this template is implementatig"
     params: Optional[Dict]
 
+    class Config:
+        frozen = True
 
-class ChildPortNestedFragmentChild(BaseModel):
+
+class IsPredicateFragment(BaseModel):
+    typename: Optional[Literal["IsPredicate"]] = Field(alias="__typename")
+    predicate: IsPredicateType
+    "The arguments for this annotation"
+
+    class Config:
+        frozen = True
+
+
+class ValueRangeFragment(BaseModel):
+    typename: Optional[Literal["ValueRange"]] = Field(alias="__typename")
+    min: float
+    "The minimum value"
+    max: float
+    "The maximum value"
+
+    class Config:
+        frozen = True
+
+
+class AnnotationFragmentBase(BaseModel):
+    kind: Optional[str]
+    "The name of the annotation"
+
+
+class AnnotationFragmentBaseIsPredicate(IsPredicateFragment, AnnotationFragmentBase):
+    pass
+
+
+class AnnotationFragmentBaseValueRange(ValueRangeFragment, AnnotationFragmentBase):
+    pass
+
+
+AnnotationFragment = Union[
+    AnnotationFragmentBaseIsPredicate,
+    AnnotationFragmentBaseValueRange,
+    AnnotationFragmentBase,
+]
+
+
+class ChildPortNestedFragmentChild(PortTrait, BaseModel):
     typename: Optional[Literal["ChildPort"]] = Field(alias="__typename")
     kind: Optional[PortKind]
     "the type of input"
 
+    class Config:
+        frozen = True
 
-class ChildPortNestedFragment(BaseModel):
+
+class ChildPortNestedFragment(PortTrait, BaseModel):
     typename: Optional[Literal["ChildPort"]] = Field(alias="__typename")
     kind: Optional[PortKind]
     "the type of input"
     child: Optional[ChildPortNestedFragmentChild]
     "The child"
+    annotations: Optional[Tuple[Optional[AnnotationFragment], ...]]
+    "The annotations of this port"
+
+    class Config:
+        frozen = True
 
 
-class ChildPortFragment(BaseModel):
+class ChildPortFragment(PortTrait, BaseModel):
     typename: Optional[Literal["ChildPort"]] = Field(alias="__typename")
     kind: Optional[PortKind]
     "the type of input"
@@ -708,9 +852,14 @@ class ChildPortFragment(BaseModel):
     "The corresponding Model"
     child: Optional[ChildPortNestedFragment]
     "The child"
+    annotations: Optional[Tuple[Optional[AnnotationFragment], ...]]
+    "The annotations of this port"
+
+    class Config:
+        frozen = True
 
 
-class ArgPortFragment(BaseModel):
+class ArgPortFragment(PortTrait, BaseModel):
     typename: Optional[Literal["ArgPort"]] = Field(alias="__typename")
     key: str
     label: Optional[str]
@@ -724,9 +873,14 @@ class ArgPortFragment(BaseModel):
     "The corresponding Model"
     child: Optional[ChildPortFragment]
     "The child"
+    annotations: Optional[Tuple[Optional[AnnotationFragment], ...]]
+    "The annotations of this port"
+
+    class Config:
+        frozen = True
 
 
-class ReturnPortFragment(BaseModel):
+class ReturnPortFragment(PortTrait, BaseModel):
     typename: Optional[Literal["ReturnPort"]] = Field(alias="__typename")
     label: Optional[str]
     key: str
@@ -739,9 +893,23 @@ class ReturnPortFragment(BaseModel):
     "the type of input"
     child: Optional[ChildPortFragment]
     "The child"
+    annotations: Optional[Tuple[Optional[AnnotationFragment], ...]]
+    "The annotations of this port"
+
+    class Config:
+        frozen = True
 
 
-class NodeFragment(Reserve, BaseModel):
+class DefinitionFragment(Reserve, BaseModel):
+    typename: Optional[Literal["Node"]] = Field(alias="__typename")
+    args: Optional[Tuple[Optional[ArgPortFragment], ...]]
+    returns: Optional[Tuple[Optional[ReturnPortFragment], ...]]
+
+    class Config:
+        frozen = True
+
+
+class NodeFragment(DefinitionFragment, Reserve, BaseModel):
     typename: Optional[Literal["Node"]] = Field(alias="__typename")
     name: str
     "The cleartext name of this Node"
@@ -750,18 +918,22 @@ class NodeFragment(Reserve, BaseModel):
     kind: NodeKind
     "Function, generator? Check async Programming Textbook"
     id: ID
-    args: Optional[List[Optional[ArgPortFragment]]]
-    returns: Optional[List[Optional[ReturnPortFragment]]]
+
+    class Config:
+        frozen = True
 
 
 class ReserveParamsFragment(BaseModel):
     typename: Optional[Literal["ReserveParams"]] = Field(alias="__typename")
-    registries: Optional[List[Optional[ID]]]
+    registries: Optional[Tuple[Optional[ID], ...]]
     "Registry thar are allowed"
     minimal_instances: Optional[int] = Field(alias="minimalInstances")
     "The minimal amount of Instances"
     desired_instances: Optional[int] = Field(alias="desiredInstances")
     "The desired amount of Instances"
+
+    class Config:
+        frozen = True
 
 
 class ReservationFragmentNode(Reserve, BaseModel):
@@ -770,11 +942,17 @@ class ReservationFragmentNode(Reserve, BaseModel):
     pure: bool
     "Is this function pure. e.g can we cache the result?"
 
+    class Config:
+        frozen = True
+
 
 class ReservationFragmentWaiter(BaseModel):
     typename: Optional[Literal["Waiter"]] = Field(alias="__typename")
     unique: str
     "The Channel we are listening to"
+
+    class Config:
+        frozen = True
 
 
 class ReservationFragment(BaseModel):
@@ -792,6 +970,9 @@ class ReservationFragment(BaseModel):
     reference: str
     "The Unique identifier of this Assignation"
     updated_at: datetime = Field(alias="updatedAt")
+
+    class Config:
+        frozen = True
 
 
 class AssignMutation(BaseModel):
@@ -826,11 +1007,11 @@ class CreateTemplateMutation(BaseModel):
         extensions: Optional[List[Optional[str]]] = None
 
     class Meta:
-        document = "fragment ChildPortNested on ChildPort {\n  kind\n  child {\n    kind\n  }\n}\n\nfragment ChildPort on ChildPort {\n  kind\n  identifier\n  child {\n    ...ChildPortNested\n  }\n}\n\nfragment ArgPort on ArgPort {\n  __typename\n  key\n  label\n  nullable\n  description\n  default\n  kind\n  identifier\n  child {\n    ...ChildPort\n  }\n}\n\nfragment ReturnPort on ReturnPort {\n  __typename\n  label\n  key\n  nullable\n  description\n  identifier\n  kind\n  child {\n    ...ChildPort\n  }\n}\n\nfragment Node on Node {\n  name\n  description\n  kind\n  id\n  args {\n    ...ArgPort\n  }\n  returns {\n    ...ReturnPort\n  }\n}\n\nfragment Template on Template {\n  id\n  registry {\n    name\n    app {\n      version\n      identifier\n    }\n    user {\n      username\n    }\n  }\n  node {\n    ...Node\n  }\n  params\n}\n\nmutation createTemplate($definition: DefinitionInput!, $params: GenericScalar, $extensions: [String]) {\n  createTemplate(\n    definition: $definition\n    params: $params\n    extensions: $extensions\n  ) {\n    ...Template\n  }\n}"
+        document = "fragment ValueRange on ValueRange {\n  min\n  max\n}\n\nfragment IsPredicate on IsPredicate {\n  predicate\n}\n\nfragment ChildPortNested on ChildPort {\n  kind\n  child {\n    kind\n  }\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment ChildPort on ChildPort {\n  kind\n  identifier\n  child {\n    ...ChildPortNested\n  }\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment Annotation on Annotation {\n  kind\n  ...IsPredicate\n  ...ValueRange\n}\n\nfragment ReturnPort on ReturnPort {\n  __typename\n  label\n  key\n  nullable\n  description\n  identifier\n  kind\n  child {\n    ...ChildPort\n  }\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment ArgPort on ArgPort {\n  __typename\n  key\n  label\n  nullable\n  description\n  default\n  kind\n  identifier\n  child {\n    ...ChildPort\n  }\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment Definition on Node {\n  args {\n    ...ArgPort\n  }\n  returns {\n    ...ReturnPort\n  }\n}\n\nfragment Node on Node {\n  name\n  description\n  kind\n  id\n  ...Definition\n}\n\nfragment Template on Template {\n  id\n  registry {\n    name\n    app {\n      version\n      identifier\n    }\n    user {\n      username\n    }\n  }\n  node {\n    ...Node\n  }\n  params\n}\n\nmutation createTemplate($definition: DefinitionInput!, $params: GenericScalar, $extensions: [String]) {\n  createTemplate(\n    definition: $definition\n    params: $params\n    extensions: $extensions\n  ) {\n    ...Template\n  }\n}"
 
 
 class SlateMutation(BaseModel):
-    slate: Optional[List[Optional[ID]]]
+    slate: Optional[Tuple[Optional[ID], ...]]
 
     class Arguments(BaseModel):
         identifier: str
@@ -842,6 +1023,9 @@ class SlateMutation(BaseModel):
 class Reset_repositoryMutationResetrepository(BaseModel):
     typename: Optional[Literal["ResetRepositoryReturn"]] = Field(alias="__typename")
     ok: Optional[bool]
+
+    class Config:
+        frozen = True
 
 
 class Reset_repositoryMutation(BaseModel):
@@ -860,6 +1044,9 @@ class Reset_repositoryMutation(BaseModel):
 class Delete_nodeMutationDeletenode(BaseModel):
     typename: Optional[Literal["DeleteNodeReturn"]] = Field(alias="__typename")
     id: Optional[str]
+
+    class Config:
+        frozen = True
 
 
 class Delete_nodeMutation(BaseModel):
@@ -883,13 +1070,13 @@ class ReserveMutation(BaseModel):
         template: Optional[ID] = None
         params: Optional[ReserveParamsInput] = None
         title: Optional[str] = None
-        imitate: Optional[str] = None
+        imitate: Optional[ID] = None
         app_group: Optional[ID] = None
         reference: Optional[str] = None
         provision: Optional[ID] = None
 
     class Meta:
-        document = "fragment ReserveParams on ReserveParams {\n  registries\n  minimalInstances\n  desiredInstances\n}\n\nfragment Reservation on Reservation {\n  id\n  statusmessage\n  status\n  node {\n    id\n    pure\n  }\n  params {\n    ...ReserveParams\n  }\n  waiter {\n    unique\n  }\n  reference\n  updatedAt\n}\n\nmutation reserve($node: ID!, $template: ID, $params: ReserveParamsInput, $title: String, $imitate: String, $appGroup: ID, $reference: String, $provision: ID) {\n  reserve(\n    node: $node\n    template: $template\n    params: $params\n    title: $title\n    imitate: $imitate\n    provision: $provision\n    appGroup: $appGroup\n    reference: $reference\n  ) {\n    ...Reservation\n  }\n}"
+        document = "fragment ReserveParams on ReserveParams {\n  registries\n  minimalInstances\n  desiredInstances\n}\n\nfragment Reservation on Reservation {\n  id\n  statusmessage\n  status\n  node {\n    id\n    pure\n  }\n  params {\n    ...ReserveParams\n  }\n  waiter {\n    unique\n  }\n  reference\n  updatedAt\n}\n\nmutation reserve($node: ID!, $template: ID, $params: ReserveParamsInput, $title: String, $imitate: ID, $appGroup: ID, $reference: String, $provision: ID) {\n  reserve(\n    node: $node\n    template: $template\n    params: $params\n    title: $title\n    imitate: $imitate\n    provision: $provision\n    appGroup: $appGroup\n    reference: $reference\n  ) {\n    ...Reservation\n  }\n}"
 
 
 class UnreserveMutation(BaseModel):
@@ -908,6 +1095,9 @@ class Watch_provisionSubscriptionProvisions(BaseModel):
     delete: Optional[ID]
     update: Optional[ProvisionFragment]
 
+    class Config:
+        frozen = True
+
 
 class Watch_provisionSubscription(BaseModel):
     provisions: Optional[Watch_provisionSubscriptionProvisions]
@@ -916,7 +1106,7 @@ class Watch_provisionSubscription(BaseModel):
         identifier: str
 
     class Meta:
-        document = "fragment ChildPortNested on ChildPort {\n  kind\n  child {\n    kind\n  }\n}\n\nfragment ChildPort on ChildPort {\n  kind\n  identifier\n  child {\n    ...ChildPortNested\n  }\n}\n\nfragment ArgPort on ArgPort {\n  __typename\n  key\n  label\n  nullable\n  description\n  default\n  kind\n  identifier\n  child {\n    ...ChildPort\n  }\n}\n\nfragment ReturnPort on ReturnPort {\n  __typename\n  label\n  key\n  nullable\n  description\n  identifier\n  kind\n  child {\n    ...ChildPort\n  }\n}\n\nfragment Node on Node {\n  name\n  description\n  kind\n  id\n  args {\n    ...ArgPort\n  }\n  returns {\n    ...ReturnPort\n  }\n}\n\nfragment Provision on Provision {\n  id\n  status\n  template {\n    id\n    node {\n      ...Node\n    }\n    params\n  }\n}\n\nsubscription watch_provision($identifier: String!) {\n  provisions(identifier: $identifier) {\n    create {\n      ...Provision\n    }\n    delete\n    update {\n      ...Provision\n    }\n  }\n}"
+        document = "fragment ValueRange on ValueRange {\n  min\n  max\n}\n\nfragment IsPredicate on IsPredicate {\n  predicate\n}\n\nfragment ChildPortNested on ChildPort {\n  kind\n  child {\n    kind\n  }\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment ChildPort on ChildPort {\n  kind\n  identifier\n  child {\n    ...ChildPortNested\n  }\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment Annotation on Annotation {\n  kind\n  ...IsPredicate\n  ...ValueRange\n}\n\nfragment ReturnPort on ReturnPort {\n  __typename\n  label\n  key\n  nullable\n  description\n  identifier\n  kind\n  child {\n    ...ChildPort\n  }\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment ArgPort on ArgPort {\n  __typename\n  key\n  label\n  nullable\n  description\n  default\n  kind\n  identifier\n  child {\n    ...ChildPort\n  }\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment Definition on Node {\n  args {\n    ...ArgPort\n  }\n  returns {\n    ...ReturnPort\n  }\n}\n\nfragment Node on Node {\n  name\n  description\n  kind\n  id\n  ...Definition\n}\n\nfragment Provision on Provision {\n  id\n  status\n  template {\n    id\n    node {\n      ...Node\n    }\n    params\n  }\n}\n\nsubscription watch_provision($identifier: String!) {\n  provisions(identifier: $identifier) {\n    create {\n      ...Provision\n    }\n    delete\n    update {\n      ...Provision\n    }\n  }\n}"
 
 
 class Watch_todosSubscriptionTodos(BaseModel):
@@ -924,6 +1114,9 @@ class Watch_todosSubscriptionTodos(BaseModel):
     create: Optional[AssignationFragment]
     update: Optional[AssignationFragment]
     delete: Optional[ID]
+
+    class Config:
+        frozen = True
 
 
 class Watch_todosSubscription(BaseModel):
@@ -942,6 +1135,9 @@ class Watch_requestsSubscriptionRequests(BaseModel):
     update: Optional[AssignationFragment]
     delete: Optional[ID]
 
+    class Config:
+        frozen = True
+
 
 class Watch_requestsSubscription(BaseModel):
     requests: Optional[Watch_requestsSubscriptionRequests]
@@ -958,6 +1154,9 @@ class Watch_reservationsSubscriptionReservations(BaseModel):
     create: Optional[ReservationFragment]
     update: Optional[ReservationFragment]
     delete: Optional[ID]
+
+    class Config:
+        frozen = True
 
 
 class Watch_reservationsSubscription(BaseModel):
@@ -977,7 +1176,7 @@ class Get_provisionQuery(BaseModel):
         id: ID
 
     class Meta:
-        document = "fragment ChildPortNested on ChildPort {\n  kind\n  child {\n    kind\n  }\n}\n\nfragment ChildPort on ChildPort {\n  kind\n  identifier\n  child {\n    ...ChildPortNested\n  }\n}\n\nfragment ArgPort on ArgPort {\n  __typename\n  key\n  label\n  nullable\n  description\n  default\n  kind\n  identifier\n  child {\n    ...ChildPort\n  }\n}\n\nfragment ReturnPort on ReturnPort {\n  __typename\n  label\n  key\n  nullable\n  description\n  identifier\n  kind\n  child {\n    ...ChildPort\n  }\n}\n\nfragment Node on Node {\n  name\n  description\n  kind\n  id\n  args {\n    ...ArgPort\n  }\n  returns {\n    ...ReturnPort\n  }\n}\n\nfragment Provision on Provision {\n  id\n  status\n  template {\n    id\n    node {\n      ...Node\n    }\n    params\n  }\n}\n\nquery get_provision($id: ID!) {\n  provision(id: $id) {\n    ...Provision\n  }\n}"
+        document = "fragment ValueRange on ValueRange {\n  min\n  max\n}\n\nfragment IsPredicate on IsPredicate {\n  predicate\n}\n\nfragment ChildPortNested on ChildPort {\n  kind\n  child {\n    kind\n  }\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment ChildPort on ChildPort {\n  kind\n  identifier\n  child {\n    ...ChildPortNested\n  }\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment Annotation on Annotation {\n  kind\n  ...IsPredicate\n  ...ValueRange\n}\n\nfragment ReturnPort on ReturnPort {\n  __typename\n  label\n  key\n  nullable\n  description\n  identifier\n  kind\n  child {\n    ...ChildPort\n  }\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment ArgPort on ArgPort {\n  __typename\n  key\n  label\n  nullable\n  description\n  default\n  kind\n  identifier\n  child {\n    ...ChildPort\n  }\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment Definition on Node {\n  args {\n    ...ArgPort\n  }\n  returns {\n    ...ReturnPort\n  }\n}\n\nfragment Node on Node {\n  name\n  description\n  kind\n  id\n  ...Definition\n}\n\nfragment Provision on Provision {\n  id\n  status\n  template {\n    id\n    node {\n      ...Node\n    }\n    params\n  }\n}\n\nquery get_provision($id: ID!) {\n  provision(id: $id) {\n    ...Provision\n  }\n}"
 
 
 class Get_agentQueryAgentRegistry(BaseModel):
@@ -985,6 +1184,9 @@ class Get_agentQueryAgentRegistry(BaseModel):
     id: ID
     name: Optional[str]
     "DEPRECATED Will be replaced in the future: : None "
+
+    class Config:
+        frozen = True
 
 
 class Get_agentQueryAgent(BaseModel):
@@ -994,6 +1196,9 @@ class Get_agentQueryAgent(BaseModel):
     name: str
     "This providers Name"
     identifier: str
+
+    class Config:
+        frozen = True
 
 
 class Get_agentQuery(BaseModel):
@@ -1007,7 +1212,7 @@ class Get_agentQuery(BaseModel):
 
 
 class RequestsQuery(BaseModel):
-    requests: Optional[List[Optional[AssignationFragment]]]
+    requests: Optional[Tuple[Optional[AssignationFragment], ...]]
 
     class Arguments(BaseModel):
         identifier: str
@@ -1023,7 +1228,7 @@ class Get_templateQuery(BaseModel):
         id: ID
 
     class Meta:
-        document = "fragment ChildPortNested on ChildPort {\n  kind\n  child {\n    kind\n  }\n}\n\nfragment ChildPort on ChildPort {\n  kind\n  identifier\n  child {\n    ...ChildPortNested\n  }\n}\n\nfragment ArgPort on ArgPort {\n  __typename\n  key\n  label\n  nullable\n  description\n  default\n  kind\n  identifier\n  child {\n    ...ChildPort\n  }\n}\n\nfragment ReturnPort on ReturnPort {\n  __typename\n  label\n  key\n  nullable\n  description\n  identifier\n  kind\n  child {\n    ...ChildPort\n  }\n}\n\nfragment Node on Node {\n  name\n  description\n  kind\n  id\n  args {\n    ...ArgPort\n  }\n  returns {\n    ...ReturnPort\n  }\n}\n\nfragment Template on Template {\n  id\n  registry {\n    name\n    app {\n      version\n      identifier\n    }\n    user {\n      username\n    }\n  }\n  node {\n    ...Node\n  }\n  params\n}\n\nquery get_template($id: ID!) {\n  template(id: $id) {\n    ...Template\n  }\n}"
+        document = "fragment ValueRange on ValueRange {\n  min\n  max\n}\n\nfragment IsPredicate on IsPredicate {\n  predicate\n}\n\nfragment ChildPortNested on ChildPort {\n  kind\n  child {\n    kind\n  }\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment ChildPort on ChildPort {\n  kind\n  identifier\n  child {\n    ...ChildPortNested\n  }\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment Annotation on Annotation {\n  kind\n  ...IsPredicate\n  ...ValueRange\n}\n\nfragment ReturnPort on ReturnPort {\n  __typename\n  label\n  key\n  nullable\n  description\n  identifier\n  kind\n  child {\n    ...ChildPort\n  }\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment ArgPort on ArgPort {\n  __typename\n  key\n  label\n  nullable\n  description\n  default\n  kind\n  identifier\n  child {\n    ...ChildPort\n  }\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment Definition on Node {\n  args {\n    ...ArgPort\n  }\n  returns {\n    ...ReturnPort\n  }\n}\n\nfragment Node on Node {\n  name\n  description\n  kind\n  id\n  ...Definition\n}\n\nfragment Template on Template {\n  id\n  registry {\n    name\n    app {\n      version\n      identifier\n    }\n    user {\n      username\n    }\n  }\n  node {\n    ...Node\n  }\n  params\n}\n\nquery get_template($id: ID!) {\n  template(id: $id) {\n    ...Template\n  }\n}"
 
 
 class FindQuery(BaseModel):
@@ -1036,7 +1241,7 @@ class FindQuery(BaseModel):
         hash: Optional[str] = None
 
     class Meta:
-        document = "fragment ChildPortNested on ChildPort {\n  kind\n  child {\n    kind\n  }\n}\n\nfragment ChildPort on ChildPort {\n  kind\n  identifier\n  child {\n    ...ChildPortNested\n  }\n}\n\nfragment ArgPort on ArgPort {\n  __typename\n  key\n  label\n  nullable\n  description\n  default\n  kind\n  identifier\n  child {\n    ...ChildPort\n  }\n}\n\nfragment ReturnPort on ReturnPort {\n  __typename\n  label\n  key\n  nullable\n  description\n  identifier\n  kind\n  child {\n    ...ChildPort\n  }\n}\n\nfragment Node on Node {\n  name\n  description\n  kind\n  id\n  args {\n    ...ArgPort\n  }\n  returns {\n    ...ReturnPort\n  }\n}\n\nquery find($id: ID, $template: ID, $hash: String) {\n  node(id: $id, template: $template, hash: $hash) {\n    ...Node\n  }\n}"
+        document = "fragment ValueRange on ValueRange {\n  min\n  max\n}\n\nfragment IsPredicate on IsPredicate {\n  predicate\n}\n\nfragment ChildPortNested on ChildPort {\n  kind\n  child {\n    kind\n  }\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment ChildPort on ChildPort {\n  kind\n  identifier\n  child {\n    ...ChildPortNested\n  }\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment Annotation on Annotation {\n  kind\n  ...IsPredicate\n  ...ValueRange\n}\n\nfragment ArgPort on ArgPort {\n  __typename\n  key\n  label\n  nullable\n  description\n  default\n  kind\n  identifier\n  child {\n    ...ChildPort\n  }\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment ReturnPort on ReturnPort {\n  __typename\n  label\n  key\n  nullable\n  description\n  identifier\n  kind\n  child {\n    ...ChildPort\n  }\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment Definition on Node {\n  args {\n    ...ArgPort\n  }\n  returns {\n    ...ReturnPort\n  }\n}\n\nfragment Node on Node {\n  name\n  description\n  kind\n  id\n  ...Definition\n}\n\nquery find($id: ID, $template: ID, $hash: String) {\n  node(id: $id, template: $template, hash: $hash) {\n    ...Node\n  }\n}"
 
 
 class Get_reservationQueryReservationTemplateRegistryApp(BaseModel):
@@ -1044,6 +1249,9 @@ class Get_reservationQueryReservationTemplateRegistryApp(BaseModel):
     id: ID
     version: str
     identifier: str
+
+    class Config:
+        frozen = True
 
 
 class Get_reservationQueryReservationTemplateRegistryUser(BaseModel):
@@ -1053,6 +1261,9 @@ class Get_reservationQueryReservationTemplateRegistryUser(BaseModel):
     id: ID
     email: str
 
+    class Config:
+        frozen = True
+
 
 class Get_reservationQueryReservationTemplateRegistry(BaseModel):
     typename: Optional[Literal["Registry"]] = Field(alias="__typename")
@@ -1061,6 +1272,9 @@ class Get_reservationQueryReservationTemplateRegistry(BaseModel):
     user: Optional[Get_reservationQueryReservationTemplateRegistryUser]
     "The Associated App"
 
+    class Config:
+        frozen = True
+
 
 class Get_reservationQueryReservationTemplate(BaseModel):
     typename: Optional[Literal["Template"]] = Field(alias="__typename")
@@ -1068,12 +1282,18 @@ class Get_reservationQueryReservationTemplate(BaseModel):
     registry: Get_reservationQueryReservationTemplateRegistry
     "The associated registry for this Template"
 
+    class Config:
+        frozen = True
+
 
 class Get_reservationQueryReservationProvisions(BaseModel):
     typename: Optional[Literal["Provision"]] = Field(alias="__typename")
     id: ID
     status: ProvisionStatus
     "Current lifecycle of Provision"
+
+    class Config:
+        frozen = True
 
 
 class Get_reservationQueryReservationNode(Reserve, BaseModel):
@@ -1084,13 +1304,16 @@ class Get_reservationQueryReservationNode(Reserve, BaseModel):
     name: str
     "The cleartext name of this Node"
 
+    class Config:
+        frozen = True
+
 
 class Get_reservationQueryReservation(BaseModel):
     typename: Optional[Literal["Reservation"]] = Field(alias="__typename")
     id: ID
     template: Optional[Get_reservationQueryReservationTemplate]
     "The template this reservation connects"
-    provisions: List[Get_reservationQueryReservationProvisions]
+    provisions: Tuple[Get_reservationQueryReservationProvisions, ...]
     "The Provisions this reservation connects"
     title: Optional[str]
     "A Short Hand Way to identify this reservation for you"
@@ -1101,6 +1324,9 @@ class Get_reservationQueryReservation(BaseModel):
     "The Unique identifier of this Assignation"
     node: Get_reservationQueryReservationNode
     "The node this reservation connects"
+
+    class Config:
+        frozen = True
 
 
 class Get_reservationQuery(BaseModel):
@@ -1114,7 +1340,7 @@ class Get_reservationQuery(BaseModel):
 
 
 class ReservationsQuery(BaseModel):
-    reservations: Optional[List[Optional[ReservationFragment]]]
+    reservations: Optional[Tuple[Optional[ReservationFragment], ...]]
 
     class Arguments(BaseModel):
         identifier: str
@@ -1376,7 +1602,7 @@ async def areserve(
     template: Optional[ID] = None,
     params: Optional[ReserveParamsInput] = None,
     title: Optional[str] = None,
-    imitate: Optional[str] = None,
+    imitate: Optional[ID] = None,
     app_group: Optional[ID] = None,
     reference: Optional[str] = None,
     provision: Optional[ID] = None,
@@ -1391,7 +1617,7 @@ async def areserve(
         template (Optional[ID], optional): template.
         params (Optional[ReserveParamsInput], optional): params.
         title (Optional[str], optional): title.
-        imitate (Optional[str], optional): imitate.
+        imitate (Optional[ID], optional): imitate.
         app_group (Optional[ID], optional): appGroup.
         reference (Optional[str], optional): reference.
         provision (Optional[ID], optional): provision.
@@ -1422,7 +1648,7 @@ def reserve(
     template: Optional[ID] = None,
     params: Optional[ReserveParamsInput] = None,
     title: Optional[str] = None,
-    imitate: Optional[str] = None,
+    imitate: Optional[ID] = None,
     app_group: Optional[ID] = None,
     reference: Optional[str] = None,
     provision: Optional[ID] = None,
@@ -1437,7 +1663,7 @@ def reserve(
         template (Optional[ID], optional): template.
         params (Optional[ReserveParamsInput], optional): params.
         title (Optional[str], optional): title.
-        imitate (Optional[str], optional): imitate.
+        imitate (Optional[ID], optional): imitate.
         app_group (Optional[ID], optional): appGroup.
         reference (Optional[str], optional): reference.
         provision (Optional[ID], optional): provision.
@@ -1877,6 +2103,7 @@ def reservations(
     ).reservations
 
 
+AnnotationInput.update_forward_refs()
 ArgPortInput.update_forward_refs()
 ChildPortInput.update_forward_refs()
 DefinitionInput.update_forward_refs()

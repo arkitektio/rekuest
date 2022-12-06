@@ -19,23 +19,14 @@ def assign(node: Reserve, *args, **kwargs) -> Any:
         x = node.assign(*args, **kwargs)
 
 
-def progress(percentage: int) -> None:
-    """Progress
 
-    Args:
-        percentage (int): Percentage to progress to
+
+
+def useUser():
+    """Use the current User
+
+    Returns:
+        User: The current User
     """
-
     helper = get_current_assignation_helper()
-    helper.progress(percentage)
-
-
-async def aprogress(percentage: int) -> None:
-    """Progress
-
-    Args:
-        percentage (int): Percentage to progress to
-    """
-
-    helper = get_current_assignation_helper()
-    await helper.aprogress(percentage)
+    return helper.assignation.user

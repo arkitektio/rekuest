@@ -2,7 +2,7 @@
 name = "aiohttp"
 version = "3.8.3"
 description = "Async http client/server framework (asyncio)"
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.6"
 
@@ -24,7 +24,7 @@ speedups = ["Brotli", "aiodns", "cchardet"]
 name = "aiosignal"
 version = "1.3.1"
 description = "aiosignal: a list of registered asynchronous callbacks"
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.7"
 
@@ -32,10 +32,21 @@ python-versions = ">=3.7"
 frozenlist = ">=1.1.0"
 
 [[package]]
+name = "annotated-types"
+version = "0.4.0"
+description = "Reusable constraint types to use with typing.Annotated"
+category = "main"
+optional = false
+python-versions = ">=3.7"
+
+[package.dependencies]
+typing-extensions = {version = ">=4.0.0", markers = "python_version < \"3.9\""}
+
+[[package]]
 name = "async-timeout"
 version = "4.0.2"
 description = "Timeout context manager for asyncio programs"
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.6"
 
@@ -46,7 +57,7 @@ typing-extensions = {version = ">=3.6.5", markers = "python_version < \"3.8\""}
 name = "asynctest"
 version = "0.13.0"
 description = "Enhance the standard unittest package with features for testing asyncio libraries"
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.5"
 
@@ -54,7 +65,7 @@ python-versions = ">=3.5"
 name = "attrs"
 version = "22.1.0"
 description = "Classes Without Boilerplate"
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.5"
 
@@ -111,7 +122,7 @@ python-versions = ">=3.6"
 name = "charset-normalizer"
 version = "2.1.1"
 description = "The Real First Universal Charset Detector. Open, modern and actively maintained alternative to Chardet."
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.6.0"
 
@@ -134,7 +145,7 @@ importlib-metadata = {version = "*", markers = "python_version < \"3.8\""}
 name = "colorama"
 version = "0.4.6"
 description = "Cross-platform colored terminal text."
-category = "dev"
+category = "main"
 optional = false
 python-versions = "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,!=3.5.*,!=3.6.*,>=2.7"
 
@@ -204,7 +215,7 @@ python-versions = ">=3.6,<4.0"
 name = "exceptiongroup"
 version = "1.0.4"
 description = "Backport of PEP 654 (exception groups)"
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.7"
 
@@ -215,7 +226,7 @@ test = ["pytest (>=6)"]
 name = "frozenlist"
 version = "1.3.3"
 description = "A list-like structure which implements collections.abc.MutableSequence"
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.7"
 
@@ -234,7 +245,7 @@ typing-extensions = {version = ">=4.2,<5", markers = "python_version < \"3.8\""}
 name = "idna"
 version = "3.4"
 description = "Internationalized Domain Names in Applications (IDNA)"
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.5"
 
@@ -242,7 +253,7 @@ python-versions = ">=3.5"
 name = "importlib-metadata"
 version = "5.0.0"
 description = "Read metadata from Python packages"
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.7"
 
@@ -267,7 +278,7 @@ python-versions = ">=3.5"
 name = "iniconfig"
 version = "1.1.1"
 description = "iniconfig: brain-dead simple config-ini parsing"
-category = "dev"
+category = "main"
 optional = false
 python-versions = "*"
 
@@ -301,7 +312,7 @@ uvloop = ["uvloop (>=0.16.0,<0.17.0)"]
 name = "multidict"
 version = "6.0.2"
 description = "multidict implementation"
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.7"
 
@@ -348,7 +359,7 @@ test = ["appdirs (==1.4.4)", "pytest (>=7.2)", "pytest-cov (>=4)", "pytest-mock 
 name = "pluggy"
 version = "1.0.0"
 description = "plugin and hook calling mechanisms for python"
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.6"
 
@@ -457,7 +468,7 @@ python-versions = "*"
 name = "pytest"
 version = "7.2.0"
 description = "pytest: simple powerful testing with Python"
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.7"
 
@@ -475,10 +486,26 @@ tomli = {version = ">=1.0.0", markers = "python_version < \"3.11\""}
 testing = ["argcomplete", "hypothesis (>=3.56)", "mock", "nose", "pygments (>=2.7.2)", "requests", "xmlschema"]
 
 [[package]]
+name = "pytest-aiohttp"
+version = "1.0.4"
+description = "Pytest plugin for aiohttp support"
+category = "main"
+optional = false
+python-versions = ">=3.7"
+
+[package.dependencies]
+aiohttp = ">=3.8.1"
+pytest = ">=6.1.0"
+pytest-asyncio = ">=0.17.2"
+
+[package.extras]
+testing = ["coverage (==6.2)", "mypy (==0.931)"]
+
+[[package]]
 name = "pytest-asyncio"
 version = "0.20.2"
 description = "Pytest support for asyncio"
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.7"
 
@@ -551,7 +578,7 @@ test = ["pytest (>=6,!=7.0.0,!=7.0.1)", "pytest-cov (>=3.0.0)", "pytest-qt"]
 
 [[package]]
 name = "rath"
-version = "0.3.3"
+version = "0.3.4"
 description = "async transport-agnostic graphql client"
 category = "main"
 optional = false
@@ -636,7 +663,7 @@ selenium = ["selenium"]
 name = "tomli"
 version = "2.0.1"
 description = "A lil' TOML parser"
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.7"
 
@@ -721,7 +748,7 @@ python-versions = "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,>=2.7"
 name = "yarl"
 version = "1.8.1"
 description = "Yet another URL library"
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.7"
 
@@ -734,7 +761,7 @@ typing-extensions = {version = ">=3.7.4", markers = "python_version < \"3.8\""}
 name = "zipp"
 version = "3.10.0"
 description = "Backport of pathlib-compatible object wrapper for zip files"
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.7"
 
@@ -745,7 +772,7 @@ testing = ["flake8 (<5)", "func-timeout", "jaraco.functools", "jaraco.itertools"
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.7"
-content-hash = "f8ad43c00b67eb1f5981bda5f01ccab5b63afa29d8cbee6fc25677c321111c8f"
+content-hash = "4a3368277317f3de7f6970676b58fb58a1cd6b1b3110948ad1e8dfc882f11f29"
 
 [metadata.files]
 aiohttp = [
@@ -840,6 +867,10 @@ aiohttp = [
 aiosignal = [
     {file = "aiosignal-1.3.1-py3-none-any.whl", hash = "sha256:f8376fb07dd1e86a584e4fcdec80b36b7f81aac666ebc724e2c090300dd83b17"},
     {file = "aiosignal-1.3.1.tar.gz", hash = "sha256:54cd96e15e1649b75d6c87526a6ff0b6c1b0dd3459f43d9ca11d48c339b68cfc"},
+]
+annotated-types = [
+    {file = "annotated_types-0.4.0-py3-none-any.whl", hash = "sha256:ac27bcccc7a1447efe9a9bd1145766cc14a841b107a6040a799c260e83adf67d"},
+    {file = "annotated_types-0.4.0.tar.gz", hash = "sha256:fae0ca44ad43b7e54dbb02b22137885b1cb1cb7a312fe9fe7a6d77a0e5b0443a"},
 ]
 async-timeout = [
     {file = "async-timeout-4.0.2.tar.gz", hash = "sha256:2163e1640ddb52b7a8c80d0a67a08587e5d245cc9c553a74a847056bc2976b15"},
@@ -1256,6 +1287,10 @@ pytest = [
     {file = "pytest-7.2.0-py3-none-any.whl", hash = "sha256:892f933d339f068883b6fd5a459f03d85bfcb355e4981e146d2c7616c21fef71"},
     {file = "pytest-7.2.0.tar.gz", hash = "sha256:c4014eb40e10f11f355ad4e3c2fb2c6c6d1919c73f3b5a433de4708202cade59"},
 ]
+pytest-aiohttp = [
+    {file = "pytest-aiohttp-1.0.4.tar.gz", hash = "sha256:39ff3a0d15484c01d1436cbedad575c6eafbf0f57cdf76fb94994c97b5b8c5a4"},
+    {file = "pytest_aiohttp-1.0.4-py3-none-any.whl", hash = "sha256:1d2dc3a304c2be1fd496c0c2fb6b31ab60cd9fc33984f761f951f8ea1eb4ca95"},
+]
 pytest-asyncio = [
     {file = "pytest-asyncio-0.20.2.tar.gz", hash = "sha256:32a87a9836298a881c0ec637ebcc952cfe23a56436bdc0d09d1511941dd8a812"},
     {file = "pytest_asyncio-0.20.2-py3-none-any.whl", hash = "sha256:07e0abf9e6e6b95894a39f688a4a875d63c2128f76c02d03d16ccbc35bcc0f8a"},
@@ -1331,8 +1366,8 @@ QtPy = [
     {file = "QtPy-2.3.0.tar.gz", hash = "sha256:0603c9c83ccc035a4717a12908bf6bc6cb22509827ea2ec0e94c2da7c9ed57c5"},
 ]
 rath = [
-    {file = "rath-0.3.3-py3-none-any.whl", hash = "sha256:c2e52f56e1ce2a8394edfa963fa47a2ebcfd7025da66aca0ecf0c1698bf3f1f0"},
-    {file = "rath-0.3.3.tar.gz", hash = "sha256:3625bc9a83b8ef3eaf0e26dc4aaabfcb27a988e998c39bcb5ebedb147217e7e5"},
+    {file = "rath-0.3.4-py3-none-any.whl", hash = "sha256:a0572770c4fa4b86f4fa26c1efa2fd0685fd1f7441bc199e34a101e399731de2"},
+    {file = "rath-0.3.4.tar.gz", hash = "sha256:8497acb6fc54f457ca482ce5c2961305808bd0cfafe7a0e8db8ca5f20ee1d145"},
 ]
 requests = [
     {file = "requests-2.28.1-py3-none-any.whl", hash = "sha256:8fefa2a1a1365bf5520aac41836fbee479da67864514bdb821f31ce07ce65349"},

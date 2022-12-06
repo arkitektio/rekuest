@@ -33,6 +33,7 @@ class UpdatableModel(BaseModel):
 
 class Assignation(UpdatableModel):
     assignation: str
+    reference: Optional[str]
     provision: Optional[str]
     reservation: Optional[str]
     args: Optional[List[Any]]
@@ -42,6 +43,7 @@ class Assignation(UpdatableModel):
     log: Optional[bool]
     status: Optional[AssignationStatus]
     message: Optional[str]
+    user: Optional[str]
 
 
 class Unassignation(UpdatableModel):
@@ -51,6 +53,7 @@ class Unassignation(UpdatableModel):
 
 class Provision(UpdatableModel):
     provision: str
+    guardian: str
     template: Optional[str]
     status: Optional[ProvisionStatus]
 
@@ -61,6 +64,7 @@ class Unprovision(UpdatableModel):
 
 
 class Reservation(UpdatableModel):
+    reference: Optional[str]
     reservation: str
     provision: Optional[str]
     template: Optional[str]

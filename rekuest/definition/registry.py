@@ -1,7 +1,7 @@
 import contextvars
 from ..actors.base import Actor
 from rekuest.api.schema import DefinitionInput
-from rekuest.actors.actify import actify
+from rekuest.actors.actify import reactify, Actifier
 from rekuest.definition.define import prepare_definition
 from rekuest.structures.registry import (
     StructureRegistry,
@@ -11,7 +11,10 @@ from rekuest.api.schema import WidgetInput
 from typing import Dict, List, Callable, Optional, Tuple
 from pydantic import Field
 from koil.composition import KoiledModel
+from typing import Protocol, runtime_checkable
 import json
+from rekuest.actors.builder import ActorBuilder
+
 
 current_definition_registry = contextvars.ContextVar(
     "current_definition_registry", default=None
@@ -30,43 +33,18 @@ def get_current_definition_registry(allow_global=True):
     return current_definition_registry.get(get_default_definition_registry())
 
 
-QString = str
-
-
-class ActorBuilder:
-    def define(*args, **kwargs) -> DefinitionInput:
-        raise NotImplementedError("Needs to be defined")
-
-    def actify(*args, **kwargs) -> Callable[[], Actor]:
-        raise NotImplementedError("Needs to be defined")
-
-
-class DefaultActorBuilder:
-    def define(*args, **kwargs) -> DefinitionInput:
-        return prepare_definition(**kwargs)
-
-    def actify(*args, **kwargs) -> Callable[[], Actor]:
-        return actify(*args, **kwargs)
-
-
 class DefinitionRegistry(KoiledModel):
     structure_registry: Optional[StructureRegistry] = None
     defined_nodes: List[Tuple[DefinitionInput, Callable]] = Field(
         default_factory=list, exclude=True
     )
-    templated_nodes: List[Tuple[QString, Callable]] = Field(
-        default_factory=list, exclude=True
+    definitions: Dict[DefinitionInput, ActorBuilder] = Field(
+        default_factory=dict, exclude=True
     )
+    actifier: Actifier = reactify
     copy_from_default: bool = False
-    defaultActorBuilder: ActorBuilder = Field(default=DefaultActorBuilder)
 
     _token: contextvars.Token = None
-
-    def __post_init__(self):
-        if self.copy_from_default:
-            default = get_default_definition_registry()
-            self.defined_nodes = default.defined_nodes + self.defined_nodes
-            self.templated_nodes = default.templated_nodes + self.templated_nodes
 
     def has_definitions(self):
         return len(self.defined_nodes) > 0 or len(self.templated_nodes) > 0
@@ -75,114 +53,65 @@ class DefinitionRegistry(KoiledModel):
         self.defined_nodes = []  # dict are queryparams for the node
         self.templated_nodes = []
 
-    def register_actor_with_defintion(
-        self, actorBuilder: Callable, definition: DefinitionInput, **params  # New Node
-    ):
-        self.defined_nodes.append((definition, actorBuilder, params))
-
-    def register_actor_with_template(
-        self, actorBuilder: Callable, q_string: QString, **params
-    ):  # Query Path
-        self.templated_nodes.append((q_string, actorBuilder, params))
+    def register_actorBuilder(self, actorBuilder: ActorBuilder, **params):  # New Node
+        self.defined_nodes.append((actorBuilder.__definition__, actorBuilder, params))
+        self.definitions[actorBuilder.__definition__] = actorBuilder
 
     def register(
         self,
         function_or_actor,
-        builder: ActorBuilder = None,
-        package=None,
-        interface=None,
+        structure_registry: StructureRegistry,
+        actifier: Actifier = None,
+        interface: str = None,
         widgets: Dict[str, WidgetInput] = {},
         interfaces: List[str] = [],
         on_provide=None,
         on_unprovide=None,
-        structure_registry: StructureRegistry = None,
-        **actorparams,
+        **actifier_params,
     ):
+        """Register a function or actor with the definition registry
 
-        structure_registry = (
-            structure_registry
-            or self.structure_registry
-            or get_current_structure_registry()
-        )
+        Register a function or actor with the definition registry. This will
+        create a definition for the function or actor and register it with the
+        definition registry.
 
-        if hasattr(function_or_actor, "assign"):
-            actor = function_or_actor
-            actorBuilder = actor
-            definition = prepare_definition(
-                actor.assign,
-                omitfirst=1,  # we are ommiting the self parameter
-                widgets=widgets,
-                interface=interface or actor.__name__,
-                interfaces=interfaces,
-                structure_registry=structure_registry,
-            )
+        If first parameter is a function, it will be wrapped in an actorBuilder
+        through the actifier. If the first parameter is an actor, it will be
+        used as the actorBuilder (needs to have the dunder __definition__) to be
+        detected as such.
+
+        Args:
+            function_or_actor (Union[Actor, Callable]): _description_
+            actifier (Actifier, optional): _description_. Defaults to None.
+            interface (str, optional): _description_. Defaults to None.
+            widgets (Dict[str, WidgetInput], optional): _description_. Defaults to {}.
+            interfaces (List[str], optional): _description_. Defaults to [].
+            on_provide (_type_, optional): _description_. Defaults to None.
+            on_unprovide (_type_, optional): _description_. Defaults to None.
+            structure_registry (StructureRegistry, optional): _description_. Defaults to None.
+        """
+
+        if hasattr(function_or_actor, "__definition__"):
+            actorBuilder = function_or_actor
 
         else:
-
-            if builder:
-                assert hasattr(builder, "actify"), "Build needs to provide actify attr"
-                assert hasattr(
-                    builder, "define"
-                ), "Builder needs to provide define attr"
-            else:
-                builder = self.defaultActorBuilder
-
-            actorBuilder = builder.actify(
+            actifier = actifier or self.actifier
+            actorBuilder = actifier(
                 function_or_actor,
-                builder=builder,
+                structure_registry,
                 on_provide=on_provide,
                 on_unprovide=on_unprovide,
-                structure_registry=structure_registry,
-                **actorparams,
-            )
-
-            definition = builder.define(
-                function=function_or_actor,
                 widgets=widgets,
-                package=package,
-                interface=interface,
-                interfaces=interfaces,
-                structure_registry=structure_registry,
+                **actifier_params,
             )
 
-        self.register_actor_with_defintion(actorBuilder, definition, **actorparams)
+        assert hasattr(
+            actorBuilder, "__definition__"
+        ), "The actorBuilder needs to have a definition. Otherwise it is not a valid actorBuilder"
 
-    def template(
-        self,
-        function,
-        qstring: QString,
-        builder: ActorBuilder = None,
-        on_provide=None,
-        on_unprovide=None,
-        structure_registry: StructureRegistry = None,
-        **actorparams,
-    ):
-        structure_registry = (
-            structure_registry
-            or self.structure_registry
-            or get_current_structure_registry()
-        )
-
-        if builder:
-            assert hasattr(builder, "actify"), "Build needs to provide actify attr"
-            assert hasattr(builder, "define"), "Builder needs to provide define attr"
-        else:
-            builder = self.defaultActorBuilder
-
-        actorBuilder = actify(
-            function,
-            on_provide=on_provide,
-            on_unprovide=on_unprovide,
-            structure_registry=structure_registry**actorparams,
-        )
-
-        self.register_actor_with_template(actorBuilder, qstring, **actorparams)
+        self.register_actorBuilder(actorBuilder)
 
     async def __aenter__(self):
-        self.structure_registry = (
-            self.structure_registry or get_current_structure_registry()
-        )
-        current_definition_registry.set(self)
         return self
 
     def dump(self):
@@ -248,38 +177,5 @@ def register(
             on_unprovide=on_unprovide,
             **params,
         )
-
-    return real_decorator
-
-
-def template(
-    q_string: QString,
-    on_provide=None,
-    on_unprovide=None,
-    structure_registry: StructureRegistry = None,
-    definition_registry: DefinitionRegistry = None,
-    **params,
-):
-
-    definition_registry = definition_registry or get_current_definition_registry()
-    structure_registry = structure_registry or get_current_structure_registry()
-
-    def real_decorator(function):
-        # Simple bypass for now
-        def wrapped_function(*args, **kwargs):
-            return function(*args, **kwargs)
-
-        definition_registry.template(
-            function,
-            q_string,
-            on_provide=on_provide,
-            on_unprovide=on_unprovide,
-            structure_registry=structure_registry,
-            **params,
-        )
-
-        # We are registering this as a template
-
-        return wrapped_function
 
     return real_decorator

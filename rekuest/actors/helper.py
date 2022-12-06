@@ -1,50 +1,43 @@
 from pydantic import BaseModel
 from rekuest.actors.base import Actor
 from rekuest.api.schema import LogLevelInput
-from rekuest.messages import Assignation
+from rekuest.messages import Assignation, Provision
 from koil import unkoil
+from rekuest.agents.transport.base import AgentTransport
 
 
 class AssignationHelper(BaseModel):
-    actor: Actor
     assignation: Assignation
+    transport: AgentTransport
 
     async def alog(self, level: LogLevelInput, message: str) -> None:
-        await self.actor.transport.log_to_assignation(
+        await self.transport.log_to_assignation(
             id=self.assignation.assignation, level=level, message=message
         )
 
+    def log(self, level: LogLevelInput, message: str) -> None:
+        return unkoil(self.alog, level, message)
+
     async def aprogress(self, progress: int) -> None:
-        await self.actor.transport.change_assignation(
-            id=self.assignation.assignation, progress=progress
-        )
+        raise NotImplementedError()
+
+    @property
+    def user(self) -> str:
+        return self.assignation.user
 
     class Config:
         arbitrary_types_allowed = True
 
 
 class ProvisionHelper(BaseModel):
-    actor: Actor
+    provision: Provision
+    transport: AgentTransport
 
     async def alog(self, level: LogLevelInput, message: str) -> None:
-        raise NotImplementedError()
-
-
-class ThreadedAssignationHelper(AssignationHelper):
-    def progress(self, progress: int) -> None:
-        unkoil(self.aprogress, progress=progress)
-
-
-class AsyncAssignationHelper(AssignationHelper):
-    async def alog(self, message: str, level: LogLevelInput = LogLevelInput.DEBUG):
-
-        await self.actor.transport.log_to_assignation(
-            id=self.assignation.assignation, level=level, message=message
+        await self.transport.log_to_provision(
+            id=self.provision.provision, level=level, message=message
         )
 
-
-class AsyncProvisionHelper(ProvisionHelper):
-    async def alog(self, message: str, level: LogLevelInput = LogLevelInput.DEBUG):
-        await self.actor.transport.log_to_provision(
-            id=self.actor.provision.id, level=level, message=message
-        )
+    @property
+    def guardian(self) -> str:
+        return self.provision.guardian

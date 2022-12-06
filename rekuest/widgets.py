@@ -1,7 +1,7 @@
 from rekuest.api.schema import WidgetInput, ReturnWidgetInput
 
 
-def SliderWidget(min=0, max=0):
+def SliderWidget(min=None, max=None):
     return WidgetInput(kind="SliderWidget", min=min, max=max)
 
 

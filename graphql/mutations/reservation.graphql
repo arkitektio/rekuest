@@ -3,7 +3,7 @@ mutation reserve(
   $template: ID
   $params: ReserveParamsInput
   $title: String
-  $imitate: String
+  $imitate: ID
   $appGroup: ID
   $reference: String
   $provision: ID

@@ -1,6 +1,6 @@
 from rekuest.structures.registry import StructureRegistry
 from rekuest.api.schema import TemplateFragment, NodeFragment, aget_template, afind
-from .annotations import ValueRange, convert_value_range
+from .annotations import add_annotations_to_structure_registry
 
 DEFAULT_STRUCTURE_REGISTRY = None
 
@@ -17,8 +17,6 @@ def get_default_structure_registry() -> StructureRegistry:
             NodeFragment, "@rekuest/node", expand=afind
         )
 
-        DEFAULT_STRUCTURE_REGISTRY.register_annotation_converter(
-            ValueRange, convert_value_range
-        )
+        add_annotations_to_structure_registry(DEFAULT_STRUCTURE_REGISTRY)
 
     return DEFAULT_STRUCTURE_REGISTRY

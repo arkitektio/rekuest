@@ -15,6 +15,14 @@ import asyncio
 import random
 from pydantic import Field
 from koil import unkoil
+from koil.composition import KoiledModel
+from rekuest.postmans.transport.protocols.postman_json import (
+    ReservePub,
+    ReserveSubUpdate,
+    AssignPub,
+    AssignSubUpdate,
+)
+import uuid
 
 
 class MockAutoresolvingPostmanTransport(PostmanTransport):
@@ -131,14 +139,16 @@ class MockAutoresolvingPostmanTransport(PostmanTransport):
         underscore_attrs_are_private = True
 
 
-class MockPostmanTransport(PostmanTransport):
-
+class MockPostmanTransport(KoiledModel):
+    connected = False
     assignationState: Dict[str, Assignation] = Field(default_factory=dict)
     unassignationState: Dict[str, Unassignation] = Field(default_factory=dict)
     unreservationState: Dict[str, Unreservation] = Field(default_factory=dict)
     reservationState: Dict[str, Reservation] = Field(default_factory=dict)
 
-    _inqueue: asyncio.Queue = None
+    _res_update_queues: Dict[str, asyncio.Queue] = {}
+    _ass_update_queues: Dict[str, asyncio.Queue] = {}
+    _in_queue: asyncio.Queue = None
 
     async def alist_assignations(
         self, exclude: Optional[AssignationStatus] = None
@@ -150,64 +160,99 @@ class MockPostmanTransport(PostmanTransport):
     ) -> List[Reservation]:
         return []
 
+    async def aconnect(self):
+
+        self._in_queue = asyncio.Queue()
+        self.connected = True
+
     async def __aenter__(self):
-        self._inqueue = asyncio.Queue()
+        await self.aconnect()
+        pass
 
     async def aassign(
         self,
         reservation: str,
         args: List[Any],
-        kwargs: Dict[str, Any],
         persist=True,
         log=False,
+        reference: str = None,
+        parent: str = None,
     ) -> Assignation:
+        assert self.connected, "Not connected"
 
-        assignation = Assignation(
-            assignation=str(len(self.assignationState) + 1),
+        if not reference:
+            reference = str(uuid.uuid4())
+
+        self._ass_update_queues[reference] = asyncio.Queue()
+
+        assignation = AssignPub(
             reservation=reservation,
             args=args,
-            kwargs=kwargs,
-            status=AssignationStatus.PENDING,
+            parent=parent,
+            reference=reference,
         )
-        self.assignationState[assignation.assignation] = assignation
-        await self._inqueue.put(assignation)
-        return assignation
+        await self._in_queue.put(assignation)
+        return self._ass_update_queues[reference]
 
     async def areserve(
-        self, node: str, params: ReserveParamsInput = None
+        self,
+        node: str,
+        params: ReserveParamsInput = None,
+        provision: str = None,
+        reference: str = "default",
     ) -> Reservation:
-        reservation = Reservation(
-            reservation=str(len(self.reservationState) + 1),
+
+        assert self.connected, "Not connected"
+
+        unique_identifier = node + reference
+
+        self.reservationState[unique_identifier] = None
+        self._res_update_queues[unique_identifier] = asyncio.Queue()
+
+        reservation = ReservePub(
             node=node,
+            reference=reference,
             status=ReservationStatus.ROUTING,
         )
-        self.reservationState[reservation.reservation] = reservation
-        await self._inqueue.put(reservation)
-        return reservation
+
+        await self._in_queue.put(reservation)
+        return self._res_update_queues[unique_identifier]
 
     async def aunreserve(self, reservation: str) -> Unreservation:
+
+        assert self.connected, "Not connected"
+
         unreservation = Unreservation(reservation=reservation)
-        await self._inqueue.put(unreservation)
+        await self._in_queue.put(unreservation)
         return unreservation
 
     async def aunassign(self, assignation: str) -> Unassignation:
-        unassignation = Unassignation(assignation=assignation)
-        await self._inqueue.put(Unassignation(assignation=assignation))
-        return unassignation
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        for item in range(self._inqueue.qsize()):
-            self._inqueue.task_done()
+        assert self.connected, "Not connected"
+
+        unassignation = Unassignation(assignation=assignation)
+        await self._in_queue.put(Unassignation(assignation=assignation))
+        return unassignation
 
     async def adelay(
         self, message: Union[Assignation, Reservation, Unreservation, Unassignation]
     ):
-        await self._abroadcast(message)
+
+        if isinstance(message, ReserveSubUpdate):
+            unique_identifier = message.node + message.reference
+            return await self._res_update_queues[unique_identifier].put(message)
+
+        if isinstance(message, AssignSubUpdate):
+            unique_identifier = message.reference
+            return await self._ass_update_queues[unique_identifier].put(message)
+
+        raise NotImplementedError()
 
     async def areceive(self, timeout=None):
+
         if timeout:
-            return await asyncio.wait_for(self._inqueue.get(), timeout)
-        return await self._inqueue.get()
+            return await asyncio.wait_for(self._in_queue.get(), timeout)
+        return await self._in_queue.get()
 
     def delay(
         self, message: Union[Assignation, Reservation, Unreservation, Unassignation]

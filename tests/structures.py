@@ -13,12 +13,15 @@ class SerializableObject(BaseModel):
 
 
 class SecondSerializableObject:
+    def __init__(self, id) -> None:
+        self.id = id
+
     async def ashrink(self):
-        return 5
+        return self.id
 
     @classmethod
     async def aexpand(cls, shrinked_value):
-        return cls()
+        return cls(id=shrinked_value)
 
 
 class IdentifiableSerializableObject(BaseModel):

@@ -1,14 +1,23 @@
-from typing import Awaitable, Callable, List, Optional, Dict, Any, Union
+from typing import (
+    Awaitable,
+    Callable,
+    List,
+    Optional,
+    Dict,
+    Any,
+    Union,
+    Protocol,
+    runtime_checkable,
+)
 
 from rekuest.messages import Assignation, Reservation, Unassignation, Unreservation
 from rekuest.api.schema import AssignationStatus, ReservationStatus, ReserveParamsInput
 from koil.composition import KoiledModel
 
 
-class PostmanTransport(KoiledModel):
-    instance_id: Optional[str]
-
-    _abroadcast: Optional[Callable[[Union[Assignation, Reservation]], Awaitable[None]]]
+@runtime_checkable
+class PostmanTransport(Protocol):
+    connected = False
 
     async def aassign(
         self,
@@ -18,34 +27,32 @@ class PostmanTransport(KoiledModel):
         persist=True,
         log=False,
     ) -> Assignation:
-        raise NotImplementedError()
+        ...
 
     async def aunassign(self, assignation: str) -> Unassignation:
-        raise NotImplementedError()
+        ...
 
     async def areserve(
         self,
         node: str,
         params: ReserveParamsInput = None,
         provision: str = None,
+        reference: str = "default",
     ) -> Reservation:
-        raise NotImplementedError()
+        ...
 
     async def aunreserve(
         self,
         reservation: str,
     ) -> Unreservation:
-        raise NotImplementedError()
+        ...
 
     async def alist_assignations(
         self, exclude: Optional[AssignationStatus] = None
     ) -> List[Assignation]:
-        raise NotImplementedError()
+        ...
 
     async def alist_reservations(
         self, exclude: Optional[ReservationStatus] = None
     ) -> List[Reservation]:
-        raise NotImplementedError()
-
-    class Config:
-        underscore_attrs_are_private = True
+        ...

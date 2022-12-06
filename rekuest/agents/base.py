@@ -3,11 +3,8 @@ from typing import Callable, Dict, List, Optional, Tuple, Union
 from pydantic import Field
 import inspect
 from rekuest.actors.base import Actor
-from rekuest.actors.transport import ActorTransport, SharedTransport
-from rekuest.actors.types import ActorBuilder
+from rekuest.actors.builder import ActorBuilder
 from rekuest.agents.errors import ProvisionException
-from rekuest.agents.transport.mock import MockAgentTransport
-from rekuest.agents.transport.websocket import WebsocketAgentTransport
 from rekuest.api.schema import (
     ProvisionFragment,
     TemplateFragment,
@@ -34,16 +31,25 @@ logger = logging.getLogger(__name__)
 class BaseAgent(KoiledModel):
     """Agent
 
-    Agents are the governing entities in the arkitekt system. They are responsible for
-    spawning and managing the lifecycle of Actors and registering Templates with the help
-    of the DefinitionRegistry.
+    Agents are the governing entities for every app. They are responsible for
+    managing the lifecycle of the direct actors that are spawned from them through arkitekt.
+
+    Agents are nothing else than actors in the classic distributed actor model, but they are
+    always provided when the app starts and they do not provide functionality themselves but rather
+    manage the lifecycle of the actors that are spawned from them.
+
+    The actors that are spawned from them are called guardian actors and they are the ones that+
+    provide the functionality of the app. These actors can then in turn spawn other actors that
+    are not guardian actors. These actors are called non-guardian actors and their lifecycle is
+    managed by the guardian actors that spawned them. This allows for a hierarchical structure
+    of actors that can be spawned from the agents.
+
 
     """
 
     transport: AgentTransport
     definition_registry: Optional[DefinitionRegistry] = None
 
-    provisionProvisionMap: Dict[str, ProvisionFragment] = Field(default_factory=dict)
     provisionActorMap: Dict[str, Actor] = Field(default_factory=dict)
 
     rath: Optional[RekuestRath] = None
@@ -70,13 +76,6 @@ class BaseAgent(KoiledModel):
         )
 
     async def aregister_definitions(self):
-        if self.definition_registry.templated_nodes:
-            for (
-                q_string,
-                actor_builder,
-                params,
-            ) in self.definition_registry.templated_nodes:
-                raise NotImplementedError("This method is not yet functional.")
 
         if self.definition_registry.defined_nodes:
             for (
@@ -96,24 +95,19 @@ class BaseAgent(KoiledModel):
                     (arkitekt_template, actor_builder, params)
                 )
 
-        if self._approved_templates:
-
-            for arkitekt_template, defined_actor, params in self._approved_templates:
-                # Generating Maps for Easy access
-                self._templateActorBuilderMap[arkitekt_template.id] = defined_actor
+                self._templateActorBuilderMap[arkitekt_template.id] = actor_builder
                 self._templateTemplatesMap[arkitekt_template.id] = arkitekt_template
 
-    async def aspawn_actor(self, message: Provision) -> Actor:
+    async def aspawn_actor(self, prov: Provision) -> Actor:
         """Spawns an Actor from a Provision"""
-        prov = await aget_provision(message.provision)
         try:
-            actor_builder = self._templateActorBuilderMap[prov.template.id]
+            actor_builder = self._templateActorBuilderMap[prov.template]
         except KeyError as e:
             raise ProvisionException("No Actor Builder found for template") from e
         actor = actor_builder(provision=prov, transport=self.transport)
-        await actor.arun()
-        self.provisionActorMap[prov.id] = actor
-        self.provisionProvisionMap[prov.id] = prov
+        task = await actor.arun()
+        task.add_done_callback(print)
+        self.provisionActorMap[prov.provision] = actor
         return actor
 
     async def astep(self):

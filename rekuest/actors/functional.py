@@ -4,38 +4,42 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Awaitable, Callable, Optional
 from koil.helpers import iterate_spawned, run_spawned
 from pydantic import BaseModel, Field
-from rekuest.actors.base import Actor
-from rekuest.actors.helper import AsyncAssignationHelper, ThreadedAssignationHelper
-from rekuest.actors.vars import current_assignation_helper
-from rekuest.api.schema import AssignationStatus, ProvisionFragment
+from rekuest.actors.base import SerializingActor
 from rekuest.messages import Assignation, Provision
+from rekuest.api.schema import AssignationStatus, ProvisionFragment
 from rekuest.structures.serialization.actor import expand_inputs, shrink_outputs
-
+from rekuest.actors.contexts import AssignationContext, ProvisionContext
 
 logger = logging.getLogger(__name__)
 
 
+async def async_none_provide(prov: Provision):
+    """Do nothing on provide"""
+    return None
+
+
+async def async_none_unprovide():
+    """Do nothing on unprovide"""
+    return None
+
+
 class FunctionalActor(BaseModel):
     assign: Callable[..., Any]
-    provide: Optional[Callable[[ProvisionFragment], Awaitable[Any]]]
-    unprovide: Optional[Callable[[], Awaitable[Any]]]
-
-    async def on_provide(self, assignation: ProvisionFragment):
-        return None if not self.provide else await self.provide(assignation)
-
-    async def on_unprovide(self):
-        return None if not self.unprovide else await self.unprovide()
+    on_provide: Callable[[ProvisionFragment], Awaitable[Any]] = Field(
+        default=async_none_provide
+    )
+    on_unprovide: Callable[[], Awaitable[Any]] = Field(default=async_none_unprovide)
 
     class Config:
         arbitrary_types_allowed = True
 
 
-class AsyncFuncActor(Actor):
+class AsyncFuncActor(SerializingActor):
     async def on_assign(self, assignation: Assignation):
         logging.info("Assigning %s", assignation)
         try:
             params = await expand_inputs(
-                self.provision.template.node,
+                self.definition,
                 assignation.args,
                 structure_registry=self.structure_registry,
                 skip_expanding=not self.expand_inputs,
@@ -46,18 +50,12 @@ class AsyncFuncActor(Actor):
                 status=AssignationStatus.ASSIGNED,
             )
 
-            current_assignation_helper.set(
-                AsyncAssignationHelper(
-                    actor=self, assignation=assignation, provision=self.provision
-                )
-            )
+            async with AssignationContext(assignation, self.transport):
 
-            returns = await self.assign(**params)
-
-            current_assignation_helper.set(None)
+                returns = await self.assign(**params)
 
             returns = await shrink_outputs(
-                self.provision.template.node,
+                self.definition,
                 returns,
                 structure_registry=self.structure_registry,
                 skip_shrinking=not self.shrink_outputs,
@@ -91,20 +89,14 @@ class AsyncFuncActor(Actor):
             )
 
 
-class AsyncGenActor(Actor):
+class AsyncGenActor(SerializingActor):
     async def on_assign(self, assignation: Assignation):
         try:
             params = await expand_inputs(
-                self.provision.template.node,
+                self.definition,
                 assignation.args,
                 structure_registry=self.structure_registry,
                 skip_expanding=not self.expand_inputs,
-            )
-
-            current_assignation_helper.set(
-                AsyncAssignationHelper(
-                    actor=self, assignation=assignation, provision=self.provision
-                )
             )
 
             await self.transport.change_assignation(
@@ -112,22 +104,21 @@ class AsyncGenActor(Actor):
                 status=AssignationStatus.ASSIGNED,
             )
 
-            async for returns in self.assign(**params):
+            async with AssignationContext(assignation, self.transport):
+                async for returns in self.assign(**params):
 
-                returns = await shrink_outputs(
-                    self.provision.template.node,
-                    returns,
-                    structure_registry=self.structure_registry,
-                    skip_shrinking=not self.shrink_outputs,
-                )
+                    returns = await shrink_outputs(
+                        self.definition,
+                        returns,
+                        structure_registry=self.structure_registry,
+                        skip_shrinking=not self.shrink_outputs,
+                    )
 
-                await self.transport.change_assignation(
-                    assignation.assignation,
-                    status=AssignationStatus.YIELD,
-                    returns=returns,
-                )
-
-            current_assignation_helper.set(None)
+                    await self.transport.change_assignation(
+                        assignation.assignation,
+                        status=AssignationStatus.YIELD,
+                        returns=returns,
+                    )
 
             await self.transport.change_assignation(
                 assignation.assignation, status=AssignationStatus.DONE
@@ -173,7 +164,7 @@ class FunctionalGenActor(FunctionalActor, AsyncGenActor):
         arbitrary_types_allowed = True
 
 
-class ThreadedFuncActor(Actor):
+class ThreadedFuncActor(SerializingActor):
     executor: ThreadPoolExecutor = Field(default_factory=lambda: ThreadPoolExecutor(4))
 
     async def on_assign(self, assignation: Assignation):
@@ -181,7 +172,7 @@ class ThreadedFuncActor(Actor):
         try:
             logger.info("Assigning Number two")
             params = await expand_inputs(
-                self.provision.template.node,
+                self.definition,
                 assignation.args,
                 structure_registry=self.structure_registry,
                 skip_expanding=not self.expand_inputs,
@@ -192,19 +183,13 @@ class ThreadedFuncActor(Actor):
                 status=AssignationStatus.ASSIGNED,
             )
 
-            current_assignation_helper.set(
-                ThreadedAssignationHelper(
-                    actor=self, assignation=assignation, provision=self.provision
+            async with AssignationContext(assignation, self.transport):
+                returns = await run_spawned(
+                    self.assign, **params, executor=self.executor, pass_context=True
                 )
-            )
 
-            returns = await run_spawned(
-                self.assign, **params, executor=self.executor, pass_context=True
-            )
-
-            current_assignation_helper.set(None)
             returns = await shrink_outputs(
-                self.provision.template.node,
+                self.definition,
                 returns,
                 structure_registry=self.structure_registry,
                 skip_shrinking=not self.shrink_outputs,
@@ -265,7 +250,7 @@ class CompletlyThreadedActor(ThreadedFuncActor):
         try:
             logger.info("Assigning Number two")
             params = await expand_inputs(
-                self.provision.template.node,
+                self.definition,
                 assignation.args,
                 structure_registry=self.structure_registry,
                 skip_expanding=not self.expand_inputs,
@@ -276,19 +261,13 @@ class CompletlyThreadedActor(ThreadedFuncActor):
                 status=AssignationStatus.ASSIGNED,
             )
 
-            current_assignation_helper.set(
-                ThreadedAssignationHelper(
-                    actor=self, assignation=assignation, provision=self.provision
+            async with AssignationContext(assignation, self.transport):
+                returns = await run_spawned(
+                    self.assign, **params, executor=self.executor, pass_context=True
                 )
-            )
 
-            returns = await run_spawned(
-                self.assign, **params, executor=self.executor, pass_context=True
-            )
-
-            current_assignation_helper.set(None)
             returns = await shrink_outputs(
-                self.provision.template.node,
+                self.definition,
                 returns,
                 structure_registry=self.structure_registry,
                 skip_shrinking=not self.shrink_outputs,
@@ -325,13 +304,13 @@ class CompletlyThreadedActor(ThreadedFuncActor):
             )
 
 
-class ThreadedGenActor(Actor):
+class ThreadedGenActor(SerializingActor):
     executor: ThreadPoolExecutor = Field(default_factory=lambda: ThreadPoolExecutor(4))
 
     async def on_assign(self, assignation: Assignation):
         try:
             params = await expand_inputs(
-                self.provision.template.node,
+                self.definition,
                 assignation.args,
                 structure_registry=self.structure_registry,
                 skip_expanding=not self.expand_inputs,
@@ -347,24 +326,24 @@ class ThreadedGenActor(Actor):
                 status=AssignationStatus.ASSIGNED,
             )
 
-            async for returns in iterate_spawned(
-                self.assign, **params, executor=self.executor, pass_context=True
-            ):
+            async with AssignationContext(assignation, self.transport):
 
-                returns = await shrink_outputs(
-                    self.provision.template.node,
-                    returns,
-                    structure_registry=self.structure_registry,
-                    skip_shrinking=not self.shrink_outputs,
-                )
+                async for returns in iterate_spawned(
+                    self.assign, **params, executor=self.executor, pass_context=True
+                ):
 
-                await self.transport.change_assignation(
-                    assignation.assignation,
-                    status=AssignationStatus.YIELD,
-                    returns=returns,
-                )
+                    returns = await shrink_outputs(
+                        self.definition,
+                        returns,
+                        structure_registry=self.structure_registry,
+                        skip_shrinking=not self.shrink_outputs,
+                    )
 
-            current_assignation_helper.set(None)
+                    await self.transport.change_assignation(
+                        assignation.assignation,
+                        status=AssignationStatus.YIELD,
+                        returns=returns,
+                    )
 
             await self.transport.change_assignation(
                 assignation.assignation, status=AssignationStatus.DONE
@@ -386,7 +365,7 @@ class ThreadedGenActor(Actor):
             )
 
         except Exception as e:
-            logger.error("Error in actor", exc_info=True)
+            logging.critical(f"Assignation Error {assignation} {e}", exc_info=True)
             await self.transport.change_assignation(
                 assignation.assignation,
                 status=AssignationStatus.CRITICAL,

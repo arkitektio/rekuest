@@ -1,12 +1,16 @@
-fragment Node on Node {
-  name
-  description
-  kind
-  id
+fragment Definition on Node {
   args {
     ...ArgPort
   }
   returns {
     ...ReturnPort
   }
+}
+
+fragment Node on Node {
+  name
+  description
+  kind
+  id
+  ...Definition
 }

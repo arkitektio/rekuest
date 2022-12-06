@@ -1,7 +1,25 @@
+fragment IsPredicate on IsPredicate {
+  predicate
+}
+
+fragment ValueRange on ValueRange {
+  min
+  max
+}
+
+fragment Annotation on Annotation {
+  kind
+  ...IsPredicate
+  ...ValueRange
+}
+
 fragment ChildPortNested on ChildPort {
   kind
   child {
     kind
+  }
+  annotations {
+    ...Annotation
   }
 }
 
@@ -10,6 +28,9 @@ fragment ChildPort on ChildPort {
   identifier
   child {
     ...ChildPortNested
+  }
+  annotations {
+    ...Annotation
   }
 }
 
@@ -25,6 +46,9 @@ fragment ArgPort on ArgPort {
   child {
     ...ChildPort
   }
+  annotations {
+    ...Annotation
+  }
 }
 
 fragment ReturnPort on ReturnPort {
@@ -37,5 +61,8 @@ fragment ReturnPort on ReturnPort {
   kind
   child {
     ...ChildPort
+  }
+  annotations {
+    ...Annotation
   }
 }

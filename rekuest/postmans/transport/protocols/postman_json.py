@@ -81,6 +81,7 @@ class ReservePub(JSONMessage):
     node: Optional[str]
     template: Optional[str]
     title: Optional[str]
+    reference: Optional[str]
 
 
 class ReservePubReply(JSONMessage, Reservation):
@@ -142,8 +143,9 @@ class AssignListDenied(JSONMessage):
 class AssignPub(JSONMessage):
     type: Literal[PostmanMessageTypes.ASSIGN] = PostmanMessageTypes.ASSIGN
     reservation: str
+    reference: Optional[str]
+    parent: Optional[str]
     args: List[Any]
-    kwargs: Dict[str, Any]
     persist: bool = True
     log: bool = True
 

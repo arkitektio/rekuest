@@ -94,18 +94,20 @@ class ProvisionListDenied(JSONMessage):
 
 class ProvisionChangedMessage(JSONMessage):
     type: Literal[AgentMessageTypes.PROVIDE_CHANGED] = AgentMessageTypes.PROVIDE_CHANGED
-    provision: str
     status: Optional[ProvisionStatus]
     message: Optional[str]
     mode: Optional[ProvisionMode]
+    provision: str
 
 
 class AssignSubMessage(JSONMessage, Assignation):
     type: Literal[AgentSubMessageTypes.ASSIGN] = AgentSubMessageTypes.ASSIGN
+    guardian: str
 
 
 class ProvideSubMessage(JSONMessage, Provision):
     type: Literal[AgentSubMessageTypes.PROVIDE] = AgentSubMessageTypes.PROVIDE
+    guardian: str
 
 
 class UnassignSubMessage(JSONMessage, Unassignation):

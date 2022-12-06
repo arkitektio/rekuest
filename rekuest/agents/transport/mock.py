@@ -29,9 +29,6 @@ class MockAgentTransport(AgentTransport):
     ) -> List[Provision]:
         return []
 
-    async def __aenter__(self):
-        self._inqueue = asyncio.Queue()
-
     async def change_assignation(
         self,
         id: str,
@@ -87,6 +84,10 @@ class MockAgentTransport(AgentTransport):
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         for item in range(self._inqueue.qsize()):
             self._inqueue.task_done()
+
+    async def __aenter__(self):
+        self._inqueue = asyncio.Queue()
+        return self
 
     class Config:
         underscore_attrs_are_private = True
