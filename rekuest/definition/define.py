@@ -320,10 +320,27 @@ def convert_return_to_returnport(
     description=None,
     widget=None,
     nullable=False,
+    annotations=None,
 ) -> ReturnPortInput:
     """
     Convert a class to an ArgPort
     """
+    if hasattr(cls, "__name__") and cls.__name__ == "Annotated":
+        real_type = cls.__args__[0]
+
+        annotations = [
+            registry.get_converter_for_annotation(i.__class__)(i)
+            for i in cls.__metadata__
+        ]
+
+        return convert_return_to_returnport(
+            real_type,
+            key,
+            registry,
+            widget=widget,
+            nullable=nullable,
+            annotations=annotations,
+        )
 
     if cls.__module__ == "typing":
 
@@ -340,6 +357,7 @@ def convert_return_to_returnport(
                     child=child.dict(exclude={"key"}),
                     nullable=nullable,
                     description=description,
+                    annotations=annotations,
                 )
 
             if cls._name == "Dict":
@@ -353,6 +371,7 @@ def convert_return_to_returnport(
                     child=child.dict(exclude={"key"}),
                     nullable=nullable,
                     description=description,
+                    annotations=annotations,
                 )
 
         if hasattr(cls, "__args__"):
@@ -370,6 +389,7 @@ def convert_return_to_returnport(
                 key=key,
                 nullable=nullable,
                 description=description,
+                annotations=annotations,
             )  # catch bool is subclass of int
         if not issubclass(cls, Enum) and issubclass(cls, int):
             return ReturnPortInput(
@@ -377,6 +397,7 @@ def convert_return_to_returnport(
                 key=key,
                 nullable=nullable,
                 description=description,
+                annotations=annotations,
             )
         if not issubclass(cls, Enum) and issubclass(cls, float):
             return ReturnPortInput(
@@ -384,6 +405,7 @@ def convert_return_to_returnport(
                 key=key,
                 nullable=nullable,
                 description=description,
+                annotations=annotations,
             )
         if not issubclass(cls, Enum) and issubclass(cls, str):
             return ReturnPortInput(
@@ -391,6 +413,7 @@ def convert_return_to_returnport(
                 key=key,
                 nullable=nullable,
                 description=description,
+                annotations=annotations,
             )
 
     identifier = registry.get_identifier_for_structure(cls)
@@ -403,6 +426,7 @@ def convert_return_to_returnport(
         widget=widget,
         nullable=nullable,
         description=None,
+        annotations=annotations,
     )
 
 
