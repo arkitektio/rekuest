@@ -30,6 +30,7 @@ from rekuest.api.schema import DefinitionFragment, DefinitionInput
 from rekuest.agents.base import BaseAgent
 from rekuest.agents.transport.mock import MockAgentTransport
 from rekuest.definition.validate import auto_validate
+from .base import BasePostman
 
 logger = logging.getLogger(__name__)
 
@@ -318,7 +319,7 @@ class localuse(RPCContract):
 
 
 class arkiuse(ReservationContract):
-    postman: StatefulPostman
+    postman: BasePostman
     structure_registry: StructureRegistry
     reserve_timeout: Optional[float] = 2
     assign_timeout: Optional[float] = 2
@@ -464,7 +465,6 @@ class arkiuse(ReservationContract):
 
     async def aenter(self):
         logger.info(f"Trying to reserve {self.definition}")
-        assert self.postman.transport.connected, "Postman is not connected"
 
         self._enter_future = asyncio.Future()
 

@@ -36,11 +36,6 @@ async def aexpand_arg(
         Any: Expanded value
 
     """
-    if not isinstance(value, (str, int, float, dict, list)):
-        raise ExpandingError(
-            f"Can't expand {value} of type {type(value)} to {port.kind}. We only accept strings, ints and floats (json serializable)"
-        ) from None
-
     if value is None:
         if port.nullable:
             return None
@@ -48,6 +43,11 @@ async def aexpand_arg(
             raise ExpandingError(
                 f"{port.key} is not nullable (optional) but your provided None"
             )
+
+    if not isinstance(value, (str, int, float, dict, list)):
+        raise ExpandingError(
+            f"Can't expand {value} of type {type(value)} to {port.kind}. We only accept strings, ints and floats (json serializable)"
+        ) from None
 
     if port.kind == PortKind.DICT:
         if not isinstance(value, dict):

@@ -63,7 +63,7 @@ class DefinitionRegistry(KoiledModel):
         structure_registry: StructureRegistry,
         actifier: Actifier = None,
         interface: str = None,
-        widgets: Dict[str, WidgetInput] = {},
+        widgets: Dict[str, WidgetInput] = None,
         interfaces: List[str] = [],
         on_provide=None,
         on_unprovide=None,
@@ -102,6 +102,7 @@ class DefinitionRegistry(KoiledModel):
                 on_provide=on_provide,
                 on_unprovide=on_unprovide,
                 widgets=widgets,
+                interfaces=interfaces,
                 **actifier_params,
             )
 

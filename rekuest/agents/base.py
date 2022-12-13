@@ -58,6 +58,7 @@ class BaseAgent(KoiledModel):
 
     _approved_templates: List[Tuple[TemplateFragment, Callable]] = []
     _templateActorBuilderMap: Dict[str, ActorBuilder] = {}
+    _localActorBuilderMap: Dict[str, ActorBuilder] = {}
     _templateTemplatesMap: Dict[str, TemplateFragment] = {}
     _provisionTaskMap: Dict[str, asyncio.Task] = Field(default_factory=dict)
     _inqueue: Contextual[asyncio.Queue] = None
@@ -95,6 +96,7 @@ class BaseAgent(KoiledModel):
                     (arkitekt_template, actor_builder, params)
                 )
 
+                self._localActorBuilderMap[arkitekt_template.node.hash] = actor_builder
                 self._templateActorBuilderMap[arkitekt_template.id] = actor_builder
                 self._templateTemplatesMap[arkitekt_template.id] = arkitekt_template
 

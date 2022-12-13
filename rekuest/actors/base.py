@@ -194,7 +194,7 @@ class Actor(BaseModel):
     class Config:
         arbitrary_types_allowed = True
         underscore_attrs_are_private = True
-        copy_on_model_validation = False
+        copy_on_model_validation = "none"
 
 
 class SerializingActor(Actor):

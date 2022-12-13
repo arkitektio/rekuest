@@ -19,6 +19,7 @@ import asyncio
 from pydantic import Field
 import logging
 from .transport.base import PostmanTransport
+from .vars import current_postman
 
 logger = logging.getLogger(__name__)
 
@@ -238,11 +239,13 @@ class GraphQLPostman(BasePostman):
 
     async def __aenter__(self):
         self._lock = asyncio.Lock()
+        current_postman.set(self)
         return await super().__aenter__()
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         if self._watching:
             await self.stop_watching()
+        current_postman.set(None)
         return await super().__aexit__(exc_type, exc_val, exc_tb)
 
     class Config:

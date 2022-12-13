@@ -230,7 +230,14 @@ def convert_argument_to_port(
         if hasattr(cls, "__args__"):
             if cls.__args__[1] == type(None):
                 return convert_argument_to_port(
-                    cls.__args__[0], key, registry, default=default, nullable=True
+                    cls.__args__[0],
+                    key,
+                    registry,
+                    default=default,
+                    nullable=True,
+                    widget=widget,
+                    annotations=annotations,
+                    description=description,
                 )
 
     if inspect.isclass(cls):
@@ -377,7 +384,12 @@ def convert_return_to_returnport(
         if hasattr(cls, "__args__"):
             if cls.__args__[1] == type(None):
                 return convert_return_to_returnport(
-                    cls.__args__[0], key, registry, nullable=True
+                    cls.__args__[0],
+                    key,
+                    registry,
+                    nullable=True,
+                    annotations=annotations,
+                    description=description,
                 )
 
     if inspect.isclass(cls):
@@ -465,7 +477,6 @@ def prepare_definition(
     sig = inspect.signature(function)
     widgets = widgets or {}
     interfaces = interfaces or []
-
     # Generate Args and Kwargs from the Annotation
     args: List[ArgPortInput] = []
     returns: List[ReturnPortInput] = []
@@ -487,16 +498,6 @@ def prepare_definition(
         f"return{index}": param.description
         for index, param in enumerate(docstring.many_returns)
     }
-
-    for port in args:
-        if port.key in doc_param_map:
-            updates = doc_param_map[port.key]
-            port.description = updates["description"] or port.description
-
-    for port in returns:
-        if port.key in doc_returns_map:
-            updates = doc_returns_map[port.key]
-            port.description = updates["description"] or port.description
 
     for index, (key, value) in enumerate(function_ins_annotation.items()):
 

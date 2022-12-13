@@ -8,6 +8,7 @@ fragment Definition on Node {
 }
 
 fragment Node on Node {
+  hash
   name
   description
   kind
