@@ -41,12 +41,20 @@ class RPCContract(KoiledModel):
     active: ContextBool = Field(default=False)
     shrink_inputs: bool = True
     expand_outputs: bool = True
+    state: ReservationStatus = Field(default=ReservationStatus.DISCONNECTED)
+    state_hook: Optional[Callable[[ReservationStatus], Awaitable[None]]] = None
 
     async def aenter(self):
         raise NotImplementedError("Should be implemented by subclass")
 
     async def aexit(self):
         raise NotImplementedError("Should be implemented by subclass")
+
+    async def change_state(self, state: ReservationStatus):
+        self.state = state
+        if self.state_hook:
+            await self.state_hook(state)
+
 
     async def aassign(
         self,
@@ -321,9 +329,9 @@ class localuse(RPCContract):
 class arkiuse(ReservationContract):
     postman: BasePostman
     structure_registry: StructureRegistry
-    reserve_timeout: Optional[float] = 2
-    assign_timeout: Optional[float] = 2
-    yield_timeout: Optional[float] = 2
+    reserve_timeout: Optional[float] = 2000
+    assign_timeout: Optional[float] = 2000
+    yield_timeout: Optional[float] = 2000
 
     _reservation: ReservationFragment = None
     _enter_future: asyncio.Future = None
@@ -337,7 +345,7 @@ class arkiuse(ReservationContract):
         structure_registry=None,
         alog: Callable[[Assignation, AssignationLogLevel, str], Awaitable[None]] = None,
         parent: Optional[Union[str, AssignationFragment]] = None,
-        assign_timeout: Optional[float] = 4,
+        assign_timeout: Optional[float] = 2000,
         **kwargs,
     ):
         assert self._reservation, "We never entered the context manager"
@@ -390,7 +398,7 @@ class arkiuse(ReservationContract):
         structure_registry=None,
         alog: Callable[[Assignation, AssignationLogLevel, str], Awaitable[None]] = None,
         parent: Optional[Union[str, AssignationFragment]] = None,
-        yield_timeout: Optional[float] = 4,
+        yield_timeout: Optional[float] = 2000,
         **kwargs,
     ):
         assert self._reservation, "We never entered the context manager"
@@ -457,8 +465,7 @@ class arkiuse(ReservationContract):
                         logger.info("Entering future")
                         self._enter_future.set_result(True)
 
-                if self.on_reservation_change:
-                    await self.on_reservation_change(self._reservation)
+                await self.change_state(self._reservation.status)
 
         except asyncio.CancelledError:
             pass

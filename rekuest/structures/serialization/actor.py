@@ -40,9 +40,12 @@ async def aexpand_arg(
         if port.nullable:
             return None
         else:
-            raise ExpandingError(
-                f"{port.key} is not nullable (optional) but your provided None"
-            )
+            if port.default is not None:
+                return port.default
+            else:
+                raise ExpandingError(
+                    f"{port.key} is not nullable (optional) but your provided None"
+                )
 
     if not isinstance(value, (str, int, float, dict, list)):
         raise ExpandingError(
@@ -104,7 +107,7 @@ async def aexpand_arg(
 
 
 async def expand_inputs(
-    definition: DefinitionInput | DefinitionFragment,
+    definition:  Union[DefinitionInput,DefinitionFragment],
     args: List[Union[str, int, float, dict, list]],
     structure_registry: StructureRegistry,
     skip_expanding: bool = False,
@@ -223,7 +226,7 @@ async def ashrink_return(
 
 
 async def shrink_outputs(
-    definition: DefinitionInput | DefinitionFragment,
+    definition: Union[DefinitionInput,DefinitionFragment],
     returns: List[Any],
     structure_registry: StructureRegistry,
     skip_shrinking: bool = False,

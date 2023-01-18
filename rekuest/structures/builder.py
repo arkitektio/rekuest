@@ -10,7 +10,7 @@ class StructureRegistryBuilder:
         return self
 
     def with_default_annotations(self):
-        from .default import add_annotations_to_structure_registry
+        from .annotations import add_annotations_to_structure_registry
 
         add_annotations_to_structure_registry(self.registry)
         return self

@@ -5,13 +5,13 @@ fragment Definition on Node {
   returns {
     ...ReturnPort
   }
+  kind
+  name
+  description
 }
 
 fragment Node on Node {
   hash
-  name
-  description
-  kind
   id
   ...Definition
 }

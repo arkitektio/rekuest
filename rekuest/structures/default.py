@@ -1,6 +1,7 @@
 from rekuest.structures.registry import StructureRegistry
 from rekuest.api.schema import TemplateFragment, NodeFragment, aget_template, afind
-from .annotations import add_annotations_to_structure_registry
+
+
 
 DEFAULT_STRUCTURE_REGISTRY = None
 
@@ -17,6 +18,13 @@ def get_default_structure_registry() -> StructureRegistry:
             NodeFragment, "@rekuest/node", expand=afind
         )
 
-        add_annotations_to_structure_registry(DEFAULT_STRUCTURE_REGISTRY)
+        try:
+            from .annotations import add_annotations_to_structure_registry
+            add_annotations_to_structure_registry(DEFAULT_STRUCTURE_REGISTRY)
+        except ImportError:
+            # annotations are not installed, either because annotated types
+            # is not installed or because python is lower than 3.9 (Annotated
+            # types got introduced in python 3.9)
+            pass
 
     return DEFAULT_STRUCTURE_REGISTRY

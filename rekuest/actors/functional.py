@@ -315,12 +315,6 @@ class ThreadedGenActor(SerializingActor):
                 structure_registry=self.structure_registry,
                 skip_expanding=not self.expand_inputs,
             )
-            current_assignation_helper.set(
-                ThreadedAssignationHelper(
-                    actor=self, assignation=assignation, provision=self.provision
-                )
-            )
-
             await self.transport.change_assignation(
                 assignation.assignation,
                 status=AssignationStatus.ASSIGNED,

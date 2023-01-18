@@ -18,6 +18,7 @@ fragment ChildPortNested on ChildPort {
   child {
     kind
   }
+  nullable
   annotations {
     ...Annotation
   }
@@ -29,6 +30,7 @@ fragment ChildPort on ChildPort {
   child {
     ...ChildPortNested
   }
+  nullable
   annotations {
     ...Annotation
   }

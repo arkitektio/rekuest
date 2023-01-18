@@ -3,3 +3,9 @@ query find($id: ID, $template: ID, $hash: String) {
     ...Node
   }
 }
+
+query retrieveall {
+  allnodes {
+    ...Node
+  }
+}

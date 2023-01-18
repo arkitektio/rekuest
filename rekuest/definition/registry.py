@@ -124,7 +124,7 @@ class DefinitionRegistry(KoiledModel):
             "templates": [x[0] for x in self.templated_nodes],
         }
 
-    async def __exit__(self, *args, **kwargs):
+    async def __aexit__(self, *args, **kwargs):
         current_definition_registry.set(None)
 
 
