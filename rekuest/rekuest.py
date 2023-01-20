@@ -71,6 +71,10 @@ class Rekuest(Composition):
         assert self.agent.transport.connected, "Transport is not connected"
         await self.agent.aprovide(instance_id=instance_id)
 
+    def _repr_html_inline_(self):
+        return f"<table><tr><td>rath</td><td>{self.rath._repr_html_inline_()}</td></tr></table>"
+
+
     class Config:
         arbitrary_types_allowed = True
         underscore_attrs_are_private = True
