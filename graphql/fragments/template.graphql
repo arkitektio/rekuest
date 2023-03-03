@@ -1,13 +1,15 @@
 fragment Template on Template {
   id
-  registry {
-    name
-    app {
-      version
-      identifier
-    }
-    user {
-      username
+  agent {
+    registry {
+      name
+      app {
+        version
+        identifier
+      }
+      user {
+        username
+      }
     }
   }
   node {

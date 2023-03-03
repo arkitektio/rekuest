@@ -26,10 +26,10 @@ async def test_expand_nullable(simple_registry):
 
     definition = auto_validate(functional_definition)
 
-    args = await expand_inputs(definition, (None,), {}, simple_registry)
+    args = await expand_inputs(definition, (None,), simple_registry)
     assert args == {"x": None}
 
-    args = await expand_inputs(definition, (1,), {}, simple_registry)
+    args = await expand_inputs(definition, (1,),  simple_registry)
     assert args == {"x": 1}
 
 
@@ -43,7 +43,7 @@ async def test_expand_basic(simple_registry):
 
     definition = auto_validate(functional_definition)
 
-    args = await expand_inputs(definition, ("hallo", "zz"), {}, simple_registry)
+    args = await expand_inputs(definition, ("hallo", "zz"), simple_registry)
     assert args == {"name": "zz", "rep": "hallo"}
 
 

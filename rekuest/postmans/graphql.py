@@ -20,9 +20,9 @@ from pydantic import Field
 import logging
 from .transport.base import PostmanTransport
 from .vars import current_postman
-
+import threading
 logger = logging.getLogger(__name__)
-
+from dataclasses import dataclass, field
 
 class GraphQLPostman(BasePostman):
     assignations: Dict[str, AssignationFragment] = Field(default_factory=dict)
@@ -32,19 +32,18 @@ class GraphQLPostman(BasePostman):
     _ass_update_queues: Dict[str, asyncio.Queue] = {}
 
     _res_update_queue: asyncio.Queue = None
-    _ass_update_queue: asyncio.Queue = None
+    _ass_update_queue: asyncio.Queue= None
 
-    _watch_resraces_task: asyncio.Task = None
-    _watch_assraces_task: asyncio.Task = None
+    _watch_resraces_task: asyncio.Task= None
+    _watch_assraces_task: asyncio.Task= None
     _watch_reservations_task: asyncio.Task = None
     _watch_assignations_task: asyncio.Task = None
-    _watching = False
 
-    _lock = None
+
+    _watching: bool = None
+    _lock: asyncio.Lock = None
 
     async def aconnect(self):
-
-        self._lock = asyncio.Lock()
         await super().aconnect()
 
         data = {}  # await self.transport.alist_reservations()
@@ -60,10 +59,10 @@ class GraphQLPostman(BasePostman):
         provision: str = None,
         reference: str = "default",
     ) -> asyncio.Queue:
+
         async with self._lock:
             if not self._watching:
-                await self.start_watching()
-
+                self.start_watching()
         unique_identifier = node + reference
 
         self.reservations[unique_identifier] = None
@@ -148,7 +147,6 @@ class GraphQLPostman(BasePostman):
         try:
             while True:
                 res: ReservationFragment = await self._res_update_queue.get()
-                self._res_update_queue.task_done()
 
                 unique_identifier = res.node.id + res.reference
 
@@ -156,24 +154,29 @@ class GraphQLPostman(BasePostman):
                     logger.info(
                         "Reservation update for unknown reservation received. Probably old stuf"
                     )
-                    continue
-
-                if self.reservations[unique_identifier] is None:
-                    self.reservations[unique_identifier] = res
-                    await self._res_update_queues[unique_identifier].put(res)
-                    continue
-
                 else:
-                    if self.reservations[unique_identifier].updated_at < res.updated_at:
+
+                    if self.reservations[unique_identifier] is None:
                         self.reservations[unique_identifier] = res
                         await self._res_update_queues[unique_identifier].put(res)
-                    else:
-                        logger.info(
-                            "Reservation update for reservation {} is older than current state. Ignoring".format(
-                                unique_identifier
-                            )
-                        )
                         continue
+
+                    else:
+                        if self.reservations[unique_identifier].updated_at  < res.updated_at:
+                            self.reservations[unique_identifier] = res
+                            await self._res_update_queues[unique_identifier].put(res)
+                        else:
+                            logger.info(
+                                "Reservation update for reservation {} is older than current state. Ignoring".format(
+                                    unique_identifier
+                                )
+                            )
+
+                
+                self._res_update_queue.task_done()
+
+
+                
         except Exception:
             logger.error("Error in watch_resraces", exc_info=True)
 
@@ -209,7 +212,8 @@ class GraphQLPostman(BasePostman):
         except Exception:
             logger.error("Error in watch_resraces", exc_info=True)
 
-    async def start_watching(self):
+    def start_watching(self):
+        logger.error("Starting watching")
         self._res_update_queue = asyncio.Queue()
         self._ass_update_queue = asyncio.Queue()
         self._watch_reservations_task = asyncio.create_task(self.watch_reservations())
@@ -217,6 +221,7 @@ class GraphQLPostman(BasePostman):
         self._watch_resraces_task = asyncio.create_task(self.watch_resraces())
         self._watch_assraces_task = asyncio.create_task(self.watch_assraces())
         self._watching = True
+        logger.error("Started watching")
 
     async def stop_watching(self):
         self._watch_reservations_task.cancel()

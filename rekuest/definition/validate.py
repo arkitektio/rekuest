@@ -14,4 +14,4 @@ def auto_validate(defintion: DefinitionInput) -> DefinitionFragment:
 
     """
 
-    return DefinitionFragment(**defintion.dict())
+    return DefinitionFragment(**defintion.dict(by_alias=True))

@@ -120,8 +120,7 @@ class DefinitionRegistry(KoiledModel):
             "definitions": [
                 json.loads(x[0].json(exclude_none=True, exclude_unset=True))
                 for x in self.defined_nodes
-            ],
-            "templates": [x[0] for x in self.templated_nodes],
+            ]
         }
 
     async def __aexit__(self, *args, **kwargs):

@@ -1,5 +1,5 @@
-from rekuest.api.schema import WidgetInput, ReturnWidgetInput
-
+from rekuest.api.schema import WidgetInput, ReturnWidgetInput, ChoiceInput
+from typing import List
 
 def SliderWidget(min=None, max=None):
     return WidgetInput(kind="SliderWidget", min=min, max=max)
@@ -14,7 +14,7 @@ def ImageReturnWidget(query, ward):
 
 
 def StringWidget(as_paragraph=False):
-    return WidgetInput(kind="StringWidget", as_paragraph=as_paragraph)
+    return WidgetInput(kind="StringWidget", asParagraph=as_paragraph)
 
 
 def CustomWidget(hook: str):
@@ -23,3 +23,6 @@ def CustomWidget(hook: str):
 
 def CustomReturnWidget(hook: str, ward: str):
     return ReturnWidgetInput(kind="CustomReturnWidget", hook=hook, ward=ward)
+
+def ChoiceReturnWidget(choices: List[ChoiceInput]):
+    return ReturnWidgetInput(kind="ChoiceReturnWidget", choices=choices)

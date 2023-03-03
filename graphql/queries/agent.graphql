@@ -5,6 +5,6 @@ query get_agent($id: ID!) {
       name
     }
     name
-    identifier
+    instanceId
   }
 }

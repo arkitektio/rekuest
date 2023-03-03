@@ -1,9 +1,9 @@
 fragment Definition on Node {
   args {
-    ...ArgPort
+    ...Port
   }
   returns {
-    ...ReturnPort
+    ...Port
   }
   kind
   name

@@ -13,6 +13,9 @@ async def alog(message: str, level: LogLevelInput = LogLevelInput.DEBUG) -> None
     await get_current_assignation_helper().alog(level, message)
 
 
+def log(message: str, level: LogLevelInput = LogLevelInput.DEBUG) -> None:
+    get_current_assignation_helper().log(level, message)
+
 async def plog(message: str, level: LogLevelInput = LogLevelInput.DEBUG) -> None:
     await get_current_provision_helper().alog(level, message)
 

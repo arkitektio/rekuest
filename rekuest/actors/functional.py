@@ -178,6 +178,7 @@ class ThreadedFuncActor(SerializingActor):
                 skip_expanding=not self.expand_inputs,
             )
 
+
             await self.transport.change_assignation(
                 assignation.assignation,
                 status=AssignationStatus.ASSIGNED,

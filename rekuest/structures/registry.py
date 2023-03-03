@@ -137,8 +137,15 @@ class StructureRegistry(BaseModel):
             identifier = "cls/" + cls.__name__.lower()
             shrink, expand = build_enum_shrink_expand(cls)
             convert_default = lambda x: x._name_
-            default_widget = WidgetInput(
+            default_widget = default_widget or WidgetInput(
                 kind="ChoiceWidget",
+                choices=[
+                    ChoiceInput(label=key, value=key)
+                    for key, value in cls.__members__.items()
+                ],
+            )
+            default_returnwidget = default_returnwidget or  ReturnWidgetInput(
+                kind="ChoiceReturnWidget",
                 choices=[
                     ChoiceInput(label=key, value=key)
                     for key, value in cls.__members__.items()

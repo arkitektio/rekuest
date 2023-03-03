@@ -6,9 +6,8 @@ from rekuest.structures.registry import StructureRegistry
 import asyncio
 from typing import Any, Union
 from rekuest.api.schema import (
-    ArgPortFragment,
+    PortFragment,
     PortKind,
-    ReturnPortFragment,
     ChildPortFragment,
     DefinitionInput,
     DefinitionFragment,
@@ -23,7 +22,7 @@ from rekuest.definition.validate import auto_validate
 
 
 async def aexpand_arg(
-    port: Union[ArgPortFragment, ChildPortFragment],
+    port: Union[PortFragment, ChildPortFragment],
     value: Union[str, int, float, dict, list],
     structure_registry,
 ) -> Any:
@@ -41,7 +40,7 @@ async def aexpand_arg(
             return None
         else:
             if port.default is not None:
-                return port.default
+                value = port.default
             else:
                 raise ExpandingError(
                     f"{port.key} is not nullable (optional) but your provided None"
@@ -93,7 +92,7 @@ async def aexpand_arg(
         except Exception as e:
             raise StructureExpandingError(
                 f"Error expanding {repr(value)} with Structure {port.identifier}"
-            ) from None
+            ) from e
 
     if port.kind == PortKind.BOOL:
 
@@ -128,6 +127,7 @@ async def expand_inputs(
         else definition
     )
 
+
     if not skip_expanding:
         try:
             expanded_args = await asyncio.gather(
@@ -150,7 +150,7 @@ async def expand_inputs(
 
 
 async def ashrink_return(
-    port: Union[ReturnPortFragment, ChildPortFragment],
+    port: Union[PortFragment, ChildPortFragment],
     value: Any,
     structure_registry=None,
 ) -> Union[str, int, float, dict, list, None]:
@@ -238,13 +238,16 @@ async def shrink_outputs(
         else definition
     )
 
+
     if returns is None:
-        returns = ()
-    if not isinstance(returns, tuple):
+        returns = []
+    elif not isinstance(returns, tuple):
         returns = [returns]
+
+
     assert len(node.returns) == len(
         returns
-    ), "Missmatch in Return Length"  # We are dealing with a single output, convert it to a proper port like structure
+    ), f"Mismatch in Return Length: expected {len(node.returns)} got {len(returns)}"  # We are dealing with a single output, convert it to a proper port like structure
 
     if not skip_shrinking:
         shrinked_returns_future = [

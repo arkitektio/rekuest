@@ -4,15 +4,16 @@ from random import choices
 from typing import Any, Callable, List, Tuple, Type
 import inflection
 from rekuest.api.schema import (
-    ArgPortInput,
+    PortInput,
     ChildPortInput,
     DefinitionInput,
     NodeKindInput,
     PortKindInput,
-    ReturnPortInput,
+    ReturnWidgetInput,
     WidgetInput,
     AnnotationInput,
 )
+from typing import Optional
 import inspect
 from docstring_parser import parse
 from rekuest.definition.errors import DefinitionError
@@ -26,9 +27,8 @@ def convert_child_to_childport(
     cls: Type,
     registry: StructureRegistry,
     nullable: bool = False,
-    is_return: bool = False,
     annotations: List[AnnotationInput] = None,
-) -> Tuple[ChildPortInput, WidgetInput, Callable]:
+) -> Tuple[ChildPortInput, Callable]:
     """Converts a element of a annotation to a child port
 
     Args:
@@ -62,7 +62,7 @@ def convert_child_to_childport(
         if hasattr(cls, "_name"):
             # We are dealing with a Typing Var?
             if cls._name == "List":
-                child, insidewidget, nested_converter = convert_child_to_childport(
+                child, nested_converter = convert_child_to_childport(
                     cls.__args__[0], registry, nullable=False
                 )
 
@@ -73,14 +73,13 @@ def convert_child_to_childport(
                         nullable=nullable,
                         annotations=annotations,
                     ),
-                    insidewidget,
                     lambda default: [nested_converter(ndefault) for ndefault in default]
                     if default
                     else None,
                 )
 
             if cls._name == "Dict":
-                child, insidewidget, nested_converter = convert_child_to_childport(
+                child, nested_converter = convert_child_to_childport(
                     cls.__args__[1], "omit", registry, nullable=False
                 )
                 return (
@@ -90,7 +89,6 @@ def convert_child_to_childport(
                         nullable=nullable,
                         annotations=annotations,
                     ),
-                    insidewidget,
                     lambda default: {
                         key: item in nested_converter(item)
                         for key, item in default.items()
@@ -101,7 +99,7 @@ def convert_child_to_childport(
 
         if hasattr(cls, "__args__"):
             if cls.__args__[1] == type(None):
-                return convert_argument_to_port(
+                return convert_child_to_childport(
                     cls.__args__[0], registry, nullable=True
                 )
 
@@ -114,7 +112,7 @@ def convert_child_to_childport(
                 nullable=nullable,
                 annotations=annotations,
             )  # catch bool is subclass of int
-            return t, None, str
+            return t, str
 
         if not issubclass(cls, Enum) and issubclass(cls, int):
             return (
@@ -123,7 +121,6 @@ def convert_child_to_childport(
                     nullable=nullable,
                     annotations=annotations,
                 ),
-                None,
                 int,
             )
         if not issubclass(cls, Enum) and issubclass(cls, str):
@@ -133,17 +130,13 @@ def convert_child_to_childport(
                     nullable=nullable,
                     annotations=annotations,
                 ),
-                None,
                 str,
             )
 
     identifier = registry.get_identifier_for_structure(cls)
     default_converter = registry.get_default_converter_for_structure(cls)
-    widget = (
-        registry.get_returnwidget_input(cls)
-        if is_return
-        else registry.get_widget_input(cls)
-    )
+    assign_widget =  registry.get_widget_input(cls)
+    return_widget  = registry.get_returnwidget_input(cls)
 
     return (
         ChildPortInput(
@@ -151,24 +144,26 @@ def convert_child_to_childport(
             identifier=identifier,
             nullable=nullable,
             annotations=annotations,
+            assignWidget=assign_widget,
+            returnWidget=return_widget,
         ),
-        widget,
         default_converter,
     )
 
 
-def convert_argument_to_port(
+def convert_object_to_port(
     cls,
     key,
     registry: StructureRegistry,
     widget=None,
+    return_widget=None,
     default=None,
     description=None,
     nullable=False,
     annotations=[],
-) -> ArgPortInput:
+) -> PortInput:
     """
-    Convert a class to an ArgPort
+    Convert a class to an Port
     """
     if hasattr(cls, "__name__") and cls.__name__ == "Annotated":
         real_type = cls.__args__[0]
@@ -178,7 +173,7 @@ def convert_argument_to_port(
             for i in cls.__metadata__
         ]
 
-        return convert_argument_to_port(
+        return convert_object_to_port(
             real_type,
             key,
             registry,
@@ -193,14 +188,15 @@ def convert_argument_to_port(
         if hasattr(cls, "_name"):
             # We are dealing with a Typing Var?
             if cls._name == "List":
-                child, widget, converter = convert_child_to_childport(
+                child,  converter = convert_child_to_childport(
                     cls.__args__[0], registry, nullable=False
                 )
-                return ArgPortInput(
+                return PortInput(
                     kind=PortKindInput.LIST,
-                    widget=widget,
+                    assignWidget=widget,
+                    returnWidget=return_widget,
                     key=key,
-                    child=child.dict(exclude={"key"}),
+                    child=child,
                     default=[converter(item) for item in default] if default else None,
                     nullable=nullable,
                     annotations=annotations,
@@ -208,14 +204,15 @@ def convert_argument_to_port(
                 )
 
             if cls._name == "Dict":
-                child, widget, converter = convert_child_to_childport(
+                child,  converter = convert_child_to_childport(
                     cls.__args__[1], registry, nullable=False
                 )
-                return ArgPortInput(
+                return PortInput(
                     kind=PortKindInput.DICT,
-                    widget=widget,
+                    assignWidget=widget,
+                    returnWidget=return_widget,
                     key=key,
-                    child=child.dict(exclude={"key"}),
+                    child=child,
                     default={key: converter(item) for key, item in default.items()}
                     if default
                     else None,
@@ -229,13 +226,14 @@ def convert_argument_to_port(
 
         if hasattr(cls, "__args__"):
             if cls.__args__[1] == type(None):
-                return convert_argument_to_port(
+                return convert_object_to_port(
                     cls.__args__[0],
                     key,
                     registry,
                     default=default,
                     nullable=True,
                     widget=widget,
+                    return_widget=return_widget,
                     annotations=annotations,
                     description=description,
                 )
@@ -248,9 +246,10 @@ def convert_argument_to_port(
             and issubclass(cls, bool)
             or (default is not None and isinstance(default, bool))
         ):
-            t = ArgPortInput(
+            t = PortInput(
                 kind=PortKindInput.BOOL,
-                widget=widget,
+                assignWidget=widget,
+                returnWidget=return_widget,
                 key=key,
                 default=default,
                 nullable=nullable,
@@ -264,9 +263,10 @@ def convert_argument_to_port(
             and issubclass(cls, int)
             or (default is not None and isinstance(default, int))
         ):
-            return ArgPortInput(
+            return PortInput(
                 kind=PortKindInput.INT,
-                widget=widget,
+                assignWidget=widget,
+                returnWidget=return_widget,
                 key=key,
                 default=default,
                 nullable=nullable,
@@ -279,9 +279,10 @@ def convert_argument_to_port(
             and issubclass(cls, float)
             or (default is not None and isinstance(default, float))
         ):
-            return ArgPortInput(
+            return PortInput(
                 kind=PortKindInput.FLOAT,
-                widget=widget,
+                assignWidget=widget,
+                returnWidget=return_widget,
                 key=key,
                 default=default,
                 nullable=nullable,
@@ -294,9 +295,10 @@ def convert_argument_to_port(
             and issubclass(cls, str)
             or (default is not None and isinstance(default, str))
         ):
-            return ArgPortInput(
+            return PortInput(
                 kind=PortKindInput.STRING,
-                widget=widget,
+                assignWidget=widget,
+                returnWidget=return_widget,
                 key=key,
                 default=default,
                 nullable=nullable,
@@ -307,11 +309,13 @@ def convert_argument_to_port(
     identifier = registry.get_identifier_for_structure(cls)
     default_converter = registry.get_default_converter_for_structure(cls)
     widget = widget or registry.get_widget_input(cls)
+    return_widget = return_widget or registry.get_returnwidget_input(cls)
 
-    return ArgPortInput(
+    return PortInput(
         kind=PortKindInput.STRUCTURE,
         identifier=identifier,
-        widget=widget,
+        assignWidget=widget,
+        returnWidget=return_widget,
         key=key,
         default=default_converter(default) if default else None,
         nullable=nullable,
@@ -328,7 +332,7 @@ def convert_return_to_returnport(
     widget=None,
     nullable=False,
     annotations=None,
-) -> ReturnPortInput:
+) -> PortInput:
     """
     Convert a class to an ArgPort
     """
@@ -357,7 +361,7 @@ def convert_return_to_returnport(
                 child, widget, converter = convert_child_to_childport(
                     cls.__args__[0], registry, nullable=False, is_return=True
                 )
-                return ReturnPortInput(
+                return PortInput(
                     kind=PortKindInput.LIST,
                     widget=widget,
                     key=key,
@@ -371,7 +375,7 @@ def convert_return_to_returnport(
                 child, widget, converter = convert_child_to_childport(
                     cls.__args__[1], registry, nullable=False, is_return=True
                 )
-                return ReturnPortInput(
+                return PortInput(
                     kind=PortKindInput.DICT,
                     widget=widget,
                     key=key,
@@ -396,7 +400,7 @@ def convert_return_to_returnport(
         # Generic Cases
 
         if not issubclass(cls, Enum) and issubclass(cls, bool):
-            return ReturnPortInput(
+            return PortInput(
                 kind=PortKindInput.BOOL,
                 key=key,
                 nullable=nullable,
@@ -404,7 +408,7 @@ def convert_return_to_returnport(
                 annotations=annotations,
             )  # catch bool is subclass of int
         if not issubclass(cls, Enum) and issubclass(cls, int):
-            return ReturnPortInput(
+            return PortInput(
                 kind=PortKindInput.INT,
                 key=key,
                 nullable=nullable,
@@ -412,7 +416,7 @@ def convert_return_to_returnport(
                 annotations=annotations,
             )
         if not issubclass(cls, Enum) and issubclass(cls, float):
-            return ReturnPortInput(
+            return PortInput(
                 kind=PortKindInput.FLOAT,
                 key=key,
                 nullable=nullable,
@@ -420,7 +424,7 @@ def convert_return_to_returnport(
                 annotations=annotations,
             )
         if not issubclass(cls, Enum) and issubclass(cls, str):
-            return ReturnPortInput(
+            return PortInput(
                 kind=PortKindInput.STRING,
                 key=key,
                 nullable=nullable,
@@ -431,11 +435,11 @@ def convert_return_to_returnport(
     identifier = registry.get_identifier_for_structure(cls)
     widget = widget or registry.get_returnwidget_input(cls)
 
-    return ReturnPortInput(
+    return PortInput(
         kind=PortKindInput.STRUCTURE,
         identifier=identifier,
         key=key,
-        widget=widget,
+        returnWidget=widget,
         nullable=nullable,
         description=None,
         annotations=annotations,
@@ -447,6 +451,7 @@ def prepare_definition(
     structure_registry: StructureRegistry,
     interface=None,
     widgets=None,
+    return_widgets=None,
     allow_empty_doc=False,
     interfaces=None,
     omitfirst=None,
@@ -476,10 +481,11 @@ def prepare_definition(
 
     sig = inspect.signature(function)
     widgets = widgets or {}
+    return_widgets = return_widgets or {}
     interfaces = interfaces or []
     # Generate Args and Kwargs from the Annotation
-    args: List[ArgPortInput] = []
-    returns: List[ReturnPortInput] = []
+    args: List[PortInput] = []
+    returns: List[PortInput] = []
 
     # Docstring Parser to help with descriptions
     docstring = parse(function.__doc__)
@@ -510,15 +516,17 @@ def prepare_definition(
             continue
 
         widget = widgets.get(key, None)
+        return_widget = return_widgets.get(key, None)
         cls = value.annotation
 
         try:
             args.append(
-                convert_argument_to_port(
+                convert_object_to_port(
                     cls,
                     key,
                     structure_registry,
                     widget=widget,
+                    return_widget=return_widget,
                     default=value.default
                     if value.default != inspect.Parameter.empty
                     else None,
@@ -537,13 +545,15 @@ def prepare_definition(
         if function_outs_annotation._name == "Tuple":
             try:
                 for index, cls in enumerate(function_outs_annotation.__args__):
+                    return_widget = return_widgets.get(f"return{index}", None)
                     widget = widgets.get(f"return{index}", None)
                     returns.append(
-                        convert_return_to_returnport(
+                        convert_object_to_port(
                             cls,
                             f"return{index}",
                             structure_registry,
                             description=doc_returns_map.get(f"return{index}", None),
+                            return_widget=return_widget,
                             widget=widget,
                         )
                     )
@@ -553,12 +563,14 @@ def prepare_definition(
                 ) from e
         else:
             try:
+                return_widget = return_widgets.get(f"return0", None)
                 widget = widgets.get(f"return0", None)
                 returns.append(
-                    convert_return_to_returnport(
+                    convert_object_to_port(
                         function_outs_annotation,
                         f"return0",
                         structure_registry,
+                        return_widget=return_widget,
                         widget=widget,
                     )
                 )  # Other types will be converted to normal lists and shit
@@ -572,13 +584,15 @@ def prepare_definition(
             pass
 
         elif function_outs_annotation.__name__ != "_empty":  # Is it not empty
+            return_widget = return_widgets.get(f"return0", None)
             widget = widgets.get(f"return0", None)
             returns.append(
-                convert_return_to_returnport(
+                convert_object_to_port(
                     function_outs_annotation,
                     "return0",
                     structure_registry,
                     widget=widget,
+                    return_widget=return_widget,
                 )
             )
 

@@ -3,15 +3,19 @@ query get_reservation($id: ID!) {
     id
     template {
       id
-      registry {
-        app {
-          id
-          version
-          identifier
-        }
-        user {
-          id
-          email
+      agent {
+        instanceId
+        id
+        registry {
+          app {
+            id
+            version
+            identifier
+          }
+          user {
+            id
+            email
+          }
         }
       }
     }

@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "rekuest"
-version = "0.1.18"
+version = "0.1.26"
 description = "rpc and node backbone"
 authors = ["jhnnsrs <jhnnsrs@gmail.com>"]
 license = "CC BY-NC 3.0"
@@ -15,8 +15,6 @@ rath = ">=0.3.4"
 koil = ">=0.2.10"
 pydantic = ">=1.9.0"
 annotated-types = "^0.4.0"
-pytest-asyncio = "^0.20.2"
-pytest-aiohttp = "^1.0.4"
 
 
 [tool.poetry.group.dev.dependencies]

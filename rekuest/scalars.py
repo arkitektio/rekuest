@@ -68,13 +68,25 @@ class SearchQuery(str):
 
         if not definition.operation == OperationType.QUERY:
             raise ValueError("Needs to be operation")
+        
+
+        assert len(definition.variable_definitions) >= 2, f"At least two arguments should be provided ($search: String, $values: [ID])): Was given: {print_ast(v)}"
+
 
         if (
-            len(definition.variable_definitions) > 0
-            and definition.variable_definitions[0].variable.name.value != "search"
+            definition.variable_definitions[0].variable.name.value != "search"
+            or definition.variable_definitions[0].type.kind != "named_type"
         ):
             raise ValueError(
-                "First parameter of search function should be '$search: String' if you provide arguments for your options. This parameter will be filled with userinput"
+                f"First parameter of search function should be '$search: String' if you provide arguments for your options. This parameter will be filled with userinput: Was given: {print_ast(v)}"
+            )
+        
+        if (
+            definition.variable_definitions[1].variable.name.value != "values"
+            or definition.variable_definitions[0].type.kind != "named_type"
+        ):
+            raise ValueError(
+                f"Seconrd parameter of search function should be '$values: [ID]' if you provide arguments for your options. This parameter will be filled with the default values: Was given: {print_ast(v)}"
             )
 
         wrapped_query = definition.selection_set.selections[0]
@@ -85,7 +97,7 @@ class SearchQuery(str):
             else wrapped_query.name.value
         )
         if options_value != "options":
-            raise ValueError("First element of query should be 'options'")
+            raise ValueError(f"First element of query should be 'options':  Was given: {print_ast(v)}")
 
         wrapped_selection = wrapped_query.selection_set.selections
         aliases = [

@@ -31,11 +31,10 @@ from rekuest.agents.base import BaseAgent
 from rekuest.agents.transport.mock import MockAgentTransport
 from rekuest.definition.validate import auto_validate
 from .base import BasePostman
-
+from dataclasses import dataclass
 logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
-
 
 class RPCContract(KoiledModel):
     active: ContextBool = Field(default=False)
@@ -86,7 +85,6 @@ class RPCContract(KoiledModel):
 
     async def __aexit__(self, exc_type, exc, tb):
         await self.aexit()
-
 
 class ReservationContract(RPCContract):
     # TODO:Assert that we can actually assign to this? validating that all of the nodes inputs are
@@ -474,7 +472,6 @@ class arkiuse(ReservationContract):
         logger.info(f"Trying to reserve {self.definition}")
 
         self._enter_future = asyncio.Future()
-
         self._updates_queue = await self.postman.areserve(
             node=self.definition.id,
             params=self.params,
@@ -521,6 +518,7 @@ class arkiuse(ReservationContract):
     class Config:
         arbitrary_types_allowed = True
         underscore_attrs_are_private = True
+        copy_on_model_validation = False
 
 
 class mockuse(RPCContract):

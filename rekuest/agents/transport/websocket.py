@@ -55,7 +55,7 @@ class WebsocketAgentTransport(AgentTransport):
         self._futures = {}
         self._send_queue = asyncio.Queue()
 
-    async def aconnect(self, instance_id: str = "default"):
+    async def aconnect(self, instance_id: str):
         self._connection_task = asyncio.create_task(self.websocket_loop(instance_id))
         self._connected = True
 
@@ -93,7 +93,7 @@ class WebsocketAgentTransport(AgentTransport):
 
             except InvalidStatusCode as e:
                 logger.warning(
-                    "Websocket Connect was denied. Trying to reload token",
+                    f"Websocket to {self.endpoint_url}?token={token}&instance_id={instance_id} was denied. Trying to reload token",
                     exc_info=True,
                 )
                 reload_token = True

@@ -64,12 +64,11 @@ class Rekuest(Composition):
         """
         return unkoil(self.arun, *args, **kwargs)
 
-    async def arun(self, instance_id: str = "default") -> None:
+    async def arun(self) -> None:
         """
         Run the application.
         """
-        assert self.agent.transport.connected, "Transport is not connected"
-        await self.agent.aprovide(instance_id=instance_id)
+        await self.agent.aprovide()
 
     def _repr_html_inline_(self):
         return f"<table><tr><td>rath</td><td>{self.rath._repr_html_inline_()}</td></tr></table>"

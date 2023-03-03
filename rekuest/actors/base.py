@@ -92,6 +92,7 @@ class Actor(BaseModel):
 
     async def provide(self):
         try:
+            logging.info(f"Providing {self.provision.provision}")
             await self.on_provide(self.provision)
             await self.transport.change_provision(
                 self.provision.provision,
@@ -110,7 +111,7 @@ class Actor(BaseModel):
 
     async def unprovide(self):
         try:
-            await self.on_unprovide(self.provision)
+            await self.on_unprovide()
             await self.transport.change_provision(
                 self.provision.provision,
                 status=ProvisionStatus.INACTIVE,

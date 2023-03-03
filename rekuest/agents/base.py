@@ -47,6 +47,7 @@ class BaseAgent(KoiledModel):
 
     """
 
+    instance_id: str = "main"
     transport: AgentTransport
     definition_registry: Optional[DefinitionRegistry] = None
 
@@ -89,6 +90,7 @@ class BaseAgent(KoiledModel):
                 arkitekt_template = await acreate_template(
                     definition=definition,
                     params={},  # Todo really make this happen
+                    instance_id=self.instance_id,
                     rath=self.rath,
                 )
 
@@ -115,10 +117,10 @@ class BaseAgent(KoiledModel):
     async def astep(self):
         await self.process(await self._inqueue.get())
 
-    async def astart(self, instance_id: str = "default"):
+    async def astart(self):
         await self.aregister_definitions()
 
-        await self.transport.aconnect(instance_id=instance_id)
+        await self.transport.aconnect(self.instance_id)
 
         data = await self.transport.list_provisions()
 
@@ -153,11 +155,11 @@ class BaseAgent(KoiledModel):
             self.running = False
             raise
 
-    async def aprovide(self, instance_id: str = "default"):
+    async def aprovide(self):
         logger.info(
             f"Launching provisioning task. We are running {self.transport.instance_id}"
         )
-        await self.astart(instance_id=instance_id)
+        await self.astart()
         await self.aloop()
 
     async def __aenter__(self):

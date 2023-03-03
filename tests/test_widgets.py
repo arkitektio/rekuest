@@ -30,7 +30,7 @@ def test_search_widget_error_on_wrong_graphql():
 def test_search_widget():
 
     SearchWidget(
-        query="query search($search: String){ options: karl { value: x label: y}} ",
+        query="query search($search: String, $values: [ID]){ options: karl { value: x label: y}} ",
         ward="mikro",
     )
 

@@ -36,7 +36,7 @@ fragment ChildPort on ChildPort {
   }
 }
 
-fragment ArgPort on ArgPort {
+fragment Port on Port {
   __typename
   key
   label
@@ -45,22 +45,6 @@ fragment ArgPort on ArgPort {
   default
   kind
   identifier
-  child {
-    ...ChildPort
-  }
-  annotations {
-    ...Annotation
-  }
-}
-
-fragment ReturnPort on ReturnPort {
-  __typename
-  label
-  key
-  nullable
-  description
-  identifier
-  kind
   child {
     ...ChildPort
   }

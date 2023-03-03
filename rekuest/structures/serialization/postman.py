@@ -6,9 +6,8 @@ from rekuest.structures.registry import StructureRegistry
 import asyncio
 from typing import Any, Union
 from rekuest.api.schema import (
-    ArgPortFragment,
+    PortFragment,
     PortKind,
-    ReturnPortFragment,
     ChildPortFragment,
 )
 from rekuest.structures.errors import (
@@ -20,7 +19,7 @@ from rekuest.structures.errors import (
 
 
 async def ashrink_arg(
-    port: Union[ArgPortFragment, ChildPortFragment], value: Any, structure_registry=None
+    port: Union[PortFragment, ChildPortFragment], value: Any, structure_registry=None
 ) -> Any:
     """Expand a value through a port
 
@@ -168,7 +167,7 @@ async def shrink_inputs(
 
 
 async def aexpand_return(
-    port: Union[ReturnPortFragment, ChildPortFragment],
+    port: Union[PortFragment, ChildPortFragment],
     value: Any,
     structure_registry=None,
 ) -> Any:

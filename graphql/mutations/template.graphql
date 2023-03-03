@@ -1,5 +1,6 @@
 mutation createTemplate(
   $definition: DefinitionInput!
+  $instance_id: ID!
   $params: GenericScalar
   $extensions: [String]
 ) {
@@ -7,6 +8,7 @@ mutation createTemplate(
     definition: $definition
     params: $params
     extensions: $extensions
+    instanceId: $instance_id
   ) {
     ...Template
   }
