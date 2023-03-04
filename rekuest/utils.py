@@ -15,14 +15,11 @@ def assign(node: Reserve, *args, **kwargs) -> Any:
         Any: Result of the node task
 
     """
-    with use(x, auto_unreserve=False) as r:
-        x = node.assign(*args, **kwargs)
+    with use(node, auto_unreserve=False):
+        return node.assign(*args, **kwargs)
 
 
-
-
-
-def useUser():
+def useUser() -> str:
     """Use the current User
 
     Returns:
