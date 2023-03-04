@@ -10,7 +10,7 @@ from koil.helpers import run_spawned
 
 
 def function():
-    return useUser()
+    return int(useUser())
 
 
 def guardian_func():
@@ -18,15 +18,13 @@ def guardian_func():
 
 
 def test_reactive_assignation_api():
-
     assignation = Assignation(assignation=444, user=1, guardian=1)
     transport = MockAgentTransport()
     with AssignationContext(assignation, transport):
-        assert function() == "1", "Should be able to use functional api"
+        assert function() == 1, "Should be able to use functional api"
 
 
 def test_reactive_provision_api():
-
     provision = Provision(provision=444, user=1, guardian=1)
     transport = MockAgentTransport()
 
@@ -36,13 +34,11 @@ def test_reactive_provision_api():
 
 @pytest.mark.asyncio
 async def test_reactive_assignation_api_async():
-
     random_sleep = [random.randint(1, 10) for i in range(10)]
 
     transport = MockAgentTransport()
 
     async def async_context(sleep_interval):
-
         assignation = Assignation(assignation=444, user=sleep_interval, guardian=1)
 
         with AssignationContext(assignation, transport):
@@ -58,8 +54,7 @@ async def test_reactive_assignation_api_async():
 
 
 @pytest.mark.asyncio
-async def test_reactive_assignation_api_async():
-
+async def test_reactive_assignation_api_threaded_async():
     random_sleep = [random.randint(1, 10) for i in range(10)]
 
     transport = MockAgentTransport()
@@ -69,7 +64,6 @@ async def test_reactive_assignation_api_async():
         return int(useUser())
 
     async def async_context(sleep_interval):
-
         assignation = Assignation(assignation=444, user=sleep_interval, guardian=1)
 
         with AssignationContext(assignation, transport):

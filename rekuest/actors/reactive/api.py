@@ -3,10 +3,6 @@ from rekuest.actors.vars import (
     get_current_provision_helper,
 )
 from rekuest.api.schema import LogLevelInput
-from rekuest.actors.vars import (
-    get_current_assignation_helper,
-    get_current_provision_helper,
-)
 
 
 async def alog(message: str, level: LogLevelInput = LogLevelInput.DEBUG) -> None:
@@ -15,6 +11,7 @@ async def alog(message: str, level: LogLevelInput = LogLevelInput.DEBUG) -> None
 
 def log(message: str, level: LogLevelInput = LogLevelInput.DEBUG) -> None:
     get_current_assignation_helper().log(level, message)
+
 
 async def plog(message: str, level: LogLevelInput = LogLevelInput.DEBUG) -> None:
     await get_current_provision_helper().alog(level, message)

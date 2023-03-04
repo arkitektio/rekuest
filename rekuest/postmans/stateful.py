@@ -12,13 +12,11 @@ import asyncio
 from pydantic import Field
 import logging
 from .transport.base import PostmanTransport
-import uuid
 
 logger = logging.getLogger(__name__)
 
 
 class StatefulPostman(BasePostman):
-
     transport: PostmanTransport
     assignations: Dict[str, Assignation] = Field(default_factory=dict)
     reservations: Dict[str, Reservation] = Field(default_factory=dict)
@@ -48,9 +46,9 @@ class StatefulPostman(BasePostman):
 
     async def aunreserve(self, reservation_id: str) -> ReservationFragment:
         unreservation = await self.transport.aunreserve(reservation_id)
-        self.reservations[
-            unreservation.reservation
-        ].status = ReservationStatus.CANCELING
+        self.reservations[unreservation.reservation].status = (
+            ReservationStatus.CANCELING
+        )
         return self.reservations[unreservation.reservation]
 
     async def aassign(
@@ -68,9 +66,9 @@ class StatefulPostman(BasePostman):
         assignation: str,
     ) -> AssignationFragment:
         unassignation = await self.transport.aunassign(assignation)
-        self.assignations[
-            unassignation.assignation
-        ].status = AssignationStatus.CANCELING
+        self.assignations[unassignation.assignation].status = (
+            AssignationStatus.CANCELING
+        )
         return unassignation
 
     def register_reservation_queue(
@@ -90,7 +88,9 @@ class StatefulPostman(BasePostman):
                 )
             else:
                 logger.warning(
-                    "Received Assignation Update without having knowingly queued it. Most likely because client crashed before receiving updates.  We will omit!"
+                    "Received Assignation Update without having knowingly queued it."
+                    " Most likely because client crashed before receiving updates.  We"
+                    " will omit!"
                 )
         elif isinstance(message, Reservation):
             if message.reservation in self._res_update_queues:
@@ -100,7 +100,9 @@ class StatefulPostman(BasePostman):
                 )
             else:
                 logger.warning(
-                    "Received Reservation Update without having knowingly queued it. Most likely because client crashed before receiving updates. We will omit!"
+                    "Received Reservation Update without having knowingly queued it."
+                    " Most likely because client crashed before receiving updates. We"
+                    " will omit!"
                 )
 
         else:

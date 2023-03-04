@@ -1,5 +1,4 @@
-from typing import Any, Dict, List, Optional, Tuple
-from rekuest.api.schema import NodeFragment
+from typing import Any, List, Tuple
 import asyncio
 from rekuest.structures.errors import ExpandingError, ShrinkingError
 from rekuest.structures.registry import StructureRegistry
@@ -15,7 +14,6 @@ from rekuest.api.schema import (
 from rekuest.structures.errors import (
     PortShrinkingError,
     StructureShrinkingError,
-    PortExpandingError,
     StructureExpandingError,
 )
 from rekuest.definition.validate import auto_validate
@@ -48,13 +46,15 @@ async def aexpand_arg(
 
     if not isinstance(value, (str, int, float, dict, list)):
         raise ExpandingError(
-            f"Can't expand {value} of type {type(value)} to {port.kind}. We only accept strings, ints and floats (json serializable)"
+            f"Can't expand {value} of type {type(value)} to {port.kind}. We only accept"
+            " strings, ints and floats (json serializable)"
         ) from None
 
     if port.kind == PortKind.DICT:
         if not isinstance(value, dict):
             raise ExpandingError(
-                f"Can't expand {value} of type {type(value)} to {port.kind}. We only accept dicts"
+                f"Can't expand {value} of type {type(value)} to {port.kind}. We only"
+                " accept dicts"
             ) from None
 
         return {
@@ -65,7 +65,8 @@ async def aexpand_arg(
     if port.kind == PortKind.LIST:
         if not isinstance(value, list):
             raise ExpandingError(
-                f"Can't expand {value} of type {type(value)} to {port.kind}. We only accept lists"
+                f"Can't expand {value} of type {type(value)} to {port.kind}. We only"
+                " accept lists"
             ) from None
 
         return await asyncio.gather(
@@ -95,18 +96,16 @@ async def aexpand_arg(
             ) from e
 
     if port.kind == PortKind.BOOL:
-
         return bool(value) if value is not None else bool(port.default)
 
     if port.kind == PortKind.STRING:
-
         return str(value) if value is not None else str(port.default)
 
     raise NotImplementedError("Should be implemented by subclass")
 
 
 async def expand_inputs(
-    definition:  Union[DefinitionInput,DefinitionFragment],
+    definition: Union[DefinitionInput, DefinitionFragment],
     args: List[Union[str, int, float, dict, list]],
     structure_registry: StructureRegistry,
     skip_expanding: bool = False,
@@ -126,7 +125,6 @@ async def expand_inputs(
         if isinstance(definition, DefinitionInput)
         else definition
     )
-
 
     if not skip_expanding:
         try:
@@ -164,7 +162,6 @@ async def ashrink_return(
 
     """
     try:
-
         if value is None:
             if port.nullable:
                 return None
@@ -174,7 +171,6 @@ async def ashrink_return(
                 )
 
         if port.kind == PortKind.DICT:
-
             return {
                 key: await ashrink_return(port.child, value, structure_registry)
                 for key, value in value.items()
@@ -206,7 +202,7 @@ async def ashrink_return(
             try:
                 shrink = await shrinker(value)
                 return str(shrink)
-            except Exception as e:
+            except Exception:
                 raise StructureShrinkingError(
                     f"Error shrinking {repr(value)} with Structure {port.identifier}"
                 ) from None
@@ -226,28 +222,27 @@ async def ashrink_return(
 
 
 async def shrink_outputs(
-    definition: Union[DefinitionInput,DefinitionFragment],
+    definition: Union[DefinitionInput, DefinitionFragment],
     returns: List[Any],
     structure_registry: StructureRegistry,
     skip_shrinking: bool = False,
 ) -> Tuple[Union[str, int, float, dict, list, None]]:
-
     node = (
         auto_validate(definition)
         if isinstance(definition, DefinitionInput)
         else definition
     )
 
-
     if returns is None:
         returns = []
     elif not isinstance(returns, tuple):
         returns = [returns]
 
-
     assert len(node.returns) == len(
         returns
-    ), f"Mismatch in Return Length: expected {len(node.returns)} got {len(returns)}"  # We are dealing with a single output, convert it to a proper port like structure
+    ), (  # We are dealing with a single output, convert it to a proper port like structure
+        f"Mismatch in Return Length: expected {len(node.returns)} got {len(returns)}"
+    )
 
     if not skip_shrinking:
         shrinked_returns_future = [

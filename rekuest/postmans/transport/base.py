@@ -1,18 +1,14 @@
 from typing import (
-    Awaitable,
-    Callable,
     List,
     Optional,
     Dict,
     Any,
-    Union,
     Protocol,
     runtime_checkable,
 )
 
 from rekuest.messages import Assignation, Reservation, Unassignation, Unreservation
 from rekuest.api.schema import AssignationStatus, ReservationStatus, ReserveParamsInput
-from koil.composition import KoiledModel
 
 
 @runtime_checkable

@@ -1,22 +1,18 @@
 from typing import Callable, Dict, List, Optional, Tuple, Union
 
 from pydantic import Field
-import inspect
 from rekuest.actors.base import Actor
 from rekuest.actors.builder import ActorBuilder
 from rekuest.agents.errors import ProvisionException
 from rekuest.api.schema import (
-    ProvisionFragment,
     TemplateFragment,
     acreate_template,
-    afind,
-    aget_provision,
 )
 from rekuest.definition.registry import (
     DefinitionRegistry,
     get_current_definition_registry,
 )
-from rekuest.rath import RekuestRath, current_rekuest_rath
+from rekuest.rath import RekuestRath
 import asyncio
 from rekuest.agents.transport.base import AgentTransport, Contextual
 from rekuest.messages import Assignation, Unassignation, Unprovision, Provision
@@ -78,7 +74,6 @@ class BaseAgent(KoiledModel):
         )
 
     async def aregister_definitions(self):
-
         if self.definition_registry.defined_nodes:
             for (
                 definition,
@@ -150,7 +145,8 @@ class BaseAgent(KoiledModel):
                 await self.astep()
         except asyncio.CancelledError:
             logger.info(
-                f"Provisioning task cancelled. We are running {self.transport.instance_id}"
+                "Provisioning task cancelled. We are running"
+                f" {self.transport.instance_id}"
             )
             self.running = False
             raise

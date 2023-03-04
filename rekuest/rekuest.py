@@ -1,12 +1,9 @@
-from textwrap import wrap
-from typing import Any, Awaitable, Callable, Dict, List
+from typing import Dict
 from pydantic import Field
 from rekuest.agents.stateful import StatefulAgent
-from rekuest.api.schema import TemplateFragment, WidgetInput
+from rekuest.api.schema import TemplateFragment
 from rekuest.postmans.graphql import GraphQLPostman
-from rekuest.postmans.stateful import StatefulPostman
 from rekuest.rath import RekuestRath
-from rekuest.messages import Provision
 from rekuest.structures.default import get_default_structure_registry
 from rekuest.structures.registry import (
     StructureRegistry,
@@ -21,8 +18,6 @@ from rekuest.postmans.base import BasePostman
 from koil import unkoil
 from koil.composition import Composition
 from koil.decorators import koilable
-from rekuest.api.schema import acreate_template
-from rekuest.actors.builder import ActorBuilder
 
 
 @koilable(fieldname="koil", add_connectors=True)
@@ -46,12 +41,11 @@ class Rekuest(Composition):
         structure_registry = kwargs.get("structure_registry", self.structure_registry)
 
         def real_decorator(function_or_actor):
-
             self.definition_registry.register(
                 function_or_actor,
                 *args,
                 structure_registry=structure_registry,
-                **kwargs
+                **kwargs,
             )
 
             return function_or_actor
@@ -72,7 +66,6 @@ class Rekuest(Composition):
 
     def _repr_html_inline_(self):
         return f"<table><tr><td>rath</td><td>{self.rath._repr_html_inline_()}</td></tr></table>"
-
 
     class Config:
         arbitrary_types_allowed = True

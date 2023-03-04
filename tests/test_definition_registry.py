@@ -1,11 +1,8 @@
-from rekuest.api.schema import TemplateFragment
 from rekuest.definition.define import prepare_definition
 from rekuest.definition.registry import DefinitionRegistry
-from .registries import simple_registry
 
 
 def test_register_function(simple_registry):
-
     defi = DefinitionRegistry(structure_registry=simple_registry)
 
     def func():

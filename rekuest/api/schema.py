@@ -1053,7 +1053,14 @@ class AssignMutation(BaseModel):
         parent: Optional[ID] = None
 
     class Meta:
-        document = "fragment Assignation on Assignation {\n  args\n  kwargs\n  id\n  parent {\n    id\n  }\n  id\n  status\n  statusmessage\n  returns\n  reference\n  updatedAt\n}\n\nmutation assign($reservation: ID!, $args: [AnyInput]!, $reference: String, $parent: ID) {\n  assign(\n    reservation: $reservation\n    args: $args\n    reference: $reference\n    parent: $parent\n  ) {\n    ...Assignation\n  }\n}"
+        document = (
+            "fragment Assignation on Assignation {\n  args\n  kwargs\n  id\n  parent"
+            " {\n    id\n  }\n  id\n  status\n  statusmessage\n  returns\n  reference\n"
+            "  updatedAt\n}\n\nmutation assign($reservation: ID!, $args: [AnyInput]!,"
+            " $reference: String, $parent: ID) {\n  assign(\n    reservation:"
+            " $reservation\n    args: $args\n    reference: $reference\n    parent:"
+            " $parent\n  ) {\n    ...Assignation\n  }\n}"
+        )
 
 
 class UnassignMutation(BaseModel):
@@ -1063,7 +1070,12 @@ class UnassignMutation(BaseModel):
         assignation: ID
 
     class Meta:
-        document = "fragment Assignation on Assignation {\n  args\n  kwargs\n  id\n  parent {\n    id\n  }\n  id\n  status\n  statusmessage\n  returns\n  reference\n  updatedAt\n}\n\nmutation unassign($assignation: ID!) {\n  unassign(assignation: $assignation) {\n    ...Assignation\n  }\n}"
+        document = (
+            "fragment Assignation on Assignation {\n  args\n  kwargs\n  id\n  parent"
+            " {\n    id\n  }\n  id\n  status\n  statusmessage\n  returns\n  reference\n"
+            "  updatedAt\n}\n\nmutation unassign($assignation: ID!) {\n "
+            " unassign(assignation: $assignation) {\n    ...Assignation\n  }\n}"
+        )
 
 
 class CreateTemplateMutation(BaseModel):
@@ -1076,7 +1088,28 @@ class CreateTemplateMutation(BaseModel):
         extensions: Optional[List[Optional[str]]] = None
 
     class Meta:
-        document = "fragment ValueRange on ValueRange {\n  min\n  max\n}\n\nfragment IsPredicate on IsPredicate {\n  predicate\n}\n\nfragment ChildPortNested on ChildPort {\n  kind\n  child {\n    kind\n  }\n  nullable\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment Annotation on Annotation {\n  kind\n  ...IsPredicate\n  ...ValueRange\n}\n\nfragment ChildPort on ChildPort {\n  kind\n  identifier\n  child {\n    ...ChildPortNested\n  }\n  nullable\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment Port on Port {\n  __typename\n  key\n  label\n  nullable\n  description\n  default\n  kind\n  identifier\n  child {\n    ...ChildPort\n  }\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment Definition on Node {\n  args {\n    ...Port\n  }\n  returns {\n    ...Port\n  }\n  kind\n  name\n  description\n}\n\nfragment Node on Node {\n  hash\n  id\n  ...Definition\n}\n\nfragment Template on Template {\n  id\n  agent {\n    registry {\n      name\n      app {\n        version\n        identifier\n      }\n      user {\n        username\n      }\n    }\n  }\n  node {\n    ...Node\n  }\n  params\n}\n\nmutation createTemplate($definition: DefinitionInput!, $instance_id: ID!, $params: GenericScalar, $extensions: [String]) {\n  createTemplate(\n    definition: $definition\n    params: $params\n    extensions: $extensions\n    instanceId: $instance_id\n  ) {\n    ...Template\n  }\n}"
+        document = (
+            "fragment ValueRange on ValueRange {\n  min\n  max\n}\n\nfragment"
+            " IsPredicate on IsPredicate {\n  predicate\n}\n\nfragment ChildPortNested"
+            " on ChildPort {\n  kind\n  child {\n    kind\n  }\n  nullable\n "
+            " annotations {\n    ...Annotation\n  }\n}\n\nfragment Annotation on"
+            " Annotation {\n  kind\n  ...IsPredicate\n  ...ValueRange\n}\n\nfragment"
+            " ChildPort on ChildPort {\n  kind\n  identifier\n  child {\n   "
+            " ...ChildPortNested\n  }\n  nullable\n  annotations {\n    ...Annotation\n"
+            "  }\n}\n\nfragment Port on Port {\n  __typename\n  key\n  label\n "
+            " nullable\n  description\n  default\n  kind\n  identifier\n  child {\n   "
+            " ...ChildPort\n  }\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment"
+            " Definition on Node {\n  args {\n    ...Port\n  }\n  returns {\n   "
+            " ...Port\n  }\n  kind\n  name\n  description\n}\n\nfragment Node on Node"
+            " {\n  hash\n  id\n  ...Definition\n}\n\nfragment Template on Template {\n "
+            " id\n  agent {\n    registry {\n      name\n      app {\n        version\n"
+            "        identifier\n      }\n      user {\n        username\n      }\n   "
+            " }\n  }\n  node {\n    ...Node\n  }\n  params\n}\n\nmutation"
+            " createTemplate($definition: DefinitionInput!, $instance_id: ID!, $params:"
+            " GenericScalar, $extensions: [String]) {\n  createTemplate(\n   "
+            " definition: $definition\n    params: $params\n    extensions:"
+            " $extensions\n    instanceId: $instance_id\n  ) {\n    ...Template\n  }\n}"
+        )
 
 
 class SlateMutation(BaseModel):
@@ -1086,7 +1119,10 @@ class SlateMutation(BaseModel):
         identifier: str
 
     class Meta:
-        document = "mutation slate($identifier: String!) {\n  slate(identifier: $identifier)\n}"
+        document = (
+            "mutation slate($identifier: String!) {\n  slate(identifier:"
+            " $identifier)\n}"
+        )
 
 
 class Reset_repositoryMutationResetrepository(BaseModel):
@@ -1149,7 +1185,18 @@ class ReserveMutation(BaseModel):
         provision: Optional[ID] = None
 
     class Meta:
-        document = "fragment ReserveParams on ReserveParams {\n  registries\n  minimalInstances\n  desiredInstances\n}\n\nfragment Reservation on Reservation {\n  id\n  statusmessage\n  status\n  node {\n    id\n    pure\n  }\n  params {\n    ...ReserveParams\n  }\n  waiter {\n    unique\n  }\n  reference\n  updatedAt\n}\n\nmutation reserve($node: ID!, $template: ID, $params: ReserveParamsInput, $title: String, $imitate: ID, $appGroup: ID, $reference: String, $provision: ID) {\n  reserve(\n    node: $node\n    template: $template\n    params: $params\n    title: $title\n    imitate: $imitate\n    provision: $provision\n    appGroup: $appGroup\n    reference: $reference\n  ) {\n    ...Reservation\n  }\n}"
+        document = (
+            "fragment ReserveParams on ReserveParams {\n  registries\n "
+            " minimalInstances\n  desiredInstances\n}\n\nfragment Reservation on"
+            " Reservation {\n  id\n  statusmessage\n  status\n  node {\n    id\n   "
+            " pure\n  }\n  params {\n    ...ReserveParams\n  }\n  waiter {\n   "
+            " unique\n  }\n  reference\n  updatedAt\n}\n\nmutation reserve($node: ID!,"
+            " $template: ID, $params: ReserveParamsInput, $title: String, $imitate: ID,"
+            " $appGroup: ID, $reference: String, $provision: ID) {\n  reserve(\n   "
+            " node: $node\n    template: $template\n    params: $params\n    title:"
+            " $title\n    imitate: $imitate\n    provision: $provision\n    appGroup:"
+            " $appGroup\n    reference: $reference\n  ) {\n    ...Reservation\n  }\n}"
+        )
 
 
 class UnreserveMutation(BaseModel):
@@ -1159,7 +1206,14 @@ class UnreserveMutation(BaseModel):
         id: ID
 
     class Meta:
-        document = "fragment ReserveParams on ReserveParams {\n  registries\n  minimalInstances\n  desiredInstances\n}\n\nfragment Reservation on Reservation {\n  id\n  statusmessage\n  status\n  node {\n    id\n    pure\n  }\n  params {\n    ...ReserveParams\n  }\n  waiter {\n    unique\n  }\n  reference\n  updatedAt\n}\n\nmutation unreserve($id: ID!) {\n  unreserve(id: $id) {\n    ...Reservation\n  }\n}"
+        document = (
+            "fragment ReserveParams on ReserveParams {\n  registries\n "
+            " minimalInstances\n  desiredInstances\n}\n\nfragment Reservation on"
+            " Reservation {\n  id\n  statusmessage\n  status\n  node {\n    id\n   "
+            " pure\n  }\n  params {\n    ...ReserveParams\n  }\n  waiter {\n   "
+            " unique\n  }\n  reference\n  updatedAt\n}\n\nmutation unreserve($id: ID!)"
+            " {\n  unreserve(id: $id) {\n    ...Reservation\n  }\n}"
+        )
 
 
 class Watch_provisionSubscriptionProvisions(BaseModel):
@@ -1181,7 +1235,26 @@ class Watch_provisionSubscription(BaseModel):
         identifier: str
 
     class Meta:
-        document = "fragment ValueRange on ValueRange {\n  min\n  max\n}\n\nfragment IsPredicate on IsPredicate {\n  predicate\n}\n\nfragment ChildPortNested on ChildPort {\n  kind\n  child {\n    kind\n  }\n  nullable\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment Annotation on Annotation {\n  kind\n  ...IsPredicate\n  ...ValueRange\n}\n\nfragment ChildPort on ChildPort {\n  kind\n  identifier\n  child {\n    ...ChildPortNested\n  }\n  nullable\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment Port on Port {\n  __typename\n  key\n  label\n  nullable\n  description\n  default\n  kind\n  identifier\n  child {\n    ...ChildPort\n  }\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment Definition on Node {\n  args {\n    ...Port\n  }\n  returns {\n    ...Port\n  }\n  kind\n  name\n  description\n}\n\nfragment Node on Node {\n  hash\n  id\n  ...Definition\n}\n\nfragment Provision on Provision {\n  id\n  status\n  template {\n    id\n    node {\n      ...Node\n    }\n    params\n  }\n}\n\nsubscription watch_provision($identifier: String!) {\n  provisions(identifier: $identifier) {\n    create {\n      ...Provision\n    }\n    delete\n    update {\n      ...Provision\n    }\n  }\n}"
+        document = (
+            "fragment ValueRange on ValueRange {\n  min\n  max\n}\n\nfragment"
+            " IsPredicate on IsPredicate {\n  predicate\n}\n\nfragment ChildPortNested"
+            " on ChildPort {\n  kind\n  child {\n    kind\n  }\n  nullable\n "
+            " annotations {\n    ...Annotation\n  }\n}\n\nfragment Annotation on"
+            " Annotation {\n  kind\n  ...IsPredicate\n  ...ValueRange\n}\n\nfragment"
+            " ChildPort on ChildPort {\n  kind\n  identifier\n  child {\n   "
+            " ...ChildPortNested\n  }\n  nullable\n  annotations {\n    ...Annotation\n"
+            "  }\n}\n\nfragment Port on Port {\n  __typename\n  key\n  label\n "
+            " nullable\n  description\n  default\n  kind\n  identifier\n  child {\n   "
+            " ...ChildPort\n  }\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment"
+            " Definition on Node {\n  args {\n    ...Port\n  }\n  returns {\n   "
+            " ...Port\n  }\n  kind\n  name\n  description\n}\n\nfragment Node on Node"
+            " {\n  hash\n  id\n  ...Definition\n}\n\nfragment Provision on Provision"
+            " {\n  id\n  status\n  template {\n    id\n    node {\n      ...Node\n   "
+            " }\n    params\n  }\n}\n\nsubscription watch_provision($identifier:"
+            " String!) {\n  provisions(identifier: $identifier) {\n    create {\n     "
+            " ...Provision\n    }\n    delete\n    update {\n      ...Provision\n   "
+            " }\n  }\n}"
+        )
 
 
 class Watch_todosSubscriptionTodos(BaseModel):
@@ -1201,7 +1274,13 @@ class Watch_todosSubscription(BaseModel):
         identifier: str
 
     class Meta:
-        document = "fragment Assignation on Assignation {\n  args\n  kwargs\n  id\n  parent {\n    id\n  }\n  id\n  status\n  statusmessage\n  returns\n  reference\n  updatedAt\n}\n\nsubscription watch_todos($identifier: String!) {\n  todos(identifier: $identifier) {\n    create {\n      ...Assignation\n    }\n    update {\n      ...Assignation\n    }\n    delete\n  }\n}"
+        document = (
+            "fragment Assignation on Assignation {\n  args\n  kwargs\n  id\n  parent"
+            " {\n    id\n  }\n  id\n  status\n  statusmessage\n  returns\n  reference\n"
+            "  updatedAt\n}\n\nsubscription watch_todos($identifier: String!) {\n "
+            " todos(identifier: $identifier) {\n    create {\n      ...Assignation\n   "
+            " }\n    update {\n      ...Assignation\n    }\n    delete\n  }\n}"
+        )
 
 
 class Watch_requestsSubscriptionRequests(BaseModel):
@@ -1223,7 +1302,13 @@ class Watch_requestsSubscription(BaseModel):
         identifier: str
 
     class Meta:
-        document = "fragment Assignation on Assignation {\n  args\n  kwargs\n  id\n  parent {\n    id\n  }\n  id\n  status\n  statusmessage\n  returns\n  reference\n  updatedAt\n}\n\nsubscription watch_requests($identifier: String!) {\n  requests(identifier: $identifier) {\n    create {\n      ...Assignation\n    }\n    update {\n      ...Assignation\n    }\n    delete\n  }\n}"
+        document = (
+            "fragment Assignation on Assignation {\n  args\n  kwargs\n  id\n  parent"
+            " {\n    id\n  }\n  id\n  status\n  statusmessage\n  returns\n  reference\n"
+            "  updatedAt\n}\n\nsubscription watch_requests($identifier: String!) {\n "
+            " requests(identifier: $identifier) {\n    create {\n      ...Assignation\n"
+            "    }\n    update {\n      ...Assignation\n    }\n    delete\n  }\n}"
+        )
 
 
 class Watch_reservationsSubscriptionReservations(BaseModel):
@@ -1245,7 +1330,16 @@ class Watch_reservationsSubscription(BaseModel):
         identifier: str
 
     class Meta:
-        document = "fragment ReserveParams on ReserveParams {\n  registries\n  minimalInstances\n  desiredInstances\n}\n\nfragment Reservation on Reservation {\n  id\n  statusmessage\n  status\n  node {\n    id\n    pure\n  }\n  params {\n    ...ReserveParams\n  }\n  waiter {\n    unique\n  }\n  reference\n  updatedAt\n}\n\nsubscription watch_reservations($identifier: String!) {\n  reservations(identifier: $identifier) {\n    create {\n      ...Reservation\n    }\n    update {\n      ...Reservation\n    }\n    delete\n  }\n}"
+        document = (
+            "fragment ReserveParams on ReserveParams {\n  registries\n "
+            " minimalInstances\n  desiredInstances\n}\n\nfragment Reservation on"
+            " Reservation {\n  id\n  statusmessage\n  status\n  node {\n    id\n   "
+            " pure\n  }\n  params {\n    ...ReserveParams\n  }\n  waiter {\n   "
+            " unique\n  }\n  reference\n  updatedAt\n}\n\nsubscription"
+            " watch_reservations($identifier: String!) {\n  reservations(identifier:"
+            " $identifier) {\n    create {\n      ...Reservation\n    }\n    update {\n"
+            "      ...Reservation\n    }\n    delete\n  }\n}"
+        )
 
 
 class Get_provisionQuery(BaseModel):
@@ -1255,7 +1349,24 @@ class Get_provisionQuery(BaseModel):
         id: ID
 
     class Meta:
-        document = "fragment ValueRange on ValueRange {\n  min\n  max\n}\n\nfragment IsPredicate on IsPredicate {\n  predicate\n}\n\nfragment ChildPortNested on ChildPort {\n  kind\n  child {\n    kind\n  }\n  nullable\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment Annotation on Annotation {\n  kind\n  ...IsPredicate\n  ...ValueRange\n}\n\nfragment ChildPort on ChildPort {\n  kind\n  identifier\n  child {\n    ...ChildPortNested\n  }\n  nullable\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment Port on Port {\n  __typename\n  key\n  label\n  nullable\n  description\n  default\n  kind\n  identifier\n  child {\n    ...ChildPort\n  }\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment Definition on Node {\n  args {\n    ...Port\n  }\n  returns {\n    ...Port\n  }\n  kind\n  name\n  description\n}\n\nfragment Node on Node {\n  hash\n  id\n  ...Definition\n}\n\nfragment Provision on Provision {\n  id\n  status\n  template {\n    id\n    node {\n      ...Node\n    }\n    params\n  }\n}\n\nquery get_provision($id: ID!) {\n  provision(id: $id) {\n    ...Provision\n  }\n}"
+        document = (
+            "fragment ValueRange on ValueRange {\n  min\n  max\n}\n\nfragment"
+            " IsPredicate on IsPredicate {\n  predicate\n}\n\nfragment ChildPortNested"
+            " on ChildPort {\n  kind\n  child {\n    kind\n  }\n  nullable\n "
+            " annotations {\n    ...Annotation\n  }\n}\n\nfragment Annotation on"
+            " Annotation {\n  kind\n  ...IsPredicate\n  ...ValueRange\n}\n\nfragment"
+            " ChildPort on ChildPort {\n  kind\n  identifier\n  child {\n   "
+            " ...ChildPortNested\n  }\n  nullable\n  annotations {\n    ...Annotation\n"
+            "  }\n}\n\nfragment Port on Port {\n  __typename\n  key\n  label\n "
+            " nullable\n  description\n  default\n  kind\n  identifier\n  child {\n   "
+            " ...ChildPort\n  }\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment"
+            " Definition on Node {\n  args {\n    ...Port\n  }\n  returns {\n   "
+            " ...Port\n  }\n  kind\n  name\n  description\n}\n\nfragment Node on Node"
+            " {\n  hash\n  id\n  ...Definition\n}\n\nfragment Provision on Provision"
+            " {\n  id\n  status\n  template {\n    id\n    node {\n      ...Node\n   "
+            " }\n    params\n  }\n}\n\nquery get_provision($id: ID!) {\n  provision(id:"
+            " $id) {\n    ...Provision\n  }\n}"
+        )
 
 
 class Get_agentQueryAgentRegistry(BaseModel):
@@ -1287,7 +1398,10 @@ class Get_agentQuery(BaseModel):
         id: ID
 
     class Meta:
-        document = "query get_agent($id: ID!) {\n  agent(id: $id) {\n    registry {\n      id\n      name\n    }\n    name\n    instanceId\n  }\n}"
+        document = (
+            "query get_agent($id: ID!) {\n  agent(id: $id) {\n    registry {\n     "
+            " id\n      name\n    }\n    name\n    instanceId\n  }\n}"
+        )
 
 
 class RequestsQuery(BaseModel):
@@ -1297,7 +1411,12 @@ class RequestsQuery(BaseModel):
         identifier: str
 
     class Meta:
-        document = "fragment Assignation on Assignation {\n  args\n  kwargs\n  id\n  parent {\n    id\n  }\n  id\n  status\n  statusmessage\n  returns\n  reference\n  updatedAt\n}\n\nquery requests($identifier: String!) {\n  requests(identifier: $identifier) {\n    ...Assignation\n  }\n}"
+        document = (
+            "fragment Assignation on Assignation {\n  args\n  kwargs\n  id\n  parent"
+            " {\n    id\n  }\n  id\n  status\n  statusmessage\n  returns\n  reference\n"
+            "  updatedAt\n}\n\nquery requests($identifier: String!) {\n "
+            " requests(identifier: $identifier) {\n    ...Assignation\n  }\n}"
+        )
 
 
 class Get_templateQuery(BaseModel):
@@ -1307,7 +1426,25 @@ class Get_templateQuery(BaseModel):
         id: ID
 
     class Meta:
-        document = "fragment ValueRange on ValueRange {\n  min\n  max\n}\n\nfragment IsPredicate on IsPredicate {\n  predicate\n}\n\nfragment ChildPortNested on ChildPort {\n  kind\n  child {\n    kind\n  }\n  nullable\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment Annotation on Annotation {\n  kind\n  ...IsPredicate\n  ...ValueRange\n}\n\nfragment ChildPort on ChildPort {\n  kind\n  identifier\n  child {\n    ...ChildPortNested\n  }\n  nullable\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment Port on Port {\n  __typename\n  key\n  label\n  nullable\n  description\n  default\n  kind\n  identifier\n  child {\n    ...ChildPort\n  }\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment Definition on Node {\n  args {\n    ...Port\n  }\n  returns {\n    ...Port\n  }\n  kind\n  name\n  description\n}\n\nfragment Node on Node {\n  hash\n  id\n  ...Definition\n}\n\nfragment Template on Template {\n  id\n  agent {\n    registry {\n      name\n      app {\n        version\n        identifier\n      }\n      user {\n        username\n      }\n    }\n  }\n  node {\n    ...Node\n  }\n  params\n}\n\nquery get_template($id: ID!) {\n  template(id: $id) {\n    ...Template\n  }\n}"
+        document = (
+            "fragment ValueRange on ValueRange {\n  min\n  max\n}\n\nfragment"
+            " IsPredicate on IsPredicate {\n  predicate\n}\n\nfragment ChildPortNested"
+            " on ChildPort {\n  kind\n  child {\n    kind\n  }\n  nullable\n "
+            " annotations {\n    ...Annotation\n  }\n}\n\nfragment Annotation on"
+            " Annotation {\n  kind\n  ...IsPredicate\n  ...ValueRange\n}\n\nfragment"
+            " ChildPort on ChildPort {\n  kind\n  identifier\n  child {\n   "
+            " ...ChildPortNested\n  }\n  nullable\n  annotations {\n    ...Annotation\n"
+            "  }\n}\n\nfragment Port on Port {\n  __typename\n  key\n  label\n "
+            " nullable\n  description\n  default\n  kind\n  identifier\n  child {\n   "
+            " ...ChildPort\n  }\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment"
+            " Definition on Node {\n  args {\n    ...Port\n  }\n  returns {\n   "
+            " ...Port\n  }\n  kind\n  name\n  description\n}\n\nfragment Node on Node"
+            " {\n  hash\n  id\n  ...Definition\n}\n\nfragment Template on Template {\n "
+            " id\n  agent {\n    registry {\n      name\n      app {\n        version\n"
+            "        identifier\n      }\n      user {\n        username\n      }\n   "
+            " }\n  }\n  node {\n    ...Node\n  }\n  params\n}\n\nquery"
+            " get_template($id: ID!) {\n  template(id: $id) {\n    ...Template\n  }\n}"
+        )
 
 
 class FindQuery(BaseModel):
@@ -1320,7 +1457,23 @@ class FindQuery(BaseModel):
         hash: Optional[str] = None
 
     class Meta:
-        document = "fragment ValueRange on ValueRange {\n  min\n  max\n}\n\nfragment IsPredicate on IsPredicate {\n  predicate\n}\n\nfragment ChildPortNested on ChildPort {\n  kind\n  child {\n    kind\n  }\n  nullable\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment Annotation on Annotation {\n  kind\n  ...IsPredicate\n  ...ValueRange\n}\n\nfragment ChildPort on ChildPort {\n  kind\n  identifier\n  child {\n    ...ChildPortNested\n  }\n  nullable\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment Port on Port {\n  __typename\n  key\n  label\n  nullable\n  description\n  default\n  kind\n  identifier\n  child {\n    ...ChildPort\n  }\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment Definition on Node {\n  args {\n    ...Port\n  }\n  returns {\n    ...Port\n  }\n  kind\n  name\n  description\n}\n\nfragment Node on Node {\n  hash\n  id\n  ...Definition\n}\n\nquery find($id: ID, $template: ID, $hash: String) {\n  node(id: $id, template: $template, hash: $hash) {\n    ...Node\n  }\n}"
+        document = (
+            "fragment ValueRange on ValueRange {\n  min\n  max\n}\n\nfragment"
+            " IsPredicate on IsPredicate {\n  predicate\n}\n\nfragment ChildPortNested"
+            " on ChildPort {\n  kind\n  child {\n    kind\n  }\n  nullable\n "
+            " annotations {\n    ...Annotation\n  }\n}\n\nfragment Annotation on"
+            " Annotation {\n  kind\n  ...IsPredicate\n  ...ValueRange\n}\n\nfragment"
+            " ChildPort on ChildPort {\n  kind\n  identifier\n  child {\n   "
+            " ...ChildPortNested\n  }\n  nullable\n  annotations {\n    ...Annotation\n"
+            "  }\n}\n\nfragment Port on Port {\n  __typename\n  key\n  label\n "
+            " nullable\n  description\n  default\n  kind\n  identifier\n  child {\n   "
+            " ...ChildPort\n  }\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment"
+            " Definition on Node {\n  args {\n    ...Port\n  }\n  returns {\n   "
+            " ...Port\n  }\n  kind\n  name\n  description\n}\n\nfragment Node on Node"
+            " {\n  hash\n  id\n  ...Definition\n}\n\nquery find($id: ID, $template: ID,"
+            " $hash: String) {\n  node(id: $id, template: $template, hash: $hash) {\n  "
+            "  ...Node\n  }\n}"
+        )
 
 
 class RetrieveallQuery(BaseModel):
@@ -1330,7 +1483,22 @@ class RetrieveallQuery(BaseModel):
         pass
 
     class Meta:
-        document = "fragment ValueRange on ValueRange {\n  min\n  max\n}\n\nfragment IsPredicate on IsPredicate {\n  predicate\n}\n\nfragment ChildPortNested on ChildPort {\n  kind\n  child {\n    kind\n  }\n  nullable\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment Annotation on Annotation {\n  kind\n  ...IsPredicate\n  ...ValueRange\n}\n\nfragment ChildPort on ChildPort {\n  kind\n  identifier\n  child {\n    ...ChildPortNested\n  }\n  nullable\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment Port on Port {\n  __typename\n  key\n  label\n  nullable\n  description\n  default\n  kind\n  identifier\n  child {\n    ...ChildPort\n  }\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment Definition on Node {\n  args {\n    ...Port\n  }\n  returns {\n    ...Port\n  }\n  kind\n  name\n  description\n}\n\nfragment Node on Node {\n  hash\n  id\n  ...Definition\n}\n\nquery retrieveall {\n  allnodes {\n    ...Node\n  }\n}"
+        document = (
+            "fragment ValueRange on ValueRange {\n  min\n  max\n}\n\nfragment"
+            " IsPredicate on IsPredicate {\n  predicate\n}\n\nfragment ChildPortNested"
+            " on ChildPort {\n  kind\n  child {\n    kind\n  }\n  nullable\n "
+            " annotations {\n    ...Annotation\n  }\n}\n\nfragment Annotation on"
+            " Annotation {\n  kind\n  ...IsPredicate\n  ...ValueRange\n}\n\nfragment"
+            " ChildPort on ChildPort {\n  kind\n  identifier\n  child {\n   "
+            " ...ChildPortNested\n  }\n  nullable\n  annotations {\n    ...Annotation\n"
+            "  }\n}\n\nfragment Port on Port {\n  __typename\n  key\n  label\n "
+            " nullable\n  description\n  default\n  kind\n  identifier\n  child {\n   "
+            " ...ChildPort\n  }\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment"
+            " Definition on Node {\n  args {\n    ...Port\n  }\n  returns {\n   "
+            " ...Port\n  }\n  kind\n  name\n  description\n}\n\nfragment Node on Node"
+            " {\n  hash\n  id\n  ...Definition\n}\n\nquery retrieveall {\n  allnodes"
+            " {\n    ...Node\n  }\n}"
+        )
 
 
 class Get_reservationQueryReservationTemplateAgentRegistryApp(BaseModel):
@@ -1436,7 +1604,15 @@ class Get_reservationQuery(BaseModel):
         id: ID
 
     class Meta:
-        document = "query get_reservation($id: ID!) {\n  reservation(id: $id) {\n    id\n    template {\n      id\n      agent {\n        instanceId\n        id\n        registry {\n          app {\n            id\n            version\n            identifier\n          }\n          user {\n            id\n            email\n          }\n        }\n      }\n    }\n    provisions {\n      id\n      status\n    }\n    title\n    status\n    id\n    reference\n    node {\n      id\n      kind\n      name\n    }\n  }\n}"
+        document = (
+            "query get_reservation($id: ID!) {\n  reservation(id: $id) {\n    id\n   "
+            " template {\n      id\n      agent {\n        instanceId\n        id\n    "
+            "    registry {\n          app {\n            id\n            version\n    "
+            "        identifier\n          }\n          user {\n            id\n       "
+            "     email\n          }\n        }\n      }\n    }\n    provisions {\n    "
+            "  id\n      status\n    }\n    title\n    status\n    id\n    reference\n "
+            "   node {\n      id\n      kind\n      name\n    }\n  }\n}"
+        )
 
 
 class ReservationsQuery(BaseModel):
@@ -1446,7 +1622,15 @@ class ReservationsQuery(BaseModel):
         identifier: str
 
     class Meta:
-        document = "fragment ReserveParams on ReserveParams {\n  registries\n  minimalInstances\n  desiredInstances\n}\n\nfragment Reservation on Reservation {\n  id\n  statusmessage\n  status\n  node {\n    id\n    pure\n  }\n  params {\n    ...ReserveParams\n  }\n  waiter {\n    unique\n  }\n  reference\n  updatedAt\n}\n\nquery reservations($identifier: String!) {\n  reservations(identifier: $identifier) {\n    ...Reservation\n  }\n}"
+        document = (
+            "fragment ReserveParams on ReserveParams {\n  registries\n "
+            " minimalInstances\n  desiredInstances\n}\n\nfragment Reservation on"
+            " Reservation {\n  id\n  statusmessage\n  status\n  node {\n    id\n   "
+            " pure\n  }\n  params {\n    ...ReserveParams\n  }\n  waiter {\n   "
+            " unique\n  }\n  reference\n  updatedAt\n}\n\nquery"
+            " reservations($identifier: String!) {\n  reservations(identifier:"
+            " $identifier) {\n    ...Reservation\n  }\n}"
+        )
 
 
 async def aassign(

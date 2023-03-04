@@ -5,9 +5,8 @@ from rekuest.messages import (
 
 
 def test_update_message():
-
     x = Assignation(
-        assignation=1, status=AssignationStatus.PENDING, kwargs={"a": 1}, guardian=1
+        assignation=1, status=AssignationStatus.PENDING, args=[1], guardian=1
     )
     y = Assignation(
         assignation=1,
@@ -19,11 +18,10 @@ def test_update_message():
 
     x.update(y)
     assert x.status == AssignationStatus.RETURNED, "Status should be updated"
-    assert x.kwargs == {"a": 1}, "Kwargs should have not been updated"
+    assert x.args == ["nana"], "Args should have been updated"
 
 
-def test_update_message():
-
+def test_update_message_not_inplace():
     x = Assignation(
         assignation=1, status=AssignationStatus.PENDING, args=[0], guardian=1
     )
@@ -31,7 +29,6 @@ def test_update_message():
         assignation=1,
         status=AssignationStatus.RETURNED,
         args=["nana"],
-        kwargs=None,
         guardian=1,
     )
 

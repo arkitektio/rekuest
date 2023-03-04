@@ -1,8 +1,7 @@
-from typing import Optional, List, Union, Any
+from typing import List, Union, Any
 
 from pydantic import Field
 
-from rekuest.postmans.vars import current_postman
 from rekuest.api.schema import AssignationFragment, ReserveParamsInput
 from koil.composition import KoiledModel
 import asyncio

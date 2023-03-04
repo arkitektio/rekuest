@@ -1,17 +1,13 @@
-from graphql import OperationType
 from pydantic import Field
 from rath import rath
 import contextvars
-from rath.links.aiohttp import AIOHttpLink
 from rath.links.auth import AuthTokenLink
 
-from rath.links.base import TerminatingLink
-from rath.links.compose import TypedComposedLink, compose
+from rath.links.compose import TypedComposedLink
 from rath.links.dictinglink import DictingLink
 from rath.links.shrink import ShrinkingLink
 from rath.links.split import SplitLink
 from rath.links.retry import RetryLink
-from rath.links.websockets import WebSocketLink
 
 current_rekuest_rath = contextvars.ContextVar("current_rekuest_rath", default=None)
 

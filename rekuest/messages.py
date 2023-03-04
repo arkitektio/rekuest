@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional, TypeVar
+from typing import Any, List, Optional, TypeVar
 from pydantic import BaseModel
 from rekuest.api.schema import (
     LogLevelInput,
@@ -18,7 +18,7 @@ class UpdatableModel(BaseModel):
             if use:
                 for key, value in use.dict().items():
                     if key in self.__fields__:
-                        if value != None:  # None is not a valid update!
+                        if value is not None:  # None is not a valid update!
                             setattr(self, key, value)
             if kwargs:
                 for key in kwargs:

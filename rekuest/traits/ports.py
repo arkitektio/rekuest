@@ -1,8 +1,5 @@
-from abc import abstractmethod
-import asyncio
-from typing import Dict, Optional, Callable
+from typing import Callable
 from pydantic import BaseModel, root_validator
-from graphql import parse
 import uuid
 import random
 
@@ -26,7 +23,8 @@ class PortTrait(BaseModel):
         if kind == PortKind.STRUCTURE:
             if values.get("identifier") is None:
                 raise ValueError(
-                    "When specifying a structure you need to provide an arkitekt identifier"
+                    "When specifying a structure you need to provide an arkitekt"
+                    " identifier"
                 )
 
         if kind == PortKind.LIST:
@@ -89,22 +87,23 @@ class WidgetInputTrait(BaseModel):
             raise ValueError("kind is required")
 
         if kind == WidgetKind.SearchWidget:
-
             if values.get("query") is None:
                 raise ValueError(
-                    "When specifying a SearchWidget you need to provide an query parameter"
+                    "When specifying a SearchWidget you need to provide an query"
+                    " parameter"
                 )
 
         if kind == WidgetKind.SliderWidget:
-
             if values.get("min") is None or values.get("max") is None:
                 raise ValueError(
-                    "When specifying a Slider you need to provide an 'max and 'min' parameter"
+                    "When specifying a Slider you need to provide an 'max and 'min'"
+                    " parameter"
                 )
 
             if values.get("min") > values.get("max"):
                 raise ValueError(
-                    "When specifying a Slider you need to provide an 'max' greater than 'min'"
+                    "When specifying a Slider you need to provide an 'max' greater than"
+                    " 'min'"
                 )
 
         return values
@@ -127,10 +126,10 @@ class ReturnWidgetInputTrait(BaseModel):
             raise ValueError("kind is required")
 
         if kind == ReturnWidgetKind.CustomReturnWidget:
-
             if values.get("hook") is None:
                 raise ValueError(
-                    "When specifying a CustomReturnWidget you need to provide a 'hook' parameter, corresponding to the desired reigstered hook"
+                    "When specifying a CustomReturnWidget you need to provide a 'hook'"
+                    " parameter, corresponding to the desired reigstered hook"
                 )
 
         return values
@@ -174,7 +173,8 @@ class AnnotationInputTrait(BaseModel):
                 raise ValueError("atrribute is required when using AttributePredicate")
             if values.get("annotations") is None:
                 raise ValueError(
-                    "annotations on the predicate is required when using AttributePredicate"
+                    "annotations on the predicate is required when using"
+                    " AttributePredicate"
                 )
 
         return values

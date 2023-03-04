@@ -21,7 +21,6 @@ class Reserve(BaseModel):
         yield "returns", self.returns
 
     def __rich__(self):
-
         from rich.table import Table
 
         my_table = Table(title=f"Node: {self.name}", show_header=False)
@@ -38,7 +37,8 @@ class Reserve(BaseModel):
         <div class="container" style="border:1px solid #00000f;padding: 4px;">
             <div class="item item-1 font-xl">{self.name}</div>
             <div class="item item-2">{self.package}/{self.interface}</div>
-            <div class="item item-3">Args: {" ".join([port._repr_html_list() for port in self.args])}</div>
+            <div class="item item-3">Args:{" ".join([port._repr_html_list() for port in self.args])}
+            </div>
             <div class="item item-3">Kwargs: {" ".join([port.key for port in self.kwargs])}</div>
             <div class="item item-3">Returns: {" ".join([port.key for port in self.returns])}</div>
         </div>"""

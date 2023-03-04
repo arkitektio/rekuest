@@ -1,8 +1,6 @@
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Union
 import uuid
 from rekuest.api.schema import (
-    AssignationStatus,
-    ReservationStatus,
     AssignationFragment,
     ReservationFragment,
     ReserveParamsInput,
@@ -18,11 +16,10 @@ from rekuest.postmans.base import BasePostman
 import asyncio
 from pydantic import Field
 import logging
-from .transport.base import PostmanTransport
 from .vars import current_postman
-import threading
+
 logger = logging.getLogger(__name__)
-from dataclasses import dataclass, field
+
 
 class GraphQLPostman(BasePostman):
     assignations: Dict[str, AssignationFragment] = Field(default_factory=dict)
@@ -32,13 +29,12 @@ class GraphQLPostman(BasePostman):
     _ass_update_queues: Dict[str, asyncio.Queue] = {}
 
     _res_update_queue: asyncio.Queue = None
-    _ass_update_queue: asyncio.Queue= None
+    _ass_update_queue: asyncio.Queue = None
 
-    _watch_resraces_task: asyncio.Task= None
-    _watch_assraces_task: asyncio.Task= None
+    _watch_resraces_task: asyncio.Task = None
+    _watch_assraces_task: asyncio.Task = None
     _watch_reservations_task: asyncio.Task = None
     _watch_assignations_task: asyncio.Task = None
-
 
     _watching: bool = None
     _lock: asyncio.Lock = None
@@ -59,7 +55,6 @@ class GraphQLPostman(BasePostman):
         provision: str = None,
         reference: str = "default",
     ) -> asyncio.Queue:
-
         async with self._lock:
             if not self._watching:
                 self.start_watching()
@@ -132,13 +127,11 @@ class GraphQLPostman(BasePostman):
         del self._ass_update_queues[ass_id]
 
     async def watch_reservations(self):
-
         async for e in awatch_reservations("default"):
             res = e.update or e.create
             await self._res_update_queue.put(res)
 
     async def watch_assignations(self):
-
         async for assignation in awatch_requests("default"):
             ass = assignation.update or assignation.create
             await self._ass_update_queue.put(ass)
@@ -152,31 +145,30 @@ class GraphQLPostman(BasePostman):
 
                 if unique_identifier not in self._res_update_queues:
                     logger.info(
-                        "Reservation update for unknown reservation received. Probably old stuf"
+                        "Reservation update for unknown reservation received. Probably"
+                        " old stuf"
                     )
                 else:
-
                     if self.reservations[unique_identifier] is None:
                         self.reservations[unique_identifier] = res
                         await self._res_update_queues[unique_identifier].put(res)
                         continue
 
                     else:
-                        if self.reservations[unique_identifier].updated_at  < res.updated_at:
+                        if (
+                            self.reservations[unique_identifier].updated_at
+                            < res.updated_at
+                        ):
                             self.reservations[unique_identifier] = res
                             await self._res_update_queues[unique_identifier].put(res)
                         else:
                             logger.info(
-                                "Reservation update for reservation {} is older than current state. Ignoring".format(
-                                    unique_identifier
-                                )
+                                "Reservation update for reservation {} is older than"
+                                " current state. Ignoring".format(unique_identifier)
                             )
 
-                
                 self._res_update_queue.task_done()
 
-
-                
         except Exception:
             logger.error("Error in watch_resraces", exc_info=True)
 
@@ -190,7 +182,8 @@ class GraphQLPostman(BasePostman):
 
                 if unique_identifier not in self._ass_update_queues:
                     logger.info(
-                        f"Assignation update for unknown assignation received. Probably old stuf {ass}"
+                        "Assignation update for unknown assignation received. Probably"
+                        f" old stuf {ass}"
                     )
                     continue
 
@@ -205,7 +198,8 @@ class GraphQLPostman(BasePostman):
                         await self._ass_update_queues[unique_identifier].put(ass)
                     else:
                         logger.info(
-                            f"Assignation update for assignation {ass} is older than current state. Ignoring"
+                            f"Assignation update for assignation {ass} is older than"
+                            " current state. Ignoring"
                         )
                         continue
 

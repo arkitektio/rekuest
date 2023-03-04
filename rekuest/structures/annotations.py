@@ -1,4 +1,3 @@
-from pydantic import BaseModel
 from rekuest.api.schema import AnnotationInput, AnnotationKind, IsPredicateType
 from annotated_types import (
     Gt,

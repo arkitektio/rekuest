@@ -1,5 +1,4 @@
 from rekuest.api.schema import DefinitionInput, DefinitionFragment
-import random
 
 
 def auto_validate(defintion: DefinitionInput) -> DefinitionFragment:

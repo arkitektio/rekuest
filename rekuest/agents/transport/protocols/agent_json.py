@@ -18,7 +18,6 @@ from pydantic import BaseModel, Field
 
 
 class AgentMessageTypes(str, Enum):
-
     ASSIGN_CHANGED = "ASSIGN_CHANGED"
     PROVIDE_CHANGED = "PROVIDE_CHANGED"
 
@@ -35,7 +34,6 @@ class AgentMessageTypes(str, Enum):
 
 
 class AgentSubMessageTypes(str, Enum):
-
     ASSIGN = "ASSIGN"
     UNASSIGN = "UNASSIGN"
     PROVIDE = "PROVIDE"
@@ -53,23 +51,23 @@ class JSONMessage(BaseModel):
 
 
 class AssignationsList(JSONMessage):
-    type: Literal[
+    type: Literal[AgentMessageTypes.LIST_ASSIGNATIONS] = (
         AgentMessageTypes.LIST_ASSIGNATIONS
-    ] = AgentMessageTypes.LIST_ASSIGNATIONS
+    )
     exclude: Optional[List[AssignationStatus]]
 
 
 class AssignationsListReply(JSONMessage):
-    type: Literal[
+    type: Literal[AgentMessageTypes.LIST_ASSIGNATIONS_REPLY] = (
         AgentMessageTypes.LIST_ASSIGNATIONS_REPLY
-    ] = AgentMessageTypes.LIST_ASSIGNATIONS_REPLY
+    )
     assignations: List[Assignation]
 
 
 class AssignationsListDenied(JSONMessage):
-    type: Literal[
+    type: Literal[AgentMessageTypes.LIST_ASSIGNATIONS_DENIED] = (
         AgentMessageTypes.LIST_ASSIGNATIONS_DENIED
-    ] = AgentMessageTypes.LIST_ASSIGNATIONS_DENIED
+    )
     error: str
 
 
@@ -79,16 +77,16 @@ class ProvisionList(JSONMessage):
 
 
 class ProvisionListReply(JSONMessage):
-    type: Literal[
+    type: Literal[AgentMessageTypes.LIST_PROVISIONS_REPLY] = (
         AgentMessageTypes.LIST_PROVISIONS_REPLY
-    ] = AgentMessageTypes.LIST_PROVISIONS_REPLY
+    )
     provisions: List[Provision]
 
 
 class ProvisionListDenied(JSONMessage):
-    type: Literal[
+    type: Literal[AgentMessageTypes.LIST_PROVISIONS_DENIED] = (
         AgentMessageTypes.LIST_PROVISIONS_DENIED
-    ] = AgentMessageTypes.LIST_PROVISIONS_DENIED
+    )
     error: str
 
 

@@ -21,7 +21,6 @@ from rekuest.postmans.stateful import StatefulPostman
 from rekuest.rekuest import Rekuest
 import contextvars
 from rath import Rath
-from koil.composition import Composition
 
 
 mikro_context = contextvars.ContextVar("mikro_context", default=None)

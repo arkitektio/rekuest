@@ -1,6 +1,6 @@
 import contextvars
 from enum import Enum
-from typing import Any, Awaitable, Callable, Dict, Optional, Type, Union, TypeVar
+from typing import Any, Awaitable, Callable, Dict, Optional, Type, TypeVar
 
 from rekuest.api.schema import (
     ChoiceInput,
@@ -89,11 +89,14 @@ class StructureRegistry(BaseModel):
                     return self._structure_identifier_map[cls]
                 except StructureDefinitionError as e:
                     raise StructureDefinitionError(
-                        f"{cls} was not registered and could not be registered automatically"
+                        f"{cls} was not registered and could not be registered"
+                        " automatically"
                     ) from e
             else:
                 raise StructureRegistryError(
-                    f"{cls} is not registered and allow_auto_register is set to False. Please make sure to register this type beforehand or set allow_auto_register to True"
+                    f"{cls} is not registered and allow_auto_register is set to False."
+                    " Please make sure to register this type beforehand or set"
+                    " allow_auto_register to True"
                 ) from e
 
     def get_default_converter_for_structure(self, cls):
@@ -106,11 +109,15 @@ class StructureRegistry(BaseModel):
                     return self._structure_convert_default_map[cls]
                 except StructureDefinitionError as e:
                     raise StructureDefinitionError(
-                        f"{cls} was not registered and not be no default converter could be registered automatically."
+                        f"{cls} was not registered and not be no default converter"
+                        " could be registered automatically."
                     ) from e
             else:
                 raise StructureRegistryError(
-                    f"{cls} is not registered and allow_auto_register is set to False. Please register a 'conver_default' function for this type beforehand or set allow_auto_register to True. Otherwise you cant use this type with a default"
+                    f"{cls} is not registered and allow_auto_register is set to False."
+                    " Please register a 'conver_default' function for this type"
+                    " beforehand or set allow_auto_register to True. Otherwise you"
+                    " cant use this type with a default"
                 ) from e
 
     def register_as_structure(
@@ -136,7 +143,8 @@ class StructureRegistry(BaseModel):
         if issubclass(cls, Enum):
             identifier = "cls/" + cls.__name__.lower()
             shrink, expand = build_enum_shrink_expand(cls)
-            convert_default = lambda x: x._name_
+            def convert_default(x):
+                return x._name_
             default_widget = default_widget or WidgetInput(
                 kind="ChoiceWidget",
                 choices=[
@@ -144,7 +152,7 @@ class StructureRegistry(BaseModel):
                     for key, value in cls.__members__.items()
                 ],
             )
-            default_returnwidget = default_returnwidget or  ReturnWidgetInput(
+            default_returnwidget = default_returnwidget or ReturnWidgetInput(
                 kind="ChoiceReturnWidget",
                 choices=[
                     ChoiceInput(label=key, value=key)
@@ -159,7 +167,8 @@ class StructureRegistry(BaseModel):
         if expand is None:
             if not hasattr(cls, "aexpand"):
                 raise StructureDefinitionError(
-                    f"You need to pass 'aexpand' method or {cls} needs to implement a aexpand method"
+                    f"You need to pass 'aexpand' method or {cls} needs to implement a"
+                    " aexpand method"
                 )
             expand = cls.aexpand
 
@@ -170,11 +179,14 @@ class StructureRegistry(BaseModel):
                         shrink = id_shrink
                     else:
                         raise StructureDefinitionError(
-                            f"You need to pass 'ashrink' method or {cls} needs to implement a ashrink method. A BaseModel can be automatically shrinked by providing an id field"
+                            f"You need to pass 'ashrink' method or {cls} needs to"
+                            " implement a ashrink method. A BaseModel can be"
+                            " automatically shrinked by providing an id field"
                         )
                 else:
                     raise StructureDefinitionError(
-                        f"You need to pass 'ashrink' method or {cls} needs to implement a ashrink method"
+                        f"You need to pass 'ashrink' method or {cls} needs to implement"
+                        " a ashrink method"
                     )
             else:
                 shrink = cls.ashrink
@@ -182,13 +194,15 @@ class StructureRegistry(BaseModel):
         if identifier is None:
             if not hasattr(cls, "get_identifier"):
                 raise StructureDefinitionError(
-                    f"You need to pass 'identifier' or  {cls} needs to implement a get_identifier method"
+                    f"You need to pass 'identifier' or  {cls} needs to implement a"
+                    " get_identifier method"
                 )
             identifier = cls.get_identifier()
 
         if identifier in self.identifier_structure_map and not self.allow_overwrites:
             raise StructureOverwriteError(
-                f"{identifier} is already registered. Previously registered {self.identifier_structure_map[identifier]}"
+                f"{identifier} is already registered. Previously registered"
+                f" {self.identifier_structure_map[identifier]}"
             )
 
         self._identifier_expander_map[identifier] = expand
@@ -213,7 +227,8 @@ class StructureRegistry(BaseModel):
     ):
         if annotation in self._structure_annotation_map and not overwrite:
             raise StructureRegistryError(
-                f"{annotation} is already registered: Specify overwrite=True to overwrite"
+                f"{annotation} is already registered: Specify overwrite=True to"
+                " overwrite"
             )
 
         self._structure_annotation_map[annotation] = converter
@@ -266,7 +281,6 @@ def register_structure(
     registry = registry or get_current_structure_registry()
 
     def func(cls):
-
         registry.register_as_structure(cls, identifier, expand, shrink, default_widget)
         return cls
 

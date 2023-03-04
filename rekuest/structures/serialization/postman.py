@@ -1,10 +1,8 @@
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 from rekuest.api.schema import NodeFragment
 import asyncio
 from rekuest.structures.errors import ExpandingError, ShrinkingError
 from rekuest.structures.registry import StructureRegistry
-import asyncio
-from typing import Any, Union
 from rekuest.api.schema import (
     PortFragment,
     PortKind,
@@ -31,7 +29,6 @@ async def ashrink_arg(
 
     """
     try:
-
         if value is None:
             if port.nullable:
                 return None
@@ -41,7 +38,6 @@ async def ashrink_arg(
                 )
 
         if port.kind == PortKind.DICT:
-
             return {
                 key: await ashrink_arg(port.child, value, structure_registry)
                 for key, value in value.items()
@@ -71,7 +67,7 @@ async def ashrink_arg(
             try:
                 shrink = await shrinker(value)
                 return str(shrink)
-            except Exception as e:
+            except Exception:
                 raise StructureShrinkingError(
                     f"Error shrinking {repr(value)} with Structure {port.identifier}"
                 ) from None
@@ -152,13 +148,12 @@ async def shrink_inputs(
             shrinked_args = await asyncio.gather(*shrinked_args_futures)
 
         except Exception as e:
-
             for future in shrinked_args_futures:
                 future.cancel()
 
             await asyncio.gather(*shrinked_args_futures, return_exceptions=True)
 
-            raise ShrinkingError(f"Couldn't shrink Arguments") from e
+            raise ShrinkingError("Couldn't shrink Arguments") from e
 
     else:
         shrinked_args = args_list
@@ -222,19 +217,16 @@ async def aexpand_return(
             ) from None
 
         try:
-
             return await expander(value)
-        except Exception as e:
+        except Exception:
             raise StructureExpandingError(
                 f"Error expanding {repr(value)} with Structure {port.identifier}"
             ) from None
 
     if port.kind == PortKind.BOOL:
-
         return bool(value)
 
     if port.kind == PortKind.STRING:
-
         return str(value)
 
     raise NotImplementedError("Should be implemented by subclass")
@@ -264,33 +256,30 @@ async def expand_outputs(
     assert returns is not None, "Returns can't be empty"
     if len(node.returns) != len(returns):
         raise ExpandingError(
-            f"Missmatch in Return Length. Node requires {len(node.returns)} returns, but got {len(returns)}"
+            f"Missmatch in Return Length. Node requires {len(node.returns)} returns,"
+            f" but got {len(returns)}"
         )
     if len(returns) == 0:
         return None
 
     if not skip_expanding:
-
         expanded_returns_futures = [
             asyncio.create_task(aexpand_return(port, value, structure_registry))
             for port, value in zip(node.returns, returns)
         ]
 
         try:
-
             expanded_returns = await asyncio.gather(*expanded_returns_futures)
 
         except Exception as e:
-
             for future in expanded_returns_futures:
                 future.cancel()
 
             await asyncio.gather(*expanded_returns_futures, return_exceptions=True)
 
-            raise ExpandingError(f"Couldn't expand Returns") from e
+            raise ExpandingError("Couldn't expand Returns") from e
 
     else:
-
         expanded_returns = returns
 
     return tuple(expanded_returns)

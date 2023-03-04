@@ -8,7 +8,6 @@ from pydantic import Field
 from typing import Any, Awaitable, Callable, Dict, Optional
 
 from pydantic import Field
-from rekuest.messages import T
 
 
 class WebsocketAgentTransportConfig(Fakt):

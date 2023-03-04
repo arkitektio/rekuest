@@ -46,13 +46,13 @@ async def aexpand(port: ArgPortFragment, value: Any, structure_registry=None) ->
         )
 
     if port.kind == PortKind.BOOL:
-        if value == None:
+        if value is None:
             value = port.default
 
         return bool(value) if value is not None else None
 
     if port.kind == PortKind.STRING:
-        if value == None:
+        if value is None:
             value = port.default
 
         return str(value) if value is not None else None
@@ -71,7 +71,6 @@ async def ashrink(port: ArgPortFragment, value: Any, structure_registry=None) ->
 
     """
     try:
-
         if value is None:
             if port.nullable:
                 return None
@@ -81,7 +80,6 @@ async def ashrink(port: ArgPortFragment, value: Any, structure_registry=None) ->
                 )
 
         if port.kind == PortKind.DICT:
-
             return {
                 key: await ashrink(port.child, value, structure_registry)
                 for key, value in value.items()
@@ -111,7 +109,7 @@ async def ashrink(port: ArgPortFragment, value: Any, structure_registry=None) ->
             try:
                 shrink = await shrinker(value)
                 return str(shrink)
-            except Exception as e:
+            except Exception:
                 raise StructureShrinkingError(
                     f"Error shrinking {repr(value)} with Structure {port.identifier}"
                 ) from None

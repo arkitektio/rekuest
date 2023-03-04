@@ -1,13 +1,5 @@
 from rekuest.actors.actify import reactify
-import pytest
-from rekuest.api.schema import TemplateFragment
 from rekuest.definition.define import prepare_definition
-from .registries import simple_registry
-from rekuest.actors.functional import (
-    FunctionalFuncActor,
-    FunctionalThreadedFuncActor,
-    FunctionalThreadedGenActor,
-)
 
 
 def test_actify_function(simple_registry):

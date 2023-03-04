@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 from rekuest.messages import Assignation, Provision
 from rekuest.actors.helper import AssignationHelper, ProvisionHelper
-from rekuest.actors.base import Actor
 from rekuest.actors.vars import current_assignation_helper, current_provision_helper
 from rekuest.agents.transport.base import AgentTransport
 
@@ -13,7 +12,6 @@ class AssignationContext:
     _helper = None
 
     def __enter__(self):
-
         self._helper = AssignationHelper(
             assignation=self.assignation, transport=self.transport
         )
@@ -39,7 +37,6 @@ class ProvisionContext:
     _helper = None
 
     def __enter__(self):
-
         self._helper = ProvisionHelper(
             provision=self.provision, transport=self.transport
         )

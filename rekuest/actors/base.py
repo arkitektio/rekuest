@@ -1,4 +1,4 @@
-from typing import Any, Dict, Optional, Union
+from typing import Dict, Union
 
 from pydantic import BaseModel, Field, PrivateAttr
 from rekuest.agents.transport.base import AgentTransport
@@ -10,13 +10,8 @@ import logging
 from rekuest.api.schema import (
     AssignationLogLevel,
     AssignationStatus,
-    ProvisionFragment,
-    ProvisionFragmentTemplate,
     ProvisionLogLevel,
-    ProvisionMode,
     ProvisionStatus,
-    aget_template,
-    TemplateFragment,
 )
 from rekuest.messages import Assignation, Provision, Unassignation
 from rekuest.actors.errors import UnknownMessageError
@@ -53,12 +48,10 @@ class Actor(BaseModel):
         )
 
     async def apass(self, message: Union[Assignation, Unassignation]):
-
         assert self._in_queue, "Actor is currently not listening"
         await self._in_queue.put(message)
 
     async def arun(self):
-
         self._in_queue = asyncio.Queue()
         self._provision_task = asyncio.create_task(self.alisten())
         return self._provision_task
@@ -160,10 +153,10 @@ class Actor(BaseModel):
                 message = await self._in_queue.get()
                 await self.process(message)
 
-        except asyncio.CancelledError as e:
+        except asyncio.CancelledError:
             logger.info("Doing Whatever needs to be done to cancel!")
 
-            cancel_assignations = [i.cancel() for i in self.runningAssignments.values()]
+            [i.cancel() for i in self.runningAssignments.values()]
 
             for i in self.runningAssignments.values():
                 try:

@@ -28,7 +28,8 @@ class StatefulAgent(BaseAgent):
                 await actor.apass(message)
             else:
                 logger.warning(
-                    f"Received assignation for a provision that is not running {self.provisionActorMap} {message.provision}"
+                    "Received assignation for a provision that is not running"
+                    f" {self.provisionActorMap} {message.provision}"
                 )
                 await self.transport.change_assignation(
                     message.assignation,
@@ -73,7 +74,6 @@ class StatefulAgent(BaseAgent):
             raise AgentException(f"Unknown message type {type(message)}")
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-
         cancelations = [actor.astop() for actor in self.provisionActorMap.values()]
         # just stopping the actor, not cancelling the provision..
 

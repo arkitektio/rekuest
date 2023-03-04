@@ -60,7 +60,6 @@ class MockAutoresolvingPostmanTransport(PostmanTransport):
         persist=True,
         log=False,
     ) -> Assignation:
-
         assignation = Assignation(
             assignation=str(len(self.assignationState) + 1),
             reservation=reservation,
@@ -96,9 +95,7 @@ class MockAutoresolvingPostmanTransport(PostmanTransport):
         return assignation
 
     async def aresolve_reservations(self):
-
         while True:
-
             await asyncio.sleep(0.1)
 
             ress = [
@@ -132,7 +129,7 @@ class MockAutoresolvingPostmanTransport(PostmanTransport):
 
         try:
             await self._task
-        except asyncio.CancelledError as e:
+        except asyncio.CancelledError:
             pass
 
     class Config:
@@ -161,7 +158,6 @@ class MockPostmanTransport(KoiledModel):
         return []
 
     async def aconnect(self):
-
         self._in_queue = asyncio.Queue()
         self.connected = True
 
@@ -201,7 +197,6 @@ class MockPostmanTransport(KoiledModel):
         provision: str = None,
         reference: str = "default",
     ) -> Reservation:
-
         assert self.connected, "Not connected"
 
         unique_identifier = node + reference
@@ -219,7 +214,6 @@ class MockPostmanTransport(KoiledModel):
         return self._res_update_queues[unique_identifier]
 
     async def aunreserve(self, reservation: str) -> Unreservation:
-
         assert self.connected, "Not connected"
 
         unreservation = Unreservation(reservation=reservation)
@@ -227,7 +221,6 @@ class MockPostmanTransport(KoiledModel):
         return unreservation
 
     async def aunassign(self, assignation: str) -> Unassignation:
-
         assert self.connected, "Not connected"
 
         unassignation = Unassignation(assignation=assignation)
@@ -237,7 +230,6 @@ class MockPostmanTransport(KoiledModel):
     async def adelay(
         self, message: Union[Assignation, Reservation, Unreservation, Unassignation]
     ):
-
         if isinstance(message, ReserveSubUpdate):
             unique_identifier = message.node + message.reference
             return await self._res_update_queues[unique_identifier].put(message)
@@ -249,7 +241,6 @@ class MockPostmanTransport(KoiledModel):
         raise NotImplementedError()
 
     async def areceive(self, timeout=None):
-
         if timeout:
             return await asyncio.wait_for(self._in_queue.get(), timeout)
         return await self._in_queue.get()

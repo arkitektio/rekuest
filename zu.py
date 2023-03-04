@@ -1,13 +1,3 @@
-from rekuest.api.schema import (
-    DefinitionInput,
-    NodeKindInput,
-    ArgPortInput,
-    PortKind,
-    AnnotationKind,
-    AnnotationInput,
-    WidgetInput,
-    WidgetKind,
-)
 from typing import Annotated
 from annotated_types import Le, Predicate
 from rekuest.definition.define import prepare_definition

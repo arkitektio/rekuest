@@ -1,11 +1,8 @@
 from rekuest.postmans.utils import arkiuse
-from .registries import simple_registry
 from rekuest.definition.define import prepare_definition
-from rekuest.definition.validate import auto_validate
 from rekuest.postmans.transport.mock import MockPostmanTransport
 from rekuest.postmans.stateful import StatefulPostman
 import asyncio
-from rekuest.messages import Reservation
 from rekuest.postmans.transport.protocols.postman_json import (
     ReserveSubUpdate,
     ReservePub,
@@ -27,10 +24,8 @@ def func(hallo: int) -> int:
     return 1
 
 
-
 @pytest.mark.asyncio
 async def test_arkiuse(simple_registry):
-
     # Tasks that are normally done by arkitket
     x = prepare_definition(func, simple_registry)
     defi = NodeFragment(id=1, hash="oinsoinsoins", **x.dict())
@@ -46,7 +41,6 @@ async def test_arkiuse(simple_registry):
             return await a.aassign(4)
 
     async with postman:
-
         what_we_want = asyncio.create_task(do_func())
 
         res = await transport.areceive(timeout=1)
@@ -82,7 +76,6 @@ async def test_arkiuse(simple_registry):
 
 @pytest.mark.asyncio
 async def test_arkiuse_state_hook(simple_registry):
-
     # Tasks that are normally done by arkitket
     x = prepare_definition(func, simple_registry)
     defi = NodeFragment(id=1, hash="oinsoinsoins", **x.dict())
@@ -94,18 +87,19 @@ async def test_arkiuse_state_hook(simple_registry):
     state = None
 
     async def do_func():
-
         async def state_hook(s):
             nonlocal state
             state = s
 
         async with arkiuse(
-            definition=defi, postman=postman, structure_registry=simple_registry, state_hook=state_hook
+            definition=defi,
+            postman=postman,
+            structure_registry=simple_registry,
+            state_hook=state_hook,
         ) as a:
             return await a.aassign(4)
 
     async with postman:
-
         what_we_want = asyncio.create_task(do_func())
 
         res = await transport.areceive(timeout=1)
@@ -122,7 +116,8 @@ async def test_arkiuse_state_hook(simple_registry):
             )
         )
 
-        await asyncio.sleep(0.1) #TODO: this is a hack, we should have a better way to wait for the state hook to be called
+        await asyncio.sleep(0.1)
+        # TODO: this is a hack, we should have a better way to wait for the state hook to be called
         assert state == ReservationStatus.ACTIVE, "The state should be active"
 
         ass = await transport.areceive(timeout=1)

@@ -1,8 +1,6 @@
 import contextvars
-from ..actors.base import Actor
 from rekuest.api.schema import DefinitionInput
 from rekuest.actors.actify import reactify, Actifier
-from rekuest.definition.define import prepare_definition
 from rekuest.structures.registry import (
     StructureRegistry,
     get_current_structure_registry,
@@ -11,7 +9,6 @@ from rekuest.api.schema import WidgetInput
 from typing import Dict, List, Callable, Optional, Tuple
 from pydantic import Field
 from koil.composition import KoiledModel
-from typing import Protocol, runtime_checkable
 import json
 from rekuest.actors.builder import ActorBuilder
 
@@ -106,9 +103,10 @@ class DefinitionRegistry(KoiledModel):
                 **actifier_params,
             )
 
-        assert hasattr(
-            actorBuilder, "__definition__"
-        ), "The actorBuilder needs to have a definition. Otherwise it is not a valid actorBuilder"
+        assert hasattr(actorBuilder, "__definition__"), (
+            "The actorBuilder needs to have a definition. Otherwise it is not a valid"
+            " actorBuilder"
+        )
 
         self.register_actorBuilder(actorBuilder)
 

@@ -1,5 +1,4 @@
 from pydantic import BaseModel
-from rekuest.actors.base import Actor
 from rekuest.api.schema import LogLevelInput, AssignationStatusInput
 from rekuest.messages import Assignation, Provision
 from koil import unkoil
@@ -19,8 +18,10 @@ class AssignationHelper(BaseModel):
         return unkoil(self.alog, level, message)
 
     async def aprogress(self, progress: int) -> None:
-       await self.transport.change_assignation(
-            id=self.assignation.assignation, status=AssignationStatusInput.PROGRESS,   progress=progress
+        await self.transport.change_assignation(
+            id=self.assignation.assignation,
+            status=AssignationStatusInput.PROGRESS,
+            progress=progress,
         )
 
     def progress(self, progress: int) -> None:

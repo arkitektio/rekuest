@@ -4,7 +4,6 @@ import pytest
 
 
 def test_argport_input_errors():
-
     with pytest.raises(ValidationError):
         # kind is required and only accepts PortKind
         PortInput(kind="lala")
@@ -27,7 +26,6 @@ def test_argport_input_errors():
 
 
 def test_argport():
-
     PortInput(kind=PortKind.BOOL, key="search", nullable=False)
     PortInput(kind=PortKind.STRING, key="search", nullable=False)
 

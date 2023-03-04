@@ -1,4 +1,3 @@
-from datetime import date
 from graphql import (
     DocumentNode,
     parse,
@@ -13,7 +12,6 @@ class QString(str):
 
 
 class Identifier(str):
-
     @classmethod
     def __get_validators__(cls):
         # one or more validators may be yielded which will be called in the
@@ -25,9 +23,10 @@ class Identifier(str):
     def validate(cls, v):
         if not isinstance(v, str):
             raise TypeError("Identifier must be a string")
-        if "@" in v and not "/" in v:
+        if "@" in v and "/" not in v:
             raise ValueError(
-                "Identifier must contain follow '@package/module' when trying to mimic a global module "
+                "Identifier must contain follow '@package/module' when trying to mimic"
+                " a global module "
             )
         return v
 
@@ -36,7 +35,6 @@ class Identifier(str):
 
 
 class SearchQuery(str):
-    
     @classmethod
     def __get_validators__(cls):
         # one or more validators may be yielded which will be called in the
@@ -68,25 +66,30 @@ class SearchQuery(str):
 
         if not definition.operation == OperationType.QUERY:
             raise ValueError("Needs to be operation")
-        
 
-        assert len(definition.variable_definitions) >= 2, f"At least two arguments should be provided ($search: String, $values: [ID])): Was given: {print_ast(v)}"
-
+        assert len(definition.variable_definitions) >= 2, (
+            "At least two arguments should be provided ($search: String, $values:"
+            f" [ID])): Was given: {print_ast(v)}"
+        )
 
         if (
             definition.variable_definitions[0].variable.name.value != "search"
             or definition.variable_definitions[0].type.kind != "named_type"
         ):
             raise ValueError(
-                f"First parameter of search function should be '$search: String' if you provide arguments for your options. This parameter will be filled with userinput: Was given: {print_ast(v)}"
+                "First parameter of search function should be '$search: String' if you"
+                " provide arguments for your options. This parameter will be filled"
+                f" with userinput: Was given: {print_ast(v)}"
             )
-        
+
         if (
             definition.variable_definitions[1].variable.name.value != "values"
             or definition.variable_definitions[0].type.kind != "named_type"
         ):
             raise ValueError(
-                f"Seconrd parameter of search function should be '$values: [ID]' if you provide arguments for your options. This parameter will be filled with the default values: Was given: {print_ast(v)}"
+                "Seconrd parameter of search function should be '$values: [ID]' if you"
+                " provide arguments for your options. This parameter will be filled"
+                f" with the default values: Was given: {print_ast(v)}"
             )
 
         wrapped_query = definition.selection_set.selections[0]
@@ -97,20 +100,25 @@ class SearchQuery(str):
             else wrapped_query.name.value
         )
         if options_value != "options":
-            raise ValueError(f"First element of query should be 'options':  Was given: {print_ast(v)}")
+            raise ValueError(
+                "First element of query should be 'options':  Was given:"
+                f" {print_ast(v)}"
+            )
 
         wrapped_selection = wrapped_query.selection_set.selections
         aliases = [
             field.alias.value if field.alias else field.name.value
             for field in wrapped_selection
         ]
-        if not "value" in aliases:
+        if "value" not in aliases:
             raise ValueError(
-                "Searched query needs to contain a 'value' not that corresponds to the selected value"
+                "Searched query needs to contain a 'value' not that corresponds to the"
+                " selected value"
             )
-        if not "label" in aliases:
+        if "label" not in aliases:
             raise ValueError(
-                "Searched query needs to contain a 'label' that corresponds to the displayed value to the user"
+                "Searched query needs to contain a 'label' that corresponds to the"
+                " displayed value to the user"
             )
 
         return print_ast(v)

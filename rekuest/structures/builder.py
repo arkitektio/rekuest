@@ -2,7 +2,7 @@ from .registry import StructureRegistry
 
 
 class StructureRegistryBuilder:
-    def __init__(self, registry: StructureRegistry = None):
+    def __init__(self, registry: StructureRegistry = None) -> None:
         self.registry = registry or StructureRegistry()
 
     def register(self, structure, identifier, expand=None):

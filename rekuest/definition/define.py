@@ -1,7 +1,5 @@
-from contextlib import nullcontext
 from enum import Enum
-from random import choices
-from typing import Any, Callable, List, Tuple, Type
+from typing import Callable, List, Tuple, Type
 import inflection
 from rekuest.api.schema import (
     PortInput,
@@ -9,11 +7,8 @@ from rekuest.api.schema import (
     DefinitionInput,
     NodeKindInput,
     PortKindInput,
-    ReturnWidgetInput,
-    WidgetInput,
     AnnotationInput,
 )
-from typing import Optional
 import inspect
 from docstring_parser import parse
 from rekuest.definition.errors import DefinitionError
@@ -34,12 +29,15 @@ def convert_child_to_childport(
     Args:
         cls (Type): The type (class or annotation) of the elemtn
         registry (StructureRegistry): The structure registry to use
-        nullable (bool, optional): Is this type optional (recursive parameter). Defaults to False.
+        nullable (bool, optional): Is this type optional (recursive parameter).
+            Defaults to False.
         is_return (bool, optional): Is this a return type?. Defaults to False.
-        annotations (List[AnnotationInput], optional): The annotations for this element. Defaults to None.
+        annotations (List[AnnotationInput], optional): The annotations for this element.
+            Defaults to None.
 
     Returns:
-        Tuple[ChildPortInput, WidgetInput, Callable]: The child port, the widget and the converter for the default
+        Tuple[ChildPortInput, WidgetInput, Callable]: The child port, the widget and the
+         converter for the default
     """
 
     if hasattr(cls, "__name__") and cls.__name__ == "Annotated":
@@ -58,7 +56,6 @@ def convert_child_to_childport(
         )
 
     if cls.__module__ == "typing":
-
         if hasattr(cls, "_name"):
             # We are dealing with a Typing Var?
             if cls._name == "List":
@@ -73,9 +70,11 @@ def convert_child_to_childport(
                         nullable=nullable,
                         annotations=annotations,
                     ),
-                    lambda default: [nested_converter(ndefault) for ndefault in default]
-                    if default
-                    else None,
+                    lambda default: (
+                        [nested_converter(ndefault) for ndefault in default]
+                        if default
+                        else None
+                    ),
                 )
 
             if cls._name == "Dict":
@@ -89,12 +88,14 @@ def convert_child_to_childport(
                         nullable=nullable,
                         annotations=annotations,
                     ),
-                    lambda default: {
-                        key: item in nested_converter(item)
-                        for key, item in default.items()
-                    }
-                    if default
-                    else None,
+                    lambda default: (
+                        {
+                            key: item in nested_converter(item)
+                            for key, item in default.items()
+                        }
+                        if default
+                        else None
+                    ),
                 )
 
         if hasattr(cls, "__args__"):
@@ -135,8 +136,8 @@ def convert_child_to_childport(
 
     identifier = registry.get_identifier_for_structure(cls)
     default_converter = registry.get_default_converter_for_structure(cls)
-    assign_widget =  registry.get_widget_input(cls)
-    return_widget  = registry.get_returnwidget_input(cls)
+    assign_widget = registry.get_widget_input(cls)
+    return_widget = registry.get_returnwidget_input(cls)
 
     return (
         ChildPortInput(
@@ -184,11 +185,10 @@ def convert_object_to_port(
         )
 
     if cls.__module__ == "typing":
-
         if hasattr(cls, "_name"):
             # We are dealing with a Typing Var?
             if cls._name == "List":
-                child,  converter = convert_child_to_childport(
+                child, converter = convert_child_to_childport(
                     cls.__args__[0], registry, nullable=False
                 )
                 return PortInput(
@@ -204,7 +204,7 @@ def convert_object_to_port(
                 )
 
             if cls._name == "Dict":
-                child,  converter = convert_child_to_childport(
+                child, converter = convert_child_to_childport(
                     cls.__args__[1], registry, nullable=False
                 )
                 return PortInput(
@@ -213,9 +213,11 @@ def convert_object_to_port(
                     returnWidget=return_widget,
                     key=key,
                     child=child,
-                    default={key: converter(item) for key, item in default.items()}
-                    if default
-                    else None,
+                    default=(
+                        {key: converter(item) for key, item in default.items()}
+                        if default
+                        else None
+                    ),
                     nullable=nullable,
                     annotations=annotations,
                     description=description,
@@ -354,7 +356,6 @@ def convert_return_to_returnport(
         )
 
     if cls.__module__ == "typing":
-
         if hasattr(cls, "_name"):
             # We are dealing with a Typing Var?
             if cls._name == "List":
@@ -465,7 +466,8 @@ def prepare_definition(
     return its definition(input).
 
     Attention this definition is not yet registered in the
-    arkitekt registry. This is done by the create_template function ( which will validate the definition with your local arkitekt instance
+    arkitekt registry. This is done by the create_template function ( which will
+    validate he definition with your local arkitekt instance
     and raise an error if the definition is not compatible with your arkitekt version)
 
 
@@ -490,9 +492,10 @@ def prepare_definition(
     # Docstring Parser to help with descriptions
     docstring = parse(function.__doc__)
     if docstring.long_description is None:
-        assert (
-            allow_empty_doc is not False
-        ), f"We don't allow empty documentation for function {function.__name__}. Please Provide"
+        assert allow_empty_doc is not False, (
+            f"We don't allow empty documentation for function {function.__name__}."
+            " Please Provide"
+        )
 
     function_ins_annotation = sig.parameters
 
@@ -506,7 +509,6 @@ def prepare_definition(
     }
 
     for index, (key, value) in enumerate(function_ins_annotation.items()):
-
         # We can skip arguments if the builder is going to provide additional arguments
         if omitfirst is not None and index < omitfirst:
             continue
@@ -527,21 +529,23 @@ def prepare_definition(
                     structure_registry,
                     widget=widget,
                     return_widget=return_widget,
-                    default=value.default
-                    if value.default != inspect.Parameter.empty
-                    else None,
+                    default=(
+                        value.default
+                        if value.default != inspect.Parameter.empty
+                        else None
+                    ),
                     description=doc_param_map.get(key, None),
                 )
             )
         except Exception as e:
             raise DefinitionError(
-                f"Could not convert Argument of function {function.__name__} to ArgPort: {value}"
+                f"Could not convert Argument of function {function.__name__} to"
+                f" ArgPort: {value}"
             ) from e
 
     function_outs_annotation = sig.return_annotation
 
     if hasattr(function_outs_annotation, "_name"):
-
         if function_outs_annotation._name == "Tuple":
             try:
                 for index, cls in enumerate(function_outs_annotation.__args__):
@@ -559,16 +563,17 @@ def prepare_definition(
                     )
             except Exception as e:
                 raise DefinitionError(
-                    f"Could not convert Return of function {function.__name__} to ArgPort: {cls}"
+                    f"Could not convert Return of function {function.__name__} to"
+                    f" ArgPort: {cls}"
                 ) from e
         else:
             try:
-                return_widget = return_widgets.get(f"return0", None)
-                widget = widgets.get(f"return0", None)
+                return_widget = return_widgets.get("return0", None)
+                widget = widgets.get("return0", None)
                 returns.append(
                     convert_object_to_port(
                         function_outs_annotation,
-                        f"return0",
+                        "return0",
                         structure_registry,
                         return_widget=return_widget,
                         widget=widget,
@@ -576,7 +581,8 @@ def prepare_definition(
                 )  # Other types will be converted to normal lists and shit
             except Exception as e:
                 raise DefinitionError(
-                    f"Could not convert Return of function {function.__name__} to ArgPort: {function_outs_annotation}"
+                    f"Could not convert Return of function {function.__name__} to"
+                    f" ArgPort: {function_outs_annotation}"
                 ) from e
     else:
         # We are dealing with a non tuple return
@@ -584,8 +590,8 @@ def prepare_definition(
             pass
 
         elif function_outs_annotation.__name__ != "_empty":  # Is it not empty
-            return_widget = return_widgets.get(f"return0", None)
-            widget = widgets.get(f"return0", None)
+            return_widget = return_widgets.get("return0", None)
+            widget = widgets.get("return0", None)
             returns.append(
                 convert_object_to_port(
                     function_outs_annotation,

@@ -1,16 +1,13 @@
-from ast import Assign
-from random import Random, random
+from random import random
 from typing import Awaitable, Callable, Optional, Union, TypeVar
 import uuid
 
 from pydantic import Field
 from rekuest.messages import Assignation, Reservation
-from rekuest.postmans.vars import current_postman
 from rekuest.structures.registry import get_current_structure_registry
 from koil.composition import KoiledModel
 from koil.helpers import unkoil_gen
 from koil.types import ContextBool
-from .stateful import StatefulPostman
 from rekuest.api.schema import (
     AssignationFragment,
     AssignationLogLevel,
@@ -21,7 +18,6 @@ from rekuest.api.schema import (
     NodeFragment,
 )
 import asyncio
-from rekuest.traits.node import Reserve
 from koil import unkoil
 import logging
 from rekuest.structures.serialization.postman import shrink_inputs, expand_outputs
@@ -31,10 +27,11 @@ from rekuest.agents.base import BaseAgent
 from rekuest.agents.transport.mock import MockAgentTransport
 from rekuest.definition.validate import auto_validate
 from .base import BasePostman
-from dataclasses import dataclass
+
 logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
+
 
 class RPCContract(KoiledModel):
     active: ContextBool = Field(default=False)
@@ -53,7 +50,6 @@ class RPCContract(KoiledModel):
         self.state = state
         if self.state_hook:
             await self.state_hook(state)
-
 
     async def aassign(
         self,
@@ -85,6 +81,7 @@ class RPCContract(KoiledModel):
 
     async def __aexit__(self, exc_type, exc, tb):
         await self.aexit()
+
 
 class ReservationContract(RPCContract):
     # TODO:Assert that we can actually assign to this? validating that all of the nodes inputs are
@@ -270,7 +267,6 @@ class localuse(RPCContract):
             raise e
 
     async def watch_updates(self):
-
         logger.info("Waiting for updates")
         try:
             while True:
@@ -452,7 +448,6 @@ class arkiuse(ReservationContract):
             raise e
 
     async def watch_updates(self):
-
         logger.info("Waiting for updates")
         try:
             while True:
@@ -501,7 +496,6 @@ class arkiuse(ReservationContract):
         self.active = False
 
         if self.auto_unreserve:
-
             unreservation = await asyncio.wait_for(
                 self.postman.aunreserve(self._reservation.id), timeout=1
             )
@@ -535,7 +529,6 @@ class mockuse(RPCContract):
         return self
 
     async def aexit(self):
-
         self.active = False
         await asyncio.sleep(self.unreserve_sleep)
 

@@ -1,4 +1,3 @@
-from rekuest.actors.base import Actor
 from rekuest.actors.functional import (
     FunctionalFuncActor,
     FunctionalGenActor,
@@ -10,7 +9,6 @@ import inspect
 from rekuest.structures.registry import StructureRegistry
 from rekuest.agents.transport.base import AgentTransport
 from rekuest.messages import Provision
-import inspect
 from .builder import ActorBuilder
 from rekuest.definition.define import prepare_definition
 from typing import Protocol, runtime_checkable, Callable
@@ -38,7 +36,6 @@ def higher_order_builder(builder, **params):
         provision: Provision,
         transport: AgentTransport,
     ):
-
         return builder(
             provision=provision,
             transport=transport,
@@ -77,9 +74,11 @@ def reactify(
 ) -> ActorBuilder:
     """Reactify a function
 
-    This function takes a callable (of type async or sync function or generator) and returns a builder function that
-    creates an actor that makes the function callable from the rekuest server. The callable will be both in the context
-    of  an assignation and a provision helper, enabling the usage of the function as a provision helper.
+    This function takes a callable (of type async or sync function or generator) and
+    returns a builder function that creates an actor that makes the function callable
+    from the rekuest server.
+    The callable will be both in the context of  an assignation and a provision helper,
+    enabling the usage of the function as a provision helper.
     """
 
     definition = prepare_definition(

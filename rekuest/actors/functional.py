@@ -1,14 +1,14 @@
 import asyncio
 import logging
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, Awaitable, Callable, Optional
+from typing import Any, Awaitable, Callable
 from koil.helpers import iterate_spawned, run_spawned
 from pydantic import BaseModel, Field
 from rekuest.actors.base import SerializingActor
 from rekuest.messages import Assignation, Provision
 from rekuest.api.schema import AssignationStatus, ProvisionFragment
 from rekuest.structures.serialization.actor import expand_inputs, shrink_outputs
-from rekuest.actors.contexts import AssignationContext, ProvisionContext
+from rekuest.actors.contexts import AssignationContext
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +51,6 @@ class AsyncFuncActor(SerializingActor):
             )
 
             async with AssignationContext(assignation, self.transport):
-
                 returns = await self.assign(**params)
 
             returns = await shrink_outputs(
@@ -68,7 +67,6 @@ class AsyncFuncActor(SerializingActor):
             )
 
         except asyncio.CancelledError:
-
             await self.transport.change_assignation(
                 assignation.assignation, status=AssignationStatus.CANCELLED
             )
@@ -106,7 +104,6 @@ class AsyncGenActor(SerializingActor):
 
             async with AssignationContext(assignation, self.transport):
                 async for returns in self.assign(**params):
-
                     returns = await shrink_outputs(
                         self.definition,
                         returns,
@@ -125,7 +122,6 @@ class AsyncGenActor(SerializingActor):
             )
 
         except asyncio.CancelledError:
-
             await self.transport.change_assignation(
                 assignation.assignation, status=AssignationStatus.CANCELLED
             )
@@ -168,7 +164,6 @@ class ThreadedFuncActor(SerializingActor):
     executor: ThreadPoolExecutor = Field(default_factory=lambda: ThreadPoolExecutor(4))
 
     async def on_assign(self, assignation: Assignation):
-
         try:
             logger.info("Assigning Number two")
             params = await expand_inputs(
@@ -177,7 +172,6 @@ class ThreadedFuncActor(SerializingActor):
                 structure_registry=self.structure_registry,
                 skip_expanding=not self.expand_inputs,
             )
-
 
             await self.transport.change_assignation(
                 assignation.assignation,
@@ -247,7 +241,6 @@ class CompletlyThreadedActor(ThreadedFuncActor):
         )
 
     async def on_assign(self, assignation: Assignation):
-
         try:
             logger.info("Assigning Number two")
             params = await expand_inputs(
@@ -322,11 +315,9 @@ class ThreadedGenActor(SerializingActor):
             )
 
             async with AssignationContext(assignation, self.transport):
-
                 async for returns in iterate_spawned(
                     self.assign, **params, executor=self.executor, pass_context=True
                 ):
-
                     returns = await shrink_outputs(
                         self.definition,
                         returns,
@@ -345,7 +336,6 @@ class ThreadedGenActor(SerializingActor):
             )
 
         except asyncio.CancelledError as e:
-
             await self.transport.change_assignation(
                 assignation.assignation,
                 status=AssignationStatus.CANCELLED,

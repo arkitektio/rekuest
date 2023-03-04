@@ -1,9 +1,9 @@
 import pytest
 from .structures import SerializableObject, SecondSerializableObject
 from rekuest.structures.registry import StructureRegistry, register_structure
-from enum import Enum
 
-@pytest.fixture(scope="session")
+
+@pytest.fixture(scope="module")
 def simple_registry():
     registry = StructureRegistry()
 
@@ -13,4 +13,3 @@ def simple_registry():
     )
 
     return registry
-

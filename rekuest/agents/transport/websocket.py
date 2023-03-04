@@ -68,11 +68,12 @@ class WebsocketAgentTransport(AgentTransport):
 
                 async with websockets.connect(
                     f"{self.endpoint_url}?token={token}&instance_id={instance_id}",
-                    ssl=self.ssl_context
-                    if self.endpoint_url.startswith("wss")
-                    else None,
+                    ssl=(
+                        self.ssl_context
+                        if self.endpoint_url.startswith("wss")
+                        else None
+                    ),
                 ) as client:
-
                     logger.info("Agent on Websockets connected")
 
                     send_task = asyncio.create_task(self.sending(client))
@@ -93,7 +94,11 @@ class WebsocketAgentTransport(AgentTransport):
 
             except InvalidStatusCode as e:
                 logger.warning(
-                    f"Websocket to {self.endpoint_url}?token={token}&instance_id={instance_id} was denied. Trying to reload token",
+                    (
+                        "Websocket to"
+                        f" {self.endpoint_url}?token={token}&instance_id={instance_id} was"
+                        " denied. Trying to reload token"
+                    ),
                     exc_info=True,
                 )
                 reload_token = True
@@ -114,7 +119,7 @@ class WebsocketAgentTransport(AgentTransport):
                 raise DefiniteConnectionFail("Exceeded Number of Retries")
 
             await asyncio.sleep(self.time_between_retries)
-            logger.info(f"Retrying to connect")
+            logger.info("Retrying to connect")
             await self.websocket_loop(
                 instance_id, retry=retry + 1, reload_token=reload_token
             )
@@ -130,7 +135,7 @@ class WebsocketAgentTransport(AgentTransport):
                 send_task.cancel()
                 receive_task.cancel()
 
-            cancellation = await asyncio.gather(
+            await asyncio.gather(
                 send_task, receive_task, return_exceptions=True
             )
             raise e
@@ -141,7 +146,7 @@ class WebsocketAgentTransport(AgentTransport):
                 message = await self._send_queue.get()
                 await client.send(message)
                 self._send_queue.task_done()
-        except asyncio.CancelledError as e:
+        except asyncio.CancelledError:
             logger.info("Sending Task sucessfully Cancelled")
 
     async def receiving(self, client):
@@ -149,7 +154,7 @@ class WebsocketAgentTransport(AgentTransport):
             async for message in client:
                 logger.info(f"Receiving message {message}")
                 await self.receive(message)
-        except asyncio.CancelledError as e:
+        except asyncio.CancelledError:
             logger.info("Receiving Task sucessfully Cancelled")
 
     async def receive(self, message):
@@ -193,7 +198,6 @@ class WebsocketAgentTransport(AgentTransport):
             logger.error(f"Unexpected messsage: {json_dict}")
 
     async def awaitaction(self, action: JSONMessage):
-
         if not self._connected:
             assert (
                 self.auto_connect

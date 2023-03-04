@@ -2,6 +2,7 @@ import asyncio
 import json
 
 import websockets
+from rekuest.api.schema import AssignationStatus, ReservationStatus, ReserveParamsInput
 from rekuest.postmans.transport.base import PostmanTransport
 from typing import Any, Awaitable, Callable, Dict, List, Optional
 from rekuest.messages import Assignation, Reservation
@@ -15,7 +16,25 @@ from rekuest.postmans.transport.errors import (
     UnreserveDeniedError,
 )
 from pydantic import Field
-from .protocols.postman_json import *
+from rekuest.postmans.transport.protocols.postman_json import (
+    JSONMessage,
+    AssignList,
+    AssignPub,
+    AssignPubReply,
+    AssignSubUpdate,
+    AssingListReply,
+    PostmanMessageTypes,
+    PostmanSubMessageTypes,
+    ReserveList,
+    ReserveListReply,
+    ReservePub,
+    ReservePubReply,
+    ReserveSubUpdate,
+    UnassignPub,
+    UnassignPubReply,
+    UnreservePub,
+    UnreservePubReply,
+)
 import logging
 from websockets.exceptions import ConnectionClosedError, InvalidStatusCode
 
@@ -52,9 +71,10 @@ class WebsocketPostmanTransport(PostmanTransport):
     _connection_task: Optional[asyncio.Task] = None
 
     async def aconnect(self):
-        assert (
-            self._abroadcast is not None
-        ), "Broadcast must be defined (either overwrite abroadcast or pass this in constructor of transport)"
+        assert self._abroadcast is not None, (
+            "Broadcast must be defined (either overwrite abroadcast or pass this in"
+            " constructor of transport)"
+        )
 
         assert self.instance_id, "Needs an instance id"
         self._send_queue = asyncio.Queue()
@@ -71,7 +91,6 @@ class WebsocketPostmanTransport(PostmanTransport):
                 async with websockets.connect(
                     f"{self.endpoint_url}?token={token}&instance_id={self.instance_id}"
                 ) as client:
-
                     logger.info("Postman on Websockets connected")
 
                     send_task = asyncio.create_task(self.sending(client))
@@ -112,7 +131,7 @@ class WebsocketPostmanTransport(PostmanTransport):
                 raise DefiniteConnectionFail("Exceeded Number of Retries")
 
             await asyncio.sleep(self.time_between_retries)
-            logger.info(f"Retrying to connect")
+            logger.info("Retrying to connect")
             await self.websocket_loop(retry=retry + 1, reload_token=reload_token)
 
         except DefiniteConnectionFail as e:
@@ -126,9 +145,7 @@ class WebsocketPostmanTransport(PostmanTransport):
                 send_task.cancel()
                 receive_task.cancel()
 
-            cancellation = await asyncio.gather(
-                send_task, receive_task, return_exceptions=True
-            )
+            await asyncio.gather(send_task, receive_task, return_exceptions=True)
             raise e
 
     async def sending(self, client):
@@ -137,14 +154,14 @@ class WebsocketPostmanTransport(PostmanTransport):
                 message = await self._send_queue.get()
                 await client.send(message)
                 self._send_queue.task_done()
-        except asyncio.CancelledError as e:
+        except asyncio.CancelledError:
             logger.info("Sending Task sucessfully Cancelled")
 
     async def receiving(self, client):
         try:
             async for message in client:
                 await self.receive(message)
-        except asyncio.CancelledError as e:
+        except asyncio.CancelledError:
             logger.info("Receiving Task sucessfully Cancelled")
 
     async def receive(self, message):
@@ -186,7 +203,7 @@ class WebsocketPostmanTransport(PostmanTransport):
                 self._futures[id].set_exception(UnassignDeniedError(json_dict["error"]))
 
             if type == PostmanMessageTypes.RESERVE_REPLY:
-                self._futures[id].set_result(ReservePubReply(**json_dict))
+                self._futures[id].set_result(UnreservePubReply(**json_dict))
             if type == PostmanMessageTypes.RESERVE_DENIED:
                 self._futures[id].set_exception(ReserveDeniedError(json_dict["error"]))
 

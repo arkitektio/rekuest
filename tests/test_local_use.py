@@ -1,18 +1,6 @@
 from rekuest.postmans.utils import localuse
-from .registries import simple_registry
 from rekuest.definition.define import prepare_definition
-from rekuest.definition.validate import auto_validate
-from rekuest.postmans.transport.mock import MockPostmanTransport
-from rekuest.postmans.stateful import StatefulPostman
 import asyncio
-from rekuest.messages import Reservation
-from rekuest.postmans.transport.protocols.postman_json import (
-    ReserveSubUpdate,
-    ReservePub,
-    AssignPub,
-    AssignSubUpdate,
-)
-from rekuest.api.schema import NodeFragment, ReservationStatus, AssignationStatus
 import pytest
 from rekuest.definition.registry import DefinitionRegistry
 from rekuest.agents.base import BaseAgent
@@ -22,7 +10,6 @@ from rekuest.agents.transport.mock import MockAgentTransport
 @pytest.mark.skip
 @pytest.mark.asyncio
 async def test_local_use(simple_registry):
-
     # THe function we would like to run
 
     d = DefinitionRegistry()
@@ -50,7 +37,6 @@ async def test_local_use(simple_registry):
             return await a.aassign(4)
 
     async with agent:
-
         what_we_want = asyncio.create_task(do_func())
 
         result = await what_we_want

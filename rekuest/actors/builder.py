@@ -1,10 +1,10 @@
-from typing import Protocol, Awaitable, runtime_checkable
+from typing import Protocol, runtime_checkable
 from rekuest.messages import Provision
 from rekuest.agents.transport.base import AgentTransport
 from .base import Actor
 from rekuest.rath import RekuestRath
 from rekuest.api.schema import TemplateFragment
-from rekuest.definition.define import prepare_definition, DefinitionInput
+from rekuest.definition.define import DefinitionInput
 
 
 @runtime_checkable
