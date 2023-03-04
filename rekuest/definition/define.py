@@ -1,5 +1,6 @@
 from enum import Enum
 from typing import Callable, List, Tuple, Type
+from .utils import get_type_hints, is_annotated
 import inflection
 from rekuest.api.schema import (
     PortInput,
@@ -40,7 +41,7 @@ def convert_child_to_childport(
          converter for the default
     """
 
-    if hasattr(cls, "__name__") and cls.__name__ == "Annotated":
+    if is_annotated(cls):
         real_type = cls.__args__[0]
 
         annotations = [
@@ -166,7 +167,7 @@ def convert_object_to_port(
     """
     Convert a class to an Port
     """
-    if hasattr(cls, "__name__") and cls.__name__ == "Annotated":
+    if is_annotated(cls):
         real_type = cls.__args__[0]
 
         annotations = [
@@ -458,6 +459,7 @@ def prepare_definition(
     omitfirst=None,
     omitlast=None,
     omitkeys=[],
+    allow_annotations=True,
 ) -> DefinitionInput:
     """Define
 
@@ -497,6 +499,7 @@ def prepare_definition(
             " Please Provide"
         )
 
+    type_hints = get_type_hints(function, include_extras=allow_annotations)
     function_ins_annotation = sig.parameters
 
     doc_param_map = {param.arg_name: param.description for param in docstring.params}
@@ -519,7 +522,7 @@ def prepare_definition(
 
         widget = widgets.get(key, None)
         return_widget = return_widgets.get(key, None)
-        cls = value.annotation
+        cls = type_hints.get(key, None)
 
         try:
             args.append(
