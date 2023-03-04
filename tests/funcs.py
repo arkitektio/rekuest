@@ -1,7 +1,7 @@
 import asyncio
 from typing import Dict, List, Tuple, Annotated, Optional
 from .structures import SecondObject, SecondSerializableObject, SerializableObject
-from annotated_types import Le, Ge, LowerCase, UpperCase, Predicate, Gt, Len
+from annotated_types import Le, Predicate, Gt, Len
 
 
 def null_function(x: Optional[int]) -> None:
@@ -67,23 +67,6 @@ def nested_basic_function(
         Tuple[List[str], int]: return, return2
     """
     return ["tested"], 6
-
-
-def plain_structure_function(
-    rep: SerializableObject, name: SerializableObject = None
-) -> SecondSerializableObject:
-    """Karl
-
-    Karl takes a a representation and does magic stuff
-
-    Args:
-        rep (SerializableObject): Nougat
-        name (SerializableObject, optional): Bugat
-
-    Returns:
-        SecondSerializableObject: The Returned Representation
-    """
-    return "tested"
 
 
 def nested_structure_function(
