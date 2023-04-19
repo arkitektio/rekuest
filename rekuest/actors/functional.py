@@ -9,6 +9,7 @@ from rekuest.messages import Assignation, Provision
 from rekuest.api.schema import AssignationStatus, ProvisionFragment
 from rekuest.structures.serialization.actor import expand_inputs, shrink_outputs
 from rekuest.actors.contexts import AssignationContext
+from rekuest.actors.types import OnProvide, OnUnprovide
 
 logger = logging.getLogger(__name__)
 
@@ -25,10 +26,8 @@ async def async_none_unprovide():
 
 class FunctionalActor(BaseModel):
     assign: Callable[..., Any]
-    on_provide: Callable[[ProvisionFragment], Awaitable[Any]] = Field(
-        default=async_none_provide
-    )
-    on_unprovide: Callable[[], Awaitable[Any]] = Field(default=async_none_unprovide)
+    on_provide: OnProvide = Field(default=async_none_provide)
+    on_unprovide: OnUnprovide = Field(default=async_none_unprovide)
 
     class Config:
         arbitrary_types_allowed = True
@@ -50,7 +49,9 @@ class AsyncFuncActor(SerializingActor):
                 status=AssignationStatus.ASSIGNED,
             )
 
-            async with AssignationContext(assignation, self.transport):
+            async with AssignationContext(
+                assignation=assignation, transport=self.transport
+            ):
                 returns = await self.assign(**params)
 
             returns = await shrink_outputs(
@@ -102,7 +103,9 @@ class AsyncGenActor(SerializingActor):
                 status=AssignationStatus.ASSIGNED,
             )
 
-            async with AssignationContext(assignation, self.transport):
+            async with AssignationContext(
+                assignation=assignation, transport=self.transport
+            ):
                 async for returns in self.assign(**params):
                     returns = await shrink_outputs(
                         self.definition,
@@ -161,7 +164,7 @@ class FunctionalGenActor(FunctionalActor, AsyncGenActor):
 
 
 class ThreadedFuncActor(SerializingActor):
-    executor: ThreadPoolExecutor = Field(default_factory=lambda: ThreadPoolExecutor(4))
+    executor: ThreadPoolExecutor = Field(default_factory=lambda: ThreadPoolExecutor(1))
 
     async def on_assign(self, assignation: Assignation):
         try:
@@ -178,7 +181,9 @@ class ThreadedFuncActor(SerializingActor):
                 status=AssignationStatus.ASSIGNED,
             )
 
-            async with AssignationContext(assignation, self.transport):
+            async with AssignationContext(
+                assignation=assignation, transport=self.transport
+            ):
                 returns = await run_spawned(
                     self.assign, **params, executor=self.executor, pass_context=True
                 )
@@ -255,7 +260,9 @@ class CompletlyThreadedActor(ThreadedFuncActor):
                 status=AssignationStatus.ASSIGNED,
             )
 
-            async with AssignationContext(assignation, self.transport):
+            async with AssignationContext(
+                assignation=assignation, transport=self.transport
+            ):
                 returns = await run_spawned(
                     self.assign, **params, executor=self.executor, pass_context=True
                 )
@@ -314,7 +321,9 @@ class ThreadedGenActor(SerializingActor):
                 status=AssignationStatus.ASSIGNED,
             )
 
-            async with AssignationContext(assignation, self.transport):
+            async with AssignationContext(
+                assignation=assignation, transport=self.transport
+            ):
                 async for returns in iterate_spawned(
                     self.assign, **params, executor=self.executor, pass_context=True
                 ):

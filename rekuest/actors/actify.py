@@ -9,10 +9,8 @@ import inspect
 from rekuest.structures.registry import StructureRegistry
 from rekuest.agents.transport.base import AgentTransport
 from rekuest.messages import Provision
-from .builder import ActorBuilder
 from rekuest.definition.define import prepare_definition
-from typing import Protocol, runtime_checkable, Callable
-
+from rekuest.actors.types import ActorBuilder
 
 async def async_none_provide(prov: Provision):
     """Do nothing on provide"""
@@ -48,17 +46,6 @@ def higher_order_builder(builder, **params):
     return inside_builder
 
 
-@runtime_checkable
-class Actifier(Protocol):
-    """An actifier is a function that takes a callable and a structure registry
-    as well as optional arguments
-
-    """
-
-    def __call__(
-        self, function: Callable, structure_registry: StructureRegistry, **kwargs
-    ) -> ActorBuilder:
-        ...
 
 
 def reactify(

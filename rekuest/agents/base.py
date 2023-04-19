@@ -2,7 +2,7 @@ from typing import Callable, Dict, List, Optional, Tuple, Union
 
 from pydantic import Field
 from rekuest.actors.base import Actor
-from rekuest.actors.builder import ActorBuilder
+from rekuest.actors.types import ActorBuilder
 from rekuest.agents.errors import ProvisionException
 from rekuest.api.schema import (
     TemplateFragment,
@@ -12,6 +12,7 @@ from rekuest.definition.registry import (
     DefinitionRegistry,
     get_current_definition_registry,
 )
+from rekuest.definition.registry import get_default_definition_registry
 from rekuest.rath import RekuestRath
 import asyncio
 from rekuest.agents.transport.base import AgentTransport, Contextual
@@ -45,9 +46,13 @@ class BaseAgent(KoiledModel):
 
     instance_id: str = "main"
     transport: AgentTransport
-    definition_registry: Optional[DefinitionRegistry] = None
+    definition_registry: DefinitionRegistry = Field(
+        default_factory=get_default_definition_registry
+    )
 
     provisionActorMap: Dict[str, Actor] = Field(default_factory=dict)
+    nodeHashActorMap: Dict[str, Actor] = Field(default_factory=dict)
+    nodeHashTemplateMap: Dict[str, TemplateFragment] = Field(default_factory=dict)
 
     rath: Optional[RekuestRath] = None
 
@@ -74,6 +79,17 @@ class BaseAgent(KoiledModel):
         )
 
     async def aregister_definitions(self):
+        """Registers the definitions that are defined in the definition registry
+
+        This method is called by the agent when it starts and it is responsible for
+        registering the definitions that are defined in the definition registry. This
+        is done by sending the definitions to arkitekt and then storing the templates
+        that are returned by arkitekt in the agent's internal data structures.
+
+        You can implement this method in your agent subclass if you want define preregistration
+        logic (like registering definitions in the definition registry).
+        """
+
         if self.definition_registry.defined_nodes:
             for (
                 definition,
@@ -93,6 +109,10 @@ class BaseAgent(KoiledModel):
                     (arkitekt_template, actor_builder, params)
                 )
 
+                self.nodeHashTemplateMap[
+                    arkitekt_template.node.hash
+                ] = arkitekt_template
+                self.nodeHashActorMap[arkitekt_template.node.hash] = actor_builder
                 self._localActorBuilderMap[arkitekt_template.node.hash] = actor_builder
                 self._templateActorBuilderMap[arkitekt_template.id] = actor_builder
                 self._templateTemplatesMap[arkitekt_template.id] = arkitekt_template
@@ -105,7 +125,6 @@ class BaseAgent(KoiledModel):
             raise ProvisionException("No Actor Builder found for template") from e
         actor = actor_builder(provision=prov, transport=self.transport)
         task = await actor.arun()
-        task.add_done_callback(print)
         self.provisionActorMap[prov.provision] = actor
         return actor
 

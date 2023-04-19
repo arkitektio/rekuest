@@ -3,7 +3,7 @@ from typing import Awaitable, Callable, Optional, Union, TypeVar
 import uuid
 
 from pydantic import Field
-from rekuest.messages import Assignation, Reservation
+from rekuest.messages import Assignation, Reservation, Unassignation
 from rekuest.structures.registry import get_current_structure_registry
 from koil.composition import KoiledModel
 from koil.helpers import unkoil_gen
@@ -12,22 +12,34 @@ from rekuest.api.schema import (
     AssignationFragment,
     AssignationLogLevel,
     AssignationStatus,
+    ProvisionStatus,
     ReservationFragment,
     ReservationStatus,
     ReserveParamsInput,
     NodeFragment,
 )
+import uuid
 import asyncio
 from koil import unkoil
 import logging
 from rekuest.structures.serialization.postman import shrink_inputs, expand_outputs
 from rekuest.structures.registry import StructureRegistry
-from rekuest.api.schema import DefinitionFragment, DefinitionInput
+from rekuest.api.schema import DefinitionFragment, DefinitionInput, ReserveBindsInput
 from rekuest.agents.base import BaseAgent
-from rekuest.agents.transport.mock import MockAgentTransport
+from rekuest.actors.base import Actor
+from rekuest.agents.transport.base import AgentTransport
+from rekuest.actors.transport.local_transport import LocalTransport
 from rekuest.definition.validate import auto_validate
 from .base import BasePostman
+from rekuest.messages import Provision
+import asyncio
+from rekuest.agents.transport.protocols.agent_json import (
+    AssignationChangedMessage,
+    ProvisionChangedMessage,
+    ProvisionMode,
+)
 
+print(asyncio.Queue)
 logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
@@ -89,6 +101,7 @@ class ReservationContract(RPCContract):
     definition: NodeFragment
     provision: Optional[str] = None
     reference: str = "default"
+    binds: Optional[ReserveBindsInput] = None
     params: Optional[ReserveParamsInput] = None
     auto_unreserve: bool = False
     shrink_inputs: bool = True
@@ -143,7 +156,9 @@ class ReservationContract(RPCContract):
 
 
 class localuse(RPCContract):
-    template: str
+    hash: str
+    provision: str
+    reference: str
     structure_registry: StructureRegistry
     agent: BaseAgent
     provide_timeout: Optional[float] = 2
@@ -151,6 +166,16 @@ class localuse(RPCContract):
     yield_timeout: Optional[float] = 2
 
     _definition: DefinitionFragment = None
+    _transport: AgentTransport = None
+    _actor: Actor
+    _enter_future: asyncio.Future = None
+    _exit_future: asyncio.Future = None
+    _updates_queue: asyncio.Queue[
+        Union[AssignationChangedMessage, ProvisionChangedMessage]
+    ] = None
+    _updates_watcher: asyncio.Task = None
+    _futures = {}
+    _assign_queues = {}
 
     async def aassign(
         self,
@@ -161,32 +186,36 @@ class localuse(RPCContract):
         assign_timeout: Optional[float] = 4,
         **kwargs,
     ):
-        assert self._reservation, "We never entered the context manager"
-        assert (
-            self._reservation.status == ReservationStatus.ACTIVE
-        ), "Reservation is not active"
-
         structure_registry = structure_registry or self.structure_registry
         inputs = await shrink_inputs(
-            self.definition,
+            self._definition,
             args,
             kwargs,
             structure_registry=structure_registry,
             skip_shrinking=not self.shrink_inputs,
         )
 
-        _ass_queue = await self.postman.aassign(
-            self._reservation.id, inputs, parent=parent
+        id = uuid.uuid4().hex  # TODO: Make this a proper uuid
+
+        _ass_queue = asyncio.Queue[AssignationChangedMessage]()
+        self._assign_queues[id] = _ass_queue
+
+        await self._actor.apass(
+            Assignation(
+                assignation=id,
+                parent=parent,
+                args=inputs,
+                status=AssignationStatus.ASSIGNED,
+            )
         )
         try:
             while True:  # Waiting for assignation
                 ass = await asyncio.wait_for(
                     _ass_queue.get(), timeout=assign_timeout or self.assign_timeout
                 )
-                logger.info(f"Reservation Context: {ass}")
                 if ass.status == AssignationStatus.RETURNED:
                     outputs = await expand_outputs(
-                        self.definition,
+                        self._definition,
                         ass.returns,
                         structure_registry=structure_registry,
                         skip_expanding=not self.expand_outputs,
@@ -194,9 +223,13 @@ class localuse(RPCContract):
                     return outputs
 
                 if ass.status in [AssignationStatus.CRITICAL, AssignationStatus.ERROR]:
-                    raise Exception(f"Critical error: {ass.statusmessage}")
+                    raise Exception(f"Critical error: {ass.message}")
         except asyncio.CancelledError as e:
-            await self.postman.aunassign(ass.id)
+            await self._actor.apass(
+                Unassignation(
+                    assignation=id,
+                )
+            )
 
             ass = await asyncio.wait_for(_ass_queue.get(), timeout=2)
             if ass.status == AssignationStatus.CANCELING:
@@ -214,25 +247,27 @@ class localuse(RPCContract):
         yield_timeout: Optional[float] = 4,
         **kwargs,
     ):
-        assert self._reservation, "We never entered the context manager"
-        assert (
-            self._reservation.status == ReservationStatus.ACTIVE
-        ), "Reservation is not active"
-
-        structure_registry = structure_registry or get_current_structure_registry()
-
+        structure_registry = structure_registry or self.structure_registry
         inputs = await shrink_inputs(
-            self.definition,
+            self._definition,
             args,
             kwargs,
             structure_registry=structure_registry,
             skip_shrinking=not self.shrink_inputs,
         )
 
-        _ass_queue = await self.postman.aassign(
-            self._reservation.id,
-            inputs,
-            parent=parent,
+        id = uuid.uuid4().hex  # TODO: Make this a proper uuid
+
+        _ass_queue = asyncio.Queue[AssignationChangedMessage]()
+        self._assign_queues[id] = _ass_queue
+
+        await self._actor.apass(
+            Assignation(
+                assignation=id,
+                parent=parent,
+                args=inputs,
+                status=AssignationStatus.ASSIGNED,
+            )
         )
         try:
             while True:  # Waiting for assignation
@@ -242,7 +277,7 @@ class localuse(RPCContract):
                 logger.info(f"Reservation Context: {ass}")
                 if ass.status == AssignationStatus.YIELD:
                     outputs = await expand_outputs(
-                        self.definition,
+                        self._definition,
                         ass.returns,
                         structure_registry=structure_registry,
                         skip_expanding=not self.expand_outputs,
@@ -253,11 +288,14 @@ class localuse(RPCContract):
                     return
 
                 if ass.status in [AssignationStatus.CRITICAL, AssignationStatus.ERROR]:
-                    raise Exception(f"Critical error: {ass.statusmessage}")
+                    raise Exception(f"Critical error: {ass.message}")
 
         except asyncio.CancelledError as e:
-            logger.warning(f"Cancelling this assignation {ass}")
-            await self.postman.aunassign(ass.id)
+            await self._actor.apass(
+                Unassignation(
+                    assignation=id,
+                )
+            )
 
             ass = await asyncio.wait_for(_ass_queue.get(), timeout=2)
             if ass.status == AssignationStatus.CANCELING:
@@ -270,54 +308,60 @@ class localuse(RPCContract):
         logger.info("Waiting for updates")
         try:
             while True:
-                self._reservation = await self._updates_queue.get()
-                logger.info(f"Updated Reservation {self._reservation}")
-                if self._reservation.status == ReservationStatus.ACTIVE:
-                    if self._enter_future and not self._enter_future.done():
-                        logger.info("Entering future")
-                        self._enter_future.set_result(True)
+                message = await self._updates_queue.get()
+                if isinstance(message, ProvisionChangedMessage):
+                    if message.status == ProvisionStatus.ACTIVE:
+                        print("Getting update that we are happy")
+                        if self._enter_future and not self._enter_future.done():
+                            print("Entering Future")
+                            self._enter_future.set_result(True)
 
-                if self.on_reservation_change:
-                    await self.on_reservation_change(self._reservation)
+                if isinstance(message, AssignationChangedMessage):
+                    assert (
+                        message.assignation in self._assign_queues
+                    ), "We never asked for this"
+                    await self._assign_queues[message.assignation].put(message)
 
         except asyncio.CancelledError:
             pass
+        except Exception as e:
+            logger.error(f"Error in updates watcher: {e}", exc_info=True)
 
     async def aenter(self):
-        logger.info(f"Trying to reserve {self.definition}")
-
         self._enter_future = asyncio.Future()
+        self._updates_queue = asyncio.Queue[
+            Union[AssignationChangedMessage, ProvisionChangedMessage]
+        ]()
 
-        self.transport = MockAgentTransport()
+        template = self.agent.nodeHashTemplateMap[self.hash]
+        self._definition = template.node
 
-        self._updates_queue = await self.agent.aspawn_actor(
-            node=self.definition.id,
-            params=self.params,
-            provision=self.provision,
-            reference=self.reference,
+        actor_builder = self.agent._templateActorBuilderMap[template.id]
+
+        provision = Provision(
+            provision=self.provision, guardian=self.provision, template=template.id
         )
+
+        self._transport = LocalTransport(broadcast=self._updates_queue.put)
+
+        self._actor = actor_builder(provision=provision, transport=self._transport)
+        await self._actor.arun()
+        self._updates_watcher = asyncio.create_task(self.watch_updates())
+        await self._enter_future
+
+    async def aexit(self, *args, **kwargs):
+        await self._actor.acancel()
+        self._updates_watcher.cancel()
+
         try:
-            self._updates_watcher = asyncio.create_task(self.watch_updates())
-            await asyncio.wait_for(
-                self._enter_future, self.reserve_timeout
-            )  # Waiting to enter
+            await self._updates_watcher
+        except asyncio.CancelledError:
+            pass
 
-            self.active = True
-
-        except asyncio.TimeoutError:
-            logger.warning("Reservation timeout")
-            self._updates_watcher.cancel()
-
-            try:
-                await self._updates_watcher
-            except asyncio.CancelledError:
-                pass
-
-            self.active = False
-
-            raise
-
-        return self
+    class Config:
+        arbitrary_types_allowed = True
+        underscore_attrs_are_private = True
+        copy_on_model_validation = False
 
 
 class arkiuse(ReservationContract):
@@ -472,6 +516,7 @@ class arkiuse(ReservationContract):
             params=self.params,
             provision=self.provision,
             reference=self.reference,
+            binds=self.binds,
         )
         try:
             self._updates_watcher = asyncio.create_task(self.watch_updates())

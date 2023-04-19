@@ -12,11 +12,15 @@ from rekuest.api.schema import (
     AssignationStatus,
     ProvisionLogLevel,
     ProvisionStatus,
+    ProvisionMode,
+    LogLevelInput,
 )
 from rekuest.messages import Assignation, Provision, Unassignation
 from rekuest.actors.errors import UnknownMessageError
 from koil.types import Contextual
 from rekuest.definition.define import DefinitionInput
+from typing import Protocol, runtime_checkable, Optional, List, Any
+from rekuest.actors.transport.types import ActorTransport
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +32,7 @@ class Actor(BaseModel):
     provision: Provision
     """ A provision is a providing request illustrating the context of the actor. This can be provided by a governing actor or by arkitekt itself. """
 
-    transport: AgentTransport
+    transport: ActorTransport
 
     runningAssignments: Dict[str, Assignation] = Field(default_factory=dict)
 

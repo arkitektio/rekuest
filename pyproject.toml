@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "rekuest"
-version = "0.1.26"
+version = "0.1.29"
 description = "rpc and node backbone"
 authors = ["jhnnsrs <jhnnsrs@gmail.com>"]
 license = "CC BY-NC 3.0"
@@ -51,7 +51,7 @@ testcontainers = "3.7.0"
 autoflake = "^1.7.7"
 pytest = "^7.2.0"
 pytest-asyncio = "^0.20.2"
-turms = { version = ">=0.2.3", python = "^3.9" }
+turms = { version = ">=0.3.1", python = "^3.9" }
 aiohttp = "^3.8.3"
 websockets = "^10.4"
 black = "^23.1.0"

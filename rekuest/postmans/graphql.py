@@ -10,6 +10,7 @@ from rekuest.api.schema import (
     awatch_reservations,
     aunassign,
     aunreserve,
+    ReserveBindsInput,
 )
 
 from rekuest.postmans.base import BasePostman
@@ -54,6 +55,7 @@ class GraphQLPostman(BasePostman):
         params: ReserveParamsInput = None,
         provision: str = None,
         reference: str = "default",
+        binds: ReserveBindsInput = None,
     ) -> asyncio.Queue:
         async with self._lock:
             if not self._watching:
@@ -63,7 +65,11 @@ class GraphQLPostman(BasePostman):
         self.reservations[unique_identifier] = None
         self._res_update_queues[unique_identifier] = asyncio.Queue()
         reservation = await areserve(
-            node=node, params=params, provision=provision, reference=reference
+            node=node,
+            params=params,
+            provision=provision,
+            reference=reference,
+            binds=binds,
         )
         await self._res_update_queue.put(reservation)
         return self._res_update_queues[unique_identifier]

@@ -7,6 +7,7 @@ mutation reserve(
   $appGroup: ID
   $reference: String
   $provision: ID
+  $binds: ReserveBindsInput
 ) {
   reserve(
     node: $node
@@ -16,6 +17,7 @@ mutation reserve(
     imitate: $imitate
     provision: $provision
     appGroup: $appGroup
+    binds: $binds
     reference: $reference
   ) {
     ...Reservation

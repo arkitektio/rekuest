@@ -9,6 +9,7 @@ from rekuest.api.schema import (
     NodeKindInput,
     PortKindInput,
     AnnotationInput,
+    Scope,
 )
 import inspect
 from docstring_parser import parse
@@ -68,6 +69,7 @@ def convert_child_to_childport(
                     ChildPortInput(
                         kind=PortKindInput.LIST,
                         child=child,
+                        scope=Scope.GLOBAL,
                         nullable=nullable,
                         annotations=annotations,
                     ),
@@ -86,6 +88,7 @@ def convert_child_to_childport(
                     ChildPortInput(
                         kind=PortKindInput.DICT,
                         child=child,
+                        scope=Scope.GLOBAL,
                         nullable=nullable,
                         annotations=annotations,
                     ),
@@ -112,6 +115,7 @@ def convert_child_to_childport(
             t = ChildPortInput(
                 kind=PortKindInput.BOOL,
                 nullable=nullable,
+                scope=Scope.GLOBAL,
                 annotations=annotations,
             )  # catch bool is subclass of int
             return t, str
@@ -121,6 +125,7 @@ def convert_child_to_childport(
                 ChildPortInput(
                     kind=PortKindInput.INT,
                     nullable=nullable,
+                    scope=Scope.GLOBAL,
                     annotations=annotations,
                 ),
                 int,
@@ -130,12 +135,14 @@ def convert_child_to_childport(
                 ChildPortInput(
                     kind=PortKindInput.STRING,
                     nullable=nullable,
+                    scope=Scope.GLOBAL,
                     annotations=annotations,
                 ),
                 str,
             )
 
     identifier = registry.get_identifier_for_structure(cls)
+    scope = registry.get_scope_for_identifier(identifier)
     default_converter = registry.get_default_converter_for_structure(cls)
     assign_widget = registry.get_widget_input(cls)
     return_widget = registry.get_returnwidget_input(cls)
@@ -144,6 +151,7 @@ def convert_child_to_childport(
         ChildPortInput(
             kind=PortKindInput.STRUCTURE,
             identifier=identifier,
+            scope=scope,
             nullable=nullable,
             annotations=annotations,
             assignWidget=assign_widget,
@@ -196,6 +204,7 @@ def convert_object_to_port(
                     kind=PortKindInput.LIST,
                     assignWidget=widget,
                     returnWidget=return_widget,
+                    scope=Scope.GLOBAL,
                     key=key,
                     child=child,
                     default=[converter(item) for item in default] if default else None,
@@ -211,6 +220,7 @@ def convert_object_to_port(
                 return PortInput(
                     kind=PortKindInput.DICT,
                     assignWidget=widget,
+                    scope=Scope.GLOBAL,
                     returnWidget=return_widget,
                     key=key,
                     child=child,
@@ -251,6 +261,7 @@ def convert_object_to_port(
         ):
             t = PortInput(
                 kind=PortKindInput.BOOL,
+                scope=Scope.GLOBAL,
                 assignWidget=widget,
                 returnWidget=return_widget,
                 key=key,
@@ -269,6 +280,7 @@ def convert_object_to_port(
             return PortInput(
                 kind=PortKindInput.INT,
                 assignWidget=widget,
+                scope=Scope.GLOBAL,
                 returnWidget=return_widget,
                 key=key,
                 default=default,
@@ -286,6 +298,7 @@ def convert_object_to_port(
                 kind=PortKindInput.FLOAT,
                 assignWidget=widget,
                 returnWidget=return_widget,
+                scope=Scope.GLOBAL,
                 key=key,
                 default=default,
                 nullable=nullable,
@@ -302,6 +315,7 @@ def convert_object_to_port(
                 kind=PortKindInput.STRING,
                 assignWidget=widget,
                 returnWidget=return_widget,
+                scope=Scope.GLOBAL,
                 key=key,
                 default=default,
                 nullable=nullable,
@@ -310,6 +324,7 @@ def convert_object_to_port(
             )
 
     identifier = registry.get_identifier_for_structure(cls)
+    scope = registry.get_scope_for_identifier(identifier)
     default_converter = registry.get_default_converter_for_structure(cls)
     widget = widget or registry.get_widget_input(cls)
     return_widget = return_widget or registry.get_returnwidget_input(cls)
@@ -318,6 +333,7 @@ def convert_object_to_port(
         kind=PortKindInput.STRUCTURE,
         identifier=identifier,
         assignWidget=widget,
+        scope=scope,
         returnWidget=return_widget,
         key=key,
         default=default_converter(default) if default else None,
@@ -366,6 +382,7 @@ def convert_return_to_returnport(
                 return PortInput(
                     kind=PortKindInput.LIST,
                     widget=widget,
+                    scope=Scope.GLOBAL,
                     key=key,
                     child=child.dict(exclude={"key"}),
                     nullable=nullable,
@@ -380,6 +397,7 @@ def convert_return_to_returnport(
                 return PortInput(
                     kind=PortKindInput.DICT,
                     widget=widget,
+                    scope=Scope.GLOBAL,
                     key=key,
                     child=child.dict(exclude={"key"}),
                     nullable=nullable,
@@ -405,6 +423,7 @@ def convert_return_to_returnport(
             return PortInput(
                 kind=PortKindInput.BOOL,
                 key=key,
+                scope=Scope.GLOBAL,
                 nullable=nullable,
                 description=description,
                 annotations=annotations,
@@ -413,6 +432,7 @@ def convert_return_to_returnport(
             return PortInput(
                 kind=PortKindInput.INT,
                 key=key,
+                scope=Scope.GLOBAL,
                 nullable=nullable,
                 description=description,
                 annotations=annotations,
@@ -421,6 +441,7 @@ def convert_return_to_returnport(
             return PortInput(
                 kind=PortKindInput.FLOAT,
                 key=key,
+                scope=Scope.GLOBAL,
                 nullable=nullable,
                 description=description,
                 annotations=annotations,
@@ -429,17 +450,20 @@ def convert_return_to_returnport(
             return PortInput(
                 kind=PortKindInput.STRING,
                 key=key,
+                scope=Scope.GLOBAL,
                 nullable=nullable,
                 description=description,
                 annotations=annotations,
             )
 
     identifier = registry.get_identifier_for_structure(cls)
+    scope = registry.get_scope_for_identifier(identifier)
     widget = widget or registry.get_returnwidget_input(cls)
 
     return PortInput(
         kind=PortKindInput.STRUCTURE,
         identifier=identifier,
+        scope=scope,
         key=key,
         returnWidget=widget,
         nullable=nullable,
@@ -522,7 +546,13 @@ def prepare_definition(
 
         widget = widgets.get(key, None)
         return_widget = return_widgets.get(key, None)
-        cls = type_hints.get(key, None)
+        default = value.default if value.default != inspect.Parameter.empty else None
+        cls = type_hints.get(key, type(default) if default is not None else None)
+
+        if cls is None:
+            raise DefinitionError(
+                f"Could not find type hint for {key} in {function.__name__}. Please provide a type hint (or default) for this argument."
+            )
 
         try:
             args.append(
@@ -532,11 +562,7 @@ def prepare_definition(
                     structure_registry,
                     widget=widget,
                     return_widget=return_widget,
-                    default=(
-                        value.default
-                        if value.default != inspect.Parameter.empty
-                        else None
-                    ),
+                    default=default,
                     description=doc_param_map.get(key, None),
                 )
             )

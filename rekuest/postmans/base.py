@@ -2,7 +2,11 @@ from typing import List, Union, Any
 
 from pydantic import Field
 
-from rekuest.api.schema import AssignationFragment, ReserveParamsInput
+from rekuest.api.schema import (
+    AssignationFragment,
+    ReserveParamsInput,
+    ReserveBindsInput,
+)
 from koil.composition import KoiledModel
 import asyncio
 
@@ -44,6 +48,7 @@ class BasePostman(KoiledModel):
         params: ReserveParamsInput = None,
         provision: str = None,
         reference: str = "default",
+        binds: ReserveBindsInput = None,
     ) -> asyncio.Queue:
         ...
 

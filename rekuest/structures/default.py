@@ -1,5 +1,11 @@
 from rekuest.structures.registry import StructureRegistry
-from rekuest.api.schema import TemplateFragment, NodeFragment, aget_template, afind
+from rekuest.api.schema import (
+    TemplateFragment,
+    NodeFragment,
+    aget_template,
+    afind,
+    Scope,
+)
 
 
 DEFAULT_STRUCTURE_REGISTRY = None
@@ -11,10 +17,13 @@ def get_default_structure_registry() -> StructureRegistry:
         DEFAULT_STRUCTURE_REGISTRY = StructureRegistry()
 
         DEFAULT_STRUCTURE_REGISTRY.register_as_structure(
-            TemplateFragment, "@rekuest/template", expand=aget_template
+            TemplateFragment,
+            "@rekuest/template",
+            scope=Scope.GLOBAL,
+            expand=aget_template,
         )
         DEFAULT_STRUCTURE_REGISTRY.register_as_structure(
-            NodeFragment, "@rekuest/node", expand=afind
+            NodeFragment, "@rekuest/node", scope=Scope.GLOBAL, expand=afind
         )
 
         try:

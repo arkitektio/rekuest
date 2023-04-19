@@ -7,6 +7,7 @@ from rekuest.api.schema import (
     ReturnWidgetInput,
     WidgetInput,
     AnnotationInput,
+    Scope,
 )
 from pydantic import BaseModel, Field
 
@@ -47,6 +48,7 @@ class StructureRegistry(BaseModel):
     identifier_structure_map: Dict[str, Type] = Field(
         default_factory=dict, exclude=True
     )
+    identifier_scope_map: Dict[str, Scope] = Field(default_factory=dict, exclude=True)
     _identifier_expander_map: Dict[str, Callable[[str], Awaitable[Any]]] = {}
     _identifier_shrinker_map: Dict[str, Callable[[Any], Awaitable[str]]] = {}
 
@@ -99,6 +101,9 @@ class StructureRegistry(BaseModel):
                     " allow_auto_register to True"
                 ) from e
 
+    def get_scope_for_identifier(self, identifier: str):
+        return self.identifier_scope_map[identifier]
+
     def get_default_converter_for_structure(self, cls):
         try:
             return self._structure_convert_default_map[cls]
@@ -124,6 +129,7 @@ class StructureRegistry(BaseModel):
         self,
         cls: Type,
         identifier: str = None,
+        scope: Scope = Scope.LOCAL,
         expand: Callable[
             [
                 str,
@@ -143,8 +149,11 @@ class StructureRegistry(BaseModel):
         if issubclass(cls, Enum):
             identifier = "cls/" + cls.__name__.lower()
             shrink, expand = build_enum_shrink_expand(cls)
+            scope = Scope.GLOBAL
+
             def convert_default(x):
                 return x._name_
+
             default_widget = default_widget or WidgetInput(
                 kind="ChoiceWidget",
                 choices=[
@@ -208,6 +217,7 @@ class StructureRegistry(BaseModel):
         self._identifier_expander_map[identifier] = expand
         self._identifier_shrinker_map[identifier] = shrink
         self.identifier_structure_map[identifier] = cls
+        self.identifier_scope_map[identifier] = scope
         self._structure_identifier_map[cls] = identifier
         self._structure_default_widget_map[cls] = default_widget
         self._structure_default_returnwidget_map[cls] = default_returnwidget

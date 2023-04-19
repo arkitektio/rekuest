@@ -2,13 +2,13 @@ from dataclasses import dataclass
 from rekuest.messages import Assignation, Provision
 from rekuest.actors.helper import AssignationHelper, ProvisionHelper
 from rekuest.actors.vars import current_assignation_helper, current_provision_helper
-from rekuest.agents.transport.base import AgentTransport
+from rekuest.actors.transport.types import ActorTransport
+from pydantic import BaseModel
 
 
-@dataclass
-class AssignationContext:
+class AssignationContext(BaseModel):
     assignation: Assignation
-    transport: AgentTransport
+    transport: ActorTransport
     _helper = None
 
     def __enter__(self):
@@ -29,11 +29,14 @@ class AssignationContext:
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         return self.__exit__(exc_type, exc_val, exc_tb)
 
+    class Config:
+        arbitrary_types_allowed = True
+        underscore_attrs_are_private = True
 
-@dataclass
-class ProvisionContext:
+
+class ProvisionContext(BaseModel):
     provision: Provision
-    transport: AgentTransport
+    transport: ActorTransport
     _helper = None
 
     def __enter__(self):
@@ -53,3 +56,7 @@ class ProvisionContext:
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         return self.__exit__(exc_type, exc_val, exc_tb)
+
+    class Config:
+        arbitrary_types_allowed = True
+        underscore_attrs_are_private = True

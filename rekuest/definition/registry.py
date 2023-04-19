@@ -1,16 +1,18 @@
 import contextvars
 from rekuest.api.schema import DefinitionInput
-from rekuest.actors.actify import reactify, Actifier
+from rekuest.actors.actify import reactify
+from rekuest.actors.types import Actifier
 from rekuest.structures.registry import (
     StructureRegistry,
     get_current_structure_registry,
 )
+from rekuest.structures.default import get_default_structure_registry
 from rekuest.api.schema import WidgetInput
 from typing import Dict, List, Callable, Optional, Tuple
 from pydantic import Field
 from koil.composition import KoiledModel
 import json
-from rekuest.actors.builder import ActorBuilder
+from rekuest.actors.types import ActorBuilder
 
 
 current_definition_registry = contextvars.ContextVar(
@@ -31,7 +33,9 @@ def get_current_definition_registry(allow_global=True):
 
 
 class DefinitionRegistry(KoiledModel):
-    structure_registry: Optional[StructureRegistry] = None
+    structure_registry: StructureRegistry = Field(
+        default_factory=get_default_structure_registry
+    )
     defined_nodes: List[Tuple[DefinitionInput, Callable]] = Field(
         default_factory=list, exclude=True
     )

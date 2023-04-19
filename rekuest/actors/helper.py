@@ -2,12 +2,12 @@ from pydantic import BaseModel
 from rekuest.api.schema import LogLevelInput, AssignationStatusInput
 from rekuest.messages import Assignation, Provision
 from koil import unkoil
-from rekuest.agents.transport.base import AgentTransport
+from rekuest.actors.transport.types import ActorTransport
 
 
 class AssignationHelper(BaseModel):
     assignation: Assignation
-    transport: AgentTransport
+    transport: ActorTransport
 
     async def alog(self, level: LogLevelInput, message: str) -> None:
         await self.transport.log_to_assignation(
@@ -37,7 +37,7 @@ class AssignationHelper(BaseModel):
 
 class ProvisionHelper(BaseModel):
     provision: Provision
-    transport: AgentTransport
+    transport: ActorTransport
 
     async def alog(self, level: LogLevelInput, message: str) -> None:
         await self.transport.log_to_provision(
@@ -47,3 +47,6 @@ class ProvisionHelper(BaseModel):
     @property
     def guardian(self) -> str:
         return self.provision.guardian
+
+    class Config:
+        arbitrary_types_allowed = True
