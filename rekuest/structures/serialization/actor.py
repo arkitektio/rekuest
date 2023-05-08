@@ -202,10 +202,10 @@ async def ashrink_return(
             try:
                 shrink = await shrinker(value)
                 return str(shrink)
-            except Exception:
+            except Exception as e:
                 raise StructureShrinkingError(
                     f"Error shrinking {repr(value)} with Structure {port.identifier}"
-                ) from None
+                ) from e
 
         if port.kind == PortKind.BOOL:
             return bool(value) if value is not None else None

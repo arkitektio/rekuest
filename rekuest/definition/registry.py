@@ -7,7 +7,7 @@ from rekuest.structures.registry import (
     get_current_structure_registry,
 )
 from rekuest.structures.default import get_default_structure_registry
-from rekuest.api.schema import WidgetInput
+from rekuest.api.schema import WidgetInput, PortGroupInput
 from typing import Dict, List, Callable, Optional, Tuple
 from pydantic import Field
 from koil.composition import KoiledModel
@@ -64,6 +64,8 @@ class DefinitionRegistry(KoiledModel):
         structure_registry: StructureRegistry,
         actifier: Actifier = None,
         interface: str = None,
+        port_groups: Optional[List[PortGroupInput]] = None,
+        groups: Optional[Dict[str, List[str]]] = None,
         widgets: Dict[str, WidgetInput] = None,
         interfaces: List[str] = [],
         on_provide=None,
@@ -103,6 +105,8 @@ class DefinitionRegistry(KoiledModel):
                 on_provide=on_provide,
                 on_unprovide=on_unprovide,
                 widgets=widgets,
+                groups=groups,
+                port_groups=port_groups,
                 interfaces=interfaces,
                 **actifier_params,
             )

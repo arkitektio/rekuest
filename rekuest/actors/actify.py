@@ -11,6 +11,9 @@ from rekuest.agents.transport.base import AgentTransport
 from rekuest.messages import Provision
 from rekuest.definition.define import prepare_definition
 from rekuest.actors.types import ActorBuilder
+from rekuest.api.schema import PortGroupInput
+from typing import Optional, Any, Dict, Union, Callable, Coroutine, Type, List
+
 
 async def async_none_provide(prov: Provision):
     """Do nothing on provide"""
@@ -46,8 +49,6 @@ def higher_order_builder(builder, **params):
     return inside_builder
 
 
-
-
 def reactify(
     function,
     structure_registry: StructureRegistry,
@@ -56,6 +57,8 @@ def reactify(
     on_provide=None,
     widgets=None,
     interfaces=None,
+    port_groups: Optional[List[PortGroupInput]] = None,
+    groups: Optional[Dict[str, List[str]]] = None,
     on_unprovide=None,
     **params,
 ) -> ActorBuilder:
@@ -69,7 +72,12 @@ def reactify(
     """
 
     definition = prepare_definition(
-        function, structure_registry, widgets=widgets, interfaces=interfaces
+        function,
+        structure_registry,
+        widgets=widgets,
+        interfaces=interfaces,
+        port_groups=port_groups,
+        groups=groups,
     )
 
     is_coroutine = inspect.iscoroutinefunction(function)

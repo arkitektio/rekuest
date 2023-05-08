@@ -10,6 +10,9 @@ from rekuest.api.schema import (
     PortKindInput,
     AnnotationInput,
     Scope,
+    WidgetInput,
+    ReturnWidgetInput,
+    PortGroupInput,
 )
 import inspect
 from docstring_parser import parse
@@ -18,6 +21,7 @@ from rekuest.definition.errors import DefinitionError
 from rekuest.structures.registry import (
     StructureRegistry,
 )
+from typing import Protocol, runtime_checkable, Optional, List, Any, Dict
 
 
 def convert_child_to_childport(
@@ -170,6 +174,7 @@ def convert_object_to_port(
     default=None,
     description=None,
     nullable=False,
+    groups: Optional[List[str]] = None,
     annotations=[],
 ) -> PortInput:
     """
@@ -191,6 +196,7 @@ def convert_object_to_port(
             default=default,
             nullable=nullable,
             annotations=annotations,
+            groups=groups,
         )
 
     if cls.__module__ == "typing":
@@ -211,6 +217,7 @@ def convert_object_to_port(
                     nullable=nullable,
                     annotations=annotations,
                     description=description,
+                    groups=groups,
                 )
 
             if cls._name == "Dict":
@@ -232,6 +239,7 @@ def convert_object_to_port(
                     nullable=nullable,
                     annotations=annotations,
                     description=description,
+                    groups=groups,
                 )
 
             if cls._name == "Union":
@@ -249,6 +257,7 @@ def convert_object_to_port(
                     return_widget=return_widget,
                     annotations=annotations,
                     description=description,
+                    groups=groups,
                 )
 
     if inspect.isclass(cls):
@@ -269,6 +278,7 @@ def convert_object_to_port(
                 nullable=nullable,
                 annotations=annotations,
                 description=description,
+                groups=groups,
             )  # catch bool is subclass of int
             return t
 
@@ -287,6 +297,7 @@ def convert_object_to_port(
                 nullable=nullable,
                 annotations=annotations,
                 description=description,
+                groups=groups,
             )
 
         if (
@@ -304,6 +315,7 @@ def convert_object_to_port(
                 nullable=nullable,
                 annotations=annotations,
                 description=description,
+                groups=groups,
             )
 
         if (
@@ -321,6 +333,7 @@ def convert_object_to_port(
                 nullable=nullable,
                 annotations=annotations,
                 description=description,
+                groups=groups,
             )
 
     identifier = registry.get_identifier_for_structure(cls)
@@ -340,150 +353,29 @@ def convert_object_to_port(
         nullable=nullable,
         annotations=annotations,
         description=description,
+        groups=groups,
     )
 
 
-def convert_return_to_returnport(
-    cls,
-    key: str,
-    registry: StructureRegistry,
-    description=None,
-    widget=None,
-    nullable=False,
-    annotations=None,
-) -> PortInput:
-    """
-    Convert a class to an ArgPort
-    """
-    if hasattr(cls, "__name__") and cls.__name__ == "Annotated":
-        real_type = cls.__args__[0]
-
-        annotations = [
-            registry.get_converter_for_annotation(i.__class__)(i)
-            for i in cls.__metadata__
-        ]
-
-        return convert_return_to_returnport(
-            real_type,
-            key,
-            registry,
-            widget=widget,
-            nullable=nullable,
-            annotations=annotations,
-        )
-
-    if cls.__module__ == "typing":
-        if hasattr(cls, "_name"):
-            # We are dealing with a Typing Var?
-            if cls._name == "List":
-                child, widget, converter = convert_child_to_childport(
-                    cls.__args__[0], registry, nullable=False, is_return=True
-                )
-                return PortInput(
-                    kind=PortKindInput.LIST,
-                    widget=widget,
-                    scope=Scope.GLOBAL,
-                    key=key,
-                    child=child.dict(exclude={"key"}),
-                    nullable=nullable,
-                    description=description,
-                    annotations=annotations,
-                )
-
-            if cls._name == "Dict":
-                child, widget, converter = convert_child_to_childport(
-                    cls.__args__[1], registry, nullable=False, is_return=True
-                )
-                return PortInput(
-                    kind=PortKindInput.DICT,
-                    widget=widget,
-                    scope=Scope.GLOBAL,
-                    key=key,
-                    child=child.dict(exclude={"key"}),
-                    nullable=nullable,
-                    description=description,
-                    annotations=annotations,
-                )
-
-        if hasattr(cls, "__args__"):
-            if cls.__args__[1] == type(None):
-                return convert_return_to_returnport(
-                    cls.__args__[0],
-                    key,
-                    registry,
-                    nullable=True,
-                    annotations=annotations,
-                    description=description,
-                )
-
-    if inspect.isclass(cls):
-        # Generic Cases
-
-        if not issubclass(cls, Enum) and issubclass(cls, bool):
-            return PortInput(
-                kind=PortKindInput.BOOL,
-                key=key,
-                scope=Scope.GLOBAL,
-                nullable=nullable,
-                description=description,
-                annotations=annotations,
-            )  # catch bool is subclass of int
-        if not issubclass(cls, Enum) and issubclass(cls, int):
-            return PortInput(
-                kind=PortKindInput.INT,
-                key=key,
-                scope=Scope.GLOBAL,
-                nullable=nullable,
-                description=description,
-                annotations=annotations,
-            )
-        if not issubclass(cls, Enum) and issubclass(cls, float):
-            return PortInput(
-                kind=PortKindInput.FLOAT,
-                key=key,
-                scope=Scope.GLOBAL,
-                nullable=nullable,
-                description=description,
-                annotations=annotations,
-            )
-        if not issubclass(cls, Enum) and issubclass(cls, str):
-            return PortInput(
-                kind=PortKindInput.STRING,
-                key=key,
-                scope=Scope.GLOBAL,
-                nullable=nullable,
-                description=description,
-                annotations=annotations,
-            )
-
-    identifier = registry.get_identifier_for_structure(cls)
-    scope = registry.get_scope_for_identifier(identifier)
-    widget = widget or registry.get_returnwidget_input(cls)
-
-    return PortInput(
-        kind=PortKindInput.STRUCTURE,
-        identifier=identifier,
-        scope=scope,
-        key=key,
-        returnWidget=widget,
-        nullable=nullable,
-        description=None,
-        annotations=annotations,
-    )
+GroupMap = Dict[str, List[str]]
+WidgetMap = Dict[str, List[WidgetInput]]
+ReturnWidgetMap = Dict[str, List[ReturnWidgetInput]]
 
 
 def prepare_definition(
     function: Callable,
     structure_registry: StructureRegistry,
-    interface=None,
-    widgets=None,
-    return_widgets=None,
+    interface: str = None,
+    widgets: Optional[WidgetMap] = None,
+    return_widgets: Optional[ReturnWidgetMap] = None,
+    groups: Optional[GroupMap] = None,
+    port_groups: List[PortGroupInput] = None,
     allow_empty_doc=False,
-    interfaces=None,
+    interfaces: Optional[List[str]] = None,
     omitfirst=None,
     omitlast=None,
     omitkeys=[],
-    allow_annotations=True,
+    allow_annotations: bool = True,
 ) -> DefinitionInput:
     """Define
 
@@ -509,6 +401,17 @@ def prepare_definition(
 
     sig = inspect.signature(function)
     widgets = widgets or {}
+
+    port_groups = port_groups or []
+    port_groups_name = [i.key for i in port_groups]
+    groups = groups or {}
+    for key, grouplist in groups.items():
+        for group in grouplist:
+            if group not in port_groups_name:
+                raise DefinitionError(
+                    f"Error mapping {group} to a group in port groups for port {key}:  Please define a PortGroup for {group}"
+                )
+
     return_widgets = return_widgets or {}
     interfaces = interfaces or []
     # Generate Args and Kwargs from the Annotation
@@ -548,6 +451,7 @@ def prepare_definition(
         return_widget = return_widgets.get(key, None)
         default = value.default if value.default != inspect.Parameter.empty else None
         cls = type_hints.get(key, type(default) if default is not None else None)
+        this_port_groups = groups.get(key, None)
 
         if cls is None:
             raise DefinitionError(
@@ -564,6 +468,7 @@ def prepare_definition(
                     return_widget=return_widget,
                     default=default,
                     description=doc_param_map.get(key, None),
+                    groups=this_port_groups,
                 )
             )
         except Exception as e:
@@ -580,6 +485,7 @@ def prepare_definition(
                 for index, cls in enumerate(function_outs_annotation.__args__):
                     return_widget = return_widgets.get(f"return{index}", None)
                     widget = widgets.get(f"return{index}", None)
+                    this_port_groups = groups.get(f"return{index}", None)
                     returns.append(
                         convert_object_to_port(
                             cls,
@@ -588,6 +494,7 @@ def prepare_definition(
                             description=doc_returns_map.get(f"return{index}", None),
                             return_widget=return_widget,
                             widget=widget,
+                            groups=this_port_groups,
                         )
                     )
             except Exception as e:
@@ -599,6 +506,7 @@ def prepare_definition(
             try:
                 return_widget = return_widgets.get("return0", None)
                 widget = widgets.get("return0", None)
+                this_port_groups = groups.get("return0", None)
                 returns.append(
                     convert_object_to_port(
                         function_outs_annotation,
@@ -606,6 +514,7 @@ def prepare_definition(
                         structure_registry,
                         return_widget=return_widget,
                         widget=widget,
+                        groups=this_port_groups,
                     )
                 )  # Other types will be converted to normal lists and shit
             except Exception as e:
@@ -621,6 +530,7 @@ def prepare_definition(
         elif function_outs_annotation.__name__ != "_empty":  # Is it not empty
             return_widget = return_widgets.get("return0", None)
             widget = widgets.get("return0", None)
+            this_port_groups = groups.get("return0", None)
             returns.append(
                 convert_object_to_port(
                     function_outs_annotation,
@@ -628,6 +538,7 @@ def prepare_definition(
                     structure_registry,
                     widget=widget,
                     return_widget=return_widget,
+                    groups=this_port_groups,
                 )
             )
 
@@ -648,6 +559,7 @@ def prepare_definition(
             "returns": returns,
             "kind": NodeKindInput.GENERATOR if is_generator else NodeKindInput.FUNCTION,
             "interfaces": interfaces,
+            "portGroups": port_groups,
         }
     )
 

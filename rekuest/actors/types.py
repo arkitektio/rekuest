@@ -4,8 +4,9 @@ from rekuest.messages import Provision
 from rekuest.agents.transport.base import AgentTransport
 from .base import Actor
 from rekuest.rath import RekuestRath
-from rekuest.api.schema import TemplateFragment
+from rekuest.api.schema import TemplateFragment, PortGroupInput
 from rekuest.definition.define import DefinitionInput
+from typing import Optional, List, Dict
 
 
 @runtime_checkable
@@ -21,6 +22,7 @@ class ActorBuilder(Protocol):
     ) -> Actor:
         ...
 
+
 @runtime_checkable
 class Actifier(Protocol):
     """An actifier is a function that takes a callable and a structure registry
@@ -29,9 +31,15 @@ class Actifier(Protocol):
     """
 
     def __call__(
-        self, function: Callable, structure_registry: StructureRegistry, **kwargs
+        self,
+        function: Callable,
+        structure_registry: StructureRegistry,
+        port_groups: Optional[List[PortGroupInput]] = None,
+        groups: Optional[Dict[str, List[str]]] = None,
+        **kwargs
     ) -> ActorBuilder:
         ...
+
 
 @runtime_checkable
 class OnProvide(Protocol):
@@ -40,7 +48,9 @@ class OnProvide(Protocol):
 
     """
 
-    def __call__(self, provision: Provision, transport: AgentTransport) -> Awaitable[Any]:
+    def __call__(
+        self, provision: Provision, transport: AgentTransport
+    ) -> Awaitable[Any]:
         ...
 
 

@@ -39,7 +39,6 @@ from rekuest.agents.transport.protocols.agent_json import (
     ProvisionMode,
 )
 
-print(asyncio.Queue)
 logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
@@ -161,9 +160,9 @@ class localuse(RPCContract):
     reference: str
     structure_registry: StructureRegistry
     agent: BaseAgent
-    provide_timeout: Optional[float] = 2
-    assign_timeout: Optional[float] = 2
-    yield_timeout: Optional[float] = 2
+    provide_timeout: Optional[float] = 2000
+    assign_timeout: Optional[float] = 2000
+    yield_timeout: Optional[float] = 2000
 
     _definition: DefinitionFragment = None
     _transport: AgentTransport = None
@@ -183,7 +182,7 @@ class localuse(RPCContract):
         structure_registry=None,
         alog: Callable[[Assignation, AssignationLogLevel, str], Awaitable[None]] = None,
         parent: Optional[Union[str, AssignationFragment]] = None,
-        assign_timeout: Optional[float] = 4,
+        assign_timeout: Optional[float] = None,
         **kwargs,
     ):
         structure_registry = structure_registry or self.structure_registry
@@ -244,7 +243,7 @@ class localuse(RPCContract):
         structure_registry=None,
         alog: Callable[[Assignation, AssignationLogLevel, str], Awaitable[None]] = None,
         parent: Optional[Union[str, AssignationFragment]] = None,
-        yield_timeout: Optional[float] = 4,
+        yield_timeout: Optional[float] = None,
         **kwargs,
     ):
         structure_registry = structure_registry or self.structure_registry
@@ -311,9 +310,7 @@ class localuse(RPCContract):
                 message = await self._updates_queue.get()
                 if isinstance(message, ProvisionChangedMessage):
                     if message.status == ProvisionStatus.ACTIVE:
-                        print("Getting update that we are happy")
                         if self._enter_future and not self._enter_future.done():
-                            print("Entering Future")
                             self._enter_future.set_result(True)
 
                 if isinstance(message, AssignationChangedMessage):
@@ -383,7 +380,7 @@ class arkiuse(ReservationContract):
         structure_registry=None,
         alog: Callable[[Assignation, AssignationLogLevel, str], Awaitable[None]] = None,
         parent: Optional[Union[str, AssignationFragment]] = None,
-        assign_timeout: Optional[float] = 2000,
+        assign_timeout: Optional[float] = None,
         **kwargs,
     ):
         assert self._reservation, "We never entered the context manager"
@@ -436,7 +433,7 @@ class arkiuse(ReservationContract):
         structure_registry=None,
         alog: Callable[[Assignation, AssignationLogLevel, str], Awaitable[None]] = None,
         parent: Optional[Union[str, AssignationFragment]] = None,
-        yield_timeout: Optional[float] = 2000,
+        yield_timeout: Optional[float] = None,
         **kwargs,
     ):
         assert self._reservation, "We never entered the context manager"

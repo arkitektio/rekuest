@@ -36,7 +36,7 @@ class QtInLoopBuilder(QtCore.QObject):
     async def on_provide(self, provision: Provision) -> Any:
         return None
 
-    async def on_unprovide(self, provision: Provision) -> Any:
+    async def on_unprovide(self) -> Any:
         return None
 
     def build(
