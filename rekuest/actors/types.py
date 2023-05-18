@@ -1,12 +1,40 @@
 from typing import Protocol, runtime_checkable, Callable, Awaitable, Any
 from rekuest.structures.registry import StructureRegistry
 from rekuest.messages import Provision
-from rekuest.agents.transport.base import AgentTransport
-from .base import Actor
 from rekuest.rath import RekuestRath
-from rekuest.api.schema import TemplateFragment, PortGroupInput
+from rekuest.api.schema import TemplateFragment, PortGroupInput, AssignationStatus
 from rekuest.definition.define import DefinitionInput
 from typing import Optional, List, Dict
+from pydantic import BaseModel, Field
+import uuid
+
+
+class Passport(BaseModel):
+    provision: str
+    parent: Optional[str]
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+
+
+class Assignment(BaseModel):
+    assignation: str
+    parent: Optional[str]
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    args: List[Any] = Field(default_factory=list)
+    user: str
+
+
+class AssignmentUpdate(BaseModel):
+    assignment: str
+    status: AssignationStatus
+    message: Optional[str]
+    parent: Optional[str]
+    progress: Optional[int]
+    returns: Optional[List[Any]]
+
+
+class Unassignment(BaseModel):
+    assignation: str
+    id: str
 
 
 @runtime_checkable
@@ -15,11 +43,10 @@ class ActorBuilder(Protocol):
 
     def __call__(
         self,
-        provision: Provision,
-        transport: AgentTransport,
-        rath: RekuestRath,
-        template: TemplateFragment,
-    ) -> Actor:
+        passport: Passport,
+        transport: Any,
+        collector: Any,
+    ) -> Any:
         ...
 
 
@@ -49,7 +76,8 @@ class OnProvide(Protocol):
     """
 
     def __call__(
-        self, provision: Provision, transport: AgentTransport
+        self,
+        passport: Passport,
     ) -> Awaitable[Any]:
         ...
 

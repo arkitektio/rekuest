@@ -24,6 +24,10 @@ async def id_shrink(self):
     return self.id
 
 
+async def void_collect(self):
+    pass
+
+
 def build_enum_shrink_expand(cls: Type[Enum]):
     async def shrink(s):
         return s._name_
@@ -51,6 +55,7 @@ class StructureRegistry(BaseModel):
     identifier_scope_map: Dict[str, Scope] = Field(default_factory=dict, exclude=True)
     _identifier_expander_map: Dict[str, Callable[[str], Awaitable[Any]]] = {}
     _identifier_shrinker_map: Dict[str, Callable[[Any], Awaitable[str]]] = {}
+    _identifier_collect_map: Dict[str, Callable[[Any], Awaitable[None]]] = {}
 
     _structure_convert_default_map: Dict[str, Callable[[Any], str]] = {}
     _structure_identifier_map: Dict[Type, str] = {}
@@ -176,10 +181,22 @@ class StructureRegistry(BaseModel):
         if expand is None:
             if not hasattr(cls, "aexpand"):
                 raise StructureDefinitionError(
-                    f"You need to pass 'aexpand' method or {cls} needs to implement a"
+                    f"You need to pass 'expand' method or {cls} needs to implement a"
                     " aexpand method"
                 )
             expand = cls.aexpand
+
+        if not hasattr(cls, "acollect"):
+            if scope == Scope.LOCAL:
+                raise StructureDefinitionError(
+                    f"Locally Scoped Structures need to provide a acollect method, that handles"
+                    f"carbage collection.{cls} needs to implement a"
+                    " 'acollect' (async method) method to be registerd locally. For more information on garbage collection see the documentation"
+                )
+            else:
+                collect = void_collect
+        else:
+            collect = cls.acollect
 
         if shrink is None:
             if not hasattr(cls, "ashrink"):
@@ -188,7 +205,7 @@ class StructureRegistry(BaseModel):
                         shrink = id_shrink
                     else:
                         raise StructureDefinitionError(
-                            f"You need to pass 'ashrink' method or {cls} needs to"
+                            f"You need to pass 'shrink' method or {cls} needs to"
                             " implement a ashrink method. A BaseModel can be"
                             " automatically shrinked by providing an id field"
                         )
@@ -215,6 +232,7 @@ class StructureRegistry(BaseModel):
             )
 
         self._identifier_expander_map[identifier] = expand
+        self._identifier_collect_map[identifier] = collect
         self._identifier_shrinker_map[identifier] = shrink
         self.identifier_structure_map[identifier] = cls
         self.identifier_scope_map[identifier] = scope

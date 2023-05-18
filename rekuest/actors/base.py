@@ -1,7 +1,6 @@
 from typing import Dict, Union
 
 from pydantic import BaseModel, Field, PrivateAttr
-from rekuest.agents.transport.base import AgentTransport
 from rekuest.structures.registry import (
     StructureRegistry,
 )
@@ -16,43 +15,53 @@ from rekuest.api.schema import (
     LogLevelInput,
 )
 from rekuest.messages import Assignation, Provision, Unassignation
-from rekuest.actors.errors import UnknownMessageError
+from rekuest.actors.errors import UnknownMessageError, ProvisionDelegateException
 from koil.types import Contextual
 from rekuest.definition.define import DefinitionInput
 from typing import Protocol, runtime_checkable, Optional, List, Any
-from rekuest.actors.transport.types import ActorTransport
+from rekuest.actors.transport.types import ActorTransport, AssignTransport
+from rekuest.collection.collector import ActorCollector, AssignationCollector
+from rekuest.definition.registry import (
+    DefinitionRegistry,
+)
+from rekuest.actors.types import Assignment, Passport, Unassignment
+import uuid
+from rekuest.collection.collector import Collector
 
 logger = logging.getLogger(__name__)
 
 
 class Actor(BaseModel):
-
-    """A definition is a descriptor of the serialization of inputs and outputs of an actor. It is a necessary element to be registered on a rekuest server"""
-
-    provision: Provision
-    """ A provision is a providing request illustrating the context of the actor. This can be provided by a governing actor or by arkitekt itself. """
-
+    passport: Passport
     transport: ActorTransport
-
-    runningAssignments: Dict[str, Assignation] = Field(default_factory=dict)
+    collector: Collector
+    definition_registry: DefinitionRegistry
+    managed_actors: Dict[str, "Actor"] = Field(default_factory=dict)
+    running_assignments: Dict[str, Assignment] = Field(default_factory=dict)
 
     _in_queue: Contextual[asyncio.Queue] = PrivateAttr(default=None)
-    _runningTasks: Dict[str, asyncio.Task] = PrivateAttr(default_factory=dict)
+    _running_asyncio_tasks: Dict[str, asyncio.Task] = PrivateAttr(default_factory=dict)
     _provision_task: asyncio.Task = PrivateAttr(default=None)
 
-    async def on_provide(self, provision: Provision):
+    async def on_provide(self, passport: Passport):
         return None
 
     async def on_unprovide(self):
         return None
 
-    async def on_assign(self, assignation: Assignation):
+    async def on_assign(
+        self,
+        assignation: Assignation,
+        collector: AssignationCollector,
+        transport: AssignTransport,
+    ):
         raise NotImplementedError(
             "Needs to be owerwritten in Actor Subclass. Never use this class directly"
         )
 
-    async def apass(self, message: Union[Assignation, Unassignation]):
+    async def apass(self, message: Union[Unassignment, Assignment]):
         assert self._in_queue, "Actor is currently not listening"
+        print("passing message")
         await self._in_queue.put(message)
 
     async def arun(self):
@@ -61,12 +70,18 @@ class Actor(BaseModel):
         return self._provision_task
 
     async def acancel(self):
-        """Cancel the actor and all its tasks, with its internal backoff strategy"""
-        logger.info("We are getting cancelled here?")
-        await self.astop()
+        # Cancel Mnaged actors
+        logger.info(f"Cancelling Actor {self.passport.id}")
+        if self.managed_actors:
+            logger.info("Cancelling Actors")
+            for actor in self.managed_actors.values():
+                logger.info(
+                    f"Cancelling managed actor with passport {actor.passport.id}"
+                )
+                await actor.acancel()
 
-    async def astop(self):
         if not self._provision_task or self._provision_task.done():
+            # Race condition
             return
 
         self._provision_task.cancel()
@@ -74,7 +89,7 @@ class Actor(BaseModel):
         try:
             await self._provision_task
         except asyncio.CancelledError:
-            logger.info("Provision was cancelled")
+            logger.info(f"Actor {self.passport.id} was cancelled")
 
     async def aass_log(self, id: str, message: str, level=AssignationLogLevel.INFO):
         logging.critical(f"ASS {id} {message}")
@@ -82,26 +97,22 @@ class Actor(BaseModel):
         logging.critical(f"ASS SEND {message}")
 
     async def aprov_log(self, message: str, level=ProvisionLogLevel.INFO):
-        logging.critical(f"PROV {self.provision.provision} {message}")
+        logging.critical(f"PROV {self.passport} {message}")
         await self.transport.log_to_provision(
-            id=self.provision.provision, level=level, message=message
+            id=self.passport, level=level, message=message
         )
 
     async def provide(self):
         try:
-            logging.info(f"Providing {self.provision.provision}")
-            await self.on_provide(self.provision)
+            logging.info(f"Providing {self.passport}")
+            await self.on_provide(self.passport)
             await self.transport.change_provision(
-                self.provision.provision,
                 status=ProvisionStatus.ACTIVE,
             )
 
         except Exception as e:
-            logging.critical(
-                f"Providing Error {self.provision.provision} {e}", exc_info=True
-            )
+            logging.critical(f"Providing Error {self.passport} {e}", exc_info=True)
             await self.transport.change_provision(
-                self.provision.provision,
                 status=ProvisionStatus.CRITICAL,
                 message=str(e),
             )
@@ -110,59 +121,59 @@ class Actor(BaseModel):
         try:
             await self.on_unprovide()
             await self.transport.change_provision(
-                self.provision.provision,
                 status=ProvisionStatus.INACTIVE,
             )
 
         except Exception as e:
-            logging.critical(
-                f"Unproviding Error {self.provision.provision} {e}", exc_info=True
-            )
+            logging.critical(f"Unproviding Error {self.passport} {e}", exc_info=True)
             await self.transport.change_provision(
-                self.provision.provision,
                 status=ProvisionStatus.CRITICAL,
                 message=str(e),
             )
 
-    async def process(self, message: Union[Assignation, Unassignation]):
-        logger.info(f"Actor for {self.provision}: Received {message}")
+    async def aprocess(self, message: Union[Assignment, Unassignment]):
+        logger.info(f"Actor for {self.passport}: Received {message}")
 
-        if isinstance(message, Assignation):
-            task = asyncio.create_task(self.on_assign(message))
-            self.runningAssignments[message.assignation] = task
-            return task
+        if isinstance(message, Assignment):
+            task = asyncio.create_task(
+                self.on_assign(
+                    message,
+                    collector=self.collector,
+                    transport=self.transport.spawn(message),
+                )
+            )
+            self._running_asyncio_tasks[message.id] = task
 
-        elif isinstance(message, Unassignation):
-            if message.assignation in self.runningAssignments:
-                task = self.runningAssignments[message.assignation]
+        elif isinstance(message, Unassignment):
+            if message.id in self._running_asyncio_tasks:
+                task = self._running_asyncio_tasks[message.id]
                 if not task.done():
                     task.cancel()
                 else:
                     logger.error("Task was already done")
-            else:
-                await self.transport.change_assignation(
-                    message.assignation,
-                    status=AssignationStatus.CRITICAL,
-                    message="Task was never assigned",
-                )
         else:
             raise UnknownMessageError(f"{message}")
 
     async def alisten(self):
         try:
             await self.provide()
-            logger.info(f"Actor for {self.provision}: Is now active")
+            logger.info(f"Actor for {self.passport}: Is now active")
 
             while True:
                 message = await self._in_queue.get()
-                await self.process(message)
+                try:
+                    await self.aprocess(message)
+                except Exception as e:
+                    logger.critical(
+                        "Processing unknown message should never happen", exc_info=True
+                    )
 
         except asyncio.CancelledError:
             logger.info("Doing Whatever needs to be done to cancel!")
 
-            [i.cancel() for i in self.runningAssignments.values()]
+            [i.cancel() for i in self._running_asyncio_tasks.values()]
 
-            for i in self.runningAssignments.values():
+            for i in self._running_asyncio_tasks.values():
                 try:
                     await i
                 except asyncio.CancelledError:
@@ -185,6 +196,35 @@ class Actor(BaseModel):
     async def __aenter__(self):
         return self
 
+    async def aspawn_actor(
+        self, interface: str, transport: ActorTransport
+    ) -> "SerializingActor":
+        """Spawns an Actor from the definition of the given interface"""
+        try:
+            actor_builder = self.definition_registry.get_builder_for_interface(
+                interface
+            )
+
+            definition = self.definition_registry.get_definition_for_interface(
+                interface
+            )
+        except KeyError as e:
+            raise ProvisionDelegateException(
+                "No Actor Builder found for interface"
+            ) from e
+
+        passport = Passport(provision=self.passport.provision, parent=self.passport.id)
+
+        actor = actor_builder(
+            definition=definition,
+            passport=passport,
+            transport=transport,
+            definition_registry=self.definition_registry,
+            collector=self.collector,
+        )
+        self.managed_actors[passport.id] = actor
+        return actor
+
     async def __aexit__(self, exc_type, exc, tb):
         if self._provision_task and not self._provision_task.done():
             await self.acancel()
@@ -200,3 +240,7 @@ class SerializingActor(Actor):
     structure_registry: StructureRegistry
     expand_inputs: bool = True
     shrink_outputs: bool = True
+
+
+Actor.update_forward_refs()
+SerializingActor.update_forward_refs()

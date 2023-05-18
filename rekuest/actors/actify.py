@@ -13,6 +13,8 @@ from rekuest.definition.define import prepare_definition
 from rekuest.actors.types import ActorBuilder
 from rekuest.api.schema import PortGroupInput
 from typing import Optional, Any, Dict, Union, Callable, Coroutine, Type, List
+from rekuest.actors.base import Passport
+from rekuest.actors.transport.types import ActorTransport
 
 
 async def async_none_provide(prov: Provision):
@@ -33,18 +35,11 @@ def higher_order_builder(builder, **params):
     constructor. Akin to a partial function.
     """
 
-    def inside_builder(
-        provision: Provision,
-        transport: AgentTransport,
-    ):
+    def inside_builder(**kwargs):
         return builder(
-            provision=provision,
-            transport=transport,
+            **kwargs,
             **params,
         )
-
-    inside_builder.__name__ = builder.__name__
-    inside_builder.__definition__ = params["definition"]
 
     return inside_builder
 
@@ -55,10 +50,6 @@ def reactify(
     bypass_shrink=False,
     bypass_expand=False,
     on_provide=None,
-    widgets=None,
-    interfaces=None,
-    port_groups: Optional[List[PortGroupInput]] = None,
-    groups: Optional[Dict[str, List[str]]] = None,
     on_unprovide=None,
     **params,
 ) -> ActorBuilder:
@@ -70,15 +61,6 @@ def reactify(
     The callable will be both in the context of  an assignation and a provision helper,
     enabling the usage of the function as a provision helper.
     """
-
-    definition = prepare_definition(
-        function,
-        structure_registry,
-        widgets=widgets,
-        interfaces=interfaces,
-        port_groups=port_groups,
-        groups=groups,
-    )
 
     is_coroutine = inspect.iscoroutinefunction(function)
     is_asyncgen = inspect.isasyncgenfunction(function)
@@ -94,7 +76,6 @@ def reactify(
         "on_provide": on_provide if on_provide else async_none_provide,
         "on_unprovide": on_unprovide if on_unprovide else async_none_unprovide,
         "structure_registry": structure_registry,
-        "definition": definition,
         **params,
     }
 

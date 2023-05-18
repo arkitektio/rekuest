@@ -7,6 +7,9 @@ from rekuest.actors.functional import FunctionalFuncActor
 from qtpy import QtWidgets
 from rekuest.definition.registry import ActorBuilder
 from rekuest.definition.define import prepare_definition, DefinitionInput
+from rekuest.actors.types import ActorBuilder, Passport
+from rekuest.collection.collector import ActorCollector
+from rekuest.actors.transport.types import ActorTransport
 
 
 class QtInLoopBuilder(QtCore.QObject):
@@ -39,18 +42,12 @@ class QtInLoopBuilder(QtCore.QObject):
     async def on_unprovide(self) -> Any:
         return None
 
-    def build(
-        self,
-        provision: Provision,
-        transport: AgentTransport,
-        definition: DefinitionInput,
-    ) -> Any:
+    def build(self, *args, **kwargs) -> Any:
         try:
             ac = FunctionalFuncActor(
-                definition=definition,
-                provision=provision,
+                *args,
+                **kwargs,
                 structure_registry=self.structure_registry,
-                transport=transport,
                 assign=self.on_assign,
                 on_provide=self.on_provide,
                 on_unprovide=self.on_unprovide,
@@ -73,16 +70,10 @@ def qtinloopactifier(
     in_loop_instance = QtInLoopBuilder(
         parent=parent, assign=function, structure_registry=structure_registry
     )
-    definition = prepare_definition(function, structure_registry)
 
-    def builder(
-        provision: Provision,
-        transport: AgentTransport,
-    ) -> Any:
+    def builder(*args, **kwargs) -> Any:
         return in_loop_instance.build(
-            provision, transport, definition
+            *args, **kwargs
         )  # build an actor for this inloop instance
-
-    builder.__definition__ = definition
 
     return builder

@@ -2,11 +2,13 @@ from typing import Callable, Dict, List, Optional, Tuple, Union
 
 from pydantic import Field
 from rekuest.actors.base import Actor
-from rekuest.actors.types import ActorBuilder
+from rekuest.actors.types import ActorBuilder, Passport
 from rekuest.agents.errors import ProvisionException
 from rekuest.api.schema import (
     TemplateFragment,
     acreate_template,
+    AssignationStatus,
+    ProvisionStatus,
 )
 from rekuest.definition.registry import (
     DefinitionRegistry,
@@ -14,13 +16,18 @@ from rekuest.definition.registry import (
 )
 from rekuest.definition.registry import get_default_definition_registry
 from rekuest.rath import RekuestRath
+from rekuest.definition.validate import auto_validate
 import asyncio
 from rekuest.agents.transport.base import AgentTransport, Contextual
 from rekuest.messages import Assignation, Unassignation, Unprovision, Provision
 from koil import unkoil
 from koil.composition import KoiledModel
 import logging
-
+from rekuest.collection.collector import Collector
+import uuid
+from rekuest.agents.errors import AgentException
+from rekuest.actors.transport.local_transport import AgentActorTransport
+from rekuest.actors.types import Assignment, Unassignment
 
 logger = logging.getLogger(__name__)
 
@@ -49,19 +56,16 @@ class BaseAgent(KoiledModel):
     definition_registry: DefinitionRegistry = Field(
         default_factory=get_default_definition_registry
     )
-
-    provisionActorMap: Dict[str, Actor] = Field(default_factory=dict)
-    nodeHashActorMap: Dict[str, Actor] = Field(default_factory=dict)
-    nodeHashTemplateMap: Dict[str, TemplateFragment] = Field(default_factory=dict)
+    collector: Collector = Field(default_factory=Collector)
+    managed_actors: Dict[str, Actor] = Field(default_factory=dict)
 
     rath: Optional[RekuestRath] = None
 
     _hooks = {}
-
-    _approved_templates: List[Tuple[TemplateFragment, Callable]] = []
-    _templateActorBuilderMap: Dict[str, ActorBuilder] = {}
-    _localActorBuilderMap: Dict[str, ActorBuilder] = {}
-    _templateTemplatesMap: Dict[str, TemplateFragment] = {}
+    interface_template_map: Dict[str, TemplateFragment] = Field(default_factory=dict)
+    template_interface_map: Dict[str, str] = Field(default_factory=dict)
+    provision_passport_map: Dict[str, Passport] = Field(default_factory=dict)
+    managed_assignments: Dict[str, Assignment] = Field(default_factory=dict)
     _provisionTaskMap: Dict[str, asyncio.Task] = Field(default_factory=dict)
     _inqueue: Contextual[asyncio.Queue] = None
 
@@ -73,10 +77,106 @@ class BaseAgent(KoiledModel):
     ):
         await self._inqueue.put(message)
 
-    async def process(self):
-        raise NotImplementedError(
-            "This method needs to be implemented by the agents subclass"
-        )
+    async def process(
+        self, message: Union[Assignation, Provision, Unassignation, Unprovision]
+    ):
+        logger.info(f"Agent received {message}")
+
+        if isinstance(message, Assignation):
+            if message.provision in self.provision_passport_map:
+                passport = self.provision_passport_map[message.provision]
+                actor = self.managed_actors[passport.id]
+
+                # Converting assignation to Assignment
+                message = Assignment(
+                    assignation=message.assignation,
+                    args=message.args,
+                    user=message.user,
+                )
+                self.managed_assignments[message.assignation] = message
+
+                await actor.apass(message)
+            else:
+                logger.warning(
+                    "Received assignation for a provision that is not running"
+                    f"Managed: {self.provision_passport_map} Received: {message.provision}"
+                )
+                await self.transport.change_assignation(
+                    message.assignation,
+                    status=AssignationStatus.CRITICAL,
+                    message="Actor was no longer running or not managed",
+                )
+
+        elif isinstance(message, Unassignation):
+            if message.assignation in self.managed_assignments:
+                passport = self.provision_passport_map[message.provision]
+                actor = self.managed_actors[passport.id]
+                assignment = self.managed_assignments[message.assignation]
+
+                # Converting unassignation to unassignment
+                unass = Unassignment(assignation=message.assignation, id=assignment.id)
+
+                await actor.apass(unass)
+            else:
+                logger.warning(
+                    "Received unassignation for a provision that is not running"
+                    f"Managed: {self.provision_passport_map} Received: {message.provision}"
+                )
+                await self.transport.change_assignation(
+                    message.assignation,
+                    status=AssignationStatus.CRITICAL,
+                    message="Actor was no longer running or not managed",
+                )
+
+        elif isinstance(message, Provision):
+            try:
+                await self.aspawn_actor_from_provision(message)
+            except Exception as e:
+                logger.error("Spawning error", exc_info=True)
+                await self.transport.change_provision(
+                    message.provision, status=ProvisionStatus.DENIED, message=str(e)
+                )
+
+        elif isinstance(message, Unprovision):
+            if message.provision in self.provision_passport_map:
+                passport = self.provision_passport_map[message.provision]
+                actor = self.managed_actors[passport.id]
+                await actor.acancel()
+                await self.transport.change_provision(
+                    message.provision,
+                    status=ProvisionStatus.CANCELLED,
+                    message=str("Actor was cancelled"),
+                )
+                del self.provision_passport_map[message.provision]
+                del self.managed_actors[passport.id]
+                logger.info("Actor stopped")
+
+            else:
+                await self.transport.change_provision(
+                    message.provision,
+                    status=ProvisionStatus.CANCELLED,
+                    message=str(
+                        "Actor was no longer active when we received this message"
+                    ),
+                )
+                logger.error(
+                    f"Received Unprovision for never provisioned provision {message}"
+                )
+
+        else:
+            raise AgentException(f"Unknown message type {type(message)}")
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        cancelations = [actor.acancel() for actor in self.managed_actors.values()]
+        # just stopping the actor, not cancelling the provision..
+
+        for c in cancelations:
+            try:
+                await c
+            except asyncio.CancelledError:
+                pass
+
+        await self.transport.__aexit__(exc_type, exc_val, exc_tb)
 
     async def aregister_definitions(self):
         """Registers the definitions that are defined in the definition registry
@@ -90,42 +190,63 @@ class BaseAgent(KoiledModel):
         logic (like registering definitions in the definition registry).
         """
 
-        if self.definition_registry.defined_nodes:
-            for (
-                definition,
-                actor_builder,
-                params,
-            ) in self.definition_registry.defined_nodes:
-                # Defined Node are nodes that are not yet reflected on arkitekt (i.e they dont have an instance
-                # id so we are trying to send them to arkitekt)
+        for (
+            interface,
+            definition,
+        ) in self.definition_registry.definitions.items():
+            # Defined Node are nodes that are not yet reflected on arkitekt (i.e they dont have an instance
+            # id so we are trying to send them to arkitekt)
+            try:
                 arkitekt_template = await acreate_template(
                     definition=definition,
-                    params={},  # Todo really make this happen
+                    interface=interface,
                     instance_id=self.instance_id,
                     rath=self.rath,
                 )
-
-                self._approved_templates.append(
-                    (arkitekt_template, actor_builder, params)
+            except Exception as e:
+                logger.info(
+                    f"Error Creating template for {definition} at interface {interface}"
                 )
+                raise e
 
-                self.nodeHashTemplateMap[
-                    arkitekt_template.node.hash
-                ] = arkitekt_template
-                self.nodeHashActorMap[arkitekt_template.node.hash] = actor_builder
-                self._localActorBuilderMap[arkitekt_template.node.hash] = actor_builder
-                self._templateActorBuilderMap[arkitekt_template.id] = actor_builder
-                self._templateTemplatesMap[arkitekt_template.id] = arkitekt_template
+            self.interface_template_map[interface] = arkitekt_template
+            self.template_interface_map[arkitekt_template.id] = interface
 
-    async def aspawn_actor(self, prov: Provision) -> Actor:
-        """Spawns an Actor from a Provision"""
+    async def aspawn_actor_from_provision(self, provision: Provision) -> Actor:
+        """Spawns an Actor from a Provision. This function closely mimics the
+        spawining protocol within an actor. But maps template"""
+
         try:
-            actor_builder = self._templateActorBuilderMap[prov.template]
+            interface = self.template_interface_map[provision.template]
+        except KeyError as e:
+            raise ProvisionException("No Interface found for requested template") from e
+
+        try:
+            actor_builder = self.definition_registry.get_builder_for_interface(
+                interface
+            )
+            definition = self.definition_registry.get_definition_for_interface(
+                interface
+            )
+
         except KeyError as e:
             raise ProvisionException("No Actor Builder found for template") from e
-        actor = actor_builder(provision=prov, transport=self.transport)
-        task = await actor.arun()
-        self.provisionActorMap[prov.provision] = actor
+
+        passport = Passport(provision=provision.provision)
+
+        actor = actor_builder(
+            passport=passport,
+            transport=AgentActorTransport(
+                passport=passport, agent_transport=self.transport
+            ),
+            definition=definition,
+            definition_registry=self.definition_registry,
+            collector=self.collector.spawn(passport),
+        )
+
+        await actor.arun()  # TODO: Maybe move this outside?
+        self.managed_actors[passport.id] = actor
+        self.provision_passport_map[provision.provision] = passport
         return actor
 
     async def astep(self):
@@ -185,9 +306,6 @@ class BaseAgent(KoiledModel):
         self.transport._abroadcast = self.abroadcast
         await self.transport.__aenter__()
         return self
-
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        await self.transport.__aexit__(exc_type, exc_val, exc_tb)
 
     class Config:
         arbitrary_types_allowed = True

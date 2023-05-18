@@ -135,9 +135,7 @@ class WebsocketAgentTransport(AgentTransport):
                 send_task.cancel()
                 receive_task.cancel()
 
-            await asyncio.gather(
-                send_task, receive_task, return_exceptions=True
-            )
+            await asyncio.gather(send_task, receive_task, return_exceptions=True)
             raise e
 
     async def sending(self, client):
@@ -198,11 +196,7 @@ class WebsocketAgentTransport(AgentTransport):
             logger.error(f"Unexpected messsage: {json_dict}")
 
     async def awaitaction(self, action: JSONMessage):
-        if not self._connected:
-            assert (
-                self.auto_connect
-            ), "Websocket not connected, and autoconnect to false"
-            await self.aconnect()
+        assert self._connected, "Should be connected"
         if action.id in self._futures:
             raise ValueError("Action already has a future")
 
@@ -212,11 +206,7 @@ class WebsocketAgentTransport(AgentTransport):
         return await future
 
     async def delayaction(self, action: JSONMessage):
-        if not self._connected:
-            assert (
-                self.auto_connect
-            ), "Websocket not connected, and autoconnect to false"
-            await self.aconnect()
+        assert self._connected, "Should be connected"
         await self._send_queue.put(action.json())
 
     async def list_provisions(
@@ -288,3 +278,8 @@ class WebsocketAgentTransport(AgentTransport):
     async def __aexit__(self, *args, **kwargs):
         if self._connection_task:
             await self.adisconnect()
+
+    class Config:
+        underscore_attrs_are_private = True
+        arbitrary_types_allowed = True
+        copy_on_model_validation = False

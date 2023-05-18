@@ -365,7 +365,6 @@ ReturnWidgetMap = Dict[str, List[ReturnWidgetInput]]
 def prepare_definition(
     function: Callable,
     structure_registry: StructureRegistry,
-    interface: str = None,
     widgets: Optional[WidgetMap] = None,
     return_widgets: Optional[ReturnWidgetMap] = None,
     groups: Optional[GroupMap] = None,
@@ -545,15 +544,11 @@ def prepare_definition(
     # Documentation Parsing
 
     name = docstring.short_description or function.__name__
-    interface = interface or inflection.underscore(
-        function.__name__
-    )  # convert this to camelcase
     description = docstring.long_description or "No Description"
 
     x = DefinitionInput(
         **{
             "name": name,
-            "interface": interface,
             "description": description,
             "args": args,
             "returns": returns,

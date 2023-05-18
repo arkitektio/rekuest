@@ -1,19 +1,13 @@
 import contextvars
-from rekuest.api.schema import DefinitionInput
-from rekuest.actors.actify import reactify
-from rekuest.actors.types import Actifier
-from rekuest.structures.registry import (
-    StructureRegistry,
-    get_current_structure_registry,
-)
-from rekuest.structures.default import get_default_structure_registry
-from rekuest.api.schema import WidgetInput, PortGroupInput
-from typing import Dict, List, Callable, Optional, Tuple
+from rekuest.api.schema import DefinitionInput, DefinitionFragment
+from rekuest.definition.validate import auto_validate, hash_definition
+from typing import Dict
 from pydantic import Field
 from koil.composition import KoiledModel
 import json
 from rekuest.actors.types import ActorBuilder
-
+from rekuest.structures.registry import StructureRegistry
+from rekuest.structures.default import get_default_structure_registry
 
 current_definition_registry = contextvars.ContextVar(
     "current_definition_registry", default=None
@@ -33,16 +27,11 @@ def get_current_definition_registry(allow_global=True):
 
 
 class DefinitionRegistry(KoiledModel):
-    structure_registry: StructureRegistry = Field(
-        default_factory=get_default_structure_registry
-    )
-    defined_nodes: List[Tuple[DefinitionInput, Callable]] = Field(
-        default_factory=list, exclude=True
-    )
-    definitions: Dict[DefinitionInput, ActorBuilder] = Field(
+    definitions: Dict[str, DefinitionInput] = Field(default_factory=dict, exclude=True)
+    actor_builders: Dict[str, ActorBuilder] = Field(default_factory=dict, exclude=True)
+    structure_registry: Dict[str, StructureRegistry] = Field(
         default_factory=dict, exclude=True
     )
-    actifier: Actifier = reactify
     copy_from_default: bool = False
 
     _token: contextvars.Token = None
@@ -54,69 +43,28 @@ class DefinitionRegistry(KoiledModel):
         self.defined_nodes = []  # dict are queryparams for the node
         self.templated_nodes = []
 
-    def register_actorBuilder(self, actorBuilder: ActorBuilder, **params):  # New Node
-        self.defined_nodes.append((actorBuilder.__definition__, actorBuilder, params))
-        self.definitions[actorBuilder.__definition__] = actorBuilder
-
-    def register(
+    def register_at_interface(
         self,
-        function_or_actor,
+        interface: str,
+        definition: DefinitionInput,
         structure_registry: StructureRegistry,
-        actifier: Actifier = None,
-        interface: str = None,
-        port_groups: Optional[List[PortGroupInput]] = None,
-        groups: Optional[Dict[str, List[str]]] = None,
-        widgets: Dict[str, WidgetInput] = None,
-        interfaces: List[str] = [],
-        on_provide=None,
-        on_unprovide=None,
-        **actifier_params,
-    ):
-        """Register a function or actor with the definition registry
+        actorBuilder: ActorBuilder,
+    ):  # New Node
+        self.definitions[interface] = definition
+        self.actor_builders[interface] = actorBuilder
+        self.structure_registry[interface] = structure_registry
 
-        Register a function or actor with the definition registry. This will
-        create a definition for the function or actor and register it with the
-        definition registry.
+    def get_builder_for_interface(self, interface) -> ActorBuilder:
+        assert interface in self.actor_builders, "No actor_builder for interface"
+        return self.actor_builders[interface]
 
-        If first parameter is a function, it will be wrapped in an actorBuilder
-        through the actifier. If the first parameter is an actor, it will be
-        used as the actorBuilder (needs to have the dunder __definition__) to be
-        detected as such.
+    def get_structure_registry_for_interface(self, interface) -> StructureRegistry:
+        assert interface in self.actor_builders, "No structure_interface for interface"
+        return self.structure_registry[interface]
 
-        Args:
-            function_or_actor (Union[Actor, Callable]): _description_
-            actifier (Actifier, optional): _description_. Defaults to None.
-            interface (str, optional): _description_. Defaults to None.
-            widgets (Dict[str, WidgetInput], optional): _description_. Defaults to {}.
-            interfaces (List[str], optional): _description_. Defaults to [].
-            on_provide (_type_, optional): _description_. Defaults to None.
-            on_unprovide (_type_, optional): _description_. Defaults to None.
-            structure_registry (StructureRegistry, optional): _description_. Defaults to None.
-        """
-
-        if hasattr(function_or_actor, "__definition__"):
-            actorBuilder = function_or_actor
-
-        else:
-            actifier = actifier or self.actifier
-            actorBuilder = actifier(
-                function_or_actor,
-                structure_registry,
-                on_provide=on_provide,
-                on_unprovide=on_unprovide,
-                widgets=widgets,
-                groups=groups,
-                port_groups=port_groups,
-                interfaces=interfaces,
-                **actifier_params,
-            )
-
-        assert hasattr(actorBuilder, "__definition__"), (
-            "The actorBuilder needs to have a definition. Otherwise it is not a valid"
-            " actorBuilder"
-        )
-
-        self.register_actorBuilder(actorBuilder)
+    def get_definition_for_interface(self, interface) -> DefinitionInput:
+        assert interface in self.definitions, "No definition for interface"
+        return self.definitions[interface]
 
     async def __aenter__(self):
         return self
@@ -132,56 +80,5 @@ class DefinitionRegistry(KoiledModel):
     async def __aexit__(self, *args, **kwargs):
         current_definition_registry.set(None)
 
-
-def register(
-    widgets: Dict[str, WidgetInput] = {},
-    interfaces: List[str] = [],
-    on_provide=None,
-    on_unprovide=None,
-    definition_registry: DefinitionRegistry = None,
-    structure_registry: StructureRegistry = None,
-    **params,
-):
-    """Take a function and register it as a node.
-
-    This function is used to register a node. Use it as a decorator. You can specify
-    specific widgets for every paramer in a dictionary {argument_key: widget}. By default
-    this function will use the default defintion registry to store the nodes inputdata.
-    This definition registry will then be used by an agent to create, and provide the node.
-
-    If your function has specific inputs that need custom rules for expansion and shrinking
-     , you can pass a structure registry to the function. This registry will then be used.
-
-    This decorator is non intrusive. You can still call this function as a normal function from
-    your code
-
-    Args:
-        widgets (Dict[str, WidgetInput], optional): _description_. Defaults to {}.
-        interfaces (List[str], optional): _description_. Defaults to [].
-        on_provide (_type_, optional): _description_. Defaults to None.
-        on_unprovide (_type_, optional): _description_. Defaults to None.
-        definition_registry (DefinitionRegistry, optional): _description_. Defaults to None.
-        structure_registry (StructureRegistry, optional): _description_. Defaults to None.
-
-    Returns:
-        Callable: A wrapped function that just returns the original function.
-    """
-    definition_registry = definition_registry or get_current_definition_registry()
-    structure_registry = structure_registry or get_current_structure_registry()
-
-    def real_decorator(function):
-        # Simple bypass for now
-        def wrapped_function(*args, **kwargs):
-            return function(*args, **kwargs)
-
-        definition_registry.register(
-            function,
-            widgets=widgets,
-            interfaces=interfaces,
-            structure_registry=structure_registry,
-            on_provide=on_provide,
-            on_unprovide=on_unprovide,
-            **params,
-        )
-
-    return real_decorator
+    class Config:
+        copy_on_model_validation = False

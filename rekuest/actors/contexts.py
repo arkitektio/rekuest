@@ -2,18 +2,19 @@ from dataclasses import dataclass
 from rekuest.messages import Assignation, Provision
 from rekuest.actors.helper import AssignationHelper, ProvisionHelper
 from rekuest.actors.vars import current_assignation_helper, current_provision_helper
-from rekuest.actors.transport.types import ActorTransport
+from rekuest.actors.transport.types import ActorTransport, AssignTransport
+from rekuest.actors.types import Assignment
 from pydantic import BaseModel
 
 
 class AssignationContext(BaseModel):
-    assignation: Assignation
-    transport: ActorTransport
+    assignment: Assignment
+    transport: AssignTransport
     _helper = None
 
     def __enter__(self):
         self._helper = AssignationHelper(
-            assignation=self.assignation, transport=self.transport
+            assignment=self.assignment, transport=self.transport
         )
 
         current_assignation_helper.set(self._helper)

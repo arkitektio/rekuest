@@ -51,7 +51,7 @@ class GraphQLPostman(BasePostman):
 
     async def areserve(
         self,
-        node: str,
+        hash: str = None,
         params: ReserveParamsInput = None,
         provision: str = None,
         reference: str = "default",
@@ -60,12 +60,13 @@ class GraphQLPostman(BasePostman):
         async with self._lock:
             if not self._watching:
                 self.start_watching()
-        unique_identifier = node + reference
+
+        unique_identifier = hash + reference
 
         self.reservations[unique_identifier] = None
         self._res_update_queues[unique_identifier] = asyncio.Queue()
         reservation = await areserve(
-            node=node,
+            hash=hash,
             params=params,
             provision=provision,
             reference=reference,
@@ -147,7 +148,7 @@ class GraphQLPostman(BasePostman):
             while True:
                 res: ReservationFragment = await self._res_update_queue.get()
 
-                unique_identifier = res.node.id + res.reference
+                unique_identifier = res.node.hash + res.reference
 
                 if unique_identifier not in self._res_update_queues:
                     logger.info(

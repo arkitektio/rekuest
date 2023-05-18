@@ -2,24 +2,22 @@ from pydantic import BaseModel
 from rekuest.api.schema import LogLevelInput, AssignationStatusInput
 from rekuest.messages import Assignation, Provision
 from koil import unkoil
-from rekuest.actors.transport.types import ActorTransport
+from rekuest.actors.types import Assignment
+from rekuest.actors.transport.types import ActorTransport, AssignTransport
 
 
 class AssignationHelper(BaseModel):
-    assignation: Assignation
-    transport: ActorTransport
+    assignment: Assignment
+    transport: AssignTransport
 
     async def alog(self, level: LogLevelInput, message: str) -> None:
-        await self.transport.log_to_assignation(
-            id=self.assignation.assignation, level=level, message=message
-        )
+        await self.transport.log_to_assignation(level=level, message=message)
 
     def log(self, level: LogLevelInput, message: str) -> None:
         return unkoil(self.alog, level, message)
 
     async def aprogress(self, progress: int) -> None:
         await self.transport.change_assignation(
-            id=self.assignation.assignation,
             status=AssignationStatusInput.PROGRESS,
             progress=progress,
         )
@@ -29,7 +27,12 @@ class AssignationHelper(BaseModel):
 
     @property
     def user(self) -> str:
-        return self.assignation.user
+        return self.assignment.user
+
+    @property
+    def assignation(self) -> str:
+        """Returns the governing assignation that cause the chained that lead to this execution"""
+        return self.assignment.assignation
 
     class Config:
         arbitrary_types_allowed = True

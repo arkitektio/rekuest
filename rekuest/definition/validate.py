@@ -1,4 +1,6 @@
 from rekuest.api.schema import DefinitionInput, DefinitionFragment
+import json
+import hashlib
 
 
 def auto_validate(defintion: DefinitionInput) -> DefinitionFragment:
@@ -14,3 +16,14 @@ def auto_validate(defintion: DefinitionInput) -> DefinitionFragment:
     """
 
     return DefinitionFragment(**defintion.dict(by_alias=True))
+
+
+def hash_definition(definition: DefinitionInput):
+    hashable_definition = {
+        key: value
+        for key, value in dict(definition.dict()).items()
+        if key not in ["meta", "interface"]
+    }
+    return hashlib.sha256(
+        json.dumps(hashable_definition, sort_keys=True).encode()
+    ).hexdigest()

@@ -6,6 +6,8 @@ from rekuest.structures.registry import StructureRegistry
 from rekuest.api.schema import (
     PortFragment,
     PortKind,
+    DefinitionInput,
+    DefinitionFragment,
     ChildPortFragment,
 )
 from rekuest.structures.errors import (
@@ -281,5 +283,91 @@ async def expand_outputs(
 
     else:
         expanded_returns = returns
+
+    return tuple(expanded_returns)
+
+
+def serialize_inputs(
+    definition: Union[DefinitionFragment, DefinitionInput],
+    args: Tuple[Any],
+    kwargs: Dict[str, Any],
+) -> Tuple[Any]:
+    """Shrinks args and kwargs
+
+    Shrinks the inputs according to the Node Definition
+
+    Args:
+        node (Node): The Node
+
+    Raises:
+        ShrinkingError: If args are not Shrinkable
+        ShrinkingError: If kwargs are not Shrinkable
+
+    Returns:
+        Tuple[List[Any], Dict[str, Any]]: Parsed Args as a List, Parsed Kwargs as a dict
+    """
+
+    args_list = []
+    try:
+        args_iterator = iter(args)
+    except TypeError:
+        raise ShrinkingError(f"Couldn't iterate over args {args}")
+
+    # Extract to Argslist
+
+    for port in definition.args:
+        try:
+            args_list.append(next(args_iterator))
+        except StopIteration as e:
+            if port.key in kwargs:
+                args_list.append(kwargs.get(port.key, None))
+            else:
+                if port.nullable or port.default is not None:
+                    args_list.append(None)
+                else:
+                    raise ShrinkingError(
+                        f"Couldn't find value for nonnunllable port {port.key}"
+                    ) from e
+
+    for port, arg in zip(definition.args, args_list):
+        if arg is None and not port.nullable and port.default is None:
+            raise ShrinkingError(
+                f"Argument {port.key} is not nullable, but received null"
+            )
+
+    shrinked_args = args_list
+
+    return tuple(shrinked_args)
+
+
+def deserialize_outputs(
+    definition: Union[DefinitionFragment, DefinitionInput],
+    returns: List[Any],
+) -> Tuple[Any]:
+    """Expands Returns
+
+    Expands the Returns according to the Node definition
+
+
+    Args:
+        node (Node): Node definition
+        returns (List[any]): The returns
+
+    Raises:
+        ExpandingError: if they are not expandable
+
+    Returns:
+        List[Any]: The Expanded Returns
+    """
+    assert returns is not None, "Returns can't be empty"
+    if len(definition.returns) != len(returns):
+        raise ExpandingError(
+            f"Missmatch in Return Length. Node requires {len(definition.returns)} returns,"
+            f" but got {len(returns)}"
+        )
+    if len(returns) == 0:
+        return None
+
+    expanded_returns = returns
 
     return tuple(expanded_returns)

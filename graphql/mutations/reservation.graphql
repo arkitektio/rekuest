@@ -1,6 +1,6 @@
 mutation reserve(
-  $node: ID!
-  $template: ID
+  $node: ID
+  $hash: String
   $params: ReserveParamsInput
   $title: String
   $imitate: ID
@@ -11,7 +11,7 @@ mutation reserve(
 ) {
   reserve(
     node: $node
-    template: $template
+    hash: $hash
     params: $params
     title: $title
     imitate: $imitate

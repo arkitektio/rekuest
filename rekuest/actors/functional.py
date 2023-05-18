@@ -9,7 +9,10 @@ from rekuest.messages import Assignation, Provision
 from rekuest.api.schema import AssignationStatus, ProvisionFragment
 from rekuest.structures.serialization.actor import expand_inputs, shrink_outputs
 from rekuest.actors.contexts import AssignationContext
-from rekuest.actors.types import OnProvide, OnUnprovide
+from rekuest.actors.types import OnProvide, OnUnprovide, Assignment, Unassignment
+from rekuest.collection.collector import Collector
+from rekuest.actors.transport.types import AssignTransport
+from rekuest.structures.parse_collectables import parse_collectable
 
 logger = logging.getLogger(__name__)
 
@@ -34,24 +37,26 @@ class FunctionalActor(BaseModel):
 
 
 class AsyncFuncActor(SerializingActor):
-    async def on_assign(self, assignation: Assignation):
-        logging.info("Assigning %s", assignation)
+    async def on_assign(
+        self,
+        assignment: Assignment,
+        collector: Collector,
+        transport: AssignTransport,
+    ):
+        print("CALLLLLLLLLLLLLED")
         try:
             params = await expand_inputs(
                 self.definition,
-                assignation.args,
+                assignment.args,
                 structure_registry=self.structure_registry,
                 skip_expanding=not self.expand_inputs,
             )
 
-            await self.transport.change_assignation(
-                assignation.assignation,
+            await transport.change_assignation(
                 status=AssignationStatus.ASSIGNED,
             )
 
-            async with AssignationContext(
-                assignation=assignation, transport=self.transport
-            ):
+            async with AssignationContext(assignment=assignment, transport=transport):
                 returns = await self.assign(**params)
 
             returns = await shrink_outputs(
@@ -61,51 +66,50 @@ class AsyncFuncActor(SerializingActor):
                 skip_shrinking=not self.shrink_outputs,
             )
 
-            await self.transport.change_assignation(
-                assignation.assignation,
+            collector.register(assignment, parse_collectable(self.definition, returns))
+
+            await transport.change_assignation(
                 status=AssignationStatus.RETURNED,
                 returns=returns,
             )
 
         except asyncio.CancelledError:
-            await self.transport.change_assignation(
-                assignation.assignation, status=AssignationStatus.CANCELLED
-            )
+            await transport.change_assignation(status=AssignationStatus.CANCELLED)
 
         except AssertionError as ex:
-            await self.transport.change_assignation(
-                assignation.assignation,
+            await transport.change_assignation(
                 status=AssignationStatus.ERROR,
                 message=str(ex),
             )
 
         except Exception as e:
-            logger.exception(e)
-            await self.transport.change_assignation(
-                assignation.assignation,
+            logger.error("Assignation error", exc_info=True)
+            await transport.change_assignation(
                 status=AssignationStatus.CRITICAL,
                 message=repr(e),
             )
 
 
 class AsyncGenActor(SerializingActor):
-    async def on_assign(self, assignation: Assignation):
+    async def on_assign(
+        self,
+        assignment: Assignation,
+        collector: Collector,
+        transport: AssignTransport,
+    ):
         try:
             params = await expand_inputs(
                 self.definition,
-                assignation.args,
+                assignment.args,
                 structure_registry=self.structure_registry,
                 skip_expanding=not self.expand_inputs,
             )
 
-            await self.transport.change_assignation(
-                assignation.assignation,
+            await transport.change_assignation(
                 status=AssignationStatus.ASSIGNED,
             )
 
-            async with AssignationContext(
-                assignation=assignation, transport=self.transport
-            ):
+            async with AssignationContext(assignment=assignment, transport=transport):
                 async for returns in self.assign(**params):
                     returns = await shrink_outputs(
                         self.definition,
@@ -114,32 +118,29 @@ class AsyncGenActor(SerializingActor):
                         skip_shrinking=not self.shrink_outputs,
                     )
 
-                    await self.transport.change_assignation(
-                        assignation.assignation,
+                    collector.register(
+                        assignment, parse_collectable(self.definition, returns)
+                    )
+
+                    await transport.change_assignation(
                         status=AssignationStatus.YIELD,
                         returns=returns,
                     )
 
-            await self.transport.change_assignation(
-                assignation.assignation, status=AssignationStatus.DONE
-            )
+            await transport.change_assignation(status=AssignationStatus.DONE)
 
         except asyncio.CancelledError:
-            await self.transport.change_assignation(
-                assignation.assignation, status=AssignationStatus.CANCELLED
-            )
+            await transport.change_assignation(status=AssignationStatus.CANCELLED)
 
         except AssertionError as ex:
-            await self.transport.change_assignation(
-                assignation.assignation,
+            await transport.change_assignation(
                 status=AssignationStatus.ERROR,
                 message=str(ex),
             )
 
         except Exception as ex:
             logger.error("Error in actor", exc_info=True)
-            await self.transport.change_assignation(
-                assignation.assignation,
+            await transport.change_assignation(
                 status=AssignationStatus.CRITICAL,
                 message=str(ex),
             )
@@ -166,27 +167,31 @@ class FunctionalGenActor(FunctionalActor, AsyncGenActor):
 class ThreadedFuncActor(SerializingActor):
     executor: ThreadPoolExecutor = Field(default_factory=lambda: ThreadPoolExecutor(1))
 
-    async def on_assign(self, assignation: Assignation):
+    async def on_assign(
+        self,
+        assignment: Assignment,
+        collector: Collector,
+        transport: AssignTransport,
+    ):
         try:
             logger.info("Assigning Number two")
             params = await expand_inputs(
                 self.definition,
-                assignation.args,
+                assignment.args,
                 structure_registry=self.structure_registry,
                 skip_expanding=not self.expand_inputs,
             )
 
-            await self.transport.change_assignation(
-                assignation.assignation,
+            await transport.change_assignation(
                 status=AssignationStatus.ASSIGNED,
             )
 
-            async with AssignationContext(
-                assignation=assignation, transport=self.transport
-            ):
+            async with AssignationContext(assignment=assignment, transport=transport):
                 returns = await run_spawned(
                     self.assign, **params, executor=self.executor, pass_context=True
                 )
+
+            collector.register(assignment, parse_collectable(self.definition, returns))
 
             returns = await shrink_outputs(
                 self.definition,
@@ -195,8 +200,7 @@ class ThreadedFuncActor(SerializingActor):
                 skip_shrinking=not self.shrink_outputs,
             )
 
-            await self.transport.change_assignation(
-                assignation.assignation,
+            await transport.change_assignation(
                 status=AssignationStatus.RETURNED,
                 returns=returns,
             )
@@ -204,102 +208,20 @@ class ThreadedFuncActor(SerializingActor):
         except asyncio.CancelledError as e:
             logger.info("Actor Cancelled")
 
-            await self.transport.change_assignation(
-                assignation.assignation,
+            await transport.change_assignation(
                 status=AssignationStatus.CANCELLED,
                 message=str(e),
             )
 
         except AssertionError as ex:
-            await self.transport.change_assignation(
-                assignation.assignation,
+            await transport.change_assignation(
                 status=AssignationStatus.ERROR,
                 message=str(ex),
             )
 
         except Exception as e:
             logger.error("Error in actor", exc_info=True)
-            await self.transport.change_assignation(
-                assignation.assignation,
-                status=AssignationStatus.CRITICAL,
-                message=str(e),
-            )
-
-
-class CompletlyThreadedActor(ThreadedFuncActor):
-    executor: ThreadPoolExecutor = Field(default_factory=lambda: ThreadPoolExecutor(4))
-
-    def provide(self, provision: ProvisionFragment):
-        return None
-
-    def unprovide(self):
-        return None
-
-    async def on_provide(self, *args, **kwargs):
-        return await run_spawned(
-            self.provide, *args, **kwargs, executor=self.executor, pass_context=True
-        )
-
-    async def on_unprovide(self, *args, **kwargs):
-        return await run_spawned(
-            self.unprovide, *args, **kwargs, executor=self.executor, pass_context=True
-        )
-
-    async def on_assign(self, assignation: Assignation):
-        try:
-            logger.info("Assigning Number two")
-            params = await expand_inputs(
-                self.definition,
-                assignation.args,
-                structure_registry=self.structure_registry,
-                skip_expanding=not self.expand_inputs,
-            )
-
-            await self.transport.change_assignation(
-                assignation.assignation,
-                status=AssignationStatus.ASSIGNED,
-            )
-
-            async with AssignationContext(
-                assignation=assignation, transport=self.transport
-            ):
-                returns = await run_spawned(
-                    self.assign, **params, executor=self.executor, pass_context=True
-                )
-
-            returns = await shrink_outputs(
-                self.definition,
-                returns,
-                structure_registry=self.structure_registry,
-                skip_shrinking=not self.shrink_outputs,
-            )
-
-            await self.transport.change_assignation(
-                assignation.assignation,
-                status=AssignationStatus.RETURNED,
-                returns=returns,
-            )
-
-        except asyncio.CancelledError as e:
-            logger.info("Actor Cancelled")
-
-            await self.transport.change_assignation(
-                assignation.assignation,
-                status=AssignationStatus.CANCELLED,
-                message=str(e),
-            )
-
-        except AssertionError as ex:
-            await self.transport.change_assignation(
-                assignation.assignation,
-                status=AssignationStatus.ERROR,
-                message=str(ex),
-            )
-
-        except Exception as e:
-            logger.error("Error in actor", exc_info=True)
-            await self.transport.change_assignation(
-                assignation.assignation,
+            await transport.change_assignation(
                 status=AssignationStatus.CRITICAL,
                 message=str(e),
             )
@@ -308,22 +230,24 @@ class CompletlyThreadedActor(ThreadedFuncActor):
 class ThreadedGenActor(SerializingActor):
     executor: ThreadPoolExecutor = Field(default_factory=lambda: ThreadPoolExecutor(4))
 
-    async def on_assign(self, assignation: Assignation):
+    async def on_assign(
+        self,
+        assignment: Assignation,
+        collector: Collector,
+        transport: AssignTransport,
+    ):
         try:
             params = await expand_inputs(
                 self.definition,
-                assignation.args,
+                assignment.args,
                 structure_registry=self.structure_registry,
                 skip_expanding=not self.expand_inputs,
             )
-            await self.transport.change_assignation(
-                assignation.assignation,
+            await transport.change_assignation(
                 status=AssignationStatus.ASSIGNED,
             )
 
-            async with AssignationContext(
-                assignation=assignation, transport=self.transport
-            ):
+            async with AssignationContext(assignment=assignment, transport=transport):
                 async for returns in iterate_spawned(
                     self.assign, **params, executor=self.executor, pass_context=True
                 ):
@@ -334,34 +258,32 @@ class ThreadedGenActor(SerializingActor):
                         skip_shrinking=not self.shrink_outputs,
                     )
 
+                    collector.register(
+                        assignment, parse_collectable(self.definition, returns)
+                    )
+
                     await self.transport.change_assignation(
-                        assignation.assignation,
                         status=AssignationStatus.YIELD,
                         returns=returns,
                     )
 
-            await self.transport.change_assignation(
-                assignation.assignation, status=AssignationStatus.DONE
-            )
+            await transport.change_assignation(status=AssignationStatus.DONE)
 
         except asyncio.CancelledError as e:
-            await self.transport.change_assignation(
-                assignation.assignation,
+            await transport.change_assignation(
                 status=AssignationStatus.CANCELLED,
                 message=str(e),
             )
 
         except AssertionError as ex:
-            await self.transport.change_assignation(
-                assignation.assignation,
+            await transport.change_assignation(
                 status=AssignationStatus.ERROR,
                 message=str(ex),
             )
 
         except Exception as e:
-            logging.critical(f"Assignation Error {assignation} {e}", exc_info=True)
-            await self.transport.change_assignation(
-                assignation.assignation,
+            logging.critical(f"Assignation Error {assignment} {e}", exc_info=True)
+            await transport.change_assignation(
                 status=AssignationStatus.CRITICAL,
                 message=str(e),
             )

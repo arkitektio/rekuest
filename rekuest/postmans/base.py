@@ -44,7 +44,8 @@ class BasePostman(KoiledModel):
 
     async def areserve(
         self,
-        node: str,
+        node: str = None,
+        hash: str = None,
         params: ReserveParamsInput = None,
         provision: str = None,
         reference: str = "default",

@@ -10,6 +10,7 @@ fragment Reservation on Reservation {
   status
   node {
     id
+    hash
     pure
   }
   params {

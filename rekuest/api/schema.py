@@ -1,19 +1,19 @@
+from typing_extensions import Literal
+from typing import Tuple, Any, List, Dict, AsyncIterator, Union, Optional, Iterator
 from rekuest.traits.ports import (
-    PortTrait,
     ReturnWidgetInputTrait,
+    PortTrait,
     AnnotationInputTrait,
     WidgetInputTrait,
 )
-from rekuest.traits.node import Reserve
-from typing_extensions import Literal
-from typing import Iterator, Union, Tuple, Any, Dict, Optional, List, AsyncIterator
-from rekuest.funcs import subscribe, execute, aexecute, asubscribe
-from rekuest.rath import RekuestRath
-from rekuest.scalars import Identifier, SearchQuery
-from rath.scalars import ID
+from rekuest.funcs import aexecute, subscribe, execute, asubscribe
+from rekuest.scalars import SearchQuery, Identifier
 from pydantic import BaseModel, Field
-from enum import Enum
+from rath.scalars import ID
 from datetime import datetime
+from rekuest.traits.node import Reserve
+from rekuest.rath import RekuestRath
+from enum import Enum
 
 
 class CommentableModels(str, Enum):
@@ -545,13 +545,11 @@ class DefinitionInput(BaseModel):
     name: str
     "The name of this template"
     port_groups: Tuple[Optional["PortGroupInput"], ...] = Field(alias="portGroups")
-    args: Optional[Tuple[Optional["PortInput"], ...]]
+    args: Tuple[Optional["PortInput"], ...]
     "The Args"
-    returns: Optional[Tuple[Optional["PortInput"], ...]]
+    returns: Tuple[Optional["PortInput"], ...]
     "The Returns"
-    interface: Optional[str]
-    "The interface of this template"
-    interfaces: Optional[Tuple[Optional[str], ...]]
+    interfaces: Tuple[Optional[str], ...]
     "The Interfaces this node provides makes sense of the metadata"
     kind: NodeKindInput
     "The variety"
@@ -1038,6 +1036,8 @@ class ReserveParamsFragment(BaseModel):
 class ReservationFragmentNode(Reserve, BaseModel):
     typename: Optional[Literal["Node"]] = Field(alias="__typename", exclude=True)
     id: ID
+    hash: str
+    "The hash of the Node (completely unique)"
     pure: bool
     "Is this function pure. e.g can we cache the result?"
 
@@ -1101,13 +1101,14 @@ class CreateTemplateMutation(BaseModel):
     create_template: Optional[TemplateFragment] = Field(alias="createTemplate")
 
     class Arguments(BaseModel):
+        interface: str
         definition: DefinitionInput
         instance_id: ID
         params: Optional[Dict]
         extensions: Optional[List[Optional[str]]]
 
     class Meta:
-        document = "fragment ValueRange on ValueRange {\n  min\n  max\n}\n\nfragment IsPredicate on IsPredicate {\n  predicate\n}\n\nfragment ChildPortNested on ChildPort {\n  kind\n  child {\n    kind\n  }\n  nullable\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment ChildPort on ChildPort {\n  kind\n  identifier\n  child {\n    ...ChildPortNested\n  }\n  nullable\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment Annotation on Annotation {\n  kind\n  ...IsPredicate\n  ...ValueRange\n}\n\nfragment Port on Port {\n  __typename\n  key\n  label\n  nullable\n  description\n  default\n  kind\n  identifier\n  child {\n    ...ChildPort\n  }\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment Definition on Node {\n  args {\n    ...Port\n  }\n  returns {\n    ...Port\n  }\n  kind\n  name\n  description\n}\n\nfragment Node on Node {\n  hash\n  id\n  ...Definition\n}\n\nfragment Template on Template {\n  id\n  agent {\n    registry {\n      name\n      app {\n        version\n        identifier\n      }\n      user {\n        username\n      }\n    }\n  }\n  node {\n    ...Node\n  }\n  params\n}\n\nmutation createTemplate($definition: DefinitionInput!, $instance_id: ID!, $params: GenericScalar, $extensions: [String]) {\n  createTemplate(\n    definition: $definition\n    params: $params\n    extensions: $extensions\n    instanceId: $instance_id\n  ) {\n    ...Template\n  }\n}"
+        document = "fragment ValueRange on ValueRange {\n  min\n  max\n}\n\nfragment IsPredicate on IsPredicate {\n  predicate\n}\n\nfragment ChildPortNested on ChildPort {\n  kind\n  child {\n    kind\n  }\n  nullable\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment ChildPort on ChildPort {\n  kind\n  identifier\n  child {\n    ...ChildPortNested\n  }\n  nullable\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment Annotation on Annotation {\n  kind\n  ...IsPredicate\n  ...ValueRange\n}\n\nfragment Port on Port {\n  __typename\n  key\n  label\n  nullable\n  description\n  default\n  kind\n  identifier\n  child {\n    ...ChildPort\n  }\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment Definition on Node {\n  args {\n    ...Port\n  }\n  returns {\n    ...Port\n  }\n  kind\n  name\n  description\n}\n\nfragment Node on Node {\n  hash\n  id\n  ...Definition\n}\n\nfragment Template on Template {\n  id\n  agent {\n    registry {\n      name\n      app {\n        version\n        identifier\n      }\n      user {\n        username\n      }\n    }\n  }\n  node {\n    ...Node\n  }\n  params\n}\n\nmutation createTemplate($interface: String!, $definition: DefinitionInput!, $instance_id: ID!, $params: GenericScalar, $extensions: [String]) {\n  createTemplate(\n    definition: $definition\n    interface: $interface\n    params: $params\n    extensions: $extensions\n    instanceId: $instance_id\n  ) {\n    ...Template\n  }\n}"
 
 
 class SlateMutation(BaseModel):
@@ -1170,8 +1171,8 @@ class ReserveMutation(BaseModel):
     reserve: Optional[ReservationFragment]
 
     class Arguments(BaseModel):
-        node: ID
-        template: Optional[ID]
+        node: Optional[ID]
+        hash: Optional[str]
         params: Optional[ReserveParamsInput]
         title: Optional[str]
         imitate: Optional[ID]
@@ -1181,7 +1182,7 @@ class ReserveMutation(BaseModel):
         binds: Optional[ReserveBindsInput]
 
     class Meta:
-        document = "fragment ReserveParams on ReserveParams {\n  registries\n  minimalInstances\n  desiredInstances\n}\n\nfragment Reservation on Reservation {\n  id\n  statusmessage\n  status\n  node {\n    id\n    pure\n  }\n  params {\n    ...ReserveParams\n  }\n  waiter {\n    unique\n  }\n  reference\n  updatedAt\n}\n\nmutation reserve($node: ID!, $template: ID, $params: ReserveParamsInput, $title: String, $imitate: ID, $appGroup: ID, $reference: String, $provision: ID, $binds: ReserveBindsInput) {\n  reserve(\n    node: $node\n    template: $template\n    params: $params\n    title: $title\n    imitate: $imitate\n    provision: $provision\n    appGroup: $appGroup\n    binds: $binds\n    reference: $reference\n  ) {\n    ...Reservation\n  }\n}"
+        document = "fragment ReserveParams on ReserveParams {\n  registries\n  minimalInstances\n  desiredInstances\n}\n\nfragment Reservation on Reservation {\n  id\n  statusmessage\n  status\n  node {\n    id\n    hash\n    pure\n  }\n  params {\n    ...ReserveParams\n  }\n  waiter {\n    unique\n  }\n  reference\n  updatedAt\n}\n\nmutation reserve($node: ID, $hash: String, $params: ReserveParamsInput, $title: String, $imitate: ID, $appGroup: ID, $reference: String, $provision: ID, $binds: ReserveBindsInput) {\n  reserve(\n    node: $node\n    hash: $hash\n    params: $params\n    title: $title\n    imitate: $imitate\n    provision: $provision\n    appGroup: $appGroup\n    binds: $binds\n    reference: $reference\n  ) {\n    ...Reservation\n  }\n}"
 
 
 class UnreserveMutation(BaseModel):
@@ -1191,7 +1192,7 @@ class UnreserveMutation(BaseModel):
         id: ID
 
     class Meta:
-        document = "fragment ReserveParams on ReserveParams {\n  registries\n  minimalInstances\n  desiredInstances\n}\n\nfragment Reservation on Reservation {\n  id\n  statusmessage\n  status\n  node {\n    id\n    pure\n  }\n  params {\n    ...ReserveParams\n  }\n  waiter {\n    unique\n  }\n  reference\n  updatedAt\n}\n\nmutation unreserve($id: ID!) {\n  unreserve(id: $id) {\n    ...Reservation\n  }\n}"
+        document = "fragment ReserveParams on ReserveParams {\n  registries\n  minimalInstances\n  desiredInstances\n}\n\nfragment Reservation on Reservation {\n  id\n  statusmessage\n  status\n  node {\n    id\n    hash\n    pure\n  }\n  params {\n    ...ReserveParams\n  }\n  waiter {\n    unique\n  }\n  reference\n  updatedAt\n}\n\nmutation unreserve($id: ID!) {\n  unreserve(id: $id) {\n    ...Reservation\n  }\n}"
 
 
 class Watch_provisionSubscriptionProvisions(BaseModel):
@@ -1277,7 +1278,7 @@ class Watch_reservationsSubscription(BaseModel):
         identifier: str
 
     class Meta:
-        document = "fragment ReserveParams on ReserveParams {\n  registries\n  minimalInstances\n  desiredInstances\n}\n\nfragment Reservation on Reservation {\n  id\n  statusmessage\n  status\n  node {\n    id\n    pure\n  }\n  params {\n    ...ReserveParams\n  }\n  waiter {\n    unique\n  }\n  reference\n  updatedAt\n}\n\nsubscription watch_reservations($identifier: String!) {\n  reservations(identifier: $identifier) {\n    create {\n      ...Reservation\n    }\n    update {\n      ...Reservation\n    }\n    delete\n  }\n}"
+        document = "fragment ReserveParams on ReserveParams {\n  registries\n  minimalInstances\n  desiredInstances\n}\n\nfragment Reservation on Reservation {\n  id\n  statusmessage\n  status\n  node {\n    id\n    hash\n    pure\n  }\n  params {\n    ...ReserveParams\n  }\n  waiter {\n    unique\n  }\n  reference\n  updatedAt\n}\n\nsubscription watch_reservations($identifier: String!) {\n  reservations(identifier: $identifier) {\n    create {\n      ...Reservation\n    }\n    update {\n      ...Reservation\n    }\n    delete\n  }\n}"
 
 
 class Get_provisionQuery(BaseModel):
@@ -1478,7 +1479,7 @@ class ReservationsQuery(BaseModel):
         identifier: str
 
     class Meta:
-        document = "fragment ReserveParams on ReserveParams {\n  registries\n  minimalInstances\n  desiredInstances\n}\n\nfragment Reservation on Reservation {\n  id\n  statusmessage\n  status\n  node {\n    id\n    pure\n  }\n  params {\n    ...ReserveParams\n  }\n  waiter {\n    unique\n  }\n  reference\n  updatedAt\n}\n\nquery reservations($identifier: String!) {\n  reservations(identifier: $identifier) {\n    ...Reservation\n  }\n}"
+        document = "fragment ReserveParams on ReserveParams {\n  registries\n  minimalInstances\n  desiredInstances\n}\n\nfragment Reservation on Reservation {\n  id\n  statusmessage\n  status\n  node {\n    id\n    hash\n    pure\n  }\n  params {\n    ...ReserveParams\n  }\n  waiter {\n    unique\n  }\n  reference\n  updatedAt\n}\n\nquery reservations($identifier: String!) {\n  reservations(identifier: $identifier) {\n    ...Reservation\n  }\n}"
 
 
 async def aassign(
@@ -1582,6 +1583,7 @@ def unassign(
 
 
 async def acreate_template(
+    interface: str,
     definition: DefinitionInput,
     instance_id: ID,
     params: Optional[Dict] = None,
@@ -1593,6 +1595,7 @@ async def acreate_template(
 
 
     Arguments:
+        interface (str): interface
         definition (DefinitionInput): definition
         instance_id (ID): instance_id
         params (Optional[Dict], optional): params.
@@ -1605,6 +1608,7 @@ async def acreate_template(
         await aexecute(
             CreateTemplateMutation,
             {
+                "interface": interface,
                 "definition": definition,
                 "instance_id": instance_id,
                 "params": params,
@@ -1616,6 +1620,7 @@ async def acreate_template(
 
 
 def create_template(
+    interface: str,
     definition: DefinitionInput,
     instance_id: ID,
     params: Optional[Dict] = None,
@@ -1627,6 +1632,7 @@ def create_template(
 
 
     Arguments:
+        interface (str): interface
         definition (DefinitionInput): definition
         instance_id (ID): instance_id
         params (Optional[Dict], optional): params.
@@ -1638,6 +1644,7 @@ def create_template(
     return execute(
         CreateTemplateMutation,
         {
+            "interface": interface,
             "definition": definition,
             "instance_id": instance_id,
             "params": params,
@@ -1744,8 +1751,8 @@ def delete_node(
 
 
 async def areserve(
-    node: ID,
-    template: Optional[ID] = None,
+    node: Optional[ID] = None,
+    hash: Optional[str] = None,
     params: Optional[ReserveParamsInput] = None,
     title: Optional[str] = None,
     imitate: Optional[ID] = None,
@@ -1760,8 +1767,8 @@ async def areserve(
 
 
     Arguments:
-        node (ID): node
-        template (Optional[ID], optional): template.
+        node (Optional[ID], optional): node.
+        hash (Optional[str], optional): hash.
         params (Optional[ReserveParamsInput], optional): params.
         title (Optional[str], optional): title.
         imitate (Optional[ID], optional): imitate.
@@ -1778,7 +1785,7 @@ async def areserve(
             ReserveMutation,
             {
                 "node": node,
-                "template": template,
+                "hash": hash,
                 "params": params,
                 "title": title,
                 "imitate": imitate,
@@ -1793,8 +1800,8 @@ async def areserve(
 
 
 def reserve(
-    node: ID,
-    template: Optional[ID] = None,
+    node: Optional[ID] = None,
+    hash: Optional[str] = None,
     params: Optional[ReserveParamsInput] = None,
     title: Optional[str] = None,
     imitate: Optional[ID] = None,
@@ -1809,8 +1816,8 @@ def reserve(
 
 
     Arguments:
-        node (ID): node
-        template (Optional[ID], optional): template.
+        node (Optional[ID], optional): node.
+        hash (Optional[str], optional): hash.
         params (Optional[ReserveParamsInput], optional): params.
         title (Optional[str], optional): title.
         imitate (Optional[ID], optional): imitate.
@@ -1826,7 +1833,7 @@ def reserve(
         ReserveMutation,
         {
             "node": node,
-            "template": template,
+            "hash": hash,
             "params": params,
             "title": title,
             "imitate": imitate,

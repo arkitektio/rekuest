@@ -20,22 +20,36 @@ from rekuest.messages import Assignation, Provision, Unassignation
 from rekuest.structures.registry import (
     StructureRegistry,
 )
+from rekuest.actors.types import Passport, Assignment
 
 
 @runtime_checkable
 class ActorTransport(Protocol):
     async def change_provision(
         self,
-        id: str,
         status: ProvisionStatus = None,
         message: str = None,
         mode: ProvisionMode = None,
     ):
         ...
 
+    async def log_to_provision(
+        self,
+        level: LogLevelInput = None,
+        message: str = None,
+    ):
+        ...
+
+    def spawn(self, assignment: Assignment) -> "AssignTransport":
+        ...
+
+
+@runtime_checkable
+class AssignTransport(Protocol):
+    assignment: Assignment
+
     async def change_assignation(
         self,
-        id: str,
         status: AssignationStatus = None,
         message: str = None,
         returns: List[Any] = None,
@@ -43,17 +57,8 @@ class ActorTransport(Protocol):
     ):
         ...
 
-    async def log_to_provision(
-        self,
-        id: str,
-        level: LogLevelInput = None,
-        message: str = None,
-    ):
-        ...
-
     async def log_to_assignation(
         self,
-        id: str,
         level: LogLevelInput = None,
         message: str = None,
     ):
