@@ -58,6 +58,10 @@ class Provision(UpdatableModel):
     status: Optional[ProvisionStatus]
 
 
+class Inquiry(UpdatableModel):
+    assignations: List[Assignation]
+
+
 class Unprovision(UpdatableModel):
     provision: str
     message: Optional[str]

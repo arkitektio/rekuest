@@ -1,6 +1,10 @@
 from rekuest.actors.types import Passport, Assignment
 from pydantic import BaseModel, Field
 from typing import Dict, Any, List
+import logging
+
+
+logger = logging.getLogger(__name__)
 
 
 class AssignationCollector(BaseModel):
@@ -57,7 +61,7 @@ class Collector(BaseModel):
     children_tree: Dict[str, List[str]] = Field(default_factory=dict)
 
     def register(self, assignment: Assignment, items: List[any]):
-        print("Registering", assignment, items)
+        logger.debug(f"Registering {assignment.id}")
 
         if assignment.id in self.assignment_map:
             self.assignment_map[assignment.id] += items
@@ -78,7 +82,10 @@ class Collector(BaseModel):
 
         if id in self.assignment_map:
             for v in self.assignment_map[id]:
-                await v.acollect()
+                try:
+                    await v.acollect()
+                except:
+                    logger.error("This shouldn't happend but lets see", exc_info=True)
 
         if id in self.children_tree:
             for child in self.children_tree[id]:

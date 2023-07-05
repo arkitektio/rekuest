@@ -3,7 +3,7 @@ from rekuest.scalars import SearchQuery
 from typing import List
 
 
-def SliderWidget(min: int = None, max: int = None) -> WidgetInput:
+def SliderWidget(min: int = None, max: int = None, **kwargs) -> WidgetInput:
     """Generate a slider widget.
 
     Args:
@@ -13,10 +13,10 @@ def SliderWidget(min: int = None, max: int = None) -> WidgetInput:
     Returns:
         WidgetInput: _description_
     """
-    return WidgetInput(kind="SliderWidget", min=min, max=max)
+    return WidgetInput(kind="SliderWidget", min=min, max=max, **kwargs)
 
 
-def SearchWidget(query: SearchQuery, ward: str) -> WidgetInput:
+def SearchWidget(query: SearchQuery, ward: str, **kwargs) -> WidgetInput:
     """Generte a search widget.
 
     A search widget is a widget that allows the user to search for a specifc
@@ -31,10 +31,10 @@ def SearchWidget(query: SearchQuery, ward: str) -> WidgetInput:
     Returns:
         WidgetInput: _description_
     """ """P"""
-    return WidgetInput(kind="SearchWidget", query=query, ward=ward)
+    return WidgetInput(kind="SearchWidget", query=query, ward=ward, **kwargs)
 
 
-def StringWidget(as_paragraph: bool = False) -> WidgetInput:
+def StringWidget(as_paragraph: bool = False, **kwargs) -> WidgetInput:
     """Generate a string widget.
 
     Args:
@@ -43,10 +43,22 @@ def StringWidget(as_paragraph: bool = False) -> WidgetInput:
     Returns:
         WidgetInput: _description_
     """
-    return WidgetInput(kind="StringWidget", asParagraph=as_paragraph)
+    return WidgetInput(kind="StringWidget", asParagraph=as_paragraph, **kwargs)
 
 
-def CustomWidget(hook: str) -> WidgetInput:
+def ParagraphWidget(**kwargs) -> WidgetInput:
+    """Generate a string widget.
+
+    Args:
+        as_paragraph (bool, optional): Should we render the string as a paragraph.Defaults to False.
+
+    Returns:
+        WidgetInput: _description_
+    """
+    return WidgetInput(kind="StringWidget", asParagraph=True, **kwargs)
+
+
+def CustomWidget(hook: str, **kwargs) -> WidgetInput:
     """Generate a custom widget.
 
     A custom widget is a widget that is rendered by a frontend registered hook
@@ -58,10 +70,10 @@ def CustomWidget(hook: str) -> WidgetInput:
     Returns:
         WidgetInput: _description_
     """
-    return WidgetInput(kind="CustomWidget", hook=hook)
+    return WidgetInput(kind="CustomWidget", hook=hook, **kwargs)
 
 
-def CustomReturnWidget(hook: str) -> ReturnWidgetInput:
+def CustomReturnWidget(hook: str, **kwargs) -> ReturnWidgetInput:
     """A custom return widget.
 
     A custom return widget is a widget that is rendered by a frontend registered hook
@@ -73,10 +85,10 @@ def CustomReturnWidget(hook: str) -> ReturnWidgetInput:
     Returns:
         ReturnWidgetInput: _description_
     """ """"""
-    return ReturnWidgetInput(kind="CustomReturnWidget", hook=hook)
+    return ReturnWidgetInput(kind="CustomReturnWidget", hook=hook, **kwargs)
 
 
-def ChoiceReturnWidget(choices: List[ChoiceInput]) -> ReturnWidgetInput:
+def ChoiceReturnWidget(choices: List[ChoiceInput], **kwargs) -> ReturnWidgetInput:
     """A choice return widget.
 
     A choice return widget is a widget that renderes a list of choices with the
@@ -88,4 +100,4 @@ def ChoiceReturnWidget(choices: List[ChoiceInput]) -> ReturnWidgetInput:
     Returns:
         ReturnWidgetInput: _description_
     """
-    return ReturnWidgetInput(kind="ChoiceReturnWidget", choices=choices)
+    return ReturnWidgetInput(kind="ChoiceReturnWidget", choices=choices, **kwargs)

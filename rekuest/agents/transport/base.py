@@ -10,6 +10,7 @@ from rekuest.api.schema import (
 )
 from koil.composition import KoiledModel
 from koil.types import Contextual
+from .types import TransportCallbacks
 
 
 class AgentTransport(KoiledModel):
@@ -33,11 +34,7 @@ class AgentTransport(KoiledModel):
 
     """
 
-    _abroadcast: Contextual[
-        Callable[
-            [Union[Assignation, Unassignation, Unprovision, Provision]], Awaitable[None]
-        ]
-    ]
+    _callback: Contextual[TransportCallbacks]
 
     @property
     def connected(self):
@@ -93,6 +90,9 @@ class AgentTransport(KoiledModel):
         self, exclude: Optional[AssignationStatus] = None
     ) -> List[Assignation]:
         raise NotImplementedError("This is an abstract Base Class")
+
+    def set_callback(self, callback: TransportCallbacks):
+        self._callback = callback
 
     async def __aenter__(self):
         return self

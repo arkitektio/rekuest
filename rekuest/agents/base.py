@@ -19,7 +19,7 @@ from rekuest.rath import RekuestRath
 from rekuest.definition.validate import auto_validate
 import asyncio
 from rekuest.agents.transport.base import AgentTransport, Contextual
-from rekuest.messages import Assignation, Unassignation, Unprovision, Provision
+from rekuest.messages import Assignation, Unassignation, Unprovision, Provision, Inquiry
 from koil import unkoil
 from koil.composition import KoiledModel
 import logging
@@ -28,6 +28,8 @@ import uuid
 from rekuest.agents.errors import AgentException
 from rekuest.actors.transport.local_transport import AgentActorTransport
 from rekuest.actors.types import Assignment, Unassignment
+from .transport.errors import DefiniteConnectionFail, CorrectableConnectionFail
+
 
 logger = logging.getLogger(__name__)
 
@@ -68,6 +70,7 @@ class BaseAgent(KoiledModel):
     managed_assignments: Dict[str, Assignment] = Field(default_factory=dict)
     _provisionTaskMap: Dict[str, asyncio.Task] = Field(default_factory=dict)
     _inqueue: Contextual[asyncio.Queue] = None
+    _errorfuture: Contextual[asyncio.Future] = None
 
     started = False
     running = False
@@ -76,6 +79,23 @@ class BaseAgent(KoiledModel):
         self, message: Union[Assignation, Provision, Unassignation, Unprovision]
     ):
         await self._inqueue.put(message)
+
+    async def on_agent_error(self, exception) -> None:
+        if self._errorfuture is None or self._errorfuture.done():
+            return
+        self._errorfuture.set_exception(exception)
+        ...
+
+    async def on_definite_error(self, error: DefiniteConnectionFail) -> None:
+        if self._errorfuture is None or self._errorfuture.done():
+            return
+        self._errorfuture.set_exception(error)
+        ...
+
+    async def on_correctable_error(self, error: CorrectableConnectionFail) -> bool:
+        # Always correctable
+        return True
+        ...
 
     async def process(
         self, message: Union[Assignation, Provision, Unassignation, Unprovision]
@@ -94,7 +114,6 @@ class BaseAgent(KoiledModel):
                     user=message.user,
                 )
                 self.managed_assignments[message.assignation] = message
-
                 await actor.apass(message)
             else:
                 logger.warning(
@@ -106,6 +125,23 @@ class BaseAgent(KoiledModel):
                     status=AssignationStatus.CRITICAL,
                     message="Actor was no longer running or not managed",
                 )
+
+        elif isinstance(message, Inquiry):
+            logger.info("Received Inquiry")
+            for assignation in message.assignations:
+                if assignation.assignation in self.managed_assignments:
+                    logger.debug(
+                        f"Received Inquiry for {assignation.assignation} and it was found. Ommiting setting Criticial"
+                    )
+                else:
+                    logger.warning(
+                        f"Did no find Inquiry for {assignation.assignation} and it was found. Setting Criticial"
+                    )
+                    await self.transport.change_assignation(
+                        message.assignation,
+                        status=AssignationStatus.CRITICAL,
+                        message="Actor was no longer running or not managed",
+                    )
 
         elif isinstance(message, Unassignation):
             if message.assignation in self.managed_assignments:
@@ -129,7 +165,15 @@ class BaseAgent(KoiledModel):
                 )
 
         elif isinstance(message, Provision):
+            # TODO: Check if the provision is already running
             try:
+                status = await self.acheck_status_for_provision(message)
+                await self.transport.change_provision(
+                    message.provision,
+                    status=status,
+                    message="Actor was already running",
+                )
+            except KeyError as e:
                 await self.aspawn_actor_from_provision(message)
             except Exception as e:
                 logger.error("Spawning error", exc_info=True)
@@ -212,6 +256,13 @@ class BaseAgent(KoiledModel):
             self.interface_template_map[interface] = arkitekt_template
             self.template_interface_map[arkitekt_template.id] = interface
 
+    async def acheck_status_for_provision(
+        self, provision: Provision
+    ) -> ProvisionStatus:
+        passport = self.provision_passport_map[provision.provision]
+        actor = self.managed_actors[passport.id]
+        return await actor.aget_status()
+
     async def aspawn_actor_from_provision(self, provision: Provision) -> Actor:
         """Spawns an Actor from a Provision. This function closely mimics the
         spawining protocol within an actor. But maps template"""
@@ -225,9 +276,6 @@ class BaseAgent(KoiledModel):
             actor_builder = self.definition_registry.get_builder_for_interface(
                 interface
             )
-            definition = self.definition_registry.get_definition_for_interface(
-                interface
-            )
 
         except KeyError as e:
             raise ProvisionException("No Actor Builder found for template") from e
@@ -239,9 +287,8 @@ class BaseAgent(KoiledModel):
             transport=AgentActorTransport(
                 passport=passport, agent_transport=self.transport
             ),
-            definition=definition,
             definition_registry=self.definition_registry,
-            collector=self.collector.spawn(passport),
+            collector=self.collector,
         )
 
         await actor.arun()  # TODO: Maybe move this outside?
@@ -250,23 +297,22 @@ class BaseAgent(KoiledModel):
         return actor
 
     async def astep(self):
-        await self.process(await self._inqueue.get())
+        queue_future = self._inqueue.get()
+        done, pending = await asyncio.wait(
+            [queue_future, self._errorfuture],
+            return_when=asyncio.FIRST_COMPLETED,
+        )
+
+        if self._errorfuture.done():
+            print("Error future done")
+            raise self._errorfuture.exception()
+        else:
+            await self.process(await done.pop())
 
     async def astart(self):
         await self.aregister_definitions()
-
+        self._errorfuture = asyncio.Future()
         await self.transport.aconnect(self.instance_id)
-
-        data = await self.transport.list_provisions()
-
-        for prov in data:
-            await self.abroadcast(prov)
-
-        data = await self.transport.list_assignations()
-
-        for ass in data:
-            await self.abroadcast(ass)
-
         self.started = True
 
     def step(self, *args, **kwargs):
@@ -303,7 +349,7 @@ class BaseAgent(KoiledModel):
             self.definition_registry or get_current_definition_registry()
         )
         self._inqueue = asyncio.Queue()
-        self.transport._abroadcast = self.abroadcast
+        self.transport.set_callback(self)
         await self.transport.__aenter__()
         return self
 

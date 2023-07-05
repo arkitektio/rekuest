@@ -1,0 +1,11 @@
+subscription watch_myagents {
+  agentsEvent {
+    created {
+      ...Agent
+    }
+    deleted
+    updated {
+      ...Agent
+    }
+  }
+}

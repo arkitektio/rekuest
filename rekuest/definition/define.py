@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Callable, List, Tuple, Type
+from typing import Callable, List, Tuple, Type, Union
 from .utils import get_type_hints, is_annotated
 import inflection
 from rekuest.api.schema import (
@@ -13,15 +13,35 @@ from rekuest.api.schema import (
     WidgetInput,
     ReturnWidgetInput,
     PortGroupInput,
+    EffectInput,
 )
 import inspect
 from docstring_parser import parse
-from rekuest.definition.errors import DefinitionError
+from rekuest.definition.errors import DefinitionError, NonSufficientDocumentation
 
 from rekuest.structures.registry import (
     StructureRegistry,
 )
-from typing import Protocol, runtime_checkable, Optional, List, Any, Dict
+from typing import (
+    Protocol,
+    runtime_checkable,
+    Optional,
+    List,
+    Any,
+    Dict,
+    get_origin,
+    get_args,
+)
+import types
+import typing
+
+
+def cls_is_union(cls):
+    return get_origin(cls) is types.UnionType or get_origin(cls) is typing.Union
+
+
+def cls_is_list(cls):
+    return get_origin(cls) is typing.List
 
 
 def convert_child_to_childport(
@@ -172,8 +192,10 @@ def convert_object_to_port(
     widget=None,
     return_widget=None,
     default=None,
+    label=None,
     description=None,
     nullable=False,
+    effects: Optional[List[EffectInput]] = None,
     groups: Optional[List[str]] = None,
     annotations=[],
 ) -> PortInput:
@@ -194,6 +216,8 @@ def convert_object_to_port(
             registry,
             widget=widget,
             default=default,
+            label=label,
+            effects=effects,
             nullable=nullable,
             annotations=annotations,
             groups=groups,
@@ -213,13 +237,43 @@ def convert_object_to_port(
                     scope=Scope.GLOBAL,
                     key=key,
                     child=child,
+                    label=label,
                     default=[converter(item) for item in default] if default else None,
                     nullable=nullable,
+                    effects=effects,
                     annotations=annotations,
                     description=description,
                     groups=groups,
                 )
 
+            if cls_is_union(cls) and False:
+                args = get_args(cls)
+                variants = []
+                for arg in args:
+                    if arg == type(None):
+                        continue
+                    child, converter = convert_child_to_childport(
+                        arg, registry, nullable=False
+                    )
+                    variants.append(child)
+
+                return PortInput(
+                    kind=PortKindInput.UNION,
+                    assignWidget=widget,
+                    returnWidget=return_widget,
+                    scope=Scope.GLOBAL,
+                    key=key,
+                    variants=variants,
+                    label=label,
+                    default=None,
+                    nullable=nullable,
+                    effects=effects,
+                    annotations=annotations,
+                    description=description,
+                    groups=groups,
+                )
+
+                raise NotImplementedError("Unions are not supported yet")
             if cls._name == "Dict":
                 child, converter = convert_child_to_childport(
                     cls.__args__[1], registry, nullable=False
@@ -231,12 +285,14 @@ def convert_object_to_port(
                     returnWidget=return_widget,
                     key=key,
                     child=child,
+                    label=label,
                     default=(
                         {key: converter(item) for key, item in default.items()}
                         if default
                         else None
                     ),
                     nullable=nullable,
+                    effects=effects,
                     annotations=annotations,
                     description=description,
                     groups=groups,
@@ -254,6 +310,8 @@ def convert_object_to_port(
                     default=default,
                     nullable=True,
                     widget=widget,
+                    label=label,
+                    effects=effects,
                     return_widget=return_widget,
                     annotations=annotations,
                     description=description,
@@ -263,10 +321,8 @@ def convert_object_to_port(
     if inspect.isclass(cls):
         # Generic Cases
 
-        if (
-            not issubclass(cls, Enum)
-            and issubclass(cls, bool)
-            or (default is not None and isinstance(default, bool))
+        if not issubclass(cls, Enum) and (
+            issubclass(cls, bool) or (default is not None and isinstance(default, bool))
         ):
             t = PortInput(
                 kind=PortKindInput.BOOL,
@@ -275,17 +331,17 @@ def convert_object_to_port(
                 returnWidget=return_widget,
                 key=key,
                 default=default,
+                label=label,
                 nullable=nullable,
+                effects=effects,
                 annotations=annotations,
                 description=description,
                 groups=groups,
             )  # catch bool is subclass of int
             return t
 
-        if (
-            not issubclass(cls, Enum)
-            and issubclass(cls, int)
-            or (default is not None and isinstance(default, int))
+        if not issubclass(cls, Enum) and (
+            issubclass(cls, int) or (default is not None and isinstance(default, int))
         ):
             return PortInput(
                 kind=PortKindInput.INT,
@@ -294,15 +350,16 @@ def convert_object_to_port(
                 returnWidget=return_widget,
                 key=key,
                 default=default,
+                label=label,
                 nullable=nullable,
+                effects=effects,
                 annotations=annotations,
                 description=description,
                 groups=groups,
             )
 
-        if (
-            not issubclass(cls, Enum)
-            and issubclass(cls, float)
+        if not issubclass(cls, Enum) and (
+            issubclass(cls, float)
             or (default is not None and isinstance(default, float))
         ):
             return PortInput(
@@ -312,16 +369,16 @@ def convert_object_to_port(
                 scope=Scope.GLOBAL,
                 key=key,
                 default=default,
+                label=label,
                 nullable=nullable,
+                effects=effects,
                 annotations=annotations,
                 description=description,
                 groups=groups,
             )
 
-        if (
-            not issubclass(cls, Enum)
-            and issubclass(cls, str)
-            or (default is not None and isinstance(default, str))
+        if not issubclass(cls, Enum) and (
+            issubclass(cls, str) or (default is not None and isinstance(default, str))
         ):
             return PortInput(
                 kind=PortKindInput.STRING,
@@ -330,7 +387,9 @@ def convert_object_to_port(
                 scope=Scope.GLOBAL,
                 key=key,
                 default=default,
+                label=label,
                 nullable=nullable,
+                effects=effects,
                 annotations=annotations,
                 description=description,
                 groups=groups,
@@ -349,8 +408,10 @@ def convert_object_to_port(
         scope=scope,
         returnWidget=return_widget,
         key=key,
+        label=label,
         default=default_converter(default) if default else None,
         nullable=nullable,
+        effects=effects,
         annotations=annotations,
         description=description,
         groups=groups,
@@ -360,6 +421,7 @@ def convert_object_to_port(
 GroupMap = Dict[str, List[str]]
 WidgetMap = Dict[str, List[WidgetInput]]
 ReturnWidgetMap = Dict[str, List[ReturnWidgetInput]]
+EffectsMap = Dict[str, List[EffectInput]]
 
 
 def prepare_definition(
@@ -368,13 +430,21 @@ def prepare_definition(
     widgets: Optional[WidgetMap] = None,
     return_widgets: Optional[ReturnWidgetMap] = None,
     groups: Optional[GroupMap] = None,
+    effects: Optional[EffectsMap] = None,
     port_groups: List[PortGroupInput] = None,
-    allow_empty_doc=False,
+    allow_empty_doc=True,
+    collections: List[str] = [],
     interfaces: Optional[List[str]] = None,
+    description: str = None,
+    is_test_for: Optional[List[str]] = None,
+    port_label_map: Optional[Dict[str, str]] = None,
+    port_description_map: Optional[Dict[str, str]] = None,
+    name: str = None,
     omitfirst=None,
     omitlast=None,
     omitkeys=[],
     allow_annotations: bool = True,
+    **kwargs,  # additional kwargs can be ignored
 ) -> DefinitionInput:
     """Define
 
@@ -400,6 +470,7 @@ def prepare_definition(
 
     sig = inspect.signature(function)
     widgets = widgets or {}
+    effects = effects or {}
 
     port_groups = port_groups or []
     port_groups_name = [i.key for i in port_groups]
@@ -413,29 +484,52 @@ def prepare_definition(
 
     return_widgets = return_widgets or {}
     interfaces = interfaces or []
+    collections = collections or []
     # Generate Args and Kwargs from the Annotation
     args: List[PortInput] = []
     returns: List[PortInput] = []
 
     # Docstring Parser to help with descriptions
     docstring = parse(function.__doc__)
-    if docstring.long_description is None:
-        assert allow_empty_doc is not False, (
-            f"We don't allow empty documentation for function {function.__name__}."
-            " Please Provide"
+    if not docstring.short_description and name is None:
+        raise NonSufficientDocumentation(
+            f"Either provide a name or better document {function.__name__}. Try docstring"
+        )
+
+    if not docstring.long_description and description is None and not allow_empty_doc:
+        raise NonSufficientDocumentation(
+            f"Please provide a description or better document  {function.__name__}. Try docstring"
         )
 
     type_hints = get_type_hints(function, include_extras=allow_annotations)
     function_ins_annotation = sig.parameters
 
-    doc_param_map = {param.arg_name: param.description for param in docstring.params}
-
-    # TODO: Update with documentatoin.... (Set description for portexample)
-
-    doc_returns_map = {
-        f"return{index}": param.description
-        for index, param in enumerate(docstring.many_returns)
+    doc_param_description_map = {
+        param.arg_name: param.description for param in docstring.params
     }
+    doc_param_label_map = {param.arg_name: param.arg_name for param in docstring.params}
+
+    if docstring.many_returns:
+        doc_param_description_map.update(
+            {
+                f"return{index}": param.description
+                for index, param in enumerate(docstring.many_returns)
+            }
+        )
+        doc_param_label_map.update(
+            {
+                f"return{index}": param.return_name
+                for index, param in enumerate(docstring.many_returns)
+            }
+        )
+    elif docstring.returns:
+        doc_param_description_map.update({"return0": docstring.returns.description})
+        doc_param_label_map.update({"return0": docstring.returns.return_name})
+
+    if port_label_map:
+        doc_param_label_map.update(port_label_map)
+    if port_description_map:
+        doc_param_description_map.update(port_description_map)
 
     for index, (key, value) in enumerate(function_ins_annotation.items()):
         # We can skip arguments if the builder is going to provide additional arguments
@@ -446,8 +540,9 @@ def prepare_definition(
         if key in omitkeys:
             continue
 
-        widget = widgets.get(key, None)
-        return_widget = return_widgets.get(key, None)
+        widget = widgets.pop(key, None)
+        port_effects = effects.pop(key, None)
+        return_widget = return_widgets.pop(key, None)
         default = value.default if value.default != inspect.Parameter.empty else None
         cls = type_hints.get(key, type(default) if default is not None else None)
         this_port_groups = groups.get(key, None)
@@ -466,7 +561,10 @@ def prepare_definition(
                     widget=widget,
                     return_widget=return_widget,
                     default=default,
-                    description=doc_param_map.get(key, None),
+                    effects=port_effects,
+                    nullable=value.default != inspect.Parameter.empty,
+                    description=doc_param_description_map.pop(key, None),
+                    label=doc_param_label_map.pop(key, None),
                     groups=this_port_groups,
                 )
             )
@@ -482,16 +580,21 @@ def prepare_definition(
         if function_outs_annotation._name == "Tuple":
             try:
                 for index, cls in enumerate(function_outs_annotation.__args__):
-                    return_widget = return_widgets.get(f"return{index}", None)
-                    widget = widgets.get(f"return{index}", None)
-                    this_port_groups = groups.get(f"return{index}", None)
+                    key = f"return{index}"
+                    return_widget = return_widgets.pop(key, None)
+                    widget = widgets.pop(key, None)
+                    port_effects = effects.pop(key, None)
+                    this_port_groups = groups.pop(key, None)
+
                     returns.append(
                         convert_object_to_port(
                             cls,
-                            f"return{index}",
+                            key,
                             structure_registry,
-                            description=doc_returns_map.get(f"return{index}", None),
                             return_widget=return_widget,
+                            effects=port_effects,
+                            description=doc_param_description_map.pop(key, None),
+                            label=doc_param_label_map.pop(key, None),
                             widget=widget,
                             groups=this_port_groups,
                         )
@@ -503,15 +606,20 @@ def prepare_definition(
                 ) from e
         else:
             try:
-                return_widget = return_widgets.get("return0", None)
-                widget = widgets.get("return0", None)
-                this_port_groups = groups.get("return0", None)
+                key = "return0"
+                return_widget = return_widgets.pop(key, None)
+                widget = widgets.pop(key, None)
+                this_port_groups = groups.get(key, None)
+                port_effects = effects.pop(key, None)
                 returns.append(
                     convert_object_to_port(
                         function_outs_annotation,
-                        "return0",
+                        key,
                         structure_registry,
                         return_widget=return_widget,
+                        effects=port_effects,
+                        description=doc_param_description_map.pop(key, None),
+                        label=doc_param_label_map.pop(key, None),
                         widget=widget,
                         groups=this_port_groups,
                     )
@@ -527,15 +635,20 @@ def prepare_definition(
             pass
 
         elif function_outs_annotation.__name__ != "_empty":  # Is it not empty
-            return_widget = return_widgets.get("return0", None)
-            widget = widgets.get("return0", None)
-            this_port_groups = groups.get("return0", None)
+            key = "return0"
+            return_widget = return_widgets.pop(key, None)
+            widget = widgets.pop(key, None)
+            this_port_groups = groups.pop(key, None)
+            port_effects = effects.pop(key, None)
             returns.append(
                 convert_object_to_port(
                     function_outs_annotation,
                     "return0",
                     structure_registry,
                     widget=widget,
+                    effects=port_effects,
+                    description=doc_param_description_map.pop(key, None),
+                    label=doc_param_label_map.pop(key, None),
                     return_widget=return_widget,
                     groups=this_port_groups,
                 )
@@ -543,18 +656,37 @@ def prepare_definition(
 
     # Documentation Parsing
 
-    name = docstring.short_description or function.__name__
-    description = docstring.long_description or "No Description"
+    name = name or docstring.short_description or function.__name__
+    description = description or docstring.long_description or "No Description"
+
+    if widgets:
+        raise DefinitionError(
+            f"Could not find the following ports for the widgets in the function {function.__name__}: {','.join(widgets.keys())}. Did you forget the type hint?"
+        )
+    if return_widgets:
+        raise DefinitionError(
+            f"Could not find the following ports for the return widgets in the function {function.__name__}: {','.join(return_widgets.keys())}. Did you forget the type hint?"
+        )
+    if port_label_map:
+        raise DefinitionError(
+            f"Could not find the following ports for the labels in the function {function.__name__}: {','.join(port_label_map.keys())}. Did you forget the type hint?"
+        )
+    if port_description_map:
+        raise DefinitionError(
+            f"Could not find the following ports for the descriptions in the function {function.__name__}: {','.join(port_description_map.keys())}. Did you forget the type hint?"
+        )
 
     x = DefinitionInput(
         **{
             "name": name,
             "description": description,
+            "collections": collections,
             "args": args,
             "returns": returns,
             "kind": NodeKindInput.GENERATOR if is_generator else NodeKindInput.FUNCTION,
             "interfaces": interfaces,
             "portGroups": port_groups,
+            "isTestFor": is_test_for,
         }
     )
 

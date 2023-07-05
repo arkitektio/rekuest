@@ -11,7 +11,14 @@ from rekuest.definition.registry import (
     get_default_definition_registry,
     get_current_definition_registry,
 )
-from rekuest.api.schema import WidgetInput, PortGroupInput, Scope, ReturnWidgetInput
+from rekuest.api.schema import (
+    WidgetInput,
+    PortGroupInput,
+    Scope,
+    ReturnWidgetInput,
+    EffectInput,
+)
+from rekuest.collection.shelve import get_current_shelve
 from typing import Dict, List, Callable, Optional, Tuple, Awaitable, Any
 import inflection
 from rekuest.definition.define import prepare_definition
@@ -27,7 +34,10 @@ def register_func(
     actifier: Actifier = reactify,
     port_groups: Optional[List[PortGroupInput]] = None,
     groups: Optional[Dict[str, List[str]]] = None,
+    collections: List[str] = None,
+    is_test_for: Optional[List[str]] = None,
     widgets: Dict[str, WidgetInput] = None,
+    effects: Dict[str, List[EffectInput]] = None,
     interfaces: List[str] = [],
     on_provide=None,
     on_unprovide=None,
@@ -63,32 +73,20 @@ def register_func(
         interface not in definition_registry.definitions
     ), "Interface already defined. Please choose a different name"
 
-    if hasattr(function_or_actor, "__definition__"):
-        # Actor comes with a definition
-        definition = function_or_actor.__definition__
-    else:
-        # We need to create a definition for the actor
-        definition = prepare_definition(
-            function_or_actor,
-            structure_registry,
-            widgets=widgets,
-            interfaces=interfaces,
-            port_groups=port_groups,
-            groups=groups,
-        )
-
-        actifier = actifier
-        actor_builder = actifier(
-            function_or_actor,
-            structure_registry,
-            on_provide=on_provide,
-            on_unprovide=on_unprovide,
-            widgets=widgets,
-            groups=groups,
-            port_groups=port_groups,
-            interfaces=interfaces,
-            **actifier_params,
-        )
+    definition, actor_builder = actifier(
+        function_or_actor,
+        structure_registry,
+        on_provide=on_provide,
+        on_unprovide=on_unprovide,
+        widgets=widgets,
+        is_test_for=is_test_for,
+        collections=collections,
+        groups=groups,
+        port_groups=port_groups,
+        effects=effects,
+        interfaces=interfaces,
+        **actifier_params,
+    )
 
     definition_registry.register_at_interface(
         interface, definition, structure_registry, actor_builder
@@ -101,8 +99,11 @@ def register(
     interface: str = None,
     widgets: Dict[str, WidgetInput] = None,
     interfaces: List[str] = [],
+    collections: List[str] = None,
     port_groups: Optional[List[PortGroupInput]] = None,
     groups: Optional[Dict[str, List[str]]] = None,
+    effects: Dict[str, List[EffectInput]] = None,
+    is_test_for: Optional[List[str]] = None,
     on_provide=None,
     on_unprovide=None,
     structure_registry: StructureRegistry = None,
@@ -151,7 +152,10 @@ def register(
             definition_registry=definition_registry,
             actifier=actifier,
             interface=interface,
+            is_test_for=is_test_for,
             widgets=widgets,
+            effects=effects,
+            collections=collections,
             interfaces=interfaces,
             on_provide=on_provide,
             on_unprovide=on_unprovide,
@@ -175,7 +179,10 @@ def register(
                 definition_registry=definition_registry,
                 actifier=actifier,
                 interface=interface,
+                is_test_for=is_test_for,
                 widgets=widgets,
+                effects=effects,
+                collections=collections,
                 interfaces=interfaces,
                 on_provide=on_provide,
                 on_unprovide=on_unprovide,
@@ -190,6 +197,86 @@ def register(
 
 
 def register_structure(
+    *cls,
+    identifier: str = None,
+    scope: Scope = Scope.LOCAL,
+    expand: Callable[
+        [
+            str,
+        ],
+        Awaitable[Any],
+    ] = None,
+    shrink: Callable[
+        [
+            any,
+        ],
+        Awaitable[str],
+    ] = None,
+    convert_default: Callable[[Any], str] = None,
+    default_widget: WidgetInput = None,
+    default_returnwidget: ReturnWidgetInput = None,
+    **kwargs,
+):
+    """Register a structure to the default structure registry.
+
+    Args:
+        cls (Structure): The structure class
+        name (str, optional): The name of the structure. Defaults to the class name.
+    """
+    if len(cls) > 1:
+        raise ValueError("You can only register one function or actor at a time.")
+    if len(cls) == 1:
+        function_or_actor = cls[0]
+
+        get_default_structure_registry().register_as_structure(
+            function_or_actor,
+            identifier=identifier,
+            scope=scope,
+            shrink=shrink,
+            expand=expand,
+            convert_default=convert_default,
+            default_widget=default_widget,
+            default_returnwidget=default_returnwidget,
+            **kwargs,
+        )
+
+        return cls
+
+    else:
+
+        def real_decorator(cls):
+            # Simple bypass for now
+
+            get_default_structure_registry().register_as_structure(
+                cls,
+                identifier=identifier,
+                scope=scope,
+                shrink=shrink,
+                expand=expand,
+                convert_default=convert_default,
+                default_widget=default_widget,
+                default_returnwidget=default_returnwidget,
+                **kwargs,
+            )
+
+            return cls
+
+        return real_decorator
+
+
+async def ashrink_to_shelve(data: Any):
+    return await get_current_shelve().aput(data)
+
+
+async def aexpand_to_shelve(data: Any):
+    return await get_current_shelve().aput(data)
+
+
+async def acollect_from_shelve(str: Any):
+    return await get_current_shelve().adelete(str)
+
+
+def register_shelved_structure(
     *cls,
     identifier: str = None,
     scope: Scope = Scope.LOCAL,

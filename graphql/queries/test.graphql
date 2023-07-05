@@ -1,0 +1,25 @@
+query get_testcase($id: ID!) {
+  testcase(id: $id) {
+    ...TestCase
+  }
+}
+
+query get_testresult($id: ID!) {
+  testresult(id: $id) {
+    ...TestResult
+  }
+}
+
+query search_testcases($search: String, $values: [ID]) {
+  options: testcases(search: $search, limit: 20, ids: $values) {
+    label: name
+    value: id
+  }
+}
+
+query search_testresults($search: String, $values: [ID]) {
+  options: testresults(search: $search, limit: 20, ids: $values) {
+    label: createdAt
+    value: id
+  }
+}

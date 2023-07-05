@@ -17,3 +17,27 @@ class AssignationListDeniedError(AgentTransportException):
     """
     Raised when the backend is not able to list the assignations.
     """
+
+
+class CorrectableConnectionFail(AgentTransportException):
+    pass
+
+
+class DefiniteConnectionFail(AgentTransportException):
+    pass
+
+
+class AgentConnectionFail(AgentTransportException):
+    pass
+
+
+class AgentWasKicked(AgentConnectionFail):
+    pass
+
+
+class AgentWasBlocked(AgentConnectionFail):
+    pass
+
+
+class AgentIsAlreadyBusy(AgentConnectionFail):
+    pass

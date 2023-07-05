@@ -11,3 +11,7 @@ class NoDefinitionRegistryFound(RekuestError):
     """Raised when no definition registry is found"""
 
     pass
+
+
+class NonSufficientDocumentation(DefinitionError):
+    """Raised when we cannot infer sufficcient documentatoin"""

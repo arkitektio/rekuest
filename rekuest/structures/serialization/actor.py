@@ -34,20 +34,20 @@ async def aexpand_arg(
 
     """
     if value is None:
+        value = port.default
+
+    if value is None:
         if port.nullable:
             return None
         else:
-            if port.default is not None:
-                value = port.default
-            else:
-                raise ExpandingError(
-                    f"{port.key} is not nullable (optional) but your provided None"
-                )
+            raise ExpandingError(
+                f"{port.key} is not nullable (optional) but received None"
+            )
 
     if not isinstance(value, (str, int, float, dict, list)):
         raise ExpandingError(
             f"Can't expand {value} of type {type(value)} to {port.kind}. We only accept"
-            " strings, ints and floats (json serializable)"
+            " strings, ints and floats (json serializable) and null values"
         ) from None
 
     if port.kind == PortKind.DICT:
@@ -65,7 +65,7 @@ async def aexpand_arg(
     if port.kind == PortKind.LIST:
         if not isinstance(value, list):
             raise ExpandingError(
-                f"Can't expand {value} of type {type(value)} to {port.kind}. We only"
+                f"Can't expand {value} of type {type(value)} to {port.kind}. Only"
                 " accept lists"
             ) from None
 
@@ -74,10 +74,10 @@ async def aexpand_arg(
         )
 
     if port.kind == PortKind.INT:
-        return int(value) if value is not None else int(port.default)
+        return int(value)
 
     if port.kind == PortKind.FLOAT:
-        return float(value) if value is not None else float(port.default)
+        return float(value)
 
     if port.kind == PortKind.STRUCTURE:
         try:
@@ -96,10 +96,10 @@ async def aexpand_arg(
             ) from e
 
     if port.kind == PortKind.BOOL:
-        return bool(value) if value is not None else bool(port.default)
+        return bool(value)
 
     if port.kind == PortKind.STRING:
-        return str(value) if value is not None else str(port.default)
+        return str(value)
 
     raise NotImplementedError("Should be implemented by subclass")
 
@@ -140,9 +140,11 @@ async def expand_inputs(
             }
 
         except Exception as e:
-            raise ExpandingError(f"Couldn't expand Arguments {args} ") from e
+            raise ExpandingError(f"Couldn't expand Arguments {args}") from e
     else:
-        expandend_params = {port.key: arg for port, arg in zip(node.args, args)}
+        expandend_params = {
+            port.key: arg for port, arg in zip(node.args, args) if arg is not None
+        }
 
     return expandend_params
 
@@ -188,6 +190,9 @@ async def ashrink_return(
 
         if port.kind == PortKind.INT:
             return int(value) if value is not None else None
+
+        if port.kind == PortKind.FLOAT:
+            return float(value) if value is not None else None
 
         if port.kind == PortKind.STRUCTURE:
             # We always convert structures returns to strings

@@ -27,9 +27,6 @@ class Rekuest(Composition):
     structure_registry: StructureRegistry = Field(
         default_factory=get_default_structure_registry
     )
-    definition_registry: DefinitionRegistry = Field(
-        default_factory=get_default_definition_registry
-    )
     agent: BaseAgent = Field(default_factory=BaseAgent)
     postman: BasePostman = Field(default_factory=GraphQLPostman)
 
@@ -41,7 +38,7 @@ class Rekuest(Composition):
         """
         structure_registry = kwargs.pop("structure_registry", self.structure_registry)
         definition_registry = kwargs.pop(
-            "definition_registry", self.definition_registry
+            "definition_registry", self.agent.definition_registry
         )
 
         return register(

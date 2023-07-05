@@ -67,6 +67,7 @@ class DefinitionRegistry(KoiledModel):
         return self.definitions[interface]
 
     async def __aenter__(self):
+        self._token = current_definition_registry.set(self)
         return self
 
     def dump(self):

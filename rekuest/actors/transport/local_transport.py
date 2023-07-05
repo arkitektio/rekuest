@@ -58,7 +58,6 @@ class LocalTransport(KoiledModel):
 
     @property
     def connected(self):
-        print("Called connected")
         return True
 
     async def change_provision(
@@ -68,7 +67,6 @@ class LocalTransport(KoiledModel):
         message: str = None,
         mode: ProvisionMode = None,
     ):
-        print("change_provision", id, status, message, mode)  #
         await self.broadcast(
             ProvisionChangedMessage(
                 provision=id, status=status, message=message, mode=mode
@@ -83,7 +81,6 @@ class LocalTransport(KoiledModel):
         returns: List[Any] = None,
         progress: int = None,
     ):
-        print("change_assignation", id, status, message, returns, progress)
         await self.broadcast(
             AssignationChangedMessage(
                 assignation=id, status=status, message=message, returns=returns
@@ -96,7 +93,6 @@ class LocalTransport(KoiledModel):
         level: LogLevelInput = None,
         message: str = None,
     ):
-        print("log_to_provision", id, level, message)
         logger.info(f"{id} {level} {message}")
 
     async def log_to_assignation(
@@ -105,7 +101,6 @@ class LocalTransport(KoiledModel):
         level: LogLevelInput = None,
         message: str = None,
     ):
-        print("log_to_assignation", id, level, message)
         logger.info(f"{id} {level} {message}")
 
     async def __aenter__(self):
@@ -180,7 +175,6 @@ class AgentActorTransport(KoiledModel):
 
     @property
     def connected(self):
-        print("Called connected")
         return True
 
     async def change_provision(
@@ -189,7 +183,6 @@ class AgentActorTransport(KoiledModel):
         message: str = None,
         mode: ProvisionMode = None,
     ):
-        print("change_provision", id, status, message, mode)  #
         await self.agent_transport.change_provision(
             self.passport.provision, status=status, message=message, mode=mode
         )
@@ -200,7 +193,6 @@ class AgentActorTransport(KoiledModel):
         level: LogLevelInput = None,
         message: str = None,
     ):
-        print("log_to_provision", id, level, message)
         logger.info(f"{id} {level} {message}")
         await self.agent_transport.log_to_provision(
             id=self.passport.provision, level=level, message=message
@@ -228,6 +220,11 @@ class ProxyAssignTransport(KoiledModel):
 
     async def log_to_assignation(self, *args, **kwargs):
         await self.on_log(self.assignment, *args, **kwargs)
+
+    class Config:
+        underscore_attrs_are_private = True
+        arbitrary_types_allowed = True
+        copy_on_model_validation = False
 
 
 class ProxyActorTransport(KoiledModel):

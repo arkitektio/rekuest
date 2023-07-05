@@ -4,7 +4,11 @@ from graphql import (
     OperationDefinitionNode,
     OperationType,
     print_ast,
+    print_source_location,
+    print_location,
+    GraphQLError,
 )
+from graphql.language.print_location import print_prefixed_lines
 
 
 class QString(str):
@@ -34,6 +38,17 @@ class Identifier(str):
         return f"Identifier({repr(self)})"
 
 
+def parse_or_raise(v: str):
+    try:
+        return parse(v)
+    except GraphQLError as e:
+        x = repr(e)
+        x += "\n" + v + "\n"
+        for l in e.locations:
+            x += "\n" + print_source_location(e.source, l)
+        raise ValueError("Could not parse to graphql: \n" + x)
+
+
 class SearchQuery(str):
     @classmethod
     def __get_validators__(cls):
@@ -49,10 +64,7 @@ class SearchQuery(str):
                 "Search query must be either a str or a graphql DocumentNode"
             )
         if isinstance(v, str):
-            try:
-                v = parse(v)
-            except Exception as e:
-                raise ValueError("Could not parse to graphql: " + repr(e))
+            v = parse_or_raise(v)
 
         if not v.definitions or len(v.definitions) > 1:
             raise ValueError("Only one definintion allowed")

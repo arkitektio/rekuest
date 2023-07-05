@@ -13,6 +13,7 @@ from rekuest.messages import (
     ProvisionLog,
     Unassignation,
     Unprovision,
+    Inquiry,
 )
 from pydantic import BaseModel, Field
 
@@ -34,9 +35,11 @@ class AgentMessageTypes(str, Enum):
 
 
 class AgentSubMessageTypes(str, Enum):
+    HELLO = "HELLO"
     ASSIGN = "ASSIGN"
     UNASSIGN = "UNASSIGN"
     PROVIDE = "PROVIDE"
+    INQUIRY = "INQUIRY"
     UNPROVIDE = "UNPROVIDE"
 
 
@@ -51,23 +54,23 @@ class JSONMessage(BaseModel):
 
 
 class AssignationsList(JSONMessage):
-    type: Literal[AgentMessageTypes.LIST_ASSIGNATIONS] = (
+    type: Literal[
         AgentMessageTypes.LIST_ASSIGNATIONS
-    )
+    ] = AgentMessageTypes.LIST_ASSIGNATIONS
     exclude: Optional[List[AssignationStatus]]
 
 
 class AssignationsListReply(JSONMessage):
-    type: Literal[AgentMessageTypes.LIST_ASSIGNATIONS_REPLY] = (
+    type: Literal[
         AgentMessageTypes.LIST_ASSIGNATIONS_REPLY
-    )
+    ] = AgentMessageTypes.LIST_ASSIGNATIONS_REPLY
     assignations: List[Assignation]
 
 
 class AssignationsListDenied(JSONMessage):
-    type: Literal[AgentMessageTypes.LIST_ASSIGNATIONS_DENIED] = (
+    type: Literal[
         AgentMessageTypes.LIST_ASSIGNATIONS_DENIED
-    )
+    ] = AgentMessageTypes.LIST_ASSIGNATIONS_DENIED
     error: str
 
 
@@ -77,16 +80,16 @@ class ProvisionList(JSONMessage):
 
 
 class ProvisionListReply(JSONMessage):
-    type: Literal[AgentMessageTypes.LIST_PROVISIONS_REPLY] = (
+    type: Literal[
         AgentMessageTypes.LIST_PROVISIONS_REPLY
-    )
+    ] = AgentMessageTypes.LIST_PROVISIONS_REPLY
     provisions: List[Provision]
 
 
 class ProvisionListDenied(JSONMessage):
-    type: Literal[AgentMessageTypes.LIST_PROVISIONS_DENIED] = (
+    type: Literal[
         AgentMessageTypes.LIST_PROVISIONS_DENIED
-    )
+    ] = AgentMessageTypes.LIST_PROVISIONS_DENIED
     error: str
 
 
@@ -101,6 +104,10 @@ class ProvisionChangedMessage(JSONMessage):
 class AssignSubMessage(JSONMessage, Assignation):
     type: Literal[AgentSubMessageTypes.ASSIGN] = AgentSubMessageTypes.ASSIGN
     guardian: str
+
+
+class InquirySubMessage(JSONMessage, Inquiry):
+    type: Literal[AgentSubMessageTypes.INQUIRY] = AgentSubMessageTypes.INQUIRY
 
 
 class ProvideSubMessage(JSONMessage, Provision):

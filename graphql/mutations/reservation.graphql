@@ -26,6 +26,6 @@ mutation reserve(
 
 mutation unreserve($id: ID!) {
   unreserve(id: $id) {
-    ...Reservation
+    id
   }
 }

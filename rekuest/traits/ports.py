@@ -24,7 +24,7 @@ class PortTrait(BaseModel):
             if values.get("identifier") is None:
                 raise ValueError(
                     "When specifying a structure you need to provide an arkitekt"
-                    " identifier"
+                    " identifier got:" + str(values)
                 )
 
         if kind == PortKind.LIST:
@@ -97,7 +97,7 @@ class WidgetInputTrait(BaseModel):
             if values.get("min") is None or values.get("max") is None:
                 raise ValueError(
                     "When specifying a Slider you need to provide an 'max and 'min'"
-                    " parameter"
+                    f" parameter {values}"
                 )
 
             if values.get("min") > values.get("max"):

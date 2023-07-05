@@ -4,7 +4,7 @@ from rekuest.messages import Provision
 from rekuest.rath import RekuestRath
 from rekuest.api.schema import TemplateFragment, PortGroupInput, AssignationStatus
 from rekuest.definition.define import DefinitionInput
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Tuple
 from pydantic import BaseModel, Field
 import uuid
 
@@ -21,6 +21,7 @@ class Assignment(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     args: List[Any] = Field(default_factory=list)
     user: str
+    reference: Optional[str]
 
 
 class AssignmentUpdate(BaseModel):
@@ -39,13 +40,12 @@ class Unassignment(BaseModel):
 
 @runtime_checkable
 class ActorBuilder(Protocol):
-    __definition__: DefinitionInput
-
     def __call__(
         self,
         passport: Passport,
         transport: Any,
         collector: Any,
+        definition_registry: Any,
     ) -> Any:
         ...
 
@@ -63,8 +63,9 @@ class Actifier(Protocol):
         structure_registry: StructureRegistry,
         port_groups: Optional[List[PortGroupInput]] = None,
         groups: Optional[Dict[str, List[str]]] = None,
+        is_test_for: Optional[List[str]] = None,
         **kwargs
-    ) -> ActorBuilder:
+    ) -> Tuple[DefinitionInput, ActorBuilder]:
         ...
 
 

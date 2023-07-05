@@ -289,7 +289,6 @@ async def expand_outputs(
 
 def serialize_inputs(
     definition: Union[DefinitionFragment, DefinitionInput],
-    args: Tuple[Any],
     kwargs: Dict[str, Any],
 ) -> Tuple[Any]:
     """Shrinks args and kwargs
@@ -308,32 +307,16 @@ def serialize_inputs(
     """
 
     args_list = []
-    try:
-        args_iterator = iter(args)
-    except TypeError:
-        raise ShrinkingError(f"Couldn't iterate over args {args}")
 
     # Extract to Argslist
 
     for port in definition.args:
-        try:
-            args_list.append(next(args_iterator))
-        except StopIteration as e:
-            if port.key in kwargs:
-                args_list.append(kwargs.get(port.key, None))
-            else:
-                if port.nullable or port.default is not None:
-                    args_list.append(None)
-                else:
-                    raise ShrinkingError(
-                        f"Couldn't find value for nonnunllable port {port.key}"
-                    ) from e
-
-    for port, arg in zip(definition.args, args_list):
-        if arg is None and not port.nullable and port.default is None:
+        value = kwargs.pop(port.key, None)
+        if value is None and not port.nullable:
             raise ShrinkingError(
-                f"Argument {port.key} is not nullable, but received null"
+                f"Couldn't find value for nonnunllable port {port.key}"
             )
+        args_list.append(value)
 
     shrinked_args = args_list
 
@@ -343,7 +326,7 @@ def serialize_inputs(
 def deserialize_outputs(
     definition: Union[DefinitionFragment, DefinitionInput],
     returns: List[Any],
-) -> Tuple[Any]:
+) -> Dict[str, Any]:
     """Expands Returns
 
     Expands the Returns according to the Node definition
@@ -357,7 +340,7 @@ def deserialize_outputs(
         ExpandingError: if they are not expandable
 
     Returns:
-        List[Any]: The Expanded Returns
+        Dcit[str, Any]: The Expanded Returns
     """
     assert returns is not None, "Returns can't be empty"
     if len(definition.returns) != len(returns):
@@ -365,9 +348,10 @@ def deserialize_outputs(
             f"Missmatch in Return Length. Node requires {len(definition.returns)} returns,"
             f" but got {len(returns)}"
         )
-    if len(returns) == 0:
-        return None
 
-    expanded_returns = returns
+    values = {}
 
-    return tuple(expanded_returns)
+    for port, value in zip(definition.returns, returns):
+        values[port.key] = value
+
+    return values

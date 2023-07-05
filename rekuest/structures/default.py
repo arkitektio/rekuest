@@ -2,10 +2,20 @@ from rekuest.structures.registry import StructureRegistry
 from rekuest.api.schema import (
     TemplateFragment,
     NodeFragment,
+    Search_templatesQuery,
+    Search_nodesQuery,
+    Search_testcasesQuery,
+    Search_testresultsQuery,
+    TestCaseFragment,
+    TestResultFragment,
+    aget_template,
+    aget_testcase,
+    aget_testresult,
     aget_template,
     afind,
     Scope,
 )
+from rekuest.widgets import SearchWidget
 
 
 DEFAULT_STRUCTURE_REGISTRY = None
@@ -21,9 +31,39 @@ def get_default_structure_registry() -> StructureRegistry:
             "@rekuest/template",
             scope=Scope.GLOBAL,
             expand=aget_template,
+            default_widget=SearchWidget(
+                query=Search_templatesQuery.Meta.document, ward="rekuest"
+            ),
         )
+
         DEFAULT_STRUCTURE_REGISTRY.register_as_structure(
-            NodeFragment, "@rekuest/node", scope=Scope.GLOBAL, expand=afind
+            NodeFragment,
+            "@rekuest/node",
+            scope=Scope.GLOBAL,
+            expand=afind,
+            default_widget=SearchWidget(
+                query=Search_nodesQuery.Meta.document, ward="rekuest"
+            ),
+        )
+
+        DEFAULT_STRUCTURE_REGISTRY.register_as_structure(
+            TestCaseFragment,
+            "@rekuest/testcase",
+            scope=Scope.GLOBAL,
+            expand=aget_testcase,
+            default_widget=SearchWidget(
+                query=Search_testcasesQuery.Meta.document, ward="rekuest"
+            ),
+        )
+
+        DEFAULT_STRUCTURE_REGISTRY.register_as_structure(
+            TestResultFragment,
+            "@rekuest/testresult",
+            scope=Scope.GLOBAL,
+            expand=aget_testresult,
+            default_widget=SearchWidget(
+                query=Search_testresultsQuery.Meta.document, ward="rekuest"
+            ),
         )
 
         try:

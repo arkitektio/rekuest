@@ -43,7 +43,6 @@ class AsyncFuncActor(SerializingActor):
         collector: Collector,
         transport: AssignTransport,
     ):
-        print("CALLLLLLLLLLLLLED")
         try:
             params = await expand_inputs(
                 self.definition,
@@ -59,6 +58,8 @@ class AsyncFuncActor(SerializingActor):
             async with AssignationContext(assignment=assignment, transport=transport):
                 returns = await self.assign(**params)
 
+            collector.register(assignment, parse_collectable(self.definition, returns))
+
             returns = await shrink_outputs(
                 self.definition,
                 returns,
@@ -66,15 +67,10 @@ class AsyncFuncActor(SerializingActor):
                 skip_shrinking=not self.shrink_outputs,
             )
 
-            collector.register(assignment, parse_collectable(self.definition, returns))
-
             await transport.change_assignation(
                 status=AssignationStatus.RETURNED,
                 returns=returns,
             )
-
-        except asyncio.CancelledError:
-            await transport.change_assignation(status=AssignationStatus.CANCELLED)
 
         except AssertionError as ex:
             await transport.change_assignation(
@@ -111,15 +107,15 @@ class AsyncGenActor(SerializingActor):
 
             async with AssignationContext(assignment=assignment, transport=transport):
                 async for returns in self.assign(**params):
+                    collector.register(
+                        assignment, parse_collectable(self.definition, returns)
+                    )
+
                     returns = await shrink_outputs(
                         self.definition,
                         returns,
                         structure_registry=self.structure_registry,
                         skip_shrinking=not self.shrink_outputs,
-                    )
-
-                    collector.register(
-                        assignment, parse_collectable(self.definition, returns)
                     )
 
                     await transport.change_assignation(
@@ -128,9 +124,6 @@ class AsyncGenActor(SerializingActor):
                     )
 
             await transport.change_assignation(status=AssignationStatus.DONE)
-
-        except asyncio.CancelledError:
-            await transport.change_assignation(status=AssignationStatus.CANCELLED)
 
         except AssertionError as ex:
             await transport.change_assignation(
@@ -205,14 +198,6 @@ class ThreadedFuncActor(SerializingActor):
                 returns=returns,
             )
 
-        except asyncio.CancelledError as e:
-            logger.info("Actor Cancelled")
-
-            await transport.change_assignation(
-                status=AssignationStatus.CANCELLED,
-                message=str(e),
-            )
-
         except AssertionError as ex:
             await transport.change_assignation(
                 status=AssignationStatus.ERROR,
@@ -251,15 +236,15 @@ class ThreadedGenActor(SerializingActor):
                 async for returns in iterate_spawned(
                     self.assign, **params, executor=self.executor, pass_context=True
                 ):
+                    collector.register(
+                        assignment, parse_collectable(self.definition, returns)
+                    )
+
                     returns = await shrink_outputs(
                         self.definition,
                         returns,
                         structure_registry=self.structure_registry,
                         skip_shrinking=not self.shrink_outputs,
-                    )
-
-                    collector.register(
-                        assignment, parse_collectable(self.definition, returns)
                     )
 
                     await self.transport.change_assignation(
@@ -268,12 +253,6 @@ class ThreadedGenActor(SerializingActor):
                     )
 
             await transport.change_assignation(status=AssignationStatus.DONE)
-
-        except asyncio.CancelledError as e:
-            await transport.change_assignation(
-                status=AssignationStatus.CANCELLED,
-                message=str(e),
-            )
 
         except AssertionError as ex:
             await transport.change_assignation(

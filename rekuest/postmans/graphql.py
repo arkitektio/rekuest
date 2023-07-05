@@ -17,6 +17,7 @@ from rekuest.postmans.base import BasePostman
 import asyncio
 from pydantic import Field
 import logging
+from .errors import PostmanException
 from .vars import current_postman
 
 logger = logging.getLogger(__name__)
@@ -65,13 +66,17 @@ class GraphQLPostman(BasePostman):
 
         self.reservations[unique_identifier] = None
         self._res_update_queues[unique_identifier] = asyncio.Queue()
-        reservation = await areserve(
-            hash=hash,
-            params=params,
-            provision=provision,
-            reference=reference,
-            binds=binds,
-        )
+        try:
+            reservation = await areserve(
+                hash=hash,
+                params=params,
+                provision=provision,
+                reference=reference,
+                binds=binds,
+            )
+        except Exception as e:
+            raise PostmanException("Cannot Reserve") from e
+
         await self._res_update_queue.put(reservation)
         return self._res_update_queues[unique_identifier]
 
@@ -80,8 +85,11 @@ class GraphQLPostman(BasePostman):
             if not self._watching:
                 await self.start_watching()
 
-        unreservation = await aunreserve(reservation_id)
-        self.reservations[unreservation.id] = unreservation
+        try:
+            unreservation = await aunreserve(reservation_id)
+            self.reservations[unreservation.id] = unreservation
+        except Exception as e:
+            raise PostmanException("Cannot Unreserve") from e
 
     async def aassign(
         self,
@@ -101,9 +109,12 @@ class GraphQLPostman(BasePostman):
 
         self.assignations[reference] = None
         self._ass_update_queues[reference] = asyncio.Queue()
-        assignation = await aassign(
-            reservation=reservation, args=args, reference=reference, parent=parent
-        )
+        try:
+            assignation = await aassign(
+                reservation=reservation, args=args, reference=reference, parent=parent
+            )
+        except Exception as e:
+            raise PostmanException("Cannot Assign") from e
         await self._ass_update_queue.put(assignation)
         return self._ass_update_queues[reference]
 
@@ -115,7 +126,10 @@ class GraphQLPostman(BasePostman):
             if not self._watching:
                 await self.start_watching()
 
-        unassignation = await aunassign(assignation)
+        try:
+            unassignation = await aunassign(assignation)
+        except Exception as e:
+            raise PostmanException("Cannot Unassign") from e
         self.assignations[unassignation.id] = unassignation
         return unassignation
 

@@ -8,14 +8,17 @@ from rekuest.api.schema import (
     WidgetInput,
     AnnotationInput,
     Scope,
+    PortInput,
 )
 from pydantic import BaseModel, Field
+import inspect
 
 from .errors import (
     StructureDefinitionError,
     StructureOverwriteError,
     StructureRegistryError,
 )
+from .types import PortBuilder
 
 current_structure_registry = contextvars.ContextVar("current_structure_registry")
 
@@ -56,6 +59,7 @@ class StructureRegistry(BaseModel):
     _identifier_expander_map: Dict[str, Callable[[str], Awaitable[Any]]] = {}
     _identifier_shrinker_map: Dict[str, Callable[[Any], Awaitable[str]]] = {}
     _identifier_collect_map: Dict[str, Callable[[Any], Awaitable[None]]] = {}
+    _identifier_builder_map: Dict[str, PortBuilder] = {}
 
     _structure_convert_default_map: Dict[str, Callable[[Any], str]] = {}
     _structure_identifier_map: Dict[Type, str] = {}
@@ -148,31 +152,33 @@ class StructureRegistry(BaseModel):
             Awaitable[str],
         ] = None,
         convert_default: Callable[[Any], str] = None,
-        default_widget: WidgetInput = None,
-        default_returnwidget: ReturnWidgetInput = None,
+        default_widget: Optional[WidgetInput] = None,
+        build: Optional[PortBuilder] = None,
+        default_returnwidget: Optional[ReturnWidgetInput] = None,
     ):
-        if issubclass(cls, Enum):
-            identifier = "cls/" + cls.__name__.lower()
-            shrink, expand = build_enum_shrink_expand(cls)
-            scope = Scope.GLOBAL
+        if inspect.isclass(cls):
+            if issubclass(cls, Enum):
+                identifier = "cls/" + cls.__name__.lower()
+                shrink, expand = build_enum_shrink_expand(cls)
+                scope = Scope.GLOBAL
 
-            def convert_default(x):
-                return x._name_
+                def convert_default(x):
+                    return x._name_
 
-            default_widget = default_widget or WidgetInput(
-                kind="ChoiceWidget",
-                choices=[
-                    ChoiceInput(label=key, value=key)
-                    for key, value in cls.__members__.items()
-                ],
-            )
-            default_returnwidget = default_returnwidget or ReturnWidgetInput(
-                kind="ChoiceReturnWidget",
-                choices=[
-                    ChoiceInput(label=key, value=key)
-                    for key, value in cls.__members__.items()
-                ],
-            )
+                default_widget = default_widget or WidgetInput(
+                    kind="ChoiceWidget",
+                    choices=[
+                        ChoiceInput(label=key, value=key)
+                        for key, value in cls.__members__.items()
+                    ],
+                )
+                default_returnwidget = default_returnwidget or ReturnWidgetInput(
+                    kind="ChoiceReturnWidget",
+                    choices=[
+                        ChoiceInput(label=key, value=key)
+                        for key, value in cls.__members__.items()
+                    ],
+                )
 
         if convert_default is None:
             if hasattr(cls, "convert_default"):
@@ -185,6 +191,12 @@ class StructureRegistry(BaseModel):
                     " aexpand method"
                 )
             expand = cls.aexpand
+
+        if build is None:
+            if not hasattr(cls, "build"):
+                build = None
+            else:
+                build = cls.build
 
         if not hasattr(cls, "acollect"):
             if scope == Scope.LOCAL:
@@ -234,6 +246,8 @@ class StructureRegistry(BaseModel):
         self._identifier_expander_map[identifier] = expand
         self._identifier_collect_map[identifier] = collect
         self._identifier_shrinker_map[identifier] = shrink
+        self._identifier_builder_map[identifier] = build
+
         self.identifier_structure_map[identifier] = cls
         self.identifier_scope_map[identifier] = scope
         self._structure_identifier_map[cls] = identifier

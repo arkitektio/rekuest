@@ -11,8 +11,8 @@ from rekuest.agents.transport.base import AgentTransport
 from rekuest.messages import Provision
 from rekuest.definition.define import prepare_definition
 from rekuest.actors.types import ActorBuilder
-from rekuest.api.schema import PortGroupInput
-from typing import Optional, Any, Dict, Union, Callable, Coroutine, Type, List
+from rekuest.api.schema import PortGroupInput, DefinitionInput, WidgetInput, EffectInput
+from typing import Optional, Any, Dict, Union, Callable, Coroutine, Type, List, Tuple
 from rekuest.actors.base import Passport
 from rekuest.actors.transport.types import ActorTransport
 
@@ -51,16 +51,34 @@ def reactify(
     bypass_expand=False,
     on_provide=None,
     on_unprovide=None,
+    collections: List[str] = None,
+    effects: Dict[str, EffectInput] = None,
+    port_groups: Optional[List[PortGroupInput]] = None,
+    groups: Optional[Dict[str, List[str]]] = None,
+    is_test_for: Optional[List[str]] = None,
+    widgets: Dict[str, WidgetInput] = None,
+    interfaces: List[str] = [],
     **params,
-) -> ActorBuilder:
+) -> Tuple[DefinitionInput, ActorBuilder]:
     """Reactify a function
 
     This function takes a callable (of type async or sync function or generator) and
     returns a builder function that creates an actor that makes the function callable
     from the rekuest server.
-    The callable will be both in the context of  an assignation and a provision helper,
-    enabling the usage of the function as a provision helper.
     """
+
+    definition = prepare_definition(
+        function,
+        structure_registry,
+        widgets=widgets,
+        interfaces=interfaces,
+        port_groups=port_groups,
+        collections=collections,
+        groups=groups,
+        effects=effects,
+        is_test_for=is_test_for,
+        **params,
+    )
 
     is_coroutine = inspect.iscoroutinefunction(function)
     is_asyncgen = inspect.isasyncgenfunction(function)
@@ -76,16 +94,20 @@ def reactify(
         "on_provide": on_provide if on_provide else async_none_provide,
         "on_unprovide": on_unprovide if on_unprovide else async_none_unprovide,
         "structure_registry": structure_registry,
-        **params,
+        "definition": definition,
     }
 
     if is_coroutine:
-        return higher_order_builder(FunctionalFuncActor, **actor_attributes)
+        return definition, higher_order_builder(FunctionalFuncActor, **actor_attributes)
     elif is_asyncgen:
-        return higher_order_builder(FunctionalGenActor, **actor_attributes)
+        return definition, higher_order_builder(FunctionalGenActor, **actor_attributes)
     elif is_generatorfunction:
-        return higher_order_builder(FunctionalThreadedGenActor, **actor_attributes)
+        return definition, higher_order_builder(
+            FunctionalThreadedGenActor, **actor_attributes
+        )
     elif is_function or is_method:
-        return higher_order_builder(FunctionalThreadedFuncActor, **actor_attributes)
+        return definition, higher_order_builder(
+            FunctionalThreadedFuncActor, **actor_attributes
+        )
     else:
         raise NotImplementedError("No way of converting this to a function")

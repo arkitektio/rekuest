@@ -41,7 +41,9 @@ class Actor(BaseModel):
 
     _in_queue: Contextual[asyncio.Queue] = PrivateAttr(default=None)
     _running_asyncio_tasks: Dict[str, asyncio.Task] = PrivateAttr(default_factory=dict)
+    _running_transports: Dict[str, AssignTransport] = PrivateAttr(default_factory=dict)
     _provision_task: asyncio.Task = PrivateAttr(default=None)
+    _status: ProvisionStatus = PrivateAttr(default=ProvisionStatus.PENDING)
 
     async def on_provide(self, passport: Passport):
         return None
@@ -51,7 +53,7 @@ class Actor(BaseModel):
 
     async def on_assign(
         self,
-        assignation: Assignation,
+        assignment: Assignment,
         collector: AssignationCollector,
         transport: AssignTransport,
     ):
@@ -61,13 +63,22 @@ class Actor(BaseModel):
 
     async def apass(self, message: Union[Unassignment, Assignment]):
         assert self._in_queue, "Actor is currently not listening"
-        print("passing message")
         await self._in_queue.put(message)
 
     async def arun(self):
         self._in_queue = asyncio.Queue()
         self._provision_task = asyncio.create_task(self.alisten())
         return self._provision_task
+
+    async def aset_status(self, status: ProvisionStatus, message: str = None):
+        self._status = status
+        await self.transport.change_provision(
+            status=status,
+            message=message or "No message provided",
+        )
+
+    async def aget_status(self):
+        return self._status
 
     async def acancel(self):
         # Cancel Mnaged actors
@@ -106,13 +117,13 @@ class Actor(BaseModel):
         try:
             logging.info(f"Providing {self.passport}")
             await self.on_provide(self.passport)
-            await self.transport.change_provision(
+            await self.aset_status(
                 status=ProvisionStatus.ACTIVE,
             )
 
         except Exception as e:
             logging.critical(f"Providing Error {self.passport} {e}", exc_info=True)
-            await self.transport.change_provision(
+            await self.aset_status(
                 status=ProvisionStatus.CRITICAL,
                 message=str(e),
             )
@@ -120,13 +131,13 @@ class Actor(BaseModel):
     async def unprovide(self):
         try:
             await self.on_unprovide()
-            await self.transport.change_provision(
+            await self.aset_status(
                 status=ProvisionStatus.INACTIVE,
             )
 
         except Exception as e:
             logging.critical(f"Unproviding Error {self.passport} {e}", exc_info=True)
-            await self.transport.change_provision(
+            await self.aset_status(
                 status=ProvisionStatus.CRITICAL,
                 message=str(e),
             )
@@ -135,22 +146,49 @@ class Actor(BaseModel):
         logger.info(f"Actor for {self.passport}: Received {message}")
 
         if isinstance(message, Assignment):
+            transport = self.transport.spawn(message)
+
             task = asyncio.create_task(
                 self.on_assign(
                     message,
                     collector=self.collector,
-                    transport=self.transport.spawn(message),
+                    transport=transport,
                 )
             )
+
+            self._running_transports[message.id] = transport
             self._running_asyncio_tasks[message.id] = task
 
         elif isinstance(message, Unassignment):
             if message.id in self._running_asyncio_tasks:
                 task = self._running_asyncio_tasks[message.id]
+                transport = self._running_transports[message.id]
+
                 if not task.done():
                     task.cancel()
+                    try:
+                        await task
+                    except asyncio.CancelledError:
+                        logger.info(
+                            f"Task {transport.assignment} was cancelled through arkitekt. Setting Cancelled"
+                        )
+                        await transport.change_assignation(
+                            status=AssignationStatus.CANCELLED,
+                            message="Cancelled by Actor",
+                        )
+
+                        del self._running_asyncio_tasks[message.id]
+                        del self._running_transports[message.id]
+
                 else:
-                    logger.error("Task was already done")
+                    logger.warning(
+                        f"Race Condition: Task was already done before cancellation"
+                    )
+
+            else:
+                logger.warning(
+                    f"Actor for {self.passport}: Received unassignment for unknown assignation {message.id}"
+                )
         else:
             raise UnknownMessageError(f"{message}")
 
@@ -173,13 +211,24 @@ class Actor(BaseModel):
 
             [i.cancel() for i in self._running_asyncio_tasks.values()]
 
-            for i in self._running_asyncio_tasks.values():
+            for task, transport in zip(
+                self._running_asyncio_tasks.values(), self._running_transports.values()
+            ):
                 try:
-                    await i
+                    await task
                 except asyncio.CancelledError:
-                    pass
+                    logger.info(
+                        f"Task {transport.assignment} was cancelled through applicaction. Setting Critical"
+                    )
+                    await transport.change_assignation(
+                        status=AssignationStatus.CRITICAL,
+                        message="Cancelled by Application",
+                    )
 
             await self.unprovide()
+
+        except Exception as e:
+            logger.critical("Unhandled exception", exc_info=True)
 
             # TODO: Maybe send back an acknoledgement that we are done cancelling.
             # If we don't do this, arkitekt will not know if we failed to cancel our
@@ -205,9 +254,6 @@ class Actor(BaseModel):
                 interface
             )
 
-            definition = self.definition_registry.get_definition_for_interface(
-                interface
-            )
         except KeyError as e:
             raise ProvisionDelegateException(
                 "No Actor Builder found for interface"
@@ -216,7 +262,6 @@ class Actor(BaseModel):
         passport = Passport(provision=self.passport.provision, parent=self.passport.id)
 
         actor = actor_builder(
-            definition=definition,
             passport=passport,
             transport=transport,
             definition_registry=self.definition_registry,
