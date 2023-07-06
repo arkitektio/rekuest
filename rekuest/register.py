@@ -200,17 +200,23 @@ def register_structure(
     *cls,
     identifier: str = None,
     scope: Scope = Scope.LOCAL,
-    expand: Callable[
+    aexpand: Callable[
         [
             str,
         ],
         Awaitable[Any],
     ] = None,
-    shrink: Callable[
+    ashrink: Callable[
         [
             any,
         ],
         Awaitable[str],
+    ] = None,
+    acollect: Callable[
+        [
+            str,
+        ],
+        Awaitable[Any],
     ] = None,
     convert_default: Callable[[Any], str] = None,
     default_widget: WidgetInput = None,
@@ -232,8 +238,9 @@ def register_structure(
             function_or_actor,
             identifier=identifier,
             scope=scope,
-            shrink=shrink,
-            expand=expand,
+            ashrink=ashrink,
+            aexpand=aexpand,
+            acollect=acollect,
             convert_default=convert_default,
             default_widget=default_widget,
             default_returnwidget=default_returnwidget,
@@ -251,88 +258,9 @@ def register_structure(
                 cls,
                 identifier=identifier,
                 scope=scope,
-                shrink=shrink,
-                expand=expand,
-                convert_default=convert_default,
-                default_widget=default_widget,
-                default_returnwidget=default_returnwidget,
-                **kwargs,
-            )
-
-            return cls
-
-        return real_decorator
-
-
-async def ashrink_to_shelve(data: Any):
-    return await get_current_shelve().aput(data)
-
-
-async def aexpand_to_shelve(data: Any):
-    return await get_current_shelve().aput(data)
-
-
-async def acollect_from_shelve(str: Any):
-    return await get_current_shelve().adelete(str)
-
-
-def register_shelved_structure(
-    *cls,
-    identifier: str = None,
-    scope: Scope = Scope.LOCAL,
-    expand: Callable[
-        [
-            str,
-        ],
-        Awaitable[Any],
-    ] = None,
-    shrink: Callable[
-        [
-            any,
-        ],
-        Awaitable[str],
-    ] = None,
-    convert_default: Callable[[Any], str] = None,
-    default_widget: WidgetInput = None,
-    default_returnwidget: ReturnWidgetInput = None,
-    **kwargs,
-):
-    """Register a structure to the default structure registry.
-
-    Args:
-        cls (Structure): The structure class
-        name (str, optional): The name of the structure. Defaults to the class name.
-    """
-    if len(cls) > 1:
-        raise ValueError("You can only register one function or actor at a time.")
-    if len(cls) == 1:
-        function_or_actor = cls[0]
-
-        get_default_structure_registry().register_as_structure(
-            function_or_actor,
-            identifier=identifier,
-            scope=scope,
-            shrink=shrink,
-            expand=expand,
-            convert_default=convert_default,
-            default_widget=default_widget,
-            default_returnwidget=default_returnwidget,
-            **kwargs,
-        )
-
-        return cls
-
-    else:
-
-        def real_decorator(cls):
-            # Simple bypass for now
-
-            get_default_structure_registry().register_as_structure(
-                cls,
-                identifier=identifier,
-                scope=scope,
-                shrink=shrink,
-                expand=expand,
+                ashrink=ashrink,
+                aexpand=aexpand,
+                acollect=acollect,
                 convert_default=convert_default,
                 default_widget=default_widget,
                 default_returnwidget=default_returnwidget,
