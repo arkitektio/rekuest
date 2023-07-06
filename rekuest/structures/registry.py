@@ -27,31 +27,30 @@ async def id_shrink(self):
     return self.id
 
 
-
-
-
 async def shelve_ashrink(cls: Type):
     shelve = get_current_shelve()
     return await shelve.aput(cls)
+
 
 async def shelve_aexpand(id: str):
     shelve = get_current_shelve()
     return await shelve.aget(id)
 
+
 async def shelve_acollect(id: str):
     shelve = get_current_shelve()
     return await shelve.adelete(id)
+
 
 async def void_acollect(id: str):
     return None
 
 
 def build_instance_predicate(cls: Type):
-    return lambda x: isinstance(x,cls)
+    return lambda x: isinstance(x, cls)
 
 
 def build_enum_shrink_expand(cls: Type[Enum]):
-
     async def shrink(s):
         return s._name_
 
@@ -94,13 +93,21 @@ class StructureRegistry(BaseModel):
         try:
             return self._identifier_expander_map[key]
         except KeyError as e:
-            raise StructureRegistryError(f"{key} is not registered") from e
+            raise StructureRegistryError(f"Expander for {key} is not registered") from e
+
+    def get_collector_for_identifier(self, key):
+        try:
+            return self._identifier_collecter_map[key]
+        except KeyError as e:
+            raise StructureRegistryError(
+                f"Collector for {key} is not registered"
+            ) from e
 
     def get_shrinker_for_identifier(self, key):
         try:
             return self._identifier_shrinker_map[key]
         except KeyError as e:
-            raise StructureRegistryError(f"{key} is not registered") from e
+            raise StructureRegistryError(f"Shrinker for {key} is not registered") from e
 
     def register_expander(self, key, expander):
         self._identifier_expander_map[key] = expander
@@ -110,6 +117,11 @@ class StructureRegistry(BaseModel):
 
     def get_returnwidget_input(self, cls) -> Optional[ReturnWidgetInput]:
         return self._structure_default_returnwidget_map.get(cls, None)
+
+    def get_predicator_for_identifier(
+        self, identifier: str
+    ) -> Optional[Callable[[Any], bool]]:
+        return self._identifier_predicate_map[identifier]
 
     def get_identifier_for_structure(self, cls):
         try:
@@ -178,7 +190,7 @@ class StructureRegistry(BaseModel):
             ],
             Awaitable[Any],
         ] = None,
-        predicate: Callable[[Any], bool ] = None,
+        predicate: Callable[[Any], bool] = None,
         convert_default: Callable[[Any], str] = None,
         default_widget: Optional[WidgetInput] = None,
         build: Optional[PortBuilder] = None,
@@ -188,6 +200,8 @@ class StructureRegistry(BaseModel):
             if issubclass(cls, Enum):
                 identifier = "cls/" + cls.__name__.lower()
                 shrink, expand = build_enum_shrink_expand(cls)
+                ashrink = ashrink or shrink
+                aexpand = aexpand or expand
                 scope = Scope.GLOBAL
 
                 def convert_default(x):
@@ -229,14 +243,13 @@ class StructureRegistry(BaseModel):
             ashrink = getattr(cls, "ashrink", shelve_ashrink)
 
         if acollect is None:
-            if not hasattr(cls, "acollect") and scope == Scope.GLOBAL:
-                acollect == void_acollect
-            acollect = getattr(cls, "acollect", shelve_acollect)
+            if scope == Scope.GLOBAL:
+                acollect = void_acollect
+            else:
+                acollect = getattr(cls, "acollect", shelve_acollect)
 
         if predicate is None:
             predicate = build_instance_predicate(cls)
-
-        
 
         if identifier is None:
             if not hasattr(cls, "get_identifier"):
@@ -251,7 +264,6 @@ class StructureRegistry(BaseModel):
                 f"{identifier} is already registered. Previously registered"
                 f" {self.identifier_structure_map[identifier]}"
             )
-        
 
         self._identifier_expander_map[identifier] = aexpand
         self._identifier_collecter_map[identifier] = acollect

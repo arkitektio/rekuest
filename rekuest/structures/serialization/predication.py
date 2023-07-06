@@ -18,12 +18,18 @@ from rekuest.structures.errors import (
 )
 
 
-def predicate_port(port: Union[PortFragment, ChildPortFragment], value: Any, structure_registry=None):
+def predicate_port(
+    port: Union[PortFragment, ChildPortFragment],
+    value: Any,
+    structure_registry: StructureRegistry = None,
+):
     if port.kind == PortKind.DICT:
-        if not isinstance(value, dict): return False
+        if not isinstance(value, dict):
+            return False
         return all([predicate_port(port.child, value) for key, value in value.items()])
     if port.kind == PortKind.LIST:
-        if not isinstance(value, list): return False
+        if not isinstance(value, list):
+            return False
         return all([predicate_port(port.child, value) for value in value])
     if port.kind == PortKind.BOOL:
         return isinstance(value, bool)
@@ -31,9 +37,6 @@ def predicate_port(port: Union[PortFragment, ChildPortFragment], value: Any, str
         return isinstance(value, int)
     if port.kind == PortKind.FLOAT:
         return isinstance(value, float)
-    if port.kind == PortKind.STRUCTURE: 
-        predicate = structure_registry.get_predicater_for_identifier(
-                        port.identifier
-                    )
+    if port.kind == PortKind.STRUCTURE:
+        predicate = structure_registry.get_predicator_for_identifier(port.identifier)
         return predicate(value)
-

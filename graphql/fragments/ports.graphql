@@ -51,6 +51,9 @@ fragment Port on Port {
   child {
     ...ChildPort
   }
+  variants {
+    ...ChildPort
+  }
   annotations {
     ...Annotation
   }

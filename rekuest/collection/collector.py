@@ -1,4 +1,5 @@
 from rekuest.actors.types import Passport, Assignment
+from rekuest.structures.default import get_default_structure_registry, StructureRegistry
 from pydantic import BaseModel, Field
 from typing import Dict, Any, List
 import logging
@@ -57,6 +58,10 @@ class Collector(BaseModel):
     collect data during the actors liftetime
     """
 
+    structure_registry: StructureRegistry = Field(
+        default_factory=get_default_structure_registry
+    )
+
     assignment_map: Dict[str, List[Any]] = Field(default_factory=dict)
     children_tree: Dict[str, List[str]] = Field(default_factory=dict)
 
@@ -81,11 +86,17 @@ class Collector(BaseModel):
         """
 
         if id in self.assignment_map:
-            for v in self.assignment_map[id]:
+            for identifier, value in self.assignment_map[id]:
                 try:
-                    await v.acollect()
-                except:
-                    logger.error("This shouldn't happend but lets see", exc_info=True)
+                    collector = self.structure_registry.get_collector_for_identifier(
+                        identifier
+                    )
+                    await collector(value)
+                except Exception as e:
+                    logger.critical(
+                        f"Error while collecting {identifier} with value {value}"
+                    )
+                    raise e
 
         if id in self.children_tree:
             for child in self.children_tree[id]:

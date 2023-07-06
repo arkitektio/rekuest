@@ -11,8 +11,8 @@ def parse_collectable(definition: DefinitionInput, returns: List[Any]):
         returns = [returns]
 
     for port, v in zip(definition.returns, returns):
+        # Only structures will be collected because others are passed by value
         if port.kind == PortKind.STRUCTURE:
-            if port.scope == Scope.LOCAL:
-                collectables.append(v)
+            collectables.append((port.identifier, v))
 
     return collectables

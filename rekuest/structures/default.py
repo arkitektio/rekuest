@@ -1,4 +1,4 @@
-from rekuest.structures.registry import StructureRegistry
+from rekuest.structures.registry import StructureRegistry, id_shrink
 from rekuest.api.schema import (
     TemplateFragment,
     NodeFragment,
@@ -30,7 +30,8 @@ def get_default_structure_registry() -> StructureRegistry:
             TemplateFragment,
             "@rekuest/template",
             scope=Scope.GLOBAL,
-            expand=aget_template,
+            aexpand=aget_template,
+            ashrink=id_shrink,
             default_widget=SearchWidget(
                 query=Search_templatesQuery.Meta.document, ward="rekuest"
             ),
@@ -40,7 +41,8 @@ def get_default_structure_registry() -> StructureRegistry:
             NodeFragment,
             "@rekuest/node",
             scope=Scope.GLOBAL,
-            expand=afind,
+            aexpand=afind,
+            ashrink=id_shrink,
             default_widget=SearchWidget(
                 query=Search_nodesQuery.Meta.document, ward="rekuest"
             ),
@@ -50,7 +52,8 @@ def get_default_structure_registry() -> StructureRegistry:
             TestCaseFragment,
             "@rekuest/testcase",
             scope=Scope.GLOBAL,
-            expand=aget_testcase,
+            aexpand=aget_testcase,
+            ashrink=id_shrink,
             default_widget=SearchWidget(
                 query=Search_testcasesQuery.Meta.document, ward="rekuest"
             ),
@@ -60,7 +63,8 @@ def get_default_structure_registry() -> StructureRegistry:
             TestResultFragment,
             "@rekuest/testresult",
             scope=Scope.GLOBAL,
-            expand=aget_testresult,
+            aexpand=aget_testresult,
+            ashrink=id_shrink,
             default_widget=SearchWidget(
                 query=Search_testresultsQuery.Meta.document, ward="rekuest"
             ),

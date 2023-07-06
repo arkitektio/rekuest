@@ -58,14 +58,14 @@ class AsyncFuncActor(SerializingActor):
             async with AssignationContext(assignment=assignment, transport=transport):
                 returns = await self.assign(**params)
 
-            collector.register(assignment, parse_collectable(self.definition, returns))
-
             returns = await shrink_outputs(
                 self.definition,
                 returns,
                 structure_registry=self.structure_registry,
                 skip_shrinking=not self.shrink_outputs,
             )
+
+            collector.register(assignment, parse_collectable(self.definition, returns))
 
             await transport.change_assignation(
                 status=AssignationStatus.RETURNED,
@@ -107,15 +107,15 @@ class AsyncGenActor(SerializingActor):
 
             async with AssignationContext(assignment=assignment, transport=transport):
                 async for returns in self.assign(**params):
-                    collector.register(
-                        assignment, parse_collectable(self.definition, returns)
-                    )
-
                     returns = await shrink_outputs(
                         self.definition,
                         returns,
                         structure_registry=self.structure_registry,
                         skip_shrinking=not self.shrink_outputs,
+                    )
+
+                    collector.register(
+                        assignment, parse_collectable(self.definition, returns)
                     )
 
                     await transport.change_assignation(
@@ -184,14 +184,14 @@ class ThreadedFuncActor(SerializingActor):
                     self.assign, **params, executor=self.executor, pass_context=True
                 )
 
-            collector.register(assignment, parse_collectable(self.definition, returns))
-
             returns = await shrink_outputs(
                 self.definition,
                 returns,
                 structure_registry=self.structure_registry,
                 skip_shrinking=not self.shrink_outputs,
             )
+
+            collector.register(assignment, parse_collectable(self.definition, returns))
 
             await transport.change_assignation(
                 status=AssignationStatus.RETURNED,
@@ -236,15 +236,15 @@ class ThreadedGenActor(SerializingActor):
                 async for returns in iterate_spawned(
                     self.assign, **params, executor=self.executor, pass_context=True
                 ):
-                    collector.register(
-                        assignment, parse_collectable(self.definition, returns)
-                    )
-
                     returns = await shrink_outputs(
                         self.definition,
                         returns,
                         structure_registry=self.structure_registry,
                         skip_shrinking=not self.shrink_outputs,
+                    )
+
+                    collector.register(
+                        assignment, parse_collectable(self.definition, returns)
                     )
 
                     await self.transport.change_assignation(
