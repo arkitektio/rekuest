@@ -28,6 +28,8 @@ def func(hallo: int) -> int:
 async def test_arkiuse(simple_registry):
     # Tasks that are normally done by arkitket
     x = prepare_definition(func, simple_registry)
+
+    
     defi = NodeFragment(id=1, hash="oinsoinsoins", **x.dict())
 
     transport = MockPostmanTransport()

@@ -1,5 +1,5 @@
 from rekuest.actors.reactive.api import useUser, useGuardian
-from rekuest.actors.contexts import AssignationContext, ProvisionContext
+from rekuest.actors.contexts import  AssignationContext, ProvisionContext, Assignment, AssignTransport
 from rekuest.messages import Assignation, Provision
 from rekuest.agents.transport.mock import MockAgentTransport
 import pytest
@@ -7,6 +7,29 @@ import random
 import asyncio
 import time
 from koil.helpers import run_spawned
+from pydantic import BaseModel
+from rekuest.api.schema import AssignationStatus, LogLevelInput
+from typing import List, Any
+
+
+class MockAssignTransport(BaseModel):
+    assignment: Assignment
+
+    async def change_assignation(
+        self,
+        status: AssignationStatus = None,
+        message: str = None,
+        returns: List[Any] = None,
+        progress: int = None,
+    ):
+        print("Called")
+
+    async def log_to_assignation(
+        self,
+        level: LogLevelInput = None,
+        message: str = None,
+    ):
+        print("Called")
 
 
 def function():
@@ -18,9 +41,8 @@ def guardian_func():
 
 
 def test_reactive_assignation_api():
-    assignation = Assignation(assignation=444, user=1, guardian=1)
-    transport = MockAgentTransport()
-    with AssignationContext(assignation, transport):
+    assignment = Assignment(assignation=2, user=1)
+    with AssignationContext(assignment=assignment, transport=MockAssignTransport(assignment=assignment)):
         assert function() == 1, "Should be able to use functional api"
 
 

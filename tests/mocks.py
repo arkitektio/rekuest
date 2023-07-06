@@ -1,6 +1,5 @@
 from pydantic import Field
 from rekuest.agents.base import BaseAgent
-from rekuest.agents.stateful import StatefulAgent
 from rekuest.agents.transport.mock import MockAgentTransport
 from rekuest.api.schema import (
     NodeKind,
@@ -140,7 +139,7 @@ class MockRequestRath(RekuestRath):
     )
 
 
-class MockAgent(StatefulAgent):
+class MockAgent(BaseAgent):
     transport: MockAgentTransport = Field(default_factory=MockAgentTransport)
 
 

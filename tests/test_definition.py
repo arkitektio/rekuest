@@ -2,11 +2,12 @@ from rekuest.api.schema import DefinitionInput, PortKind, AnnotationKind
 import pytest
 from .structures import SecondSerializableObject, SerializableObject
 from rekuest.definition.define import prepare_definition
+from rekuest.structures.registry import StructureRegistry, Scope
 from .mocks import MockRequestRath
-from rekuest.structures.builder import StructureRegistryBuilder
 from .funcs import (
     plain_basic_function,
     plain_structure_function,
+    union_structure_function,
     nested_basic_function,
     nested_structure_function,
     annotated_basic_function,
@@ -19,14 +20,12 @@ from rekuest.structures.serialization.postman import shrink_inputs
 
 @pytest.fixture
 def simple_registry():
-    builder = StructureRegistryBuilder()
-    builder.register(SerializableObject, "SerializableObject")
-    builder.register(SecondSerializableObject, "SecondSerializableObject")
-    builder.with_default_annotations()
+    reg = StructureRegistry()
+    reg.register_as_structure(SerializableObject, "SerializableObject", scope=Scope.LOCAL)
+    reg.register_as_structure(SecondSerializableObject, "SecondSerializableObject",  scope=Scope.LOCAL)
+    
 
-    registry = builder.build()
-
-    return registry
+    return reg
 
 
 @pytest.mark.define
@@ -88,6 +87,26 @@ def test_define_structure(simple_registry):
         functional_definition.name == "Karl"
     ), "Doesnt conform to standard Naming Scheme"
     assert functional_definition.args[0].identifier == "SerializableObject"
+
+
+@pytest.mark.define
+def test_define_union_structure(simple_registry):
+    functional_definition = prepare_definition(
+        union_structure_function, structure_registry=simple_registry
+    )
+    assert isinstance(
+        functional_definition, DefinitionInput
+    ), "output is not a definition"
+    assert (
+        functional_definition.name == "Karl"
+    ), "Doesnt conform to standard Naming Scheme"
+    assert functional_definition.args[0].kind == PortKind.UNION
+
+
+    assert functional_definition.args[0].variants[0].kind == PortKind.STRUCTURE
+    
+    assert functional_definition.returns[0].kind == PortKind.UNION
+    
 
 
 @pytest.mark.define

@@ -12,7 +12,7 @@ from rekuest.api.schema import (
 )
 from pydantic import BaseModel, Field
 import inspect
-
+from rekuest.collection.shelve import get_current_shelve
 from .errors import (
     StructureDefinitionError,
     StructureOverwriteError,
@@ -27,11 +27,31 @@ async def id_shrink(self):
     return self.id
 
 
-async def void_collect(self):
-    pass
+
+
+
+async def shelve_ashrink(cls: Type):
+    shelve = get_current_shelve()
+    return await shelve.aput(cls)
+
+async def shelve_aexpand(id: str):
+    shelve = get_current_shelve()
+    return await shelve.aget(id)
+
+async def shelve_acollect(id: str):
+    shelve = get_current_shelve()
+    return await shelve.adelete(id)
+
+async def void_acollect(id: str):
+    return None
+
+
+def build_instance_predicate(cls: Type):
+    return lambda x: isinstance(x,cls)
 
 
 def build_enum_shrink_expand(cls: Type[Enum]):
+
     async def shrink(s):
         return s._name_
 
@@ -58,7 +78,8 @@ class StructureRegistry(BaseModel):
     identifier_scope_map: Dict[str, Scope] = Field(default_factory=dict, exclude=True)
     _identifier_expander_map: Dict[str, Callable[[str], Awaitable[Any]]] = {}
     _identifier_shrinker_map: Dict[str, Callable[[Any], Awaitable[str]]] = {}
-    _identifier_collect_map: Dict[str, Callable[[Any], Awaitable[None]]] = {}
+    _identifier_collecter_map: Dict[str, Callable[[Any], Awaitable[None]]] = {}
+    _identifier_predicate_map: Dict[str, Callable[[Any], bool]] = {}
     _identifier_builder_map: Dict[str, PortBuilder] = {}
 
     _structure_convert_default_map: Dict[str, Callable[[Any], str]] = {}
@@ -139,18 +160,25 @@ class StructureRegistry(BaseModel):
         cls: Type,
         identifier: str = None,
         scope: Scope = Scope.LOCAL,
-        expand: Callable[
+        aexpand: Callable[
             [
                 str,
             ],
             Awaitable[Any],
         ] = None,
-        shrink: Callable[
+        ashrink: Callable[
             [
                 any,
             ],
             Awaitable[str],
         ] = None,
+        acollect: Callable[
+            [
+                str,
+            ],
+            Awaitable[Any],
+        ] = None,
+        predicate: Callable[[Any], bool ] = None,
         convert_default: Callable[[Any], str] = None,
         default_widget: Optional[WidgetInput] = None,
         build: Optional[PortBuilder] = None,
@@ -184,50 +212,31 @@ class StructureRegistry(BaseModel):
             if hasattr(cls, "convert_default"):
                 convert_default = cls.convert_default
 
-        if expand is None:
-            if not hasattr(cls, "aexpand"):
+        if aexpand is None:
+            if not hasattr(cls, "aexpand") and scope == Scope.GLOBAL:
                 raise StructureDefinitionError(
                     f"You need to pass 'expand' method or {cls} needs to implement a"
-                    " aexpand method"
+                    " aexpand method if it wants to become a GLOBAL structure"
                 )
-            expand = cls.aexpand
+            aexpand = getattr(cls, "aexpand", shelve_aexpand)
 
-        if build is None:
-            if not hasattr(cls, "build"):
-                build = None
-            else:
-                build = cls.build
-
-        if not hasattr(cls, "acollect"):
-            if scope == Scope.LOCAL:
+        if ashrink is None:
+            if not hasattr(cls, "ashrink") and scope == Scope.GLOBAL:
                 raise StructureDefinitionError(
-                    f"Locally Scoped Structures need to provide a acollect method, that handles"
-                    f"carbage collection.{cls} needs to implement a"
-                    " 'acollect' (async method) method to be registerd locally. For more information on garbage collection see the documentation"
+                    f"You need to pass 'ashrink' method or {cls} needs to implement a"
+                    " ashrink method if it wants to become a GLOBAL structure"
                 )
-            else:
-                collect = void_collect
-        else:
-            collect = cls.acollect
+            ashrink = getattr(cls, "ashrink", shelve_ashrink)
 
-        if shrink is None:
-            if not hasattr(cls, "ashrink"):
-                if issubclass(cls, BaseModel):
-                    if "id" in cls.__fields__:
-                        shrink = id_shrink
-                    else:
-                        raise StructureDefinitionError(
-                            f"You need to pass 'shrink' method or {cls} needs to"
-                            " implement a ashrink method. A BaseModel can be"
-                            " automatically shrinked by providing an id field"
-                        )
-                else:
-                    raise StructureDefinitionError(
-                        f"You need to pass 'ashrink' method or {cls} needs to implement"
-                        " a ashrink method"
-                    )
-            else:
-                shrink = cls.ashrink
+        if acollect is None:
+            if not hasattr(cls, "acollect") and scope == Scope.GLOBAL:
+                acollect == void_acollect
+            acollect = getattr(cls, "acollect", shelve_acollect)
+
+        if predicate is None:
+            predicate = build_instance_predicate(cls)
+
+        
 
         if identifier is None:
             if not hasattr(cls, "get_identifier"):
@@ -242,11 +251,12 @@ class StructureRegistry(BaseModel):
                 f"{identifier} is already registered. Previously registered"
                 f" {self.identifier_structure_map[identifier]}"
             )
+        
 
-        self._identifier_expander_map[identifier] = expand
-        self._identifier_collect_map[identifier] = collect
-        self._identifier_shrinker_map[identifier] = shrink
-        self._identifier_builder_map[identifier] = build
+        self._identifier_expander_map[identifier] = aexpand
+        self._identifier_collecter_map[identifier] = acollect
+        self._identifier_shrinker_map[identifier] = ashrink
+        self._identifier_predicate_map[identifier] = predicate
 
         self.identifier_structure_map[identifier] = cls
         self.identifier_scope_map[identifier] = scope

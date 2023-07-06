@@ -17,7 +17,7 @@ from rekuest.structures.errors import (
     StructureExpandingError,
 )
 from rekuest.definition.validate import auto_validate
-
+from .predication import predicate_port
 
 async def aexpand_arg(
     port: Union[PortFragment, ChildPortFragment],
@@ -61,6 +61,20 @@ async def aexpand_arg(
             key: await aexpand_arg(port.child, value, structure_registry)
             for key, value in value.items()
         }
+    
+    if port.kind == PortKind.UNION:
+        if not isinstance(value, dict):
+            raise ExpandingError(
+                f"Can't expand {value} of type {type(value)} to {port.kind}. We only"
+                " accept dicts in unions"
+            ) 
+        assert "use" in value, "No use in vaalue"
+        index = value["use"]
+        true_value = value["value"]
+        return await aexpand_arg(port.variants[index], true_value, structure_registry=structure_registry)
+                
+
+
 
     if port.kind == PortKind.LIST:
         if not isinstance(value, list):
@@ -171,6 +185,15 @@ async def ashrink_return(
                 raise ValueError(
                     f"{port} is not nullable (optional) but your provided None"
                 )
+            
+        if port.kind == PortKind.UNION:
+            for index, x in enumerate(port.variants):
+                if predicate_port(x, value, structure_registry):
+                    return {"use": index, "value": await ashrink_return(x, value, structure_registry)}
+                
+            raise ShrinkingError(f"Port is union butn none of the predicated for this port held true {port.variants}")
+
+
 
         if port.kind == PortKind.DICT:
             return {

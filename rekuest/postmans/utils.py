@@ -14,7 +14,7 @@ from typing import (
     AsyncIterator,
 )
 import uuid
-
+from rekuest.scalars import Interface
 from pydantic import Field
 from rekuest.messages import Assignation, Reservation, Unassignation
 from rekuest.structures.registry import get_current_structure_registry
@@ -255,8 +255,12 @@ class RPCContractBase(KoiledModel):
         await self.aexit()
 
 
+
+
+
+
 class actoruse(RPCContractBase):
-    interface: str
+    interface: Interface
     supervisor: Actor
     reference: Optional[str]
     "The governing actor"

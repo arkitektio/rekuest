@@ -1,4 +1,4 @@
-from rekuest.postmans.utils import definitionmockuse
+from rekuest.postmans.utils import mockuse
 from rekuest.definition.define import prepare_definition
 import asyncio
 import pytest
@@ -30,7 +30,7 @@ async def test_definitionmockuse_assign(simple_registry):
     agent = BaseAgent(transport=agenttransport)
 
     async def do_func():
-        async with definitionmockuse(
+        async with mockuse(
             definition=x, assign_sleep=0.1, reserve_sleep=0.1, unreserve_sleep=0.1
         ) as a:
             return await a.aassign(4)

@@ -1,4 +1,4 @@
-from rekuest.api.schema import PortInput, PortKind, ChildPortInput
+from rekuest.api.schema import PortInput, PortKind, ChildPortInput, Scope
 from pydantic import ValidationError
 import pytest
 
@@ -26,16 +26,18 @@ def test_argport_input_errors():
 
 
 def test_argport():
-    PortInput(kind=PortKind.BOOL, key="search", nullable=False)
-    PortInput(kind=PortKind.STRING, key="search", nullable=False)
+    PortInput(kind=PortKind.BOOL, key="search", nullable=False, scope=Scope.GLOBAL)
+    PortInput(kind=PortKind.STRING, key="search", nullable=False, scope=Scope.GLOBAL)
 
     PortInput(
         kind=PortKind.STRUCTURE, identifier="hm/karl", key="search", nullable=False
+        , scope=Scope.GLOBAL
     )
 
     PortInput(
         kind=PortKind.LIST,
-        child=ChildPortInput(kind=PortKind.BOOL, nullable=False),
+        child=ChildPortInput(kind=PortKind.BOOL, nullable=False, scope=Scope.GLOBAL),
+        scope=Scope.GLOBAL,
         nullable=False,
         key="search",
     )

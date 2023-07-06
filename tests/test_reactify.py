@@ -12,13 +12,8 @@ def test_actify_function(simple_registry):
 
         return 1
 
-    actorBuilder = reactify(func, simple_registry)
-    defi = prepare_definition(func, simple_registry)
+    defi, actorBuilder = reactify(func, simple_registry)
 
-    actor = actorBuilder
-
-    assert hasattr(actor, "__definition__")
-    assert actor.__definition__ == defi
 
 
 def test_actify_generator(simple_registry):
@@ -31,10 +26,4 @@ def test_actify_generator(simple_registry):
 
         yield 1
 
-    actorBuilder = reactify(gen, simple_registry)
-    defi = prepare_definition(gen, simple_registry)
-
-    actor = actorBuilder
-
-    assert hasattr(actor, "__definition__")
-    assert actor.__definition__ == defi
+    defi, actorBuilder = reactify(gen, simple_registry)

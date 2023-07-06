@@ -1,5 +1,7 @@
 from enum import Enum
 from typing import Callable, List, Tuple, Type, Union
+
+from rekuest.definition.guards import cls_is_union
 from .utils import get_type_hints, is_annotated
 import inflection
 from rekuest.api.schema import (
@@ -36,12 +38,6 @@ import types
 import typing
 
 
-def cls_is_union(cls):
-    return get_origin(cls) is types.UnionType or get_origin(cls) is typing.Union
-
-
-def cls_is_list(cls):
-    return get_origin(cls) is typing.List
 
 
 def convert_child_to_childport(
@@ -246,34 +242,58 @@ def convert_object_to_port(
                     groups=groups,
                 )
 
-            if cls_is_union(cls) and False:
+            if cls_is_union(cls):
+
                 args = get_args(cls)
-                variants = []
-                for arg in args:
-                    if arg == type(None):
-                        continue
-                    child, converter = convert_child_to_childport(
-                        arg, registry, nullable=False
+                if len(args) == 2 and args[0] == type(None) or args[1] == type(None):
+                    if args[0] == type(None):
+                        cls = args[1]
+                    if args[1] == type(None):
+                        cls = args[0]
+
+                    return convert_object_to_port(
+                        cls,
+                        key,
+                        registry,
+                        default=default,
+                        nullable=True,
+                        widget=widget,
+                        label=label,
+                        effects=effects,
+                        return_widget=return_widget,
+                        annotations=annotations,
+                        description=description,
+                        groups=groups,
                     )
-                    variants.append(child)
+                else:
+                    # We are dealing with a "Real union"
+                    args = get_args(cls)
+                    nullable = False
+                    variants = []
+                    for arg in args:
+                        if arg == type(None):
+                            nullable = True
+                        child, converter = convert_child_to_childport(
+                            arg, registry, nullable=False
+                        )
+                        variants.append(child)
 
-                return PortInput(
-                    kind=PortKindInput.UNION,
-                    assignWidget=widget,
-                    returnWidget=return_widget,
-                    scope=Scope.GLOBAL,
-                    key=key,
-                    variants=variants,
-                    label=label,
-                    default=None,
-                    nullable=nullable,
-                    effects=effects,
-                    annotations=annotations,
-                    description=description,
-                    groups=groups,
-                )
+                    return PortInput(
+                        kind=PortKindInput.UNION,
+                        assignWidget=widget,
+                        returnWidget=return_widget,
+                        scope=Scope.GLOBAL,
+                        key=key,
+                        variants=variants,
+                        label=label,
+                        default=None,
+                        nullable=nullable,
+                        effects=effects,
+                        annotations=annotations,
+                        description=description,
+                        groups=groups,
+                    )
 
-                raise NotImplementedError("Unions are not supported yet")
             if cls._name == "Dict":
                 child, converter = convert_child_to_childport(
                     cls.__args__[1], registry, nullable=False
@@ -691,3 +711,4 @@ def prepare_definition(
     )
 
     return x
+

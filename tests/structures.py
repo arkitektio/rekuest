@@ -8,20 +8,22 @@ class SerializableObject(BaseModel):
         return self.number
 
     @classmethod
-    async def aexpand(cls, shrinked_value):
-        return cls(number=shrinked_value)
+    async def aexpand(cls, value):
+        return cls(number=value)
+
+
+
+
+
+class GlobalObject(BaseModel):
+    number: int
 
 
 class SecondSerializableObject:
     def __init__(self, id) -> None:
         self.id = id
 
-    async def ashrink(self):
-        return self.id
 
-    @classmethod
-    async def aexpand(cls, shrinked_value):
-        return cls(id=shrinked_value)
 
 
 class IdentifiableSerializableObject(BaseModel):

@@ -1,5 +1,5 @@
 import asyncio
-from typing import Dict, List, Tuple, Annotated, Optional
+from typing import Dict, List, Tuple, Annotated, Optional, Union
 from .structures import SecondObject, SecondSerializableObject, SerializableObject
 from annotated_types import Le, Predicate, Gt, Len
 
@@ -37,6 +37,22 @@ def plain_basic_function(rep: str, name: str = None) -> str:
 def plain_structure_function(
     rep: SerializableObject, name: SerializableObject = None
 ) -> SecondSerializableObject:
+    """Karl
+
+    Karl takes a a representation and does magic stuff
+
+    Args:
+        rep (SerializableObject): Nougat
+        name (SerializableObject, optional): Bugat
+
+    Returns:
+        SecondSerializableObject: The Returned Representation
+    """
+    return "tested"
+
+def union_structure_function(
+    rep: Union[SerializableObject, SecondSerializableObject]
+) -> Union[SerializableObject, SecondSerializableObject]:
     """Karl
 
     Karl takes a a representation and does magic stuff

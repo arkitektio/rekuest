@@ -1,5 +1,5 @@
 from rekuest.messages import Provision, Assignation
-from rekuest.actors.base import Actor
+from rekuest.actors.base import Actor, Passport
 from rekuest.agents.transport.mock import MockAgentTransport
 from .funcs import plain_basic_function
 import pytest
@@ -9,22 +9,28 @@ from rekuest.agents.transport.protocols.agent_json import (
     ProvisionStatus,
     AssignationStatus,
 )
+from rekuest.definition.registry import DefinitionRegistry
+from rekuest.collection.collector import Collector
 from rekuest.api.schema import DefinitionInput, NodeKindInput
 
 
 @pytest.mark.actor
 def test_reactify_instatiation(simple_registry):
-    actorBuilder = reactify(plain_basic_function, simple_registry)
+    definition, actorBuilder = reactify(plain_basic_function, simple_registry)
 
-    provision = Provision(provision=1, guardian=1, user=1)
+    p = Passport(provision="i")
+    c = Collector()
+    d = DefinitionRegistry()
 
-    actor = actorBuilder(provision=provision, transport=MockAgentTransport())
+    actor = actorBuilder(passport=p, transport=MockAgentTransport(), collector=c, definition_registry=d)
     assert actor is not None, "Actor should be instatiated"
 
 
 class MockActor(Actor):
     definition = DefinitionInput(
-        name="mock", description="mock", kind=NodeKindInput.GENERATOR
+        name="mock", description="mock", kind=NodeKindInput.GENERATOR, portGroups=[],
+        args=[], returns=[], interfaces=[]
+
     )
 
     async def on_provide(self, provision: Provision):
@@ -40,7 +46,8 @@ class MockActor(Actor):
 
 class MockErrorActor(Actor):
     definition = DefinitionInput(
-        name="mock", description="mock", kind=NodeKindInput.GENERATOR
+        name="mock", description="mock", kind=NodeKindInput.GENERATOR, portGroups=[],
+        args=[], returns=[], interfaces=[]
     )
 
     async def on_provide(self, provision: Provision):

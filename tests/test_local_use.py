@@ -1,4 +1,4 @@
-from rekuest.postmans.utils import localuse
+from rekuest.postmans.utils import actoruse
 from rekuest.definition.define import prepare_definition
 import asyncio
 import pytest
@@ -14,6 +14,8 @@ async def test_local_use(simple_registry):
 
     d = DefinitionRegistry()
 
+    
+
     def func(hallo: int) -> int:
         """This function
 
@@ -25,19 +27,18 @@ async def test_local_use(simple_registry):
 
     # Tasks that are normally done by arkitket
     d.register(func, simple_registry)
-    x = prepare_definition(func, simple_registry)
 
     agenttransport = MockAgentTransport()
     agent = BaseAgent(transport=agenttransport)
 
     async def do_func():
-        async with localuse(
-            localdefinition=x, agent=agent, structure_registry=simple_registry
+
+        async with actoruse(
+            interface=func, structure_registry=simple_registry
         ) as a:
             return await a.aassign(4)
 
     async with agent:
-        what_we_want = asyncio.create_task(do_func())
 
         result = await what_we_want
 
