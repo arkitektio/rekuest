@@ -13,6 +13,7 @@ from rekuest.actors.types import OnProvide, OnUnprovide, Assignment, Unassignmen
 from rekuest.collection.collector import Collector
 from rekuest.actors.transport.types import AssignTransport
 from rekuest.structures.parse_collectables import parse_collectable
+from rekuest.structures.errors import SerializationError
 
 logger = logging.getLogger(__name__)
 
@@ -72,16 +73,22 @@ class AsyncFuncActor(SerializingActor):
                 returns=returns,
             )
 
+        except SerializationError as ex:
+            await transport.change_assignation(
+                status=AssignationStatus.CRITICAL,
+                message=str(ex),
+            )
+
         except AssertionError as ex:
             await transport.change_assignation(
-                status=AssignationStatus.ERROR,
+                status=AssignationStatus.CRITICAL,
                 message=str(ex),
             )
 
         except Exception as e:
             logger.error("Assignation error", exc_info=True)
             await transport.change_assignation(
-                status=AssignationStatus.CRITICAL,
+                status=AssignationStatus.ERROR,
                 message=repr(e),
             )
 
@@ -124,6 +131,12 @@ class AsyncGenActor(SerializingActor):
                     )
 
             await transport.change_assignation(status=AssignationStatus.DONE)
+
+        except SerializationError as ex:
+            await transport.change_assignation(
+                status=AssignationStatus.CRITICAL,
+                message=str(ex),
+            )
 
         except AssertionError as ex:
             await transport.change_assignation(
@@ -198,9 +211,15 @@ class ThreadedFuncActor(SerializingActor):
                 returns=returns,
             )
 
+        except SerializationError as ex:
+            await transport.change_assignation(
+                status=AssignationStatus.CRITICAL,
+                message=str(ex),
+            )
+
         except AssertionError as ex:
             await transport.change_assignation(
-                status=AssignationStatus.ERROR,
+                status=AssignationStatus.CRITICAL,
                 message=str(ex),
             )
 
@@ -256,7 +275,13 @@ class ThreadedGenActor(SerializingActor):
 
         except AssertionError as ex:
             await transport.change_assignation(
-                status=AssignationStatus.ERROR,
+                status=AssignationStatus.CRITICAL,
+                message=str(ex),
+            )
+
+        except SerializationError as ex:
+            await transport.change_assignation(
+                status=AssignationStatus.CRITICAL,
                 message=str(ex),
             )
 
