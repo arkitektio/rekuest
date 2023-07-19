@@ -41,6 +41,7 @@ def register_func(
     interfaces: List[str] = [],
     on_provide=None,
     on_unprovide=None,
+    in_process: bool = False,
     **actifier_params,
 ):
     """Register a function or actor with the definition registry
@@ -85,6 +86,7 @@ def register_func(
         port_groups=port_groups,
         effects=effects,
         interfaces=interfaces,
+        in_process=in_process,
         **actifier_params,
     )
 
@@ -108,6 +110,7 @@ def register(
     on_unprovide=None,
     structure_registry: StructureRegistry = None,
     definition_registry: DefinitionRegistry = None,
+    in_process: bool = False,
     **actifier_params,
 ):
     """Register a function or actor to the default definition registry.
@@ -161,6 +164,7 @@ def register(
             on_unprovide=on_unprovide,
             port_groups=port_groups,
             groups=groups,
+            in_process=in_process,
             **actifier_params,
         )
 
@@ -170,6 +174,7 @@ def register(
 
         def real_decorator(function_or_actor):
             # Simple bypass for now
+            @wraps(function_or_actor)
             def wrapped_function(*args, **kwargs):
                 return function_or_actor(*args, **kwargs)
 
@@ -188,6 +193,7 @@ def register(
                 on_unprovide=on_unprovide,
                 port_groups=port_groups,
                 groups=groups,
+                in_process=in_process,
                 **actifier_params,
             )
 

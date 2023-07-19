@@ -2,7 +2,7 @@ import asyncio
 import logging
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Awaitable, Callable
-from koil.helpers import iterate_spawned, run_spawned
+from koil.helpers import iterate_spawned, run_spawned, iterate_processed, run_processed
 from pydantic import BaseModel, Field
 from rekuest.actors.base import SerializingActor
 from rekuest.messages import Assignation, Provision
@@ -295,6 +295,128 @@ class ThreadedGenActor(SerializingActor):
             raise e
 
 
+class ProcessedGenActor(SerializingActor):
+    async def on_assign(
+        self,
+        assignment: Assignation,
+        collector: Collector,
+        transport: AssignTransport,
+    ):
+        try:
+            params = await expand_inputs(
+                self.definition,
+                assignment.args,
+                structure_registry=self.structure_registry,
+                skip_expanding=not self.expand_inputs,
+            )
+            await transport.change_assignation(
+                status=AssignationStatus.ASSIGNED,
+            )
+
+            async with AssignationContext(assignment=assignment, transport=transport):
+                async for returns in iterate_processed(self.assign, **params):
+                    returns = await shrink_outputs(
+                        self.definition,
+                        returns,
+                        structure_registry=self.structure_registry,
+                        skip_shrinking=not self.shrink_outputs,
+                    )
+
+                    collector.register(
+                        assignment, parse_collectable(self.definition, returns)
+                    )
+
+                    await self.transport.change_assignation(
+                        status=AssignationStatus.YIELD,
+                        returns=returns,
+                    )
+
+            await transport.change_assignation(status=AssignationStatus.DONE)
+
+        except AssertionError as ex:
+            await transport.change_assignation(
+                status=AssignationStatus.CRITICAL,
+                message=str(ex),
+            )
+
+        except SerializationError as ex:
+            await transport.change_assignation(
+                status=AssignationStatus.CRITICAL,
+                message=str(ex),
+            )
+
+        except Exception as e:
+            logging.critical(f"Assignation Error {assignment} {e}", exc_info=True)
+            await transport.change_assignation(
+                status=AssignationStatus.CRITICAL,
+                message=str(e),
+            )
+
+            raise e
+
+
+class ProcessedFuncActor(SerializingActor):
+    async def on_assign(
+        self,
+        assignment: Assignment,
+        collector: Collector,
+        transport: AssignTransport,
+    ):
+        try:
+            logger.info("Assigning Number two")
+            params = await expand_inputs(
+                self.definition,
+                assignment.args,
+                structure_registry=self.structure_registry,
+                skip_expanding=not self.expand_inputs,
+            )
+
+            await transport.change_assignation(
+                status=AssignationStatus.ASSIGNED,
+            )
+
+            print("Assigning processed")
+
+            async with AssignationContext(assignment=assignment, transport=transport):
+                returns = await run_processed(
+                    self.assign,
+                    **params,
+                )
+
+            returns = await shrink_outputs(
+                self.definition,
+                returns,
+                structure_registry=self.structure_registry,
+                skip_shrinking=not self.shrink_outputs,
+            )
+
+            collector.register(assignment, parse_collectable(self.definition, returns))
+
+            await transport.change_assignation(
+                status=AssignationStatus.RETURNED,
+                returns=returns,
+            )
+
+        except SerializationError as ex:
+            await transport.change_assignation(
+                status=AssignationStatus.CRITICAL,
+                message=str(ex),
+            )
+
+        except AssertionError as ex:
+            await transport.change_assignation(
+                status=AssignationStatus.CRITICAL,
+                message=str(ex),
+            )
+
+        except Exception as e:
+            logger.error("Error in actor", exc_info=True)
+            await transport.change_assignation(
+                status=AssignationStatus.CRITICAL,
+                message=str(e),
+            )
+
+
 class FunctionalThreadedFuncActor(FunctionalActor, ThreadedFuncActor):
     async def progress(self, value, percentage):
         await self._progress(value, percentage)
@@ -304,6 +426,22 @@ class FunctionalThreadedFuncActor(FunctionalActor, ThreadedFuncActor):
 
 
 class FunctionalThreadedGenActor(FunctionalActor, ThreadedGenActor):
+    async def progress(self, value, percentage):
+        await self._progress(value, percentage)
+
+    class Config:
+        arbitrary_types_allowed = True
+
+
+class FunctionalProcessedFuncActor(FunctionalActor, ProcessedFuncActor):
+    async def progress(self, value, percentage):
+        await self._progress(value, percentage)
+
+    class Config:
+        arbitrary_types_allowed = True
+
+
+class FunctionalProcessedGenActor(FunctionalActor, ProcessedGenActor):
     async def progress(self, value, percentage):
         await self._progress(value, percentage)
 

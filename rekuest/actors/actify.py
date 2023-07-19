@@ -3,6 +3,8 @@ from rekuest.actors.functional import (
     FunctionalGenActor,
     FunctionalThreadedFuncActor,
     FunctionalThreadedGenActor,
+    FunctionalProcessedFuncActor,
+    FunctionalProcessedGenActor,
 )
 
 import inspect
@@ -58,6 +60,7 @@ def reactify(
     is_test_for: Optional[List[str]] = None,
     widgets: Dict[str, WidgetInput] = None,
     interfaces: List[str] = [],
+    in_process: bool = False,
     **params,
 ) -> Tuple[DefinitionInput, ActorBuilder]:
     """Reactify a function
@@ -97,17 +100,27 @@ def reactify(
         "definition": definition,
     }
 
+    print(in_process)
+
     if is_coroutine:
         return definition, higher_order_builder(FunctionalFuncActor, **actor_attributes)
     elif is_asyncgen:
         return definition, higher_order_builder(FunctionalGenActor, **actor_attributes)
-    elif is_generatorfunction:
+    elif is_generatorfunction and not in_process:
         return definition, higher_order_builder(
             FunctionalThreadedGenActor, **actor_attributes
         )
-    elif is_function or is_method:
+    elif (is_function or is_method) and not in_process:
         return definition, higher_order_builder(
             FunctionalThreadedFuncActor, **actor_attributes
+        )
+    elif is_generatorfunction and in_process:
+        return definition, higher_order_builder(
+            FunctionalProcessedGenActor, **actor_attributes
+        )
+    elif (is_function or is_method) and in_process:
+        return definition, higher_order_builder(
+            FunctionalProcessedFuncActor, **actor_attributes
         )
     else:
         raise NotImplementedError("No way of converting this to a function")

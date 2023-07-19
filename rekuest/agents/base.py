@@ -296,10 +296,14 @@ class BaseAgent(KoiledModel):
         self.provision_passport_map[provision.provision] = passport
         return actor
 
+    async def await_errorfuture(self):
+        return await self._errorfuture
+
     async def astep(self):
-        queue_future = self._inqueue.get()
+        queue_task = asyncio.create_task(self._inqueue.get(), name="queue_future")
+        error_task = asyncio.create_task(self.await_errorfuture(), name="error_future")
         done, pending = await asyncio.wait(
-            [queue_future, self._errorfuture],
+            [queue_task, error_task],
             return_when=asyncio.FIRST_COMPLETED,
         )
 
