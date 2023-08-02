@@ -255,10 +255,6 @@ class RPCContractBase(KoiledModel):
         await self.aexit()
 
 
-
-
-
-
 class actoruse(RPCContractBase):
     interface: Interface
     supervisor: Actor

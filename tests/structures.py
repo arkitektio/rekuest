@@ -12,9 +12,6 @@ class SerializableObject(BaseModel):
         return cls(number=value)
 
 
-
-
-
 class GlobalObject(BaseModel):
     number: int
 
@@ -22,8 +19,6 @@ class GlobalObject(BaseModel):
 class SecondSerializableObject:
     def __init__(self, id) -> None:
         self.id = id
-
-
 
 
 class IdentifiableSerializableObject(BaseModel):

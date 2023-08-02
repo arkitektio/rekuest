@@ -227,6 +227,7 @@ def register_structure(
     convert_default: Callable[[Any], str] = None,
     default_widget: WidgetInput = None,
     default_returnwidget: ReturnWidgetInput = None,
+    registry: StructureRegistry = None,
     **kwargs,
 ):
     """Register a structure to the default structure registry.
@@ -240,7 +241,9 @@ def register_structure(
     if len(cls) == 1:
         function_or_actor = cls[0]
 
-        get_default_structure_registry().register_as_structure(
+        sregistry = registry or get_default_structure_registry()
+
+        sregistry.register_as_structure(
             function_or_actor,
             identifier=identifier,
             scope=scope,
@@ -260,7 +263,9 @@ def register_structure(
         def real_decorator(cls):
             # Simple bypass for now
 
-            get_default_structure_registry().register_as_structure(
+            sregistry = registry or get_default_structure_registry()
+
+            sregistry.register_as_structure(
                 cls,
                 identifier=identifier,
                 scope=scope,

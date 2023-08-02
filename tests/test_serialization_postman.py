@@ -78,8 +78,7 @@ async def test_shrink_union(simple_registry):
         simple_registry,
     )
 
-    for arg in args:
-        assert isinstance(arg, str), "Should be a string"
+    assert args[0]["use"] == 0, "Should use the first union type"
 
 
 @pytest.mark.shrink
@@ -98,12 +97,8 @@ async def test_roundtrip(simple_registry):
         simple_registry,
     )
 
-
     expanded_args = await expand_inputs(definition, shrinked_args, simple_registry)
     assert expanded_args["rep"].number == 3, "Should be"
-    
-
-
 
 
 @pytest.mark.shrink

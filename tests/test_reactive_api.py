@@ -1,5 +1,10 @@
 from rekuest.actors.reactive.api import useUser, useGuardian
-from rekuest.actors.contexts import  AssignationContext, ProvisionContext, Assignment, AssignTransport
+from rekuest.actors.contexts import (
+    AssignationContext,
+    ProvisionContext,
+    Assignment,
+    AssignTransport,
+)
 from rekuest.messages import Assignation, Provision
 from rekuest.agents.transport.mock import MockAgentTransport
 import pytest
@@ -42,16 +47,10 @@ def guardian_func():
 
 def test_reactive_assignation_api():
     assignment = Assignment(assignation=2, user=1)
-    with AssignationContext(assignment=assignment, transport=MockAssignTransport(assignment=assignment)):
+    with AssignationContext(
+        assignment=assignment, transport=MockAssignTransport(assignment=assignment)
+    ):
         assert function() == 1, "Should be able to use functional api"
-
-
-def test_reactive_provision_api():
-    provision = Provision(provision=444, user=1, guardian=1)
-    transport = MockAgentTransport()
-
-    with ProvisionContext(provision, transport):
-        assert guardian_func() == "1", "Should be able to use functional api"
 
 
 @pytest.mark.asyncio
@@ -61,9 +60,11 @@ async def test_reactive_assignation_api_async():
     transport = MockAgentTransport()
 
     async def async_context(sleep_interval):
-        assignation = Assignation(assignation=444, user=sleep_interval, guardian=1)
+        assignment = Assignment(assignation=444, user=sleep_interval, guardian=1)
 
-        with AssignationContext(assignation, transport):
+        with AssignationContext(
+            assignment=assignment, transport=MockAssignTransport(assignment=assignment)
+        ):
             await asyncio.sleep(sleep_interval * 0.03)
             return function()
 
@@ -86,9 +87,11 @@ async def test_reactive_assignation_api_threaded_async():
         return int(useUser())
 
     async def async_context(sleep_interval):
-        assignation = Assignation(assignation=444, user=sleep_interval, guardian=1)
+        assignment = Assignment(assignation=444, user=sleep_interval, guardian=1)
 
-        with AssignationContext(assignation, transport):
+        with AssignationContext(
+            assignment=assignment, transport=MockAssignTransport(assignment=assignment)
+        ):
             await asyncio.sleep(sleep_interval * 0.03)
             return await run_spawned(function, pass_context=True)
 

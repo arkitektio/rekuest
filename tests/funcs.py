@@ -50,6 +50,7 @@ def plain_structure_function(
     """
     return "tested"
 
+
 def union_structure_function(
     rep: Union[SerializableObject, SecondSerializableObject]
 ) -> Union[SerializableObject, SecondSerializableObject]:

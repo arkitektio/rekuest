@@ -1,9 +1,10 @@
 from rekuest.definition.define import prepare_definition
 from rekuest.definition.registry import DefinitionRegistry
+from rekuest.register import register_structure, register_func
 
 
 def test_register_function(simple_registry):
-    defi = DefinitionRegistry(structure_registry=simple_registry)
+    defi = DefinitionRegistry()
 
     def func():
         """This function
@@ -14,7 +15,6 @@ def test_register_function(simple_registry):
 
         return 1
 
-    defi.register(func, simple_registry)
-    x = prepare_definition(func, simple_registry)
+    register_func(func, simple_registry, defi)
 
-    assert defi.definitions[x]
+    assert defi.definitions["func"]

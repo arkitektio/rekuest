@@ -2,13 +2,13 @@ from rath.links.base import ContinuationLink
 from rath.operation import GraphQLResult, Operation
 from typing import AsyncIterator, Awaitable, Callable, Optional
 from rekuest.actors.vars import (
-    get_current_assignation_helper,
+    current_assignment,
     NotWithinAnAssignationError,
 )
 
 
 class SetAssignationLink(ContinuationLink):
-    header_name: str = "ASSIGNATION_ID"
+    header_name: str = "x-assignation-id"
 
     async def aconnect(self):
         pass
@@ -17,11 +17,9 @@ class SetAssignationLink(ContinuationLink):
         self, operation: Operation, **kwargs
     ) -> AsyncIterator[GraphQLResult]:
         try:
-            asshelper = get_current_assignation_helper()
-            operation.context.headers[
-                self.header_name
-            ] = asshelper.assignment.assignation
-        except NotWithinAnAssignationError:
+            assignment = current_assignment.get()
+            operation.context.headers[self.header_name] = assignment.assignation
+        except LookupError as e:
             pass
 
         async for result in self.next.aexecute(operation, **kwargs):

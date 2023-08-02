@@ -101,4 +101,3 @@ class MockAgentTransport(AgentTransport):
     class Config:
         underscore_attrs_are_private = True
         arbitrary_types_allowed = True
-

@@ -2,6 +2,7 @@ import contextvars
 from rekuest.actors.helper import AssignationHelper, ProvisionHelper
 from rekuest.actors.errors import NotWithinAnAssignationError, NotWithinAProvisionError
 
+current_assignment = contextvars.ContextVar("current_assignment")
 current_assignation_helper = contextvars.ContextVar("current_assignation_helper")
 current_provision_helper = contextvars.ContextVar("current_provision_helper")
 

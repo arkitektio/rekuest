@@ -1,5 +1,6 @@
 from rekuest.actors.actify import reactify
 from rekuest.definition.define import prepare_definition
+from rekuest.api.schema import NodeKind
 
 
 def test_actify_function(simple_registry):
@@ -13,7 +14,7 @@ def test_actify_function(simple_registry):
         return 1
 
     defi, actorBuilder = reactify(func, simple_registry)
-
+    assert defi.kind == NodeKind.FUNCTION
 
 
 def test_actify_generator(simple_registry):
@@ -27,3 +28,4 @@ def test_actify_generator(simple_registry):
         yield 1
 
     defi, actorBuilder = reactify(gen, simple_registry)
+    assert defi.kind == NodeKind.GENERATOR

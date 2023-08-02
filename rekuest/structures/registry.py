@@ -68,7 +68,7 @@ Identifier = str
 
 class StructureRegistry(BaseModel):
     copy_from_default: bool = False
-    allow_overwrites: bool = True
+    allow_overwrites: bool = False
     allow_auto_register: bool = True
 
     identifier_structure_map: Dict[str, Type] = Field(
@@ -193,7 +193,6 @@ class StructureRegistry(BaseModel):
         predicate: Callable[[Any], bool] = None,
         convert_default: Callable[[Any], str] = None,
         default_widget: Optional[WidgetInput] = None,
-        build: Optional[PortBuilder] = None,
         default_returnwidget: Optional[ReturnWidgetInput] = None,
     ):
         if inspect.isclass(cls):
@@ -314,38 +313,3 @@ DEFAULT_STRUCTURE_REGISTRY = None
 
 def get_current_structure_registry(allow_default=True):
     return current_structure_registry.get()
-
-
-def register_structure(
-    identifier: str = None,
-    expand: Callable[
-        [
-            str,
-        ],
-        Awaitable[Any],
-    ] = None,
-    shrink: Callable[
-        [
-            any,
-        ],
-        Awaitable[str],
-    ] = None,
-    default_widget: WidgetInput = None,
-    registry: StructureRegistry = None,
-):
-    """A Decorator for registering a structure
-
-    Args:
-        identifier ([type], optional): [description]. Defaults to None.
-        expand ([type], optional): [description]. Defaults to None.
-        shrink ([type], optional): [description]. Defaults to None.
-        default_widget ([type], optional): [description]. Defaults to None.
-    """
-
-    registry = registry or get_current_structure_registry()
-
-    def func(cls):
-        registry.register_as_structure(cls, identifier, expand, shrink, default_widget)
-        return cls
-
-    return func

@@ -54,14 +54,13 @@ class BaseAgent(KoiledModel):
     """
 
     instance_id: str = "main"
+    rath: RekuestRath
     transport: AgentTransport
     definition_registry: DefinitionRegistry = Field(
         default_factory=get_default_definition_registry
     )
     collector: Collector = Field(default_factory=Collector)
     managed_actors: Dict[str, Actor] = Field(default_factory=dict)
-
-    rath: Optional[RekuestRath] = None
 
     _hooks = {}
     interface_template_map: Dict[str, TemplateFragment] = Field(default_factory=dict)

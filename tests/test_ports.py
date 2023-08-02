@@ -30,8 +30,11 @@ def test_argport():
     PortInput(kind=PortKind.STRING, key="search", nullable=False, scope=Scope.GLOBAL)
 
     PortInput(
-        kind=PortKind.STRUCTURE, identifier="hm/karl", key="search", nullable=False
-        , scope=Scope.GLOBAL
+        kind=PortKind.STRUCTURE,
+        identifier="hm/karl",
+        key="search",
+        nullable=False,
+        scope=Scope.GLOBAL,
     )
 
     PortInput(
