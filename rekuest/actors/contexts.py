@@ -1,7 +1,11 @@
 from dataclasses import dataclass
 from rekuest.messages import Assignation, Provision
 from rekuest.actors.helper import AssignationHelper, ProvisionHelper
-from rekuest.actors.vars import current_assignation_helper, current_provision_helper
+from rekuest.actors.vars import (
+    current_assignation_helper,
+    current_provision_helper,
+    current_assignment,
+)
 from rekuest.actors.transport.types import ActorTransport, AssignTransport
 from rekuest.actors.types import Assignment
 from pydantic import BaseModel
@@ -17,11 +21,13 @@ class AssignationContext(BaseModel):
             assignment=self.assignment, transport=self.transport
         )
 
+        current_assignment.set(self.assignment)
         current_assignation_helper.set(self._helper)
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         current_assignation_helper.set(None)
+        current_assignment.set(None)
         self._helper = None
 
     async def __aenter__(self):

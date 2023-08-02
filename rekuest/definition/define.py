@@ -38,8 +38,6 @@ import types
 import typing
 
 
-
-
 def convert_child_to_childport(
     cls: Type,
     registry: StructureRegistry,
@@ -64,11 +62,6 @@ def convert_child_to_childport(
 
     if is_annotated(cls):
         real_type = cls.__args__[0]
-
-        annotations = [
-            registry.get_converter_for_annotation(i.__class__)(i)
-            for i in cls.__metadata__
-        ]
 
         return convert_child_to_childport(
             real_type,
@@ -201,11 +194,6 @@ def convert_object_to_port(
     if is_annotated(cls):
         real_type = cls.__args__[0]
 
-        annotations = [
-            registry.get_converter_for_annotation(i.__class__)(i)
-            for i in cls.__metadata__
-        ]
-
         return convert_object_to_port(
             real_type,
             key,
@@ -243,7 +231,6 @@ def convert_object_to_port(
                 )
 
             if cls_is_union(cls):
-
                 args = get_args(cls)
                 if len(args) == 2 and args[0] == type(None) or args[1] == type(None):
                     if args[0] == type(None):
@@ -711,4 +698,3 @@ def prepare_definition(
     )
 
     return x
-

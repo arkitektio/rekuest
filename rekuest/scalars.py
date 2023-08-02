@@ -11,23 +11,23 @@ from graphql import (
 from graphql.language.print_location import print_prefixed_lines
 import inspect
 
+
 class QString(str):
     pass
 
 
 class Interface(str):
-
     @classmethod
     def validate(cls, v):
         if not isinstance(v, str):
             if hasattr(v, "__name__"):
                 return v.__name__
             else:
-                raise ValueError(
-                    "Interface must be either a str or function"
-                )
+                raise ValueError("Interface must be either a str or function")
         return v
+
     pass
+
 
 class Identifier(str):
     @classmethod

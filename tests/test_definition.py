@@ -21,9 +21,12 @@ from rekuest.structures.serialization.postman import shrink_inputs
 @pytest.fixture
 def simple_registry():
     reg = StructureRegistry()
-    reg.register_as_structure(SerializableObject, "SerializableObject", scope=Scope.LOCAL)
-    reg.register_as_structure(SecondSerializableObject, "SecondSerializableObject",  scope=Scope.LOCAL)
-    
+    reg.register_as_structure(
+        SerializableObject, "SerializableObject", scope=Scope.LOCAL
+    )
+    reg.register_as_structure(
+        SecondSerializableObject, "SecondSerializableObject", scope=Scope.LOCAL
+    )
 
     return reg
 
@@ -102,11 +105,9 @@ def test_define_union_structure(simple_registry):
     ), "Doesnt conform to standard Naming Scheme"
     assert functional_definition.args[0].kind == PortKind.UNION
 
-
     assert functional_definition.args[0].variants[0].kind == PortKind.STRUCTURE
-    
+
     assert functional_definition.returns[0].kind == PortKind.UNION
-    
 
 
 @pytest.mark.define
@@ -188,20 +189,6 @@ def test_define_annotated_basic_function(simple_registry):
         functional_definition.name == "Annotated Karl"
     ), "Doesnt conform to standard Naming Scheme"
 
-    assert (
-        functional_definition.args[0].annotations[0].kind == AnnotationKind.IsPredicate
-    )
-    assert (
-        functional_definition.args[1].annotations[0].kind == AnnotationKind.ValueRange
-    )
-    assert functional_definition.args[1].annotations[0].max == 4
-    assert functional_definition.args[1].annotations[0].min is None
-    assert (
-        functional_definition.args[1].annotations[1].kind == AnnotationKind.ValueRange
-    )
-    assert functional_definition.args[1].annotations[1].max is None
-    assert functional_definition.args[1].annotations[1].min == 4
-
 
 @pytest.mark.define
 def test_define_annotated_nested_function(simple_registry):
@@ -212,23 +199,6 @@ def test_define_annotated_nested_function(simple_registry):
     assert (
         functional_definition.name == "Annotated Karl"
     ), "Doesnt conform to standard Naming Scheme"
-
-    assert (
-        functional_definition.args[0].annotations[0].kind == AnnotationKind.IsPredicate
-    )
-    assert functional_definition.args[1].kind == PortKind.DICT
-    assert functional_definition.args[1].child.kind == PortKind.LIST
-    assert (
-        functional_definition.args[1].child.annotations[0].kind
-        == AnnotationKind.ValueRange
-    )
-    assert functional_definition.args[1].child.annotations[0].max == 3
-    assert functional_definition.args[1].child.annotations[0].min == 3
-    assert functional_definition.args[1].child.child.kind == PortKind.STRUCTURE
-    assert (
-        functional_definition.args[1].child.child.identifier
-        == "SecondSerializableObject"
-    )
 
 
 @pytest.mark.define

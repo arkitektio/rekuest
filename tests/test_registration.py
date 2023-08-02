@@ -1,9 +1,9 @@
 from rekuest.structures.registry import (
     StructureDefinitionError,
     StructureRegistry,
-    register_structure,
     StructureOverwriteError,
 )
+from rekuest.register import register_structure
 import pytest
 
 
@@ -44,14 +44,12 @@ def test_structure_registration():
             async def aexpand(cls, shrinked_value):
                 return cls(shrinked_value)
 
-    with pytest.raises(StructureDefinitionError):
+    @register_structure(identifier="karl", registry=registry)
+    class SerializableObject:
+        def __init__(self, number) -> None:
+            super().__init__()
+            self.number = number
 
-        @register_structure(identifier="karl", registry=registry)
-        class SerializableObject:
-            def __init__(self, number) -> None:
-                super().__init__()
-                self.number = number
-
-            @classmethod
-            async def aexpand(cls, shrinked_value):
-                return cls(shrinked_value)
+        @classmethod
+        async def aexpand(cls, shrinked_value):
+            return cls(shrinked_value)

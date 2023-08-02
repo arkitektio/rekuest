@@ -14,8 +14,6 @@ async def test_local_use(simple_registry):
 
     d = DefinitionRegistry()
 
-    
-
     def func(hallo: int) -> int:
         """This function
 
@@ -32,14 +30,10 @@ async def test_local_use(simple_registry):
     agent = BaseAgent(transport=agenttransport)
 
     async def do_func():
-
-        async with actoruse(
-            interface=func, structure_registry=simple_registry
-        ) as a:
+        async with actoruse(interface=func, structure_registry=simple_registry) as a:
             return await a.aassign(4)
 
     async with agent:
-
         result = await what_we_want
 
     assert result == 1, "The result should be 1"

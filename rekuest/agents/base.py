@@ -54,14 +54,13 @@ class BaseAgent(KoiledModel):
     """
 
     instance_id: str = "main"
+    rath: RekuestRath
     transport: AgentTransport
     definition_registry: DefinitionRegistry = Field(
         default_factory=get_default_definition_registry
     )
     collector: Collector = Field(default_factory=Collector)
     managed_actors: Dict[str, Actor] = Field(default_factory=dict)
-
-    rath: Optional[RekuestRath] = None
 
     _hooks = {}
     interface_template_map: Dict[str, TemplateFragment] = Field(default_factory=dict)
@@ -296,10 +295,14 @@ class BaseAgent(KoiledModel):
         self.provision_passport_map[provision.provision] = passport
         return actor
 
+    async def await_errorfuture(self):
+        return await self._errorfuture
+
     async def astep(self):
-        queue_future = self._inqueue.get()
+        queue_task = asyncio.create_task(self._inqueue.get(), name="queue_future")
+        error_task = asyncio.create_task(self.await_errorfuture(), name="error_future")
         done, pending = await asyncio.wait(
-            [queue_future, self._errorfuture],
+            [queue_task, error_task],
             return_when=asyncio.FIRST_COMPLETED,
         )
 

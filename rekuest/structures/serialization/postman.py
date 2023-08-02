@@ -19,8 +19,6 @@ from rekuest.structures.errors import (
 from .predication import predicate_port
 
 
-
-
 async def ashrink_arg(
     port: Union[PortFragment, ChildPortFragment], value: Any, structure_registry=None
 ) -> Any:
@@ -58,16 +56,18 @@ async def ashrink_arg(
 
         if port.kind == PortKind.INT:
             return int(value) if value is not None else None
-        
-        if port.kind == PortKind.UNION:
 
+        if port.kind == PortKind.UNION:
             for index, x in enumerate(port.variants):
                 if predicate_port(x, value, structure_registry):
-                    return {"use": index, "value": await ashrink_arg(x, value, structure_registry)}
-                
-            raise ShrinkingError(f"Port is union butn none of the predicated for this port held true {port.variants}")
+                    return {
+                        "use": index,
+                        "value": await ashrink_arg(x, value, structure_registry),
+                    }
 
-
+            raise ShrinkingError(
+                f"Port is union butn none of the predicated for this port held true {port.variants}"
+            )
 
         if port.kind == PortKind.STRUCTURE:
             # We always convert structures returns to strings
@@ -211,14 +211,15 @@ async def aexpand_return(
                 for item in value
             ]
         )
-    
+
     if port.kind == PortKind.UNION:
         assert isinstance(value, dict), "Union value needs to be a dict"
         assert "use" in value, "No use in vaalue"
         index = value["use"]
         true_value = value["value"]
-        return await aexpand_return(port.variants[index], true_value, structure_registry=structure_registry)
-                
+        return await aexpand_return(
+            port.variants[index], true_value, structure_registry=structure_registry
+        )
 
     if port.kind == PortKind.INT:
         return int(value)
