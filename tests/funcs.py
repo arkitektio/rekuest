@@ -1,7 +1,13 @@
 import asyncio
-from typing import Dict, List, Tuple, Annotated, Optional, Union
+import sys
+from typing import Dict, List, Tuple, Optional, Union
 from .structures import SecondObject, SecondSerializableObject, SerializableObject
 from annotated_types import Le, Predicate, Gt, Len
+
+if sys.version_info < (3, 9):
+    from typing_extensions import Annotated
+else:
+    from typing import Annotated
 
 
 def null_function(x: Optional[int]) -> None:
