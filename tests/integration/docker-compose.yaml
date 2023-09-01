@@ -5,20 +5,11 @@ services:
     image: jhnnsrs/daten:prod
     restart: always
     environment:
-      POSTGRES_MULTIPLE_DATABASES: herre_db, arkitekt_db
+      POSTGRES_MULTIPLE_DATABASES: arkitekt_db
       POSTGRES_PASSWORD: 6398045f7711b517ac0aa3c7e6b77a63
       POSTGRES_USER: arkitekt
-  herre:
-    image: jhnnsrs/herre:prod
-    volumes:
-      - ./configs/herre.yaml:/workspace/config.yaml
-      - ./fakts:/workspace/fakts
-    ports:
-      - 8019:8000
-    depends_on:
-      - daten
-  arkitekt:
-    image: jhnnsrs/arkitekt:prod
+  rekuest:
+    image: jhnnsrs/rekuest:prod
     volumes:
       - ./configs/arkitekt.yaml:/workspace/config.yaml
     ports:

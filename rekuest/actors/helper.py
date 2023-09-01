@@ -3,27 +3,28 @@ from rekuest.api.schema import LogLevelInput, AssignationStatusInput
 from rekuest.messages import Assignation, Provision
 from koil import unkoil
 from rekuest.actors.types import Assignment
-from rekuest.actors.transport.types import ActorTransport, AssignTransport
+from rekuest.actors.transport.types import ActorTransport, AssignTransport, Passport
 
 
 class AssignationHelper(BaseModel):
+    passport: Passport
     assignment: Assignment
     transport: AssignTransport
 
     async def alog(self, level: LogLevelInput, message: str) -> None:
-        await self.transport.log_to_assignation(level=level, message=message)
-
-    def log(self, level: LogLevelInput, message: str) -> None:
-        return unkoil(self.alog, level, message)
+        await self.transport.log(level=level, message=message)
 
     async def aprogress(self, progress: int) -> None:
-        await self.transport.change_assignation(
+        await self.transport.change(
             status=AssignationStatusInput.PROGRESS,
             progress=progress,
         )
 
     def progress(self, progress: int) -> None:
         return unkoil(self.aprogress, progress)
+
+    def log(self, level: LogLevelInput, message: str) -> None:
+        return unkoil(self.alog, level, message)
 
     @property
     def user(self) -> str:
@@ -43,9 +44,7 @@ class ProvisionHelper(BaseModel):
     transport: ActorTransport
 
     async def alog(self, level: LogLevelInput, message: str) -> None:
-        await self.transport.log_to_provision(
-            id=self.provision.provision, level=level, message=message
-        )
+        await self.transport.log(level=level, message=message)
 
     @property
     def guardian(self) -> str:

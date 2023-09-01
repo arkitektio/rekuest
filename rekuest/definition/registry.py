@@ -55,7 +55,6 @@ class DefinitionRegistry(KoiledModel):
         self.structure_registry[interface] = structure_registry
 
     def get_builder_for_interface(self, interface) -> ActorBuilder:
-        assert interface in self.actor_builders, "No actor_builder for interface"
         return self.actor_builders[interface]
 
     def get_structure_registry_for_interface(self, interface) -> StructureRegistry:

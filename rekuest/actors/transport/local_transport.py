@@ -215,11 +215,11 @@ class ProxyAssignTransport(KoiledModel):
     on_change: Callable
     on_log: Callable
 
-    async def change_assignation(self, *args, **kwargs):
-        await self.on_change(self.assignment, *args, **kwargs)
+    async def change(self, *args, **kwargs):
+        await self.on_change(self.assignment, *args, **kwargs)  # Forwards assignment up
 
-    async def log_to_assignation(self, *args, **kwargs):
-        await self.on_log(self.assignment, *args, **kwargs)
+    async def log(self, *args, **kwargs):
+        await self.on_log(self.assignment, *args, **kwargs)  # Forwards assignment up
 
     class Config:
         underscore_attrs_are_private = True
@@ -228,26 +228,32 @@ class ProxyAssignTransport(KoiledModel):
 
 
 class ProxyActorTransport(KoiledModel):
-    on_log: Callable
-    on_change: Callable
-    on_assign_change: Callable
-    on_assign_log: Callable
+    passport: Passport
+    on_actor_log: Callable[[Passport, LogLevelInput, str], Awaitable[None]]
+    on_actor_change: Callable[
+        [Passport, ProvisionStatus, str, ProvisionMode], Awaitable[None]
+    ]
+    on_assign_change: Callable[
+        [Assignment, AssignationStatus, str, List[Any], int], None
+    ]
+    on_assign_log: Callable[[Assignment, LogLevelInput, str], None]
 
-    async def change_provision(self, *args, **kwargs):
-        await self.on_change(*args, **kwargs)
+    async def change(self, *args, **kwargs):
+        await self.on_actor_change(self.passport, *args, **kwargs)
 
-    async def log_to_provision(self, *args, **kwargs):
-        await self.on_log(*args, **kwargs)
+    async def log(self, *args, **kwargs):
+        await self.on_actor_log(self.passport, *args, **kwargs)
 
-    async def change_assignation(self, *args, **kwargs):
+    # Just forwaring the calls further up
+    async def _change_assignation(self, *args, **kwargs):
         await self.on_assign_change(*args, **kwargs)
 
-    async def log_to_assignation(self, *args, **kwargs):
+    async def _log_to_assignation(self, *args, **kwargs):
         await self.on_assign_log(*args, **kwargs)
 
-    def spawn(self, assignment: Assignment) -> AgentActorAssignTransport:
+    def spawn(self, assignment: Assignment) -> ProxyAssignTransport:
         return ProxyAssignTransport(
             assignment=assignment,
-            on_change=self.change_assignation,
-            on_log=self.log_to_assignation,
+            on_change=self._change_assignation,
+            on_log=self._log_to_assignation,
         )

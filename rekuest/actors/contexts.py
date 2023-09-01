@@ -7,18 +7,19 @@ from rekuest.actors.vars import (
     current_assignment,
 )
 from rekuest.actors.transport.types import ActorTransport, AssignTransport
-from rekuest.actors.types import Assignment
+from rekuest.actors.types import Assignment, Passport
 from pydantic import BaseModel
 
 
 class AssignationContext(BaseModel):
+    passport: Passport
     assignment: Assignment
     transport: AssignTransport
     _helper = None
 
     def __enter__(self):
         self._helper = AssignationHelper(
-            assignment=self.assignment, transport=self.transport
+            assignment=self.assignment, transport=self.transport, passport=self.passport
         )
 
         current_assignment.set(self.assignment)

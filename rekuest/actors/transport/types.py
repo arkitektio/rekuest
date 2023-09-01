@@ -25,7 +25,9 @@ from rekuest.actors.types import Passport, Assignment
 
 @runtime_checkable
 class ActorTransport(Protocol):
-    async def change_provision(
+    passport: Passport
+
+    async def change(
         self,
         status: ProvisionStatus = None,
         message: str = None,
@@ -33,7 +35,7 @@ class ActorTransport(Protocol):
     ):
         ...
 
-    async def log_to_provision(
+    async def log(
         self,
         level: LogLevelInput = None,
         message: str = None,
@@ -48,7 +50,7 @@ class ActorTransport(Protocol):
 class AssignTransport(Protocol):
     assignment: Assignment
 
-    async def change_assignation(
+    async def change(
         self,
         status: AssignationStatus = None,
         message: str = None,
@@ -57,7 +59,7 @@ class AssignTransport(Protocol):
     ):
         ...
 
-    async def log_to_assignation(
+    async def log(
         self,
         level: LogLevelInput = None,
         message: str = None,

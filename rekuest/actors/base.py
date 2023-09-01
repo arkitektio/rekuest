@@ -1,4 +1,4 @@
-from typing import Dict, Union
+from typing import Dict, Union, Callable, Awaitable, List
 
 from pydantic import BaseModel, Field, PrivateAttr
 from rekuest.structures.registry import (
@@ -27,15 +27,26 @@ from rekuest.definition.registry import (
 from rekuest.actors.types import Assignment, Passport, Unassignment
 import uuid
 from rekuest.collection.collector import Collector
+from rekuest.api.schema import TemplateFragment
+from rekuest.actors.transport.local_transport import ProxyActorTransport
 
 logger = logging.getLogger(__name__)
+
+
+@runtime_checkable
+class Agent(Protocol):
+    async def abuild_actor_for_template(
+        self, template: TemplateFragment, passport: Passport, transport: ActorTransport
+    ) -> "Actor":
+        ...
 
 
 class Actor(BaseModel):
     passport: Passport
     transport: ActorTransport
     collector: Collector
-    definition_registry: DefinitionRegistry
+    agent: Agent
+    supervisor: Optional["Actor"] = None
     managed_actors: Dict[str, "Actor"] = Field(default_factory=dict)
     running_assignments: Dict[str, Assignment] = Field(default_factory=dict)
 
@@ -72,10 +83,11 @@ class Actor(BaseModel):
 
     async def aset_status(self, status: ProvisionStatus, message: str = None):
         self._status = status
-        await self.transport.change_provision(
+        await self.transport.change(
             status=status,
             message=message or "No message provided",
         )
+        logger.info(f"Setting self to {status}: {message}")
 
     async def aget_status(self):
         return self._status
@@ -102,16 +114,9 @@ class Actor(BaseModel):
         except asyncio.CancelledError:
             logger.info(f"Actor {self.passport.id} was cancelled")
 
-    async def aass_log(self, id: str, message: str, level=AssignationLogLevel.INFO):
-        logging.critical(f"ASS {id} {message}")
-        await self.transport.log_to_assignation(id=id, level=level, message=message)
-        logging.critical(f"ASS SEND {message}")
-
     async def aprov_log(self, message: str, level=ProvisionLogLevel.INFO):
         logging.critical(f"PROV {self.passport} {message}")
-        await self.transport.log_to_provision(
-            id=self.passport, level=level, message=message
-        )
+        await self.transport.log(id=self.passport, level=level, message=message)
 
     async def provide(self):
         try:
@@ -142,6 +147,19 @@ class Actor(BaseModel):
                 message=str(e),
             )
 
+    def assign_task_done(self, task):
+        logger.info(f"Assign task is done: {task}")
+        if task.exception():
+            try:
+                raise task.exception()
+            except asyncio.CancelledError:
+                pass
+            except Exception as e:
+                logger.error(
+                    f"Assign task {task} failed with exception {e}", exc_info=True
+                )
+            pass
+
     async def aprocess(self, message: Union[Assignment, Unassignment]):
         logger.info(f"Actor for {self.passport}: Received {message}")
 
@@ -156,13 +174,15 @@ class Actor(BaseModel):
                 )
             )
 
+            task.add_done_callback(self.assign_task_done)
+
             self._running_transports[message.id] = transport
             self._running_asyncio_tasks[message.id] = task
 
         elif isinstance(message, Unassignment):
             if message.id in self._running_asyncio_tasks:
                 task = self._running_asyncio_tasks[message.id]
-                transport = self._running_transports[message.id]
+                assign_transport = self._running_transports[message.id]
 
                 if not task.done():
                     task.cancel()
@@ -170,13 +190,12 @@ class Actor(BaseModel):
                         await task
                     except asyncio.CancelledError:
                         logger.info(
-                            f"Task {transport.assignment} was cancelled through arkitekt. Setting Cancelled"
+                            f"Task {assign_transport.assignment} was cancelled through arkitekt. Setting Cancelled"
                         )
-                        await transport.change_assignation(
+                        await assign_transport.change(
                             status=AssignationStatus.CANCELLED,
-                            message="Cancelled by Actor",
+                            message="Cancelled through arkitekt",
                         )
-
                         del self._running_asyncio_tasks[message.id]
                         del self._running_transports[message.id]
 
@@ -211,16 +230,16 @@ class Actor(BaseModel):
 
             [i.cancel() for i in self._running_asyncio_tasks.values()]
 
-            for task, transport in zip(
+            for task, assign_transport in zip(
                 self._running_asyncio_tasks.values(), self._running_transports.values()
             ):
                 try:
                     await task
                 except asyncio.CancelledError:
                     logger.info(
-                        f"Task {transport.assignment} was cancelled through applicaction. Setting Critical"
+                        f"Task {assign_transport.assignment} was cancelled through applicaction. Setting Critical"
                     )
-                    await transport.change_assignation(
+                    await assign_transport.change(
                         status=AssignationStatus.CRITICAL,
                         message="Cancelled by Application",
                     )
@@ -246,28 +265,40 @@ class Actor(BaseModel):
         return self
 
     async def aspawn_actor(
-        self, interface: str, transport: ActorTransport
+        self,
+        template: TemplateFragment,
+        on_actor_log: Callable[[Passport, LogLevelInput, str], Awaitable[None]],
+        on_actor_change: Callable[
+            [Passport, ProvisionStatus, str, ProvisionMode], Awaitable[None]
+        ],
+        on_assign_change: Callable[
+            [Assignment, AssignationStatus, str, List[Any], int], None
+        ],
+        on_assign_log: Callable[[Assignment, LogLevelInput, str], None],
     ) -> "SerializingActor":
-        """Spawns an Actor from the definition of the given interface"""
-        try:
-            actor_builder = self.definition_registry.get_builder_for_interface(
-                interface
-            )
+        """Spawns an Actor managed by thisfrom the definition of the given interface"""
 
-        except KeyError as e:
-            raise ProvisionDelegateException(
-                "No Actor Builder found for interface"
-            ) from e
-
-        passport = Passport(provision=self.passport.provision, parent=self.passport.id)
-
-        actor = actor_builder(
-            passport=passport,
-            transport=transport,
-            definition_registry=self.definition_registry,
-            collector=self.collector,
+        passport = Passport(
+            provision=self.passport.provision,
+            parent=self.passport.id,
+            instance_id=self.passport.instance_id,
         )
-        self.managed_actors[passport.id] = actor
+
+        transport = ProxyActorTransport(
+            passport=passport,
+            on_actor_change=on_actor_change,
+            on_actor_log=on_actor_log,
+            on_assign_change=on_assign_change,
+            on_assign_log=on_assign_log,
+        )
+
+        actor = await self.agent.abuild_actor_for_template(
+            template,
+            passport,
+            transport,
+        )
+
+        self.managed_actors[actor.passport.id] = actor
         return actor
 
     async def __aexit__(self, exc_type, exc, tb):

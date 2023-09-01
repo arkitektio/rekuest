@@ -1,4 +1,5 @@
-from rekuest.structures.registry import StructureRegistry, id_shrink
+from rekuest.structures.registry import StructureRegistry
+from rekuest.structures.hooks.standard import id_shrink
 from rekuest.api.schema import (
     TemplateFragment,
     NodeFragment,

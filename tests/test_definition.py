@@ -8,6 +8,7 @@ from .funcs import (
     plain_basic_function,
     plain_structure_function,
     union_structure_function,
+    plain_enum_function,
     nested_basic_function,
     nested_structure_function,
     annotated_basic_function,
@@ -76,6 +77,24 @@ def test_define_basic(simple_registry):
     assert (
         functional_definition.args[0].annotations == ()
     ), "Should not have annotations"
+
+    functional_definition.json()
+
+
+@pytest.mark.define
+def test_define_enum(simple_registry):
+    functional_definition = prepare_definition(
+        plain_enum_function, structure_registry=simple_registry
+    )
+    assert isinstance(
+        functional_definition, DefinitionInput
+    ), "output is not a definition"
+    assert (
+        functional_definition.name == "Karl"
+    ), "Doesnt conform to standard Naming Scheme"
+    assert functional_definition.args[1].kind == PortKind.STRUCTURE
+
+    functional_definition.json()
 
 
 @pytest.mark.define

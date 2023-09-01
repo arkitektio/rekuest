@@ -13,5 +13,7 @@ fragment Definition on Node {
 fragment Node on Node {
   hash
   id
+
+  scope
   ...Definition
 }

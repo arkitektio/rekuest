@@ -10,6 +10,13 @@ from graphql import (
 )
 from graphql.language.print_location import print_prefixed_lines
 import inspect
+import sys
+from typing import Any
+
+if sys.version_info < (3, 9):
+    from typing_extensions import Annotated
+else:
+    from typing import Annotated
 
 
 class QString(str):
@@ -27,6 +34,9 @@ class Interface(str):
         return v
 
     pass
+
+
+JSONSerializable = Any
 
 
 class Identifier(str):

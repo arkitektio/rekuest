@@ -20,7 +20,7 @@ from rekuest.api.schema import (
 import inspect
 from docstring_parser import parse
 from rekuest.definition.errors import DefinitionError, NonSufficientDocumentation
-
+import datetime as dt
 from rekuest.structures.registry import (
     StructureRegistry,
 )
@@ -42,7 +42,6 @@ def convert_child_to_childport(
     cls: Type,
     registry: StructureRegistry,
     nullable: bool = False,
-    annotations: List[AnnotationInput] = None,
 ) -> Tuple[ChildPortInput, Callable]:
     """Converts a element of a annotation to a child port
 
@@ -67,7 +66,6 @@ def convert_child_to_childport(
             real_type,
             registry,
             nullable=nullable,
-            annotations=annotations,
         )
 
     if cls.__module__ == "typing":
@@ -84,7 +82,6 @@ def convert_child_to_childport(
                         child=child,
                         scope=Scope.GLOBAL,
                         nullable=nullable,
-                        annotations=annotations,
                     ),
                     lambda default: (
                         [nested_converter(ndefault) for ndefault in default]
@@ -103,7 +100,6 @@ def convert_child_to_childport(
                         child=child,
                         scope=Scope.GLOBAL,
                         nullable=nullable,
-                        annotations=annotations,
                     ),
                     lambda default: (
                         {
@@ -129,9 +125,18 @@ def convert_child_to_childport(
                 kind=PortKindInput.BOOL,
                 nullable=nullable,
                 scope=Scope.GLOBAL,
-                annotations=annotations,
             )  # catch bool is subclass of int
             return t, str
+
+        if not issubclass(cls, Enum) and issubclass(cls, float):
+            return (
+                ChildPortInput(
+                    kind=PortKindInput.FLOAT,
+                    nullable=nullable,
+                    scope=Scope.GLOBAL,
+                ),
+                float,
+            )
 
         if not issubclass(cls, Enum) and issubclass(cls, int):
             return (
@@ -139,46 +144,38 @@ def convert_child_to_childport(
                     kind=PortKindInput.INT,
                     nullable=nullable,
                     scope=Scope.GLOBAL,
-                    annotations=annotations,
                 ),
                 int,
             )
+
+        if not issubclass(cls, Enum) and (issubclass(cls, dt.datetime)):
+            return (
+                ChildPortInput(
+                    kind=PortKindInput.DATE,
+                    nullable=nullable,
+                    scope=Scope.GLOBAL,
+                ),
+                lambda x: x.isoformat(),
+            )
+
         if not issubclass(cls, Enum) and issubclass(cls, str):
             return (
                 ChildPortInput(
                     kind=PortKindInput.STRING,
                     nullable=nullable,
                     scope=Scope.GLOBAL,
-                    annotations=annotations,
                 ),
                 str,
             )
 
-    identifier = registry.get_identifier_for_structure(cls)
-    scope = registry.get_scope_for_identifier(identifier)
-    default_converter = registry.get_default_converter_for_structure(cls)
-    assign_widget = registry.get_widget_input(cls)
-    return_widget = registry.get_returnwidget_input(cls)
-
-    return (
-        ChildPortInput(
-            kind=PortKindInput.STRUCTURE,
-            identifier=identifier,
-            scope=scope,
-            nullable=nullable,
-            annotations=annotations,
-            assignWidget=assign_widget,
-            returnWidget=return_widget,
-        ),
-        default_converter,
-    )
+    return registry.get_child_port_and_default_converter_for_cls(cls, nullable=nullable)
 
 
 def convert_object_to_port(
     cls,
     key,
     registry: StructureRegistry,
-    widget=None,
+    assign_widget=None,
     return_widget=None,
     default=None,
     label=None,
@@ -198,7 +195,7 @@ def convert_object_to_port(
             real_type,
             key,
             registry,
-            widget=widget,
+            assign_widget=assign_widget,
             default=default,
             label=label,
             effects=effects,
@@ -216,7 +213,7 @@ def convert_object_to_port(
                 )
                 return PortInput(
                     kind=PortKindInput.LIST,
-                    assignWidget=widget,
+                    assignWidget=assign_widget,
                     returnWidget=return_widget,
                     scope=Scope.GLOBAL,
                     key=key,
@@ -244,7 +241,7 @@ def convert_object_to_port(
                         registry,
                         default=default,
                         nullable=True,
-                        widget=widget,
+                        assign_widget=assign_widget,
                         label=label,
                         effects=effects,
                         return_widget=return_widget,
@@ -267,13 +264,13 @@ def convert_object_to_port(
 
                     return PortInput(
                         kind=PortKindInput.UNION,
-                        assignWidget=widget,
+                        assignWidget=assign_widget,
                         returnWidget=return_widget,
                         scope=Scope.GLOBAL,
                         key=key,
                         variants=variants,
                         label=label,
-                        default=None,
+                        default=None,  # TODO: SHould fix based on predicate of default
                         nullable=nullable,
                         effects=effects,
                         annotations=annotations,
@@ -287,7 +284,7 @@ def convert_object_to_port(
                 )
                 return PortInput(
                     kind=PortKindInput.DICT,
-                    assignWidget=widget,
+                    assignWidget=assign_widget,
                     scope=Scope.GLOBAL,
                     returnWidget=return_widget,
                     key=key,
@@ -316,7 +313,7 @@ def convert_object_to_port(
                     registry,
                     default=default,
                     nullable=True,
-                    widget=widget,
+                    assign_widget=assign_widget,
                     label=label,
                     effects=effects,
                     return_widget=return_widget,
@@ -334,7 +331,7 @@ def convert_object_to_port(
             t = PortInput(
                 kind=PortKindInput.BOOL,
                 scope=Scope.GLOBAL,
-                assignWidget=widget,
+                assignWidget=assign_widget,
                 returnWidget=return_widget,
                 key=key,
                 default=default,
@@ -352,7 +349,7 @@ def convert_object_to_port(
         ):
             return PortInput(
                 kind=PortKindInput.INT,
-                assignWidget=widget,
+                assignWidget=assign_widget,
                 scope=Scope.GLOBAL,
                 returnWidget=return_widget,
                 key=key,
@@ -371,7 +368,26 @@ def convert_object_to_port(
         ):
             return PortInput(
                 kind=PortKindInput.FLOAT,
-                assignWidget=widget,
+                assignWidget=assign_widget,
+                returnWidget=return_widget,
+                scope=Scope.GLOBAL,
+                key=key,
+                default=default,
+                label=label,
+                nullable=nullable,
+                effects=effects,
+                annotations=annotations,
+                description=description,
+                groups=groups,
+            )
+
+        if not issubclass(cls, Enum) and (
+            issubclass(cls, dt.datetime)
+            or (default is not None and isinstance(default, dt.datetime))
+        ):
+            return PortInput(
+                kind=PortKindInput.DATE,
+                assignWidget=assign_widget,
                 returnWidget=return_widget,
                 scope=Scope.GLOBAL,
                 key=key,
@@ -389,7 +405,7 @@ def convert_object_to_port(
         ):
             return PortInput(
                 kind=PortKindInput.STRING,
-                assignWidget=widget,
+                assignWidget=assign_widget,
                 returnWidget=return_widget,
                 scope=Scope.GLOBAL,
                 key=key,
@@ -402,26 +418,17 @@ def convert_object_to_port(
                 groups=groups,
             )
 
-    identifier = registry.get_identifier_for_structure(cls)
-    scope = registry.get_scope_for_identifier(identifier)
-    default_converter = registry.get_default_converter_for_structure(cls)
-    widget = widget or registry.get_widget_input(cls)
-    return_widget = return_widget or registry.get_returnwidget_input(cls)
-
-    return PortInput(
-        kind=PortKindInput.STRUCTURE,
-        identifier=identifier,
-        assignWidget=widget,
-        scope=scope,
-        returnWidget=return_widget,
-        key=key,
-        label=label,
-        default=default_converter(default) if default else None,
+    return registry.get_port_for_cls(
+        cls,
+        key,
         nullable=nullable,
-        effects=effects,
-        annotations=annotations,
         description=description,
         groups=groups,
+        effects=effects,
+        label=label,
+        default=default,
+        assign_widget=assign_widget,
+        return_widget=return_widget,
     )
 
 
@@ -547,7 +554,7 @@ def prepare_definition(
         if key in omitkeys:
             continue
 
-        widget = widgets.pop(key, None)
+        assign_widget = widgets.pop(key, None)
         port_effects = effects.pop(key, None)
         return_widget = return_widgets.pop(key, None)
         default = value.default if value.default != inspect.Parameter.empty else None
@@ -565,7 +572,7 @@ def prepare_definition(
                     cls,
                     key,
                     structure_registry,
-                    widget=widget,
+                    assign_widget=assign_widget,
                     return_widget=return_widget,
                     default=default,
                     effects=port_effects,
@@ -589,7 +596,7 @@ def prepare_definition(
                 for index, cls in enumerate(function_outs_annotation.__args__):
                     key = f"return{index}"
                     return_widget = return_widgets.pop(key, None)
-                    widget = widgets.pop(key, None)
+                    assign_widget = widgets.pop(key, None)
                     port_effects = effects.pop(key, None)
                     this_port_groups = groups.pop(key, None)
 
@@ -602,7 +609,7 @@ def prepare_definition(
                             effects=port_effects,
                             description=doc_param_description_map.pop(key, None),
                             label=doc_param_label_map.pop(key, None),
-                            widget=widget,
+                            assign_widget=assign_widget,
                             groups=this_port_groups,
                         )
                     )
@@ -615,7 +622,7 @@ def prepare_definition(
             try:
                 key = "return0"
                 return_widget = return_widgets.pop(key, None)
-                widget = widgets.pop(key, None)
+                assign_widget = widgets.pop(key, None)
                 this_port_groups = groups.get(key, None)
                 port_effects = effects.pop(key, None)
                 returns.append(
@@ -627,7 +634,7 @@ def prepare_definition(
                         effects=port_effects,
                         description=doc_param_description_map.pop(key, None),
                         label=doc_param_label_map.pop(key, None),
-                        widget=widget,
+                        assign_widget=assign_widget,
                         groups=this_port_groups,
                     )
                 )  # Other types will be converted to normal lists and shit
@@ -644,7 +651,7 @@ def prepare_definition(
         elif function_outs_annotation.__name__ != "_empty":  # Is it not empty
             key = "return0"
             return_widget = return_widgets.pop(key, None)
-            widget = widgets.pop(key, None)
+            assign_widget = widgets.pop(key, None)
             this_port_groups = groups.pop(key, None)
             port_effects = effects.pop(key, None)
             returns.append(
@@ -652,7 +659,7 @@ def prepare_definition(
                     function_outs_annotation,
                     "return0",
                     structure_registry,
-                    widget=widget,
+                    assign_widget=assign_widget,
                     effects=port_effects,
                     description=doc_param_description_map.pop(key, None),
                     label=doc_param_label_map.pop(key, None),

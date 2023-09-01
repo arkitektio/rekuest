@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "rekuest"
-version = "0.2.0"
+version = "0.2.18"
 description = "rpc and node backbone"
 authors = ["jhnnsrs <jhnnsrs@gmail.com>"]
 license = "CC BY-NC 3.0"
@@ -11,12 +11,14 @@ python = "^3.7"
 docstring-parser = ">=0.11"
 inflection = "^0.5.1"
 websockets = "^10.0"
-pydantic = ">=1.9.0"
+pydantic = ">=1.9.0,<=2.0"
 annotated-types = "^0.4.0"
-rath = ">=0.4.0"
+rath = ">=0.4.6"
+aenum = { version = "^3.1.15", optional = true }
+
 
 [tool.ruff]
-extend-select = ["ANN", "D1"]
+extend-select = []
 
 # Exclude a variety of commonly ignored directories.
 exclude = [
@@ -64,6 +66,7 @@ requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.pytest.ini_options]
+asyncio_mode = "auto"
 qt_api = "pyqt5"
 markers = [
     "integration: marks tests that require a running server",

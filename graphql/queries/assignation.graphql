@@ -1,5 +1,5 @@
-query requests($identifier: String!) {
-  requests(identifier: $identifier) {
+query requests($instanceId: String!) {
+  requests(instanceId: $instanceId) {
     ...Assignation
   }
 }

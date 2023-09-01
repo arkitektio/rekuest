@@ -3,6 +3,7 @@ from rekuest.actors.contexts import (
     AssignationContext,
     ProvisionContext,
     Assignment,
+    Passport,
     AssignTransport,
 )
 from rekuest.messages import Assignation, Provision
@@ -48,7 +49,9 @@ def guardian_func():
 def test_reactive_assignation_api():
     assignment = Assignment(assignation=2, user=1)
     with AssignationContext(
-        assignment=assignment, transport=MockAssignTransport(assignment=assignment)
+        assignment=assignment,
+        transport=MockAssignTransport(assignment=assignment),
+        passport=Passport(instance_id=1, provision=1),
     ):
         assert function() == 1, "Should be able to use functional api"
 

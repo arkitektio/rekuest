@@ -1,6 +1,5 @@
 from typing import Optional
 from fakts.fakt.base import Fakt
-from fakts.fakts import get_current_fakts
 from fakts import Fakts
 from herre import Herre
 from rekuest.agents.transport.websocket import WebsocketAgentTransport

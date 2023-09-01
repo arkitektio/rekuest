@@ -16,6 +16,7 @@ from rekuest.structures.errors import (
     PortExpandingError,
     StructureExpandingError,
 )
+import datetime as dt
 
 
 def predicate_port(
@@ -33,6 +34,8 @@ def predicate_port(
         return all([predicate_port(port.child, value) for value in value])
     if port.kind == PortKind.BOOL:
         return isinstance(value, bool)
+    if port.kind == PortKind.DATE:
+        return isinstance(value, dt.datetime)
     if port.kind == PortKind.INT:
         return isinstance(value, int)
     if port.kind == PortKind.FLOAT:

@@ -35,8 +35,8 @@ query get_reservation($id: ID!) {
   }
 }
 
-query reservations($identifier: String!) {
-  reservations(identifier: $identifier) {
+query reservations($instanceId: String!) {
+  reservations(instanceId: $instanceId) {
     ...Reservation
   }
 }

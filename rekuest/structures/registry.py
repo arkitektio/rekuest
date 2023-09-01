@@ -1,75 +1,66 @@
 import contextvars
 from enum import Enum
-from typing import Any, Awaitable, Callable, Dict, Optional, Type, TypeVar
+from typing import (
+    Any,
+    Awaitable,
+    Callable,
+    OrderedDict,
+    Dict,
+    Optional,
+    Type,
+    List,
+    TypeVar,
+    Protocol,
+    runtime_checkable,
+)
 
 from rekuest.api.schema import (
     ChoiceInput,
     ReturnWidgetInput,
     WidgetInput,
+    WidgetInput,
+    ReturnWidgetInput,
     AnnotationInput,
     Scope,
     PortInput,
+    EffectInput,
+    ChildPortInput,
+    PortKindInput,
 )
 from pydantic import BaseModel, Field
 import inspect
-from rekuest.collection.shelve import get_current_shelve
 from .errors import (
     StructureDefinitionError,
     StructureOverwriteError,
     StructureRegistryError,
 )
-from .types import PortBuilder
+from .types import PortBuilder, FullFilledStructure
+from .hooks.types import RegistryHook
+from .hooks.default import get_default_hooks
+from .hooks.errors import HookError
 
 current_structure_registry = contextvars.ContextVar("current_structure_registry")
-
-
-async def id_shrink(self):
-    return self.id
-
-
-async def shelve_ashrink(cls: Type):
-    shelve = get_current_shelve()
-    return await shelve.aput(cls)
-
-
-async def shelve_aexpand(id: str):
-    shelve = get_current_shelve()
-    return await shelve.aget(id)
-
-
-async def shelve_acollect(id: str):
-    shelve = get_current_shelve()
-    return await shelve.adelete(id)
-
-
-async def void_acollect(id: str):
-    return None
-
-
-def build_instance_predicate(cls: Type):
-    return lambda x: isinstance(x, cls)
-
-
-def build_enum_shrink_expand(cls: Type[Enum]):
-    async def shrink(s):
-        return s._name_
-
-    async def expand(v):
-        return cls.__members__[v].value
-
-    return shrink, expand
 
 
 T = TypeVar("T")
 
 Identifier = str
 """ A unique identifier of this structure on the arkitekt platform"""
+GroupMap = Dict[str, List[str]]
+WidgetMap = Dict[str, List[WidgetInput]]
+ReturnWidgetMap = Dict[str, List[ReturnWidgetInput]]
+EffectsMap = Dict[str, List[EffectInput]]
+
+
+def cls_to_identifier(cls: Type) -> Identifier:
+    return f"{cls.__module__.lower()}.{cls.__name__.lower()}"
 
 
 class StructureRegistry(BaseModel):
     copy_from_default: bool = False
-    allow_overwrites: bool = False
+    allow_overwrites: bool = True
     allow_auto_register: bool = True
+    cls_to_identifier: Callable[[Type], Identifier] = cls_to_identifier
 
     identifier_structure_map: Dict[str, Type] = Field(
         default_factory=dict, exclude=True
@@ -86,6 +77,11 @@ class StructureRegistry(BaseModel):
     _structure_default_widget_map: Dict[Type, WidgetInput] = {}
     _structure_default_returnwidget_map: Dict[Type, ReturnWidgetInput] = {}
     _structure_annotation_map: Dict[Type, Type] = {}
+
+    registry_hooks: OrderedDict[str, RegistryHook] = Field(
+        default_factory=get_default_hooks
+    )
+    _fullfilled_structures_map: Dict[Type, FullFilledStructure] = {}
 
     _token: contextvars.Token = None
 
@@ -195,92 +191,179 @@ class StructureRegistry(BaseModel):
         default_widget: Optional[WidgetInput] = None,
         default_returnwidget: Optional[ReturnWidgetInput] = None,
     ):
-        if inspect.isclass(cls):
-            if issubclass(cls, Enum):
-                identifier = "cls/" + cls.__name__.lower()
-                shrink, expand = build_enum_shrink_expand(cls)
-                ashrink = ashrink or shrink
-                aexpand = aexpand or expand
-                scope = Scope.GLOBAL
-
-                def convert_default(x):
-                    return x._name_
-
-                default_widget = default_widget or WidgetInput(
-                    kind="ChoiceWidget",
-                    choices=[
-                        ChoiceInput(label=key, value=key)
-                        for key, value in cls.__members__.items()
-                    ],
-                )
-                default_returnwidget = default_returnwidget or ReturnWidgetInput(
-                    kind="ChoiceReturnWidget",
-                    choices=[
-                        ChoiceInput(label=key, value=key)
-                        for key, value in cls.__members__.items()
-                    ],
-                )
-
-        if convert_default is None:
-            if hasattr(cls, "convert_default"):
-                convert_default = cls.convert_default
-
-        if aexpand is None:
-            if not hasattr(cls, "aexpand") and scope == Scope.GLOBAL:
+        fullfilled_structure = None
+        for key, hook in self.registry_hooks.items():
+            try:
+                if hook.is_applicable(cls):
+                    try:
+                        fullfilled_structure = hook.apply(
+                            cls,
+                            identifier=identifier,
+                            scope=scope,
+                            aexpand=aexpand,
+                            ashrink=ashrink,
+                            acollect=acollect,
+                            predicate=predicate,
+                            convert_default=convert_default,
+                            default_widget=default_widget,
+                            default_returnwidget=default_returnwidget,
+                        )
+                        break  # we found a hook that applies
+                    except HookError as e:
+                        raise StructureDefinitionError(
+                            f"Hook {key} failed to apply to {cls}"
+                        ) from e
+            except Exception as e:
                 raise StructureDefinitionError(
-                    f"You need to pass 'expand' method or {cls} needs to implement a"
-                    " aexpand method if it wants to become a GLOBAL structure"
-                )
-            aexpand = getattr(cls, "aexpand", shelve_aexpand)
+                    f"Hook {key} does not correctly implement its interface. Please contact the developer of this hook."
+                ) from e
 
-        if ashrink is None:
-            if not hasattr(cls, "ashrink") and scope == Scope.GLOBAL:
-                raise StructureDefinitionError(
-                    f"You need to pass 'ashrink' method or {cls} needs to implement a"
-                    " ashrink method if it wants to become a GLOBAL structure"
-                )
-            ashrink = getattr(cls, "ashrink", shelve_ashrink)
-
-        if acollect is None:
-            if scope == Scope.GLOBAL:
-                acollect = void_acollect
-            else:
-                acollect = getattr(cls, "acollect", shelve_acollect)
-
-        if predicate is None:
-            predicate = build_instance_predicate(cls)
-
-        if identifier is None:
-            if not hasattr(cls, "get_identifier"):
-                raise StructureDefinitionError(
-                    f"You need to pass 'identifier' or  {cls} needs to implement a"
-                    " get_identifier method"
-                )
-            identifier = cls.get_identifier()
-
-        if identifier in self.identifier_structure_map and not self.allow_overwrites:
-            raise StructureOverwriteError(
-                f"{identifier} is already registered. Previously registered"
-                f" {self.identifier_structure_map[identifier]}"
+        if fullfilled_structure is None:
+            raise StructureDefinitionError(
+                f"No hook was able to apply to {cls}. Please check your hooks {self.registry_hooks}"
             )
 
-        self._identifier_expander_map[identifier] = aexpand
-        self._identifier_collecter_map[identifier] = acollect
-        self._identifier_shrinker_map[identifier] = ashrink
-        self._identifier_predicate_map[identifier] = predicate
+        self.fullfill_registration(fullfilled_structure)
 
-        self.identifier_structure_map[identifier] = cls
-        self.identifier_scope_map[identifier] = scope
-        self._structure_identifier_map[cls] = identifier
-        self._structure_default_widget_map[cls] = default_widget
-        self._structure_default_returnwidget_map[cls] = default_returnwidget
-        self._structure_convert_default_map[cls] = convert_default
+    def get_fullfilled_structure_for_cls(self, cls: Type) -> FullFilledStructure:
+        try:
+            return self._fullfilled_structures_map[cls]
+        except KeyError as e:
+            if self.allow_auto_register:
+                try:
+                    self.register_as_structure(cls)
+                    return self._fullfilled_structures_map[cls]
+                except StructureDefinitionError as e:
+                    raise StructureDefinitionError(
+                        f"{cls} was not registered and could not be registered"
+                        " automatically"
+                    ) from e
+            else:
+                raise StructureRegistryError(
+                    f"{cls} is not registered and allow_auto_register is set to False."
+                    " Please make sure to register this type beforehand or set"
+                    " allow_auto_register to True"
+                ) from e
+
+    def fullfill_registration(
+        self,
+        fullfilled_structure: FullFilledStructure,
+    ):
+        if (
+            fullfilled_structure.identifier in self.identifier_structure_map
+            and not self.allow_overwrites
+        ):
+            raise StructureOverwriteError(
+                f"{fullfilled_structure.identifier} is already registered. Previously registered"
+                f" {self.identifier_structure_map[fullfilled_structure.identifier]}"
+            )
+
+        self._identifier_expander_map[
+            fullfilled_structure.identifier
+        ] = fullfilled_structure.aexpand
+        self._identifier_collecter_map[
+            fullfilled_structure.identifier
+        ] = fullfilled_structure.acollect
+        self._identifier_shrinker_map[
+            fullfilled_structure.identifier
+        ] = fullfilled_structure.ashrink
+        self._identifier_predicate_map[
+            fullfilled_structure.identifier
+        ] = fullfilled_structure.predicate
+
+        self.identifier_structure_map[
+            fullfilled_structure.identifier
+        ] = fullfilled_structure.cls
+        self.identifier_scope_map[
+            fullfilled_structure.identifier
+        ] = fullfilled_structure.scope
+        self._structure_identifier_map[
+            fullfilled_structure.cls
+        ] = fullfilled_structure.identifier
+        self._structure_default_widget_map[
+            fullfilled_structure.cls
+        ] = fullfilled_structure.default_widget
+        self._structure_default_returnwidget_map[
+            fullfilled_structure.cls
+        ] = fullfilled_structure.default_returnwidget
+        self._structure_convert_default_map[
+            fullfilled_structure.cls
+        ] = fullfilled_structure.convert_default
+
+        self._fullfilled_structures_map[fullfilled_structure.cls] = fullfilled_structure
 
     def get_converter_for_annotation(self, annotation):
         try:
             return self._structure_annotation_map[annotation]
         except KeyError as e:
             raise StructureRegistryError(f"{annotation} is not registered") from e
+
+    def get_port_for_cls(
+        self,
+        cls: Type,
+        key: str,
+        nullable: bool = False,
+        description: Optional[str] = None,
+        groups: List[str] = None,
+        effects: Optional[EffectsMap] = None,
+        label: Optional[str] = None,
+        default: Any = None,
+        assign_widget: Optional[WidgetInput] = None,
+        return_widget: Optional[ReturnWidgetInput] = None,
+    ) -> PortInput:
+        structure = self.get_fullfilled_structure_for_cls(cls)
+
+        identifier = structure.identifier
+        scope = structure.scope
+        default_converter = structure.convert_default
+        assign_widget = assign_widget or structure.default_widget
+        return_widget = return_widget or structure.default_returnwidget
+
+        try:
+            return PortInput(
+                kind=PortKindInput.STRUCTURE,
+                identifier=identifier,
+                assignWidget=assign_widget,
+                scope=scope,
+                returnWidget=return_widget,
+                key=key,
+                label=label,
+                default=default_converter(default) if default else None,
+                nullable=nullable,
+                effects=effects,
+                description=description,
+                groups=groups,
+            )
+        except Exception as e:
+            raise StructureRegistryError(
+                f"Could not create port for {cls} with fullfilled structure {structure}"
+            ) from e
+
+    def get_child_port_and_default_converter_for_cls(
+        self,
+        cls: Type,
+        nullable: bool = False,
+        assign_widget: Optional[WidgetInput] = None,
+        return_widget: Optional[ReturnWidgetInput] = None,
+    ) -> PortInput:
+        identifier = self.get_identifier_for_structure(cls)
+        scope = self.get_scope_for_identifier(identifier)
+        identifier = self.get_identifier_for_structure(cls)
+        default_converter = self.get_default_converter_for_structure(cls)
+        assign_widget = assign_widget or self.get_widget_input(cls)
+        return_widget = return_widget or self.get_returnwidget_input(cls)
+
+        return (
+            ChildPortInput(
+                kind=PortKindInput.STRUCTURE,
+                identifier=identifier,
+                scope=scope,
+                nullable=nullable,
+                assignWidget=assign_widget,
+                returnWidget=return_widget,
+            ),
+            default_converter,
+        )
 
     def register_annotation_converter(
         self,

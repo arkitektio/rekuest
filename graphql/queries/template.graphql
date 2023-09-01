@@ -4,6 +4,12 @@ query get_template($id: ID!) {
   }
 }
 
+query mytemplatefor($hash: String!, $instance_id: ID!) {
+  mytemplatefor(hash: $hash, instanceId: $instance_id) {
+    ...Template
+  }
+}
+
 query search_templates($search: String, $values: [ID]) {
   options: templates(search: $search, limit: 20, ids: $values) {
     label: name

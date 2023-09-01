@@ -52,11 +52,13 @@ class AsyncFuncActor(SerializingActor):
                 skip_expanding=not self.expand_inputs,
             )
 
-            await transport.change_assignation(
+            await transport.change(
                 status=AssignationStatus.ASSIGNED,
             )
 
-            async with AssignationContext(assignment=assignment, transport=transport):
+            async with AssignationContext(
+                assignment=assignment, transport=transport, passport=self.passport
+            ):
                 returns = await self.assign(**params)
 
             returns = await shrink_outputs(
@@ -68,26 +70,26 @@ class AsyncFuncActor(SerializingActor):
 
             collector.register(assignment, parse_collectable(self.definition, returns))
 
-            await transport.change_assignation(
+            await transport.change(
                 status=AssignationStatus.RETURNED,
                 returns=returns,
             )
 
         except SerializationError as ex:
-            await transport.change_assignation(
+            await transport.change(
                 status=AssignationStatus.CRITICAL,
                 message=str(ex),
             )
 
         except AssertionError as ex:
-            await transport.change_assignation(
+            await transport.change(
                 status=AssignationStatus.CRITICAL,
                 message=str(ex),
             )
 
         except Exception as e:
             logger.error("Assignation error", exc_info=True)
-            await transport.change_assignation(
+            await transport.change(
                 status=AssignationStatus.ERROR,
                 message=repr(e),
             )
@@ -108,11 +110,13 @@ class AsyncGenActor(SerializingActor):
                 skip_expanding=not self.expand_inputs,
             )
 
-            await transport.change_assignation(
+            await transport.change(
                 status=AssignationStatus.ASSIGNED,
             )
 
-            async with AssignationContext(assignment=assignment, transport=transport):
+            async with AssignationContext(
+                assignment=assignment, transport=transport, passport=self.passport
+            ):
                 async for returns in self.assign(**params):
                     returns = await shrink_outputs(
                         self.definition,
@@ -125,28 +129,28 @@ class AsyncGenActor(SerializingActor):
                         assignment, parse_collectable(self.definition, returns)
                     )
 
-                    await transport.change_assignation(
+                    await transport.change(
                         status=AssignationStatus.YIELD,
                         returns=returns,
                     )
 
-            await transport.change_assignation(status=AssignationStatus.DONE)
+            await transport.change(status=AssignationStatus.DONE)
 
         except SerializationError as ex:
-            await transport.change_assignation(
+            await transport.change(
                 status=AssignationStatus.CRITICAL,
                 message=str(ex),
             )
 
         except AssertionError as ex:
-            await transport.change_assignation(
+            await transport.change(
                 status=AssignationStatus.ERROR,
                 message=str(ex),
             )
 
         except Exception as ex:
             logger.error("Error in actor", exc_info=True)
-            await transport.change_assignation(
+            await transport.change(
                 status=AssignationStatus.CRITICAL,
                 message=str(ex),
             )
@@ -188,11 +192,13 @@ class ThreadedFuncActor(SerializingActor):
                 skip_expanding=not self.expand_inputs,
             )
 
-            await transport.change_assignation(
+            await transport.change(
                 status=AssignationStatus.ASSIGNED,
             )
 
-            async with AssignationContext(assignment=assignment, transport=transport):
+            async with AssignationContext(
+                assignment=assignment, transport=transport, passport=self.passport
+            ):
                 returns = await run_spawned(
                     self.assign, **params, executor=self.executor, pass_context=True
                 )
@@ -206,26 +212,28 @@ class ThreadedFuncActor(SerializingActor):
 
             collector.register(assignment, parse_collectable(self.definition, returns))
 
-            await transport.change_assignation(
+            await transport.change(
                 status=AssignationStatus.RETURNED,
                 returns=returns,
             )
 
         except SerializationError as ex:
-            await transport.change_assignation(
+            logger.error("Serializing Error in actor", exc_info=True)
+            await transport.change(
                 status=AssignationStatus.CRITICAL,
                 message=str(ex),
             )
 
         except AssertionError as ex:
-            await transport.change_assignation(
+            logger.error("AssertionError in actor", exc_info=True)
+            await transport.change(
                 status=AssignationStatus.CRITICAL,
                 message=str(ex),
             )
 
         except Exception as e:
             logger.error("Error in actor", exc_info=True)
-            await transport.change_assignation(
+            await transport.change(
                 status=AssignationStatus.CRITICAL,
                 message=str(e),
             )
@@ -247,11 +255,13 @@ class ThreadedGenActor(SerializingActor):
                 structure_registry=self.structure_registry,
                 skip_expanding=not self.expand_inputs,
             )
-            await transport.change_assignation(
+            await transport.change(
                 status=AssignationStatus.ASSIGNED,
             )
 
-            async with AssignationContext(assignment=assignment, transport=transport):
+            async with AssignationContext(
+                assignment=assignment, transport=transport, passport=self.passport
+            ):
                 async for returns in iterate_spawned(
                     self.assign, **params, executor=self.executor, pass_context=True
                 ):
@@ -266,28 +276,28 @@ class ThreadedGenActor(SerializingActor):
                         assignment, parse_collectable(self.definition, returns)
                     )
 
-                    await self.transport.change_assignation(
+                    await transport.change(
                         status=AssignationStatus.YIELD,
                         returns=returns,
                     )
 
-            await transport.change_assignation(status=AssignationStatus.DONE)
+            await transport.change(status=AssignationStatus.DONE)
 
         except AssertionError as ex:
-            await transport.change_assignation(
+            await transport.change(
                 status=AssignationStatus.CRITICAL,
                 message=str(ex),
             )
 
         except SerializationError as ex:
-            await transport.change_assignation(
+            await transport.change(
                 status=AssignationStatus.CRITICAL,
                 message=str(ex),
             )
 
         except Exception as e:
             logging.critical(f"Assignation Error {assignment} {e}", exc_info=True)
-            await transport.change_assignation(
+            await transport.change(
                 status=AssignationStatus.CRITICAL,
                 message=str(e),
             )
@@ -309,11 +319,13 @@ class ProcessedGenActor(SerializingActor):
                 structure_registry=self.structure_registry,
                 skip_expanding=not self.expand_inputs,
             )
-            await transport.change_assignation(
+            await transport.change(
                 status=AssignationStatus.ASSIGNED,
             )
 
-            async with AssignationContext(assignment=assignment, transport=transport):
+            async with AssignationContext(
+                assignment=assignment, transport=transport, passport=self.passport
+            ):
                 async for returns in iterate_processed(self.assign, **params):
                     returns = await shrink_outputs(
                         self.definition,
@@ -326,28 +338,28 @@ class ProcessedGenActor(SerializingActor):
                         assignment, parse_collectable(self.definition, returns)
                     )
 
-                    await self.transport.change_assignation(
+                    await self.transport.change(
                         status=AssignationStatus.YIELD,
                         returns=returns,
                     )
 
-            await transport.change_assignation(status=AssignationStatus.DONE)
+            await transport.change(status=AssignationStatus.DONE)
 
         except AssertionError as ex:
-            await transport.change_assignation(
+            await transport.change(
                 status=AssignationStatus.CRITICAL,
                 message=str(ex),
             )
 
         except SerializationError as ex:
-            await transport.change_assignation(
+            await transport.change(
                 status=AssignationStatus.CRITICAL,
                 message=str(ex),
             )
 
         except Exception as e:
             logging.critical(f"Assignation Error {assignment} {e}", exc_info=True)
-            await transport.change_assignation(
+            await transport.change(
                 status=AssignationStatus.CRITICAL,
                 message=str(e),
             )
@@ -371,13 +383,13 @@ class ProcessedFuncActor(SerializingActor):
                 skip_expanding=not self.expand_inputs,
             )
 
-            await transport.change_assignation(
+            await transport.change(
                 status=AssignationStatus.ASSIGNED,
             )
 
-            print("Assigning processed")
-
-            async with AssignationContext(assignment=assignment, transport=transport):
+            async with AssignationContext(
+                assignment=assignment, transport=transport, passport=self.passport
+            ):
                 returns = await run_processed(
                     self.assign,
                     **params,
@@ -392,26 +404,26 @@ class ProcessedFuncActor(SerializingActor):
 
             collector.register(assignment, parse_collectable(self.definition, returns))
 
-            await transport.change_assignation(
+            await transport.change(
                 status=AssignationStatus.RETURNED,
                 returns=returns,
             )
 
         except SerializationError as ex:
-            await transport.change_assignation(
+            await transport.change(
                 status=AssignationStatus.CRITICAL,
                 message=str(ex),
             )
 
         except AssertionError as ex:
-            await transport.change_assignation(
+            await transport.change(
                 status=AssignationStatus.CRITICAL,
                 message=str(ex),
             )
 
         except Exception as e:
             logger.error("Error in actor", exc_info=True)
-            await transport.change_assignation(
+            await transport.change(
                 status=AssignationStatus.CRITICAL,
                 message=str(e),
             )

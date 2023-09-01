@@ -12,18 +12,21 @@ from rekuest.api.schema import (
     aunreserve,
     ReserveBindsInput,
 )
-
+import traceback
 from rekuest.postmans.base import BasePostman
 import asyncio
 from pydantic import Field
 import logging
 from .errors import PostmanException
 from .vars import current_postman
+from rekuest.rath import RekuestRath
 
 logger = logging.getLogger(__name__)
 
 
 class GraphQLPostman(BasePostman):
+    rath: RekuestRath
+    instance_id: str
     assignations: Dict[str, AssignationFragment] = Field(default_factory=dict)
     reservations: Dict[str, ReservationFragment] = Field(default_factory=dict)
 
@@ -60,7 +63,7 @@ class GraphQLPostman(BasePostman):
     ) -> asyncio.Queue:
         async with self._lock:
             if not self._watching:
-                self.start_watching()
+                await self.start_watching()
 
         unique_identifier = hash + reference
 
@@ -68,11 +71,13 @@ class GraphQLPostman(BasePostman):
         self._res_update_queues[unique_identifier] = asyncio.Queue()
         try:
             reservation = await areserve(
+                instance_id=self.instance_id,
                 hash=hash,
                 params=params,
                 provision=provision,
                 reference=reference,
                 binds=binds,
+                rath=self.rath,
             )
         except Exception as e:
             raise PostmanException("Cannot Reserve") from e
@@ -148,12 +153,12 @@ class GraphQLPostman(BasePostman):
         del self._ass_update_queues[ass_id]
 
     async def watch_reservations(self):
-        async for e in awatch_reservations("default"):
+        async for e in awatch_reservations(self.instance_id, rath=self.rath):
             res = e.update or e.create
             await self._res_update_queue.put(res)
 
     async def watch_assignations(self):
-        async for assignation in awatch_requests("default"):
+        async for assignation in awatch_requests(self.instance_id, rath=self.rath):
             ass = assignation.update or assignation.create
             await self._ass_update_queue.put(ass)
 
@@ -198,6 +203,7 @@ class GraphQLPostman(BasePostman):
             while True:
                 ass: AssignationFragment = await self._ass_update_queue.get()
                 self._ass_update_queue.task_done()
+                logger.info(f"Postman received Assignation {ass}")
 
                 unique_identifier = ass.reference
 
@@ -227,16 +233,36 @@ class GraphQLPostman(BasePostman):
         except Exception:
             logger.error("Error in watch_resraces", exc_info=True)
 
-    def start_watching(self):
-        logger.error("Starting watching")
+    async def start_watching(self):
+        logger.info("Starting watching")
         self._res_update_queue = asyncio.Queue()
         self._ass_update_queue = asyncio.Queue()
         self._watch_reservations_task = asyncio.create_task(self.watch_reservations())
+        self._watch_reservations_task.add_done_callback(self.log_reservation_fail)
         self._watch_assignations_task = asyncio.create_task(self.watch_assignations())
+
+        self._watch_assignations_task.add_done_callback(self.log_assignation_fail)
         self._watch_resraces_task = asyncio.create_task(self.watch_resraces())
         self._watch_assraces_task = asyncio.create_task(self.watch_assraces())
         self._watching = True
-        logger.error("Started watching")
+
+    def log_reservation_fail(self, future):
+        """if future.exception():
+        exception = future.exception()
+        if not isinstance(exception, asyncio.exceptions.CancelledError):
+            print(
+                str(exception)
+                + "\n"
+                + "".join(
+                    traceback.format_exception(
+                        type(exception), exception, exception.__traceback__
+                    )
+                )
+            )"""
+        return
+
+    def log_assignation_fail(self, future):
+        return
 
     async def stop_watching(self):
         self._watch_reservations_task.cancel()

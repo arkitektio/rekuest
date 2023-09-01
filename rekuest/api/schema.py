@@ -1,24 +1,25 @@
+from rekuest.scalars import SearchQuery, JSONSerializable, Identifier
 from typing_extensions import Literal
-from typing import Tuple, Any, Optional, Iterator, Dict, List, AsyncIterator, Union
-from datetime import datetime
+from typing import List, Tuple, Iterator, Dict, Union, AsyncIterator, Optional
 from rekuest.traits.ports import (
+    WidgetInputTrait,
     AnnotationInputTrait,
     PortTrait,
     ReturnWidgetInputTrait,
-    WidgetInputTrait,
 )
-from rath.scalars import ID
-from rekuest.funcs import subscribe, aexecute, execute, asubscribe
-from rekuest.traits.node import Reserve
-from enum import Enum
-from rekuest.rath import RekuestRath
-from rekuest.scalars import SearchQuery, Identifier
+from rekuest.funcs import asubscribe, execute, subscribe, aexecute
 from pydantic import BaseModel, Field
+from rekuest.traits.node import Reserve
+from datetime import datetime
+from enum import Enum
+from rath.scalars import ID
+from rekuest.rath import RekuestRath
 
 
 class CommentableModels(str, Enum):
     FACADE_REPOSITORY = "FACADE_REPOSITORY"
     FACADE_REGISTRY = "FACADE_REGISTRY"
+    FACADE_PROTOCOL = "FACADE_PROTOCOL"
     FACADE_STRUCTURE = "FACADE_STRUCTURE"
     FACADE_MIRRORREPOSITORY = "FACADE_MIRRORREPOSITORY"
     FACADE_APPREPOSITORY = "FACADE_APPREPOSITORY"
@@ -62,6 +63,7 @@ class PortKind(str, Enum):
     DICT = "DICT"
     FLOAT = "FLOAT"
     UNION = "UNION"
+    DATE = "DATE"
 
 
 class LogicalCondition(str, Enum):
@@ -151,6 +153,8 @@ class AssignationStatus(str, Enum):
 
     PENDING = "PENDING"
     "Pending"
+    BOUND = "BOUND"
+    "Bound"
     ACKNOWLEDGED = "ACKNOWLEDGED"
     "Acknowledged"
     RETURNED = "RETURNED"
@@ -324,6 +328,8 @@ class AssignationStatusInput(str, Enum):
 
     PENDING = "PENDING"
     "Pending"
+    BOUND = "BOUND"
+    "Bound"
     ACKNOWLEDGED = "ACKNOWLEDGED"
     "Acknowledged"
     RETURNED = "RETURNED"
@@ -420,6 +426,18 @@ class AgentStatusInput(str, Enum):
     "Complete Vanilla Scenario after a forced restart of"
 
 
+class PortKindInput(str, Enum):
+    INT = "INT"
+    STRING = "STRING"
+    STRUCTURE = "STRUCTURE"
+    LIST = "LIST"
+    BOOL = "BOOL"
+    DICT = "DICT"
+    FLOAT = "FLOAT"
+    UNION = "UNION"
+    DATE = "DATE"
+
+
 class NodeKindInput(str, Enum):
     """An enumeration."""
 
@@ -468,6 +486,7 @@ class SharableModels(str, Enum):
     LOK_LOKCLIENT = "LOK_LOKCLIENT"
     FACADE_REPOSITORY = "FACADE_REPOSITORY"
     FACADE_REGISTRY = "FACADE_REGISTRY"
+    FACADE_PROTOCOL = "FACADE_PROTOCOL"
     FACADE_STRUCTURE = "FACADE_STRUCTURE"
     FACADE_MIRRORREPOSITORY = "FACADE_MIRRORREPOSITORY"
     FACADE_APPREPOSITORY = "FACADE_APPREPOSITORY"
@@ -484,17 +503,6 @@ class SharableModels(str, Enum):
     FACADE_ASSIGNATIONLOG = "FACADE_ASSIGNATIONLOG"
     FACADE_TESTCASE = "FACADE_TESTCASE"
     FACADE_TESTRESULT = "FACADE_TESTRESULT"
-
-
-class PortKindInput(str, Enum):
-    INT = "INT"
-    STRING = "STRING"
-    STRUCTURE = "STRUCTURE"
-    LIST = "LIST"
-    BOOL = "BOOL"
-    DICT = "DICT"
-    FLOAT = "FLOAT"
-    UNION = "UNION"
 
 
 class AnnotationKind(str, Enum):
@@ -525,6 +533,8 @@ class WidgetKind(str, Enum):
     ChoiceWidget = "ChoiceWidget"
     CustomWidget = "CustomWidget"
     TemplateWidget = "TemplateWidget"
+    DateWidget = "DateWidget"
+    ColorWidget = "ColorWidget"
 
 
 class ReturnWidgetKind(str, Enum):
@@ -540,6 +550,31 @@ class MessageKind(str, Enum):
     CANCEL = "CANCEL"
     ASSIGN = "ASSIGN"
     TELL = "TELL"
+
+
+class PortDemandInput(BaseModel):
+    at: Optional[int]
+    key: Optional[str]
+    kind: Optional[PortKindInput]
+    identifier: Optional[str]
+    nullable: Optional[bool]
+    variants: Optional[Tuple[Optional["PortDemandInput"], ...]]
+    child: Optional["PortDemandInput"]
+
+    class Config:
+        frozen = True
+        extra = "forbid"
+        use_enum_values = True
+
+
+class TemplateParamInput(BaseModel):
+    key: str
+    value: Optional[Dict]
+
+    class Config:
+        frozen = True
+        extra = "forbid"
+        use_enum_values = True
 
 
 class DescendendInput(BaseModel):
@@ -628,7 +663,7 @@ class PortInput(PortTrait, BaseModel):
     "The child of this argument"
     return_widget: Optional["ReturnWidgetInput"] = Field(alias="returnWidget")
     "The child of this argument"
-    default: Optional[Any]
+    default: Optional[JSONSerializable]
     "The key of the arg"
     nullable: bool
     "Is this argument nullable"
@@ -661,7 +696,7 @@ class DependencyInput(BaseModel):
     "The key of the port, defaults to self"
     condition: LogicalCondition
     "The condition of the dependency"
-    value: Any
+    value: JSONSerializable
 
     class Config:
         frozen = True
@@ -752,8 +787,9 @@ class WidgetInput(WidgetInputTrait, BaseModel):
 
 
 class ChoiceInput(BaseModel):
-    value: Any
+    value: JSONSerializable
     label: str
+    description: Optional[str]
 
     class Config:
         frozen = True
@@ -833,7 +869,7 @@ class MessageInput(BaseModel):
     kind: MessageKind
     text: str
     reference: str
-    data: Any
+    data: JSONSerializable
 
     class Config:
         frozen = True
@@ -972,7 +1008,7 @@ class AssignationFragmentParent(BaseModel):
 
 class AssignationFragment(BaseModel):
     typename: Optional[Literal["Assignation"]] = Field(alias="__typename", exclude=True)
-    args: Optional[Tuple[Optional[Any], ...]]
+    args: Optional[Tuple[Optional[JSONSerializable], ...]]
     kwargs: Optional[Dict]
     id: ID
     parent: Optional[AssignationFragmentParent]
@@ -982,7 +1018,7 @@ class AssignationFragment(BaseModel):
     "Current lifecycle of Assignation"
     statusmessage: str
     "Clear Text status of the Assignation as for now"
-    returns: Optional[Tuple[Optional[Any], ...]]
+    returns: Optional[Tuple[Optional[JSONSerializable], ...]]
     reference: str
     "The Unique identifier of this Assignation considering its parent"
     updated_at: datetime = Field(alias="updatedAt")
@@ -1036,10 +1072,14 @@ class TemplateFragmentAgent(BaseModel):
 class TemplateFragment(BaseModel):
     typename: Optional[Literal["Template"]] = Field(alias="__typename", exclude=True)
     id: ID
+    interface: str
+    "Interface (think Function)"
     agent: TemplateFragmentAgent
     "The associated registry for this Template"
     node: "NodeFragment"
     "The node this template is implementatig"
+    extensions: Optional[Tuple[Optional[str], ...]]
+    "The extentions of this template"
     params: Optional[Dict]
 
     class Config:
@@ -1140,7 +1180,7 @@ class PortFragment(PortTrait, BaseModel):
     nullable: bool
     description: Optional[str]
     "A description for this Port"
-    default: Optional[Any]
+    default: Optional[JSONSerializable]
     kind: PortKind
     "the type of input"
     identifier: Optional[Identifier]
@@ -1176,6 +1216,8 @@ class NodeFragment(DefinitionFragment, Reserve, BaseModel):
     hash: str
     "The hash of the Node (completely unique)"
     id: ID
+    scope: NodeScope
+    "The scope of this port"
 
     class Config:
         frozen = True
@@ -1244,7 +1286,7 @@ class Create_testcaseMutation(BaseModel):
     class Arguments(BaseModel):
         node: ID
         key: str
-        is_benchmark: Optional[bool]
+        is_benchmark: Optional[bool] = Field(default=None)
         description: str
         name: str
 
@@ -1260,7 +1302,7 @@ class Create_testresultMutation(BaseModel):
         case: ID
         template: ID
         passed: bool
-        result: Optional[str]
+        result: Optional[str] = Field(default=None)
 
     class Meta:
         document = "fragment TestResult on TestResult {\n  id\n  case {\n    id\n    key\n  }\n  passed\n}\n\nmutation create_testresult($case: ID!, $template: ID!, $passed: Boolean!, $result: String) {\n  createTestResult(\n    case: $case\n    template: $template\n    passed: $passed\n    result: $result\n  ) {\n    ...TestResult\n  }\n}"
@@ -1271,9 +1313,9 @@ class AssignMutation(BaseModel):
 
     class Arguments(BaseModel):
         reservation: ID
-        args: List[Optional[Any]]
-        reference: Optional[str]
-        parent: Optional[ID]
+        args: List[Optional[JSONSerializable]]
+        reference: Optional[str] = Field(default=None)
+        parent: Optional[ID] = Field(default=None)
 
     class Meta:
         document = "fragment Assignation on Assignation {\n  args\n  kwargs\n  id\n  parent {\n    id\n  }\n  id\n  status\n  statusmessage\n  returns\n  reference\n  updatedAt\n}\n\nmutation assign($reservation: ID!, $args: [AnyInput]!, $reference: String, $parent: ID) {\n  assign(\n    reservation: $reservation\n    args: $args\n    reference: $reference\n    parent: $parent\n  ) {\n    ...Assignation\n  }\n}"
@@ -1296,11 +1338,11 @@ class CreateTemplateMutation(BaseModel):
         interface: str
         definition: DefinitionInput
         instance_id: ID
-        params: Optional[Dict]
-        extensions: Optional[List[Optional[str]]]
+        params: Optional[Dict] = Field(default=None)
+        extensions: Optional[List[Optional[str]]] = Field(default=None)
 
     class Meta:
-        document = "fragment ChildPortNested on ChildPort {\n  kind\n  child {\n    identifier\n    nullable\n    kind\n  }\n  identifier\n  nullable\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment ValueRange on ValueRange {\n  min\n  max\n}\n\nfragment IsPredicate on IsPredicate {\n  predicate\n}\n\nfragment ChildPort on ChildPort {\n  kind\n  identifier\n  child {\n    ...ChildPortNested\n  }\n  nullable\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment Annotation on Annotation {\n  kind\n  ...IsPredicate\n  ...ValueRange\n}\n\nfragment Port on Port {\n  __typename\n  key\n  label\n  nullable\n  description\n  default\n  kind\n  identifier\n  child {\n    ...ChildPort\n  }\n  variants {\n    ...ChildPort\n  }\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment Definition on Node {\n  args {\n    ...Port\n  }\n  returns {\n    ...Port\n  }\n  kind\n  name\n  description\n}\n\nfragment Node on Node {\n  hash\n  id\n  ...Definition\n}\n\nfragment Template on Template {\n  id\n  agent {\n    registry {\n      name\n      app {\n        version\n        identifier\n      }\n      user {\n        username\n      }\n    }\n  }\n  node {\n    ...Node\n  }\n  params\n}\n\nmutation createTemplate($interface: String!, $definition: DefinitionInput!, $instance_id: ID!, $params: GenericScalar, $extensions: [String]) {\n  createTemplate(\n    definition: $definition\n    interface: $interface\n    params: $params\n    extensions: $extensions\n    instanceId: $instance_id\n  ) {\n    ...Template\n  }\n}"
+        document = "fragment IsPredicate on IsPredicate {\n  predicate\n}\n\nfragment ValueRange on ValueRange {\n  min\n  max\n}\n\nfragment ChildPortNested on ChildPort {\n  kind\n  child {\n    identifier\n    nullable\n    kind\n  }\n  identifier\n  nullable\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment ChildPort on ChildPort {\n  kind\n  identifier\n  child {\n    ...ChildPortNested\n  }\n  nullable\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment Annotation on Annotation {\n  kind\n  ...IsPredicate\n  ...ValueRange\n}\n\nfragment Port on Port {\n  __typename\n  key\n  label\n  nullable\n  description\n  default\n  kind\n  identifier\n  child {\n    ...ChildPort\n  }\n  variants {\n    ...ChildPort\n  }\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment Definition on Node {\n  args {\n    ...Port\n  }\n  returns {\n    ...Port\n  }\n  kind\n  name\n  description\n}\n\nfragment Node on Node {\n  hash\n  id\n  scope\n  ...Definition\n}\n\nfragment Template on Template {\n  id\n  interface\n  agent {\n    registry {\n      name\n      app {\n        version\n        identifier\n      }\n      user {\n        username\n      }\n    }\n  }\n  node {\n    ...Node\n  }\n  extensions\n  params\n}\n\nmutation createTemplate($interface: String!, $definition: DefinitionInput!, $instance_id: ID!, $params: GenericScalar, $extensions: [String]) {\n  createTemplate(\n    definition: $definition\n    interface: $interface\n    params: $params\n    extensions: $extensions\n    instanceId: $instance_id\n  ) {\n    ...Template\n  }\n}"
 
 
 class SlateMutation(BaseModel):
@@ -1363,25 +1405,25 @@ class ReserveMutation(BaseModel):
     reserve: Optional[ReservationFragment]
 
     class Arguments(BaseModel):
-        node: Optional[ID]
-        hash: Optional[str]
-        params: Optional[ReserveParamsInput]
-        title: Optional[str]
-        imitate: Optional[ID]
-        app_group: Optional[ID]
-        reference: Optional[str]
-        provision: Optional[ID]
-        binds: Optional[ReserveBindsInput]
+        instance_id: ID = Field(alias="instanceId")
+        node: Optional[ID] = Field(default=None)
+        hash: Optional[str] = Field(default=None)
+        params: Optional[ReserveParamsInput] = Field(default=None)
+        title: Optional[str] = Field(default=None)
+        imitate: Optional[ID] = Field(default=None)
+        reference: Optional[str] = Field(default=None)
+        provision: Optional[ID] = Field(default=None)
+        binds: Optional[ReserveBindsInput] = Field(default=None)
 
     class Meta:
-        document = "fragment ReserveParams on ReserveParams {\n  registries\n  minimalInstances\n  desiredInstances\n}\n\nfragment Reservation on Reservation {\n  id\n  statusmessage\n  status\n  node {\n    id\n    hash\n    pure\n  }\n  params {\n    ...ReserveParams\n  }\n  waiter {\n    unique\n  }\n  reference\n  updatedAt\n}\n\nmutation reserve($node: ID, $hash: String, $params: ReserveParamsInput, $title: String, $imitate: ID, $appGroup: ID, $reference: String, $provision: ID, $binds: ReserveBindsInput) {\n  reserve(\n    node: $node\n    hash: $hash\n    params: $params\n    title: $title\n    imitate: $imitate\n    provision: $provision\n    appGroup: $appGroup\n    binds: $binds\n    reference: $reference\n  ) {\n    ...Reservation\n  }\n}"
+        document = "fragment ReserveParams on ReserveParams {\n  registries\n  minimalInstances\n  desiredInstances\n}\n\nfragment Reservation on Reservation {\n  id\n  statusmessage\n  status\n  node {\n    id\n    hash\n    pure\n  }\n  params {\n    ...ReserveParams\n  }\n  waiter {\n    unique\n  }\n  reference\n  updatedAt\n}\n\nmutation reserve($instanceId: ID!, $node: ID, $hash: String, $params: ReserveParamsInput, $title: String, $imitate: ID, $reference: String, $provision: ID, $binds: ReserveBindsInput) {\n  reserve(\n    instanceId: $instanceId\n    node: $node\n    hash: $hash\n    params: $params\n    title: $title\n    imitate: $imitate\n    provision: $provision\n    binds: $binds\n    reference: $reference\n  ) {\n    ...Reservation\n  }\n}"
 
 
 class UnreserveMutationUnreserve(BaseModel):
     typename: Optional[Literal["UnreserveResult"]] = Field(
         alias="__typename", exclude=True
     )
-    id: Optional[ID]
+    id: ID
 
     class Config:
         frozen = True
@@ -1418,7 +1460,7 @@ class Watch_provisionSubscription(BaseModel):
         identifier: str
 
     class Meta:
-        document = "fragment ChildPortNested on ChildPort {\n  kind\n  child {\n    identifier\n    nullable\n    kind\n  }\n  identifier\n  nullable\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment ValueRange on ValueRange {\n  min\n  max\n}\n\nfragment IsPredicate on IsPredicate {\n  predicate\n}\n\nfragment ChildPort on ChildPort {\n  kind\n  identifier\n  child {\n    ...ChildPortNested\n  }\n  nullable\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment Annotation on Annotation {\n  kind\n  ...IsPredicate\n  ...ValueRange\n}\n\nfragment Port on Port {\n  __typename\n  key\n  label\n  nullable\n  description\n  default\n  kind\n  identifier\n  child {\n    ...ChildPort\n  }\n  variants {\n    ...ChildPort\n  }\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment Definition on Node {\n  args {\n    ...Port\n  }\n  returns {\n    ...Port\n  }\n  kind\n  name\n  description\n}\n\nfragment Node on Node {\n  hash\n  id\n  ...Definition\n}\n\nfragment Provision on Provision {\n  id\n  status\n  template {\n    id\n    node {\n      ...Node\n    }\n    params\n  }\n}\n\nsubscription watch_provision($identifier: String!) {\n  provisions(identifier: $identifier) {\n    create {\n      ...Provision\n    }\n    delete\n    update {\n      ...Provision\n    }\n  }\n}"
+        document = "fragment IsPredicate on IsPredicate {\n  predicate\n}\n\nfragment ValueRange on ValueRange {\n  min\n  max\n}\n\nfragment ChildPortNested on ChildPort {\n  kind\n  child {\n    identifier\n    nullable\n    kind\n  }\n  identifier\n  nullable\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment ChildPort on ChildPort {\n  kind\n  identifier\n  child {\n    ...ChildPortNested\n  }\n  nullable\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment Annotation on Annotation {\n  kind\n  ...IsPredicate\n  ...ValueRange\n}\n\nfragment Port on Port {\n  __typename\n  key\n  label\n  nullable\n  description\n  default\n  kind\n  identifier\n  child {\n    ...ChildPort\n  }\n  variants {\n    ...ChildPort\n  }\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment Definition on Node {\n  args {\n    ...Port\n  }\n  returns {\n    ...Port\n  }\n  kind\n  name\n  description\n}\n\nfragment Node on Node {\n  hash\n  id\n  scope\n  ...Definition\n}\n\nfragment Provision on Provision {\n  id\n  status\n  template {\n    id\n    node {\n      ...Node\n    }\n    params\n  }\n}\n\nsubscription watch_provision($identifier: String!) {\n  provisions(identifier: $identifier) {\n    create {\n      ...Provision\n    }\n    delete\n    update {\n      ...Provision\n    }\n  }\n}"
 
 
 class Watch_myagentsSubscriptionAgentsevent(BaseModel):
@@ -1443,26 +1485,6 @@ class Watch_myagentsSubscription(BaseModel):
         document = "fragment Agent on Agent {\n  registry {\n    client {\n      id\n    }\n    user {\n      id\n    }\n  }\n}\n\nsubscription watch_myagents {\n  agentsEvent {\n    created {\n      ...Agent\n    }\n    deleted\n    updated {\n      ...Agent\n    }\n  }\n}"
 
 
-class Watch_todosSubscriptionTodos(BaseModel):
-    typename: Optional[Literal["TodoEvent"]] = Field(alias="__typename", exclude=True)
-    create: Optional[AssignationFragment]
-    update: Optional[AssignationFragment]
-    delete: Optional[ID]
-
-    class Config:
-        frozen = True
-
-
-class Watch_todosSubscription(BaseModel):
-    todos: Optional[Watch_todosSubscriptionTodos]
-
-    class Arguments(BaseModel):
-        identifier: str
-
-    class Meta:
-        document = "fragment Assignation on Assignation {\n  args\n  kwargs\n  id\n  parent {\n    id\n  }\n  id\n  status\n  statusmessage\n  returns\n  reference\n  updatedAt\n}\n\nsubscription watch_todos($identifier: String!) {\n  todos(identifier: $identifier) {\n    create {\n      ...Assignation\n    }\n    update {\n      ...Assignation\n    }\n    delete\n  }\n}"
-
-
 class Watch_requestsSubscriptionRequests(BaseModel):
     typename: Optional[Literal["AssignationsEvent"]] = Field(
         alias="__typename", exclude=True
@@ -1479,10 +1501,10 @@ class Watch_requestsSubscription(BaseModel):
     requests: Optional[Watch_requestsSubscriptionRequests]
 
     class Arguments(BaseModel):
-        identifier: str
+        instance_id: str = Field(alias="instanceId")
 
     class Meta:
-        document = "fragment Assignation on Assignation {\n  args\n  kwargs\n  id\n  parent {\n    id\n  }\n  id\n  status\n  statusmessage\n  returns\n  reference\n  updatedAt\n}\n\nsubscription watch_requests($identifier: String!) {\n  requests(identifier: $identifier) {\n    create {\n      ...Assignation\n    }\n    update {\n      ...Assignation\n    }\n    delete\n  }\n}"
+        document = "fragment Assignation on Assignation {\n  args\n  kwargs\n  id\n  parent {\n    id\n  }\n  id\n  status\n  statusmessage\n  returns\n  reference\n  updatedAt\n}\n\nsubscription watch_requests($instanceId: String!) {\n  requests(instanceId: $instanceId) {\n    create {\n      ...Assignation\n    }\n    update {\n      ...Assignation\n    }\n    delete\n  }\n}"
 
 
 class Watch_reservationsSubscriptionReservations(BaseModel):
@@ -1501,10 +1523,10 @@ class Watch_reservationsSubscription(BaseModel):
     reservations: Optional[Watch_reservationsSubscriptionReservations]
 
     class Arguments(BaseModel):
-        identifier: str
+        instance_id: str = Field(alias="instanceId")
 
     class Meta:
-        document = "fragment ReserveParams on ReserveParams {\n  registries\n  minimalInstances\n  desiredInstances\n}\n\nfragment Reservation on Reservation {\n  id\n  statusmessage\n  status\n  node {\n    id\n    hash\n    pure\n  }\n  params {\n    ...ReserveParams\n  }\n  waiter {\n    unique\n  }\n  reference\n  updatedAt\n}\n\nsubscription watch_reservations($identifier: String!) {\n  reservations(identifier: $identifier) {\n    create {\n      ...Reservation\n    }\n    update {\n      ...Reservation\n    }\n    delete\n  }\n}"
+        document = "fragment ReserveParams on ReserveParams {\n  registries\n  minimalInstances\n  desiredInstances\n}\n\nfragment Reservation on Reservation {\n  id\n  statusmessage\n  status\n  node {\n    id\n    hash\n    pure\n  }\n  params {\n    ...ReserveParams\n  }\n  waiter {\n    unique\n  }\n  reference\n  updatedAt\n}\n\nsubscription watch_reservations($instanceId: String!) {\n  reservations(instanceId: $instanceId) {\n    create {\n      ...Reservation\n    }\n    update {\n      ...Reservation\n    }\n    delete\n  }\n}"
 
 
 class Get_provisionQuery(BaseModel):
@@ -1514,7 +1536,7 @@ class Get_provisionQuery(BaseModel):
         id: ID
 
     class Meta:
-        document = "fragment ChildPortNested on ChildPort {\n  kind\n  child {\n    identifier\n    nullable\n    kind\n  }\n  identifier\n  nullable\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment ValueRange on ValueRange {\n  min\n  max\n}\n\nfragment IsPredicate on IsPredicate {\n  predicate\n}\n\nfragment ChildPort on ChildPort {\n  kind\n  identifier\n  child {\n    ...ChildPortNested\n  }\n  nullable\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment Annotation on Annotation {\n  kind\n  ...IsPredicate\n  ...ValueRange\n}\n\nfragment Port on Port {\n  __typename\n  key\n  label\n  nullable\n  description\n  default\n  kind\n  identifier\n  child {\n    ...ChildPort\n  }\n  variants {\n    ...ChildPort\n  }\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment Definition on Node {\n  args {\n    ...Port\n  }\n  returns {\n    ...Port\n  }\n  kind\n  name\n  description\n}\n\nfragment Node on Node {\n  hash\n  id\n  ...Definition\n}\n\nfragment Provision on Provision {\n  id\n  status\n  template {\n    id\n    node {\n      ...Node\n    }\n    params\n  }\n}\n\nquery get_provision($id: ID!) {\n  provision(id: $id) {\n    ...Provision\n  }\n}"
+        document = "fragment IsPredicate on IsPredicate {\n  predicate\n}\n\nfragment ValueRange on ValueRange {\n  min\n  max\n}\n\nfragment ChildPortNested on ChildPort {\n  kind\n  child {\n    identifier\n    nullable\n    kind\n  }\n  identifier\n  nullable\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment ChildPort on ChildPort {\n  kind\n  identifier\n  child {\n    ...ChildPortNested\n  }\n  nullable\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment Annotation on Annotation {\n  kind\n  ...IsPredicate\n  ...ValueRange\n}\n\nfragment Port on Port {\n  __typename\n  key\n  label\n  nullable\n  description\n  default\n  kind\n  identifier\n  child {\n    ...ChildPort\n  }\n  variants {\n    ...ChildPort\n  }\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment Definition on Node {\n  args {\n    ...Port\n  }\n  returns {\n    ...Port\n  }\n  kind\n  name\n  description\n}\n\nfragment Node on Node {\n  hash\n  id\n  scope\n  ...Definition\n}\n\nfragment Provision on Provision {\n  id\n  status\n  template {\n    id\n    node {\n      ...Node\n    }\n    params\n  }\n}\n\nquery get_provision($id: ID!) {\n  provision(id: $id) {\n    ...Provision\n  }\n}"
 
 
 class Get_testcaseQuery(BaseModel):
@@ -1550,8 +1572,8 @@ class Search_testcasesQuery(BaseModel):
     options: Optional[Tuple[Optional[Search_testcasesQueryOptions], ...]]
 
     class Arguments(BaseModel):
-        search: Optional[str]
-        values: Optional[List[Optional[ID]]]
+        search: Optional[str] = Field(default=None)
+        values: Optional[List[Optional[ID]]] = Field(default=None)
 
     class Meta:
         document = "query search_testcases($search: String, $values: [ID]) {\n  options: testcases(search: $search, limit: 20, ids: $values) {\n    label: name\n    value: id\n  }\n}"
@@ -1570,8 +1592,8 @@ class Search_testresultsQuery(BaseModel):
     options: Optional[Tuple[Optional[Search_testresultsQueryOptions], ...]]
 
     class Arguments(BaseModel):
-        search: Optional[str]
-        values: Optional[List[Optional[ID]]]
+        search: Optional[str] = Field(default=None)
+        values: Optional[List[Optional[ID]]] = Field(default=None)
 
     class Meta:
         document = "query search_testresults($search: String, $values: [ID]) {\n  options: testresults(search: $search, limit: 20, ids: $values) {\n    label: createdAt\n    value: id\n  }\n}"
@@ -1613,10 +1635,10 @@ class RequestsQuery(BaseModel):
     requests: Optional[Tuple[Optional[AssignationFragment], ...]]
 
     class Arguments(BaseModel):
-        identifier: str
+        instance_id: str = Field(alias="instanceId")
 
     class Meta:
-        document = "fragment Assignation on Assignation {\n  args\n  kwargs\n  id\n  parent {\n    id\n  }\n  id\n  status\n  statusmessage\n  returns\n  reference\n  updatedAt\n}\n\nquery requests($identifier: String!) {\n  requests(identifier: $identifier) {\n    ...Assignation\n  }\n}"
+        document = "fragment Assignation on Assignation {\n  args\n  kwargs\n  id\n  parent {\n    id\n  }\n  id\n  status\n  statusmessage\n  returns\n  reference\n  updatedAt\n}\n\nquery requests($instanceId: String!) {\n  requests(instanceId: $instanceId) {\n    ...Assignation\n  }\n}"
 
 
 class Get_templateQuery(BaseModel):
@@ -1626,7 +1648,19 @@ class Get_templateQuery(BaseModel):
         id: ID
 
     class Meta:
-        document = "fragment ChildPortNested on ChildPort {\n  kind\n  child {\n    identifier\n    nullable\n    kind\n  }\n  identifier\n  nullable\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment ValueRange on ValueRange {\n  min\n  max\n}\n\nfragment IsPredicate on IsPredicate {\n  predicate\n}\n\nfragment ChildPort on ChildPort {\n  kind\n  identifier\n  child {\n    ...ChildPortNested\n  }\n  nullable\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment Annotation on Annotation {\n  kind\n  ...IsPredicate\n  ...ValueRange\n}\n\nfragment Port on Port {\n  __typename\n  key\n  label\n  nullable\n  description\n  default\n  kind\n  identifier\n  child {\n    ...ChildPort\n  }\n  variants {\n    ...ChildPort\n  }\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment Definition on Node {\n  args {\n    ...Port\n  }\n  returns {\n    ...Port\n  }\n  kind\n  name\n  description\n}\n\nfragment Node on Node {\n  hash\n  id\n  ...Definition\n}\n\nfragment Template on Template {\n  id\n  agent {\n    registry {\n      name\n      app {\n        version\n        identifier\n      }\n      user {\n        username\n      }\n    }\n  }\n  node {\n    ...Node\n  }\n  params\n}\n\nquery get_template($id: ID!) {\n  template(id: $id) {\n    ...Template\n  }\n}"
+        document = "fragment IsPredicate on IsPredicate {\n  predicate\n}\n\nfragment ValueRange on ValueRange {\n  min\n  max\n}\n\nfragment ChildPortNested on ChildPort {\n  kind\n  child {\n    identifier\n    nullable\n    kind\n  }\n  identifier\n  nullable\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment ChildPort on ChildPort {\n  kind\n  identifier\n  child {\n    ...ChildPortNested\n  }\n  nullable\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment Annotation on Annotation {\n  kind\n  ...IsPredicate\n  ...ValueRange\n}\n\nfragment Port on Port {\n  __typename\n  key\n  label\n  nullable\n  description\n  default\n  kind\n  identifier\n  child {\n    ...ChildPort\n  }\n  variants {\n    ...ChildPort\n  }\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment Definition on Node {\n  args {\n    ...Port\n  }\n  returns {\n    ...Port\n  }\n  kind\n  name\n  description\n}\n\nfragment Node on Node {\n  hash\n  id\n  scope\n  ...Definition\n}\n\nfragment Template on Template {\n  id\n  interface\n  agent {\n    registry {\n      name\n      app {\n        version\n        identifier\n      }\n      user {\n        username\n      }\n    }\n  }\n  node {\n    ...Node\n  }\n  extensions\n  params\n}\n\nquery get_template($id: ID!) {\n  template(id: $id) {\n    ...Template\n  }\n}"
+
+
+class MytemplateforQuery(BaseModel):
+    mytemplatefor: Optional[TemplateFragment]
+    "Asss\n\n    Is A query for all of these specials in the world\n    "
+
+    class Arguments(BaseModel):
+        hash: str
+        instance_id: ID
+
+    class Meta:
+        document = "fragment IsPredicate on IsPredicate {\n  predicate\n}\n\nfragment ValueRange on ValueRange {\n  min\n  max\n}\n\nfragment ChildPortNested on ChildPort {\n  kind\n  child {\n    identifier\n    nullable\n    kind\n  }\n  identifier\n  nullable\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment ChildPort on ChildPort {\n  kind\n  identifier\n  child {\n    ...ChildPortNested\n  }\n  nullable\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment Annotation on Annotation {\n  kind\n  ...IsPredicate\n  ...ValueRange\n}\n\nfragment Port on Port {\n  __typename\n  key\n  label\n  nullable\n  description\n  default\n  kind\n  identifier\n  child {\n    ...ChildPort\n  }\n  variants {\n    ...ChildPort\n  }\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment Definition on Node {\n  args {\n    ...Port\n  }\n  returns {\n    ...Port\n  }\n  kind\n  name\n  description\n}\n\nfragment Node on Node {\n  hash\n  id\n  scope\n  ...Definition\n}\n\nfragment Template on Template {\n  id\n  interface\n  agent {\n    registry {\n      name\n      app {\n        version\n        identifier\n      }\n      user {\n        username\n      }\n    }\n  }\n  node {\n    ...Node\n  }\n  extensions\n  params\n}\n\nquery mytemplatefor($hash: String!, $instance_id: ID!) {\n  mytemplatefor(hash: $hash, instanceId: $instance_id) {\n    ...Template\n  }\n}"
 
 
 class Search_templatesQueryOptions(BaseModel):
@@ -1643,8 +1677,8 @@ class Search_templatesQuery(BaseModel):
     options: Optional[Tuple[Optional[Search_templatesQueryOptions], ...]]
 
     class Arguments(BaseModel):
-        search: Optional[str]
-        values: Optional[List[Optional[ID]]]
+        search: Optional[str] = Field(default=None)
+        values: Optional[List[Optional[ID]]] = Field(default=None)
 
     class Meta:
         document = "query search_templates($search: String, $values: [ID]) {\n  options: templates(search: $search, limit: 20, ids: $values) {\n    label: name\n    value: id\n  }\n}"
@@ -1655,12 +1689,12 @@ class FindQuery(BaseModel):
     "Asss\n\n    Is A query for all of these specials in the world\n    "
 
     class Arguments(BaseModel):
-        id: Optional[ID]
-        template: Optional[ID]
-        hash: Optional[str]
+        id: Optional[ID] = Field(default=None)
+        template: Optional[ID] = Field(default=None)
+        hash: Optional[str] = Field(default=None)
 
     class Meta:
-        document = "fragment ChildPortNested on ChildPort {\n  kind\n  child {\n    identifier\n    nullable\n    kind\n  }\n  identifier\n  nullable\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment ValueRange on ValueRange {\n  min\n  max\n}\n\nfragment IsPredicate on IsPredicate {\n  predicate\n}\n\nfragment ChildPort on ChildPort {\n  kind\n  identifier\n  child {\n    ...ChildPortNested\n  }\n  nullable\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment Annotation on Annotation {\n  kind\n  ...IsPredicate\n  ...ValueRange\n}\n\nfragment Port on Port {\n  __typename\n  key\n  label\n  nullable\n  description\n  default\n  kind\n  identifier\n  child {\n    ...ChildPort\n  }\n  variants {\n    ...ChildPort\n  }\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment Definition on Node {\n  args {\n    ...Port\n  }\n  returns {\n    ...Port\n  }\n  kind\n  name\n  description\n}\n\nfragment Node on Node {\n  hash\n  id\n  ...Definition\n}\n\nquery find($id: ID, $template: ID, $hash: String) {\n  node(id: $id, template: $template, hash: $hash) {\n    ...Node\n  }\n}"
+        document = "fragment IsPredicate on IsPredicate {\n  predicate\n}\n\nfragment ValueRange on ValueRange {\n  min\n  max\n}\n\nfragment ChildPortNested on ChildPort {\n  kind\n  child {\n    identifier\n    nullable\n    kind\n  }\n  identifier\n  nullable\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment ChildPort on ChildPort {\n  kind\n  identifier\n  child {\n    ...ChildPortNested\n  }\n  nullable\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment Annotation on Annotation {\n  kind\n  ...IsPredicate\n  ...ValueRange\n}\n\nfragment Port on Port {\n  __typename\n  key\n  label\n  nullable\n  description\n  default\n  kind\n  identifier\n  child {\n    ...ChildPort\n  }\n  variants {\n    ...ChildPort\n  }\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment Definition on Node {\n  args {\n    ...Port\n  }\n  returns {\n    ...Port\n  }\n  kind\n  name\n  description\n}\n\nfragment Node on Node {\n  hash\n  id\n  scope\n  ...Definition\n}\n\nquery find($id: ID, $template: ID, $hash: String) {\n  node(id: $id, template: $template, hash: $hash) {\n    ...Node\n  }\n}"
 
 
 class RetrieveallQuery(BaseModel):
@@ -1670,7 +1704,7 @@ class RetrieveallQuery(BaseModel):
         pass
 
     class Meta:
-        document = "fragment ChildPortNested on ChildPort {\n  kind\n  child {\n    identifier\n    nullable\n    kind\n  }\n  identifier\n  nullable\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment ValueRange on ValueRange {\n  min\n  max\n}\n\nfragment IsPredicate on IsPredicate {\n  predicate\n}\n\nfragment ChildPort on ChildPort {\n  kind\n  identifier\n  child {\n    ...ChildPortNested\n  }\n  nullable\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment Annotation on Annotation {\n  kind\n  ...IsPredicate\n  ...ValueRange\n}\n\nfragment Port on Port {\n  __typename\n  key\n  label\n  nullable\n  description\n  default\n  kind\n  identifier\n  child {\n    ...ChildPort\n  }\n  variants {\n    ...ChildPort\n  }\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment Definition on Node {\n  args {\n    ...Port\n  }\n  returns {\n    ...Port\n  }\n  kind\n  name\n  description\n}\n\nfragment Node on Node {\n  hash\n  id\n  ...Definition\n}\n\nquery retrieveall {\n  allnodes {\n    ...Node\n  }\n}"
+        document = "fragment IsPredicate on IsPredicate {\n  predicate\n}\n\nfragment ValueRange on ValueRange {\n  min\n  max\n}\n\nfragment ChildPortNested on ChildPort {\n  kind\n  child {\n    identifier\n    nullable\n    kind\n  }\n  identifier\n  nullable\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment ChildPort on ChildPort {\n  kind\n  identifier\n  child {\n    ...ChildPortNested\n  }\n  nullable\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment Annotation on Annotation {\n  kind\n  ...IsPredicate\n  ...ValueRange\n}\n\nfragment Port on Port {\n  __typename\n  key\n  label\n  nullable\n  description\n  default\n  kind\n  identifier\n  child {\n    ...ChildPort\n  }\n  variants {\n    ...ChildPort\n  }\n  annotations {\n    ...Annotation\n  }\n}\n\nfragment Definition on Node {\n  args {\n    ...Port\n  }\n  returns {\n    ...Port\n  }\n  kind\n  name\n  description\n}\n\nfragment Node on Node {\n  hash\n  id\n  scope\n  ...Definition\n}\n\nquery retrieveall {\n  allnodes {\n    ...Node\n  }\n}"
 
 
 class Search_nodesQueryOptions(Reserve, BaseModel):
@@ -1687,8 +1721,8 @@ class Search_nodesQuery(BaseModel):
     options: Optional[Tuple[Optional[Search_nodesQueryOptions], ...]]
 
     class Arguments(BaseModel):
-        search: Optional[str]
-        values: Optional[List[Optional[ID]]]
+        search: Optional[str] = Field(default=None)
+        values: Optional[List[Optional[ID]]] = Field(default=None)
 
     class Meta:
         document = "query search_nodes($search: String, $values: [ID]) {\n  options: allnodes(search: $search, limit: 20, ids: $values) {\n    label: name\n    value: id\n  }\n}"
@@ -1804,10 +1838,10 @@ class ReservationsQuery(BaseModel):
     reservations: Optional[Tuple[Optional[ReservationFragment], ...]]
 
     class Arguments(BaseModel):
-        identifier: str
+        instance_id: str = Field(alias="instanceId")
 
     class Meta:
-        document = "fragment ReserveParams on ReserveParams {\n  registries\n  minimalInstances\n  desiredInstances\n}\n\nfragment Reservation on Reservation {\n  id\n  statusmessage\n  status\n  node {\n    id\n    hash\n    pure\n  }\n  params {\n    ...ReserveParams\n  }\n  waiter {\n    unique\n  }\n  reference\n  updatedAt\n}\n\nquery reservations($identifier: String!) {\n  reservations(identifier: $identifier) {\n    ...Reservation\n  }\n}"
+        document = "fragment ReserveParams on ReserveParams {\n  registries\n  minimalInstances\n  desiredInstances\n}\n\nfragment Reservation on Reservation {\n  id\n  statusmessage\n  status\n  node {\n    id\n    hash\n    pure\n  }\n  params {\n    ...ReserveParams\n  }\n  waiter {\n    unique\n  }\n  reference\n  updatedAt\n}\n\nquery reservations($instanceId: String!) {\n  reservations(instanceId: $instanceId) {\n    ...Reservation\n  }\n}"
 
 
 async def acreate_testcase(
@@ -1940,7 +1974,7 @@ def create_testresult(
 
 async def aassign(
     reservation: ID,
-    args: List[Optional[Any]],
+    args: List[Optional[JSONSerializable]],
     reference: Optional[str] = None,
     parent: Optional[ID] = None,
     rath: RekuestRath = None,
@@ -1951,7 +1985,7 @@ async def aassign(
 
     Arguments:
         reservation (ID): reservation
-        args (List[Optional[Any]]): args
+        args (List[Optional[JSONSerializable]]): args
         reference (Optional[str], optional): reference.
         parent (Optional[ID], optional): parent.
         rath (rekuest.rath.RekuestRath, optional): The arkitekt rath client
@@ -1974,7 +2008,7 @@ async def aassign(
 
 def assign(
     reservation: ID,
-    args: List[Optional[Any]],
+    args: List[Optional[JSONSerializable]],
     reference: Optional[str] = None,
     parent: Optional[ID] = None,
     rath: RekuestRath = None,
@@ -1985,7 +2019,7 @@ def assign(
 
     Arguments:
         reservation (ID): reservation
-        args (List[Optional[Any]]): args
+        args (List[Optional[JSONSerializable]]): args
         reference (Optional[str], optional): reference.
         parent (Optional[ID], optional): parent.
         rath (rekuest.rath.RekuestRath, optional): The arkitekt rath client
@@ -2207,12 +2241,12 @@ def delete_node(
 
 
 async def areserve(
+    instance_id: ID,
     node: Optional[ID] = None,
     hash: Optional[str] = None,
     params: Optional[ReserveParamsInput] = None,
     title: Optional[str] = None,
     imitate: Optional[ID] = None,
-    app_group: Optional[ID] = None,
     reference: Optional[str] = None,
     provision: Optional[ID] = None,
     binds: Optional[ReserveBindsInput] = None,
@@ -2223,12 +2257,12 @@ async def areserve(
 
 
     Arguments:
+        instance_id (ID): instanceId
         node (Optional[ID], optional): node.
         hash (Optional[str], optional): hash.
         params (Optional[ReserveParamsInput], optional): params.
         title (Optional[str], optional): title.
         imitate (Optional[ID], optional): imitate.
-        app_group (Optional[ID], optional): appGroup.
         reference (Optional[str], optional): reference.
         provision (Optional[ID], optional): provision.
         binds (Optional[ReserveBindsInput], optional): binds.
@@ -2240,12 +2274,12 @@ async def areserve(
         await aexecute(
             ReserveMutation,
             {
+                "instanceId": instance_id,
                 "node": node,
                 "hash": hash,
                 "params": params,
                 "title": title,
                 "imitate": imitate,
-                "appGroup": app_group,
                 "reference": reference,
                 "provision": provision,
                 "binds": binds,
@@ -2256,12 +2290,12 @@ async def areserve(
 
 
 def reserve(
+    instance_id: ID,
     node: Optional[ID] = None,
     hash: Optional[str] = None,
     params: Optional[ReserveParamsInput] = None,
     title: Optional[str] = None,
     imitate: Optional[ID] = None,
-    app_group: Optional[ID] = None,
     reference: Optional[str] = None,
     provision: Optional[ID] = None,
     binds: Optional[ReserveBindsInput] = None,
@@ -2272,12 +2306,12 @@ def reserve(
 
 
     Arguments:
+        instance_id (ID): instanceId
         node (Optional[ID], optional): node.
         hash (Optional[str], optional): hash.
         params (Optional[ReserveParamsInput], optional): params.
         title (Optional[str], optional): title.
         imitate (Optional[ID], optional): imitate.
-        app_group (Optional[ID], optional): appGroup.
         reference (Optional[str], optional): reference.
         provision (Optional[ID], optional): provision.
         binds (Optional[ReserveBindsInput], optional): binds.
@@ -2288,12 +2322,12 @@ def reserve(
     return execute(
         ReserveMutation,
         {
+            "instanceId": instance_id,
             "node": node,
             "hash": hash,
             "params": params,
             "title": title,
             "imitate": imitate,
-            "appGroup": app_group,
             "reference": reference,
             "provision": provision,
             "binds": binds,
@@ -2402,116 +2436,78 @@ def watch_myagents(
         yield event.agents_event
 
 
-async def awatch_todos(
-    identifier: str, rath: RekuestRath = None
-) -> AsyncIterator[Optional[Watch_todosSubscriptionTodos]]:
-    """watch_todos
-
-
-
-    Arguments:
-        identifier (str): identifier
-        rath (rekuest.rath.RekuestRath, optional): The arkitekt rath client
-
-    Returns:
-        Optional[Watch_todosSubscriptionTodos]"""
-    async for event in asubscribe(
-        Watch_todosSubscription, {"identifier": identifier}, rath=rath
-    ):
-        yield event.todos
-
-
-def watch_todos(
-    identifier: str, rath: RekuestRath = None
-) -> Iterator[Optional[Watch_todosSubscriptionTodos]]:
-    """watch_todos
-
-
-
-    Arguments:
-        identifier (str): identifier
-        rath (rekuest.rath.RekuestRath, optional): The arkitekt rath client
-
-    Returns:
-        Optional[Watch_todosSubscriptionTodos]"""
-    for event in subscribe(
-        Watch_todosSubscription, {"identifier": identifier}, rath=rath
-    ):
-        yield event.todos
-
-
 async def awatch_requests(
-    identifier: str, rath: RekuestRath = None
+    instance_id: str, rath: RekuestRath = None
 ) -> AsyncIterator[Optional[Watch_requestsSubscriptionRequests]]:
     """watch_requests
 
 
 
     Arguments:
-        identifier (str): identifier
+        instance_id (str): instanceId
         rath (rekuest.rath.RekuestRath, optional): The arkitekt rath client
 
     Returns:
         Optional[Watch_requestsSubscriptionRequests]"""
     async for event in asubscribe(
-        Watch_requestsSubscription, {"identifier": identifier}, rath=rath
+        Watch_requestsSubscription, {"instanceId": instance_id}, rath=rath
     ):
         yield event.requests
 
 
 def watch_requests(
-    identifier: str, rath: RekuestRath = None
+    instance_id: str, rath: RekuestRath = None
 ) -> Iterator[Optional[Watch_requestsSubscriptionRequests]]:
     """watch_requests
 
 
 
     Arguments:
-        identifier (str): identifier
+        instance_id (str): instanceId
         rath (rekuest.rath.RekuestRath, optional): The arkitekt rath client
 
     Returns:
         Optional[Watch_requestsSubscriptionRequests]"""
     for event in subscribe(
-        Watch_requestsSubscription, {"identifier": identifier}, rath=rath
+        Watch_requestsSubscription, {"instanceId": instance_id}, rath=rath
     ):
         yield event.requests
 
 
 async def awatch_reservations(
-    identifier: str, rath: RekuestRath = None
+    instance_id: str, rath: RekuestRath = None
 ) -> AsyncIterator[Optional[Watch_reservationsSubscriptionReservations]]:
     """watch_reservations
 
 
 
     Arguments:
-        identifier (str): identifier
+        instance_id (str): instanceId
         rath (rekuest.rath.RekuestRath, optional): The arkitekt rath client
 
     Returns:
         Optional[Watch_reservationsSubscriptionReservations]"""
     async for event in asubscribe(
-        Watch_reservationsSubscription, {"identifier": identifier}, rath=rath
+        Watch_reservationsSubscription, {"instanceId": instance_id}, rath=rath
     ):
         yield event.reservations
 
 
 def watch_reservations(
-    identifier: str, rath: RekuestRath = None
+    instance_id: str, rath: RekuestRath = None
 ) -> Iterator[Optional[Watch_reservationsSubscriptionReservations]]:
     """watch_reservations
 
 
 
     Arguments:
-        identifier (str): identifier
+        instance_id (str): instanceId
         rath (rekuest.rath.RekuestRath, optional): The arkitekt rath client
 
     Returns:
         Optional[Watch_reservationsSubscriptionReservations]"""
     for event in subscribe(
-        Watch_reservationsSubscription, {"identifier": identifier}, rath=rath
+        Watch_reservationsSubscription, {"instanceId": instance_id}, rath=rath
     ):
         yield event.reservations
 
@@ -2721,37 +2717,37 @@ def get_agent(id: ID, rath: RekuestRath = None) -> Optional[Get_agentQueryAgent]
 
 
 async def arequests(
-    identifier: str, rath: RekuestRath = None
+    instance_id: str, rath: RekuestRath = None
 ) -> Optional[List[Optional[AssignationFragment]]]:
     """requests
 
 
 
     Arguments:
-        identifier (str): identifier
+        instance_id (str): instanceId
         rath (rekuest.rath.RekuestRath, optional): The arkitekt rath client
 
     Returns:
         Optional[List[Optional[AssignationFragment]]]"""
     return (
-        await aexecute(RequestsQuery, {"identifier": identifier}, rath=rath)
+        await aexecute(RequestsQuery, {"instanceId": instance_id}, rath=rath)
     ).requests
 
 
 def requests(
-    identifier: str, rath: RekuestRath = None
+    instance_id: str, rath: RekuestRath = None
 ) -> Optional[List[Optional[AssignationFragment]]]:
     """requests
 
 
 
     Arguments:
-        identifier (str): identifier
+        instance_id (str): instanceId
         rath (rekuest.rath.RekuestRath, optional): The arkitekt rath client
 
     Returns:
         Optional[List[Optional[AssignationFragment]]]"""
-    return execute(RequestsQuery, {"identifier": identifier}, rath=rath).requests
+    return execute(RequestsQuery, {"instanceId": instance_id}, rath=rath).requests
 
 
 async def aget_template(id: ID, rath: RekuestRath = None) -> Optional[TemplateFragment]:
@@ -2780,6 +2776,46 @@ def get_template(id: ID, rath: RekuestRath = None) -> Optional[TemplateFragment]
     Returns:
         Optional[TemplateFragment]"""
     return execute(Get_templateQuery, {"id": id}, rath=rath).template
+
+
+async def amytemplatefor(
+    hash: str, instance_id: ID, rath: RekuestRath = None
+) -> Optional[TemplateFragment]:
+    """mytemplatefor
+
+
+
+    Arguments:
+        hash (str): hash
+        instance_id (ID): instance_id
+        rath (rekuest.rath.RekuestRath, optional): The arkitekt rath client
+
+    Returns:
+        Optional[TemplateFragment]"""
+    return (
+        await aexecute(
+            MytemplateforQuery, {"hash": hash, "instance_id": instance_id}, rath=rath
+        )
+    ).mytemplatefor
+
+
+def mytemplatefor(
+    hash: str, instance_id: ID, rath: RekuestRath = None
+) -> Optional[TemplateFragment]:
+    """mytemplatefor
+
+
+
+    Arguments:
+        hash (str): hash
+        instance_id (ID): instance_id
+        rath (rekuest.rath.RekuestRath, optional): The arkitekt rath client
+
+    Returns:
+        Optional[TemplateFragment]"""
+    return execute(
+        MytemplateforQuery, {"hash": hash, "instance_id": instance_id}, rath=rath
+    ).mytemplatefor
 
 
 async def asearch_templates(
@@ -2979,38 +3015,38 @@ def get_reservation(
 
 
 async def areservations(
-    identifier: str, rath: RekuestRath = None
+    instance_id: str, rath: RekuestRath = None
 ) -> Optional[List[Optional[ReservationFragment]]]:
     """reservations
 
 
 
     Arguments:
-        identifier (str): identifier
+        instance_id (str): instanceId
         rath (rekuest.rath.RekuestRath, optional): The arkitekt rath client
 
     Returns:
         Optional[List[Optional[ReservationFragment]]]"""
     return (
-        await aexecute(ReservationsQuery, {"identifier": identifier}, rath=rath)
+        await aexecute(ReservationsQuery, {"instanceId": instance_id}, rath=rath)
     ).reservations
 
 
 def reservations(
-    identifier: str, rath: RekuestRath = None
+    instance_id: str, rath: RekuestRath = None
 ) -> Optional[List[Optional[ReservationFragment]]]:
     """reservations
 
 
 
     Arguments:
-        identifier (str): identifier
+        instance_id (str): instanceId
         rath (rekuest.rath.RekuestRath, optional): The arkitekt rath client
 
     Returns:
         Optional[List[Optional[ReservationFragment]]]"""
     return execute(
-        ReservationsQuery, {"identifier": identifier}, rath=rath
+        ReservationsQuery, {"instanceId": instance_id}, rath=rath
     ).reservations
 
 
@@ -3019,6 +3055,7 @@ ChildPortInput.update_forward_refs()
 DefinitionInput.update_forward_refs()
 DescendendInput.update_forward_refs()
 EffectInput.update_forward_refs()
+PortDemandInput.update_forward_refs()
 PortInput.update_forward_refs()
 ProvisionFragmentTemplate.update_forward_refs()
 TemplateFragment.update_forward_refs()

@@ -1,5 +1,5 @@
-subscription watch_reservations($identifier: String!) {
-  reservations(identifier: $identifier) {
+subscription watch_reservations($instanceId: String!) {
+  reservations(instanceId: $instanceId) {
     create {
       ...Reservation
     }

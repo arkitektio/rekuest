@@ -26,10 +26,15 @@ import logging
 from rekuest.collection.collector import Collector
 import uuid
 from rekuest.agents.errors import AgentException
-from rekuest.actors.transport.local_transport import AgentActorTransport
+from rekuest.actors.transport.local_transport import (
+    AgentActorTransport,
+    ProxyActorTransport,
+)
+from rekuest.actors.transport.types import ActorTransport
 from rekuest.actors.types import Assignment, Unassignment
 from .transport.errors import DefiniteConnectionFail, CorrectableConnectionFail
-
+from rekuest.api.schema import aget_template
+from rekuest.agents.extension import AgentExtension
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +64,7 @@ class BaseAgent(KoiledModel):
     definition_registry: DefinitionRegistry = Field(
         default_factory=get_default_definition_registry
     )
+    extensions: Dict[str, AgentExtension] = Field(default_factory=dict)
     collector: Collector = Field(default_factory=Collector)
     managed_actors: Dict[str, Actor] = Field(default_factory=dict)
 
@@ -173,12 +179,15 @@ class BaseAgent(KoiledModel):
                     message="Actor was already running",
                 )
             except KeyError as e:
-                await self.aspawn_actor_from_provision(message)
-            except Exception as e:
-                logger.error("Spawning error", exc_info=True)
-                await self.transport.change_provision(
-                    message.provision, status=ProvisionStatus.DENIED, message=str(e)
-                )
+                try:
+                    await self.aspawn_actor_from_provision(message)
+                except ProvisionException as e:
+                    logger.error(
+                        f"Error when spawing Actor for {message}", exc_info=True
+                    )
+                    await self.transport.change_provision(
+                        message.provision, status=ProvisionStatus.DENIED, message=str(e)
+                    )
 
         elif isinstance(message, Unprovision):
             if message.provision in self.provision_passport_map:
@@ -202,7 +211,7 @@ class BaseAgent(KoiledModel):
                         "Actor was no longer active when we received this message"
                     ),
                 )
-                logger.error(
+                logger.warning(
                     f"Received Unprovision for never provisioned provision {message}"
                 )
 
@@ -221,7 +230,7 @@ class BaseAgent(KoiledModel):
 
         await self.transport.__aexit__(exc_type, exc_val, exc_tb)
 
-    async def aregister_definitions(self):
+    async def aregister_definitions(self, instance_id: Optional[str] = None):
         """Registers the definitions that are defined in the definition registry
 
         This method is called by the agent when it starts and it is responsible for
@@ -232,6 +241,11 @@ class BaseAgent(KoiledModel):
         You can implement this method in your agent subclass if you want define preregistration
         logic (like registering definitions in the definition registry).
         """
+        for i in self.extensions.values():
+            await i.aregister_definitions(
+                self.definition_registry,
+                instance_id=instance_id or self.instance_id,
+            )  # Lets register all the extensions
 
         for (
             interface,
@@ -243,7 +257,7 @@ class BaseAgent(KoiledModel):
                 arkitekt_template = await acreate_template(
                     definition=definition,
                     interface=interface,
-                    instance_id=self.instance_id,
+                    instance_id=instance_id or self.instance_id,
                     rath=self.rath,
                 )
             except Exception as e:
@@ -262,37 +276,84 @@ class BaseAgent(KoiledModel):
         actor = self.managed_actors[passport.id]
         return await actor.aget_status()
 
+    async def abuild_actor_for_template(
+        self, template: TemplateFragment, passport: Passport, transport: ActorTransport
+    ) -> Actor:
+        if not template.extensions:
+            try:
+                actor_builder = self.definition_registry.get_builder_for_interface(
+                    template.interface
+                )
+
+            except KeyError as e:
+                raise ProvisionException(
+                    f"No Actor Builder found for template {template.interface} and no extensions specified"
+                )
+
+            actor = actor_builder(
+                passport=passport,
+                transport=transport,
+                collector=self.collector,
+                agent=self,
+            )
+
+        for i in template.extensions:
+            if i in self.extensions:
+                extension = self.extensions[i]
+                try:
+                    actor = await extension.aspawn_actor_from_template(
+                        template, passport, transport, self
+                    )
+                except Exception as e:
+                    raise ProvisionException(
+                        "Error spawning actor from extension"
+                    ) from e
+                if actor:
+                    # First extension that manages to spawn an actor wins
+                    break
+
+        if not actor:
+            raise ProvisionException("No extensions managed to spawn an actor")
+
+        return actor
+
+    async def on_assign_change(self, assignment: Assignment, *args, **kwargs):
+        await self.transport.change_assignation(assignment.assignation, *args, **kwargs)
+
+    async def on_assign_log(self, assignment: Assignment, *args, **kwargs):
+        await self.transport.log_to_assignation(assignment.assignation, *args, **kwargs)
+
+    async def on_actor_change(self, passport: Passport, *args, **kwargs):
+        await self.transport.change_provision(passport.provision, *args, **kwargs)
+
+    async def on_actor_log(self, passport: Passport, *args, **kwargs):
+        await self.transport.log_to_provision(passport.provision, *args, **kwargs)
+
     async def aspawn_actor_from_provision(self, provision: Provision) -> Actor:
         """Spawns an Actor from a Provision. This function closely mimics the
         spawining protocol within an actor. But maps template"""
 
-        try:
-            interface = self.template_interface_map[provision.template]
-        except KeyError as e:
-            raise ProvisionException("No Interface found for requested template") from e
-
-        try:
-            actor_builder = self.definition_registry.get_builder_for_interface(
-                interface
-            )
-
-        except KeyError as e:
-            raise ProvisionException("No Actor Builder found for template") from e
-
-        passport = Passport(provision=provision.provision)
-
-        actor = actor_builder(
-            passport=passport,
-            transport=AgentActorTransport(
-                passport=passport, agent_transport=self.transport
-            ),
-            definition_registry=self.definition_registry,
-            collector=self.collector,
+        template = await aget_template(
+            provision.template,
+            rath=self.rath,
         )
 
+        passport = Passport(provision=provision.provision, instance_id=self.instance_id)
+
+        transport = ProxyActorTransport(
+            passport=passport,
+            on_assign_change=self.on_assign_change,
+            on_assign_log=self.on_assign_log,
+            on_actor_change=self.on_actor_change,
+            on_actor_log=self.on_actor_log,
+        )
+
+        actor = await self.abuild_actor_for_template(template, passport, transport)
+
         await actor.arun()  # TODO: Maybe move this outside?
-        self.managed_actors[passport.id] = actor
-        self.provision_passport_map[provision.provision] = passport
+        self.managed_actors[actor.passport.id] = actor
+        self.provision_passport_map[provision.provision] = actor.passport
+
         return actor
 
     async def await_errorfuture(self):
@@ -307,15 +368,14 @@ class BaseAgent(KoiledModel):
         )
 
         if self._errorfuture.done():
-            print("Error future done")
             raise self._errorfuture.exception()
         else:
             await self.process(await done.pop())
 
-    async def astart(self):
-        await self.aregister_definitions()
+    async def astart(self, instance_id: Optional[str] = None):
+        await self.aregister_definitions(instance_id=instance_id)
         self._errorfuture = asyncio.Future()
-        await self.transport.aconnect(self.instance_id)
+        await self.transport.aconnect(instance_id or self.instance_id)
         self.started = True
 
     def step(self, *args, **kwargs):
@@ -334,17 +394,16 @@ class BaseAgent(KoiledModel):
                 await self.astep()
         except asyncio.CancelledError:
             logger.info(
-                "Provisioning task cancelled. We are running"
-                f" {self.transport.instance_id}"
+                "Provisioning task cancelled. We are running" f" {self.transport}"
             )
             self.running = False
             raise
 
-    async def aprovide(self):
+    async def aprovide(self, instance_id: Optional[str] = None):
         logger.info(
             f"Launching provisioning task. We are running {self.transport.instance_id}"
         )
-        await self.astart()
+        await self.astart(instance_id=instance_id)
         await self.aloop()
 
     async def __aenter__(self):

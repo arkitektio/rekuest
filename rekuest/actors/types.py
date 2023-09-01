@@ -10,17 +10,18 @@ import uuid
 
 
 class Passport(BaseModel):
+    instance_id: str
     provision: str
     parent: Optional[str]
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
 
 
 class Assignment(BaseModel):
-    assignation: str
+    assignation: Optional[str]
     parent: Optional[str]
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     args: List[Any] = Field(default_factory=list)
-    user: str
+    user: Optional[str]
     reference: Optional[str]
 
 

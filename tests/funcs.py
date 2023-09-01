@@ -3,6 +3,7 @@ import sys
 from typing import Dict, List, Tuple, Optional, Union
 from .structures import SecondObject, SecondSerializableObject, SerializableObject
 from annotated_types import Le, Predicate, Gt, Len
+from enum import Enum
 
 if sys.version_info < (3, 9):
     from typing_extensions import Annotated
@@ -26,6 +27,28 @@ def null_function(x: Optional[int]) -> None:
 
 
 def plain_basic_function(rep: str, name: str = None) -> str:
+    """Karl
+
+    Karl takes a a representation and does magic stuff
+
+    Args:
+        rep (str): Nougat
+        name (str, optional): Bugat
+
+    Returns:
+        Representation: The Returned Representation
+    """
+    return "tested"
+
+
+class PlainEnum(str, Enum):
+    """Plain Enum"""
+
+    A = "A"
+    B = "B"
+
+
+def plain_enum_function(rep: str, name: PlainEnum = PlainEnum.A) -> str:
     """Karl
 
     Karl takes a a representation and does magic stuff

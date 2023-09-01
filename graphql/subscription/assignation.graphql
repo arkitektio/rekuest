@@ -1,17 +1,5 @@
-subscription watch_todos($identifier: String!) {
-  todos(identifier: $identifier) {
-    create {
-      ...Assignation
-    }
-    update {
-      ...Assignation
-    }
-    delete
-  }
-}
-
-subscription watch_requests($identifier: String!) {
-  requests(identifier: $identifier) {
+subscription watch_requests($instanceId: String!) {
+  requests(instanceId: $instanceId) {
     create {
       ...Assignation
     }

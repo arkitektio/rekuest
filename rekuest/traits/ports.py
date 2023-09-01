@@ -1,5 +1,5 @@
 from typing import Callable
-from pydantic import BaseModel, root_validator
+from pydantic import BaseModel, root_validator, validator
 import uuid
 import random
 
@@ -10,6 +10,19 @@ class PortTrait(BaseModel):
     on the client side
 
     """
+
+    @validator("default", check_fields=False)
+    def validator(cls, v):
+        # Check if the default value is JSON serializable
+        if v is None:
+            return v
+
+        if not isinstance(v, (str, int, float, dict, list, bool)):
+            raise ValueError(
+                "Default value must be JSON serializable, got: " + str(v)
+            ) from None
+
+        return v
 
     @root_validator(pre=True)
     def validate_portkind_nested(cls, values):

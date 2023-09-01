@@ -1,22 +1,22 @@
 mutation reserve(
+  $instanceId: ID!
   $node: ID
   $hash: String
   $params: ReserveParamsInput
   $title: String
   $imitate: ID
-  $appGroup: ID
   $reference: String
   $provision: ID
   $binds: ReserveBindsInput
 ) {
   reserve(
+    instanceId: $instanceId
     node: $node
     hash: $hash
     params: $params
     title: $title
     imitate: $imitate
     provision: $provision
-    appGroup: $appGroup
     binds: $binds
     reference: $reference
   ) {

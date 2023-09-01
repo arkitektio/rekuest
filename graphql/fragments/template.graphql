@@ -1,5 +1,6 @@
 fragment Template on Template {
   id
+  interface
   agent {
     registry {
       name
@@ -15,5 +16,6 @@ fragment Template on Template {
   node {
     ...Node
   }
+  extensions
   params
 }

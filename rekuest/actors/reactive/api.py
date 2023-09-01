@@ -27,6 +27,11 @@ def useGuardian() -> str:
     return get_current_provision_helper().guardian
 
 
+def useInstanceID() -> str:
+    """Returns the guardian id of the current provision"""
+    return get_current_assignation_helper().passport.instance_id
+
+
 def progress(percentage: int) -> None:
     """Progress
 

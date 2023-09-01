@@ -18,6 +18,7 @@ from rekuest.structures.errors import (
 )
 from rekuest.definition.validate import auto_validate
 from .predication import predicate_port
+import datetime as dt
 
 
 async def aexpand_arg(
@@ -89,6 +90,9 @@ async def aexpand_arg(
 
     if port.kind == PortKind.INT:
         return int(value)
+
+    if port.kind == PortKind.DATE:
+        return dt.datetime.fromisoformat(value.replace("Z", "+00:00"))
 
     if port.kind == PortKind.FLOAT:
         return float(value)
@@ -219,6 +223,9 @@ async def ashrink_return(
 
         if port.kind == PortKind.FLOAT:
             return float(value) if value is not None else None
+
+        if port.kind == PortKind.DATE:
+            return value.isoformat() if value is not None else None
 
         if port.kind == PortKind.STRUCTURE:
             # We always convert structures returns to strings

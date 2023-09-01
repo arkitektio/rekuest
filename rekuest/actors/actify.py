@@ -100,8 +100,6 @@ def reactify(
         "definition": definition,
     }
 
-    print(in_process)
-
     if is_coroutine:
         return definition, higher_order_builder(FunctionalFuncActor, **actor_attributes)
     elif is_asyncgen:

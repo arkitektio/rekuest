@@ -34,6 +34,21 @@ def SearchWidget(query: SearchQuery, ward: str, **kwargs) -> WidgetInput:
     return WidgetInput(kind="SearchWidget", query=query, ward=ward, **kwargs)
 
 
+def ChoiceWidget(choices: List[ChoiceInput], **kwargs) -> WidgetInput:
+    """Generate a choice widget.
+
+    A choice widget is a widget that renderes a list of choices with the
+    value of the choice being highlighted.
+
+    Args:
+        choices (List[ChoiceInput]): The choices
+
+    Returns:
+        WidgetInput: _description_
+    """
+    return WidgetInput(kind="ChoiceWidget", choices=choices, **kwargs)
+
+
 def StringWidget(as_paragraph: bool = False, **kwargs) -> WidgetInput:
     """Generate a string widget.
 

@@ -94,7 +94,8 @@ class QtFutureBuilder(QtCore.QObject):
         self.definition = definition
 
     async def on_assign(self, *args, **kwargs) -> None:
-        return await self.coro.acall(*args, **kwargs)
+        x = await self.coro.acall(*args, **kwargs)
+        return x
 
     async def on_provide(self, provision: Provision) -> Any:
         return None

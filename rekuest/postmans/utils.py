@@ -2,6 +2,7 @@ from random import random
 from typing import (
     Awaitable,
     Callable,
+    Coroutine,
     Optional,
     Union,
     TypeVar,
@@ -17,7 +18,7 @@ import uuid
 from rekuest.scalars import Interface
 from pydantic import Field
 from rekuest.messages import Assignation, Reservation, Unassignation
-from rekuest.structures.registry import get_current_structure_registry
+from rekuest.structures.default import get_default_structure_registry
 from koil.composition import KoiledModel
 from koil.helpers import unkoil_gen
 from koil.types import ContextBool
@@ -26,6 +27,7 @@ from rekuest.api.schema import (
     AssignationLogLevel,
     AssignationStatus,
     ProvisionStatus,
+    TemplateFragment,
     ReservationFragment,
     ReservationStatus,
     ReserveParamsInput,
@@ -112,34 +114,38 @@ class RPCContract(Protocol):
     async def aassign(
         self,
         kwargs: Dict[str, Any],
-        parent: Assignment,
-        assign_timeout: float = 10,
+        parent: Optional[Assignment] = None,
+        reference: Optional[str] = None,
+        assign_timeout: Optional[float] = None,
     ) -> Dict[str, Any]:
         ...
 
     async def aassign_retry(
         self,
         kwargs: Dict[str, Any],
-        parent: Assignment,
-        assign_timeout: float = 10,
-        retry: int = 0,
+        parent: Optional[Assignment] = None,
+        reference: Optional[str] = None,
+        assign_timeout: Optional[float] = None,
+        retry: Optional[int] = 0,
     ) -> Dict[str, Any]:
         ...
 
     async def astream(
         self,
         kwargs: Dict[str, Any],
-        parent: Assignment,
-        yield_timeout: float = 10,
+        parent: Optional[Assignment] = None,
+        reference: Optional[str] = None,
+        yield_timeout: Optional[float] = None,
     ) -> AsyncIterator[List[Any]]:
         ...
 
     async def astream_retry(
         self,
         kwargs: Dict[str, Any],
-        parent: Assignment,
-        yield_timeout: float = 10,
-        retry: int = 0,
+        parent: Optional[Assignment] = None,
+        reference: Optional[str] = None,
+        yield_timeout: Optional[float] = None,
+        retry: Optional[int] = 0,
     ) -> Dict[str, Any]:
         ...
 
@@ -167,8 +173,8 @@ class RPCContractBase(KoiledModel):
     async def aassign(
         self,
         kwargs: Dict[str, Any],
-        parent: Assignment,
-        reference: str = None,
+        parent: Optional[Assignment] = None,
+        reference: Optional[str] = None,
         assign_timeout: Optional[int] = None,
     ):
         raise NotImplementedError("Should be implemented by subclass")
@@ -176,8 +182,8 @@ class RPCContractBase(KoiledModel):
     async def astream(
         self,
         kwargs: Dict[str, Any],
-        parent: Assignment,
-        reference: str = None,
+        parent: Optional[Assignment] = None,
+        reference: Optional[str] = None,
         yield_timeout: Optional[int] = None,
     ):
         raise NotImplementedError("Should be implemented by subclass")
@@ -185,10 +191,10 @@ class RPCContractBase(KoiledModel):
     async def astream_retry(
         self,
         kwargs: Dict[str, Any],
-        parent: Assignment,
+        parent: Optional[Assignment] = None,
         yield_timeout: Optional[int] = None,
-        retry: int = 0,
-        reference: str = None,
+        retry: Optional[int] = 0,
+        reference: Optional[str] = None,
         retry_delay_ms: Optional[int] = None,
     ) -> Dict[str, Any]:
         try:
@@ -218,10 +224,10 @@ class RPCContractBase(KoiledModel):
     async def aassign_retry(
         self,
         kwargs: Dict[str, Any],
-        parent: Assignment,
+        parent: Optional[Assignment] = None,
         assign_timeout: Optional[int] = None,
-        retry: int = 0,
-        reference: str = None,
+        retry: Optional[int] = 0,
+        reference: Optional[str] = None,
         retry_delay_ms: Optional[int] = None,
     ) -> Dict[str, Any]:
         try:
@@ -256,8 +262,8 @@ class RPCContractBase(KoiledModel):
 
 
 class actoruse(RPCContractBase):
-    interface: Interface
-    supervisor: Actor
+    template: TemplateFragment
+    supervisor: Actor = Field(repr=False, exclude=True)
     reference: Optional[str]
     "The governing actor"
     assign_timeout: Optional[float] = 36000
@@ -276,16 +282,16 @@ class actoruse(RPCContractBase):
     async def aassign(
         self,
         kwargs: Dict[str, Any],
-        parent: Assignment,
+        parent: Optional[Assignment] = None,
         assign_timeout: Optional[float] = None,
-        reference: str = None,
+        reference: Optional[str] = None,
     ) -> Dict[str, Any]:
         assignment = Assignment(
-            assignation=parent.assignation,
-            parent=parent.id,
+            assignation=parent.assignation if parent else None,
+            parent=parent.id if parent else None,
             args=serialize_inputs(self._actor.definition, kwargs),
             status=AssignationStatus.ASSIGNED,
-            user=parent.user,
+            user=parent.user if parent else None,
             reference=reference,
         )
 
@@ -295,14 +301,26 @@ class actoruse(RPCContractBase):
         await self._actor.apass(assignment)
         try:
             while True:  # Waiting for assignation
+                logger.info("Waiting for update")
                 ass = await asyncio.wait_for(
                     _ass_queue.get(), timeout=assign_timeout or self.assign_timeout
                 )
+                logger.info(f"Local Assign Context: {ass}")
                 if ass.status == AssignationStatus.RETURNED:
                     return deserialize_outputs(self._actor.definition, ass.returns)
 
-                if ass.status in [AssignationStatus.CRITICAL, AssignationStatus.ERROR]:
+                if ass.status in [AssignationStatus.ERROR]:
+                    raise RecoverableAssignException(
+                        f"Recoverable Exception: {ass.message}"
+                    )
+
+                if ass.status in [AssignationStatus.CRITICAL]:
                     raise AssignException(f"Critical error: {ass.message}")
+
+                if ass.status in [AssignationStatus.CANCELLED]:
+                    raise AssignException("Was cancelled from the outside")
+
+                _ass_queue.task_done()
         except asyncio.CancelledError as e:
             await self._actor.apass(
                 Unassignation(
@@ -326,13 +344,20 @@ class actoruse(RPCContractBase):
 
             raise exc_class("Timeout error for assignation") from e
 
+        except Exception as e:
+            logger.error("Error in Assignation", exc_info=True)
+            raise e
+
     async def on_actor_log(self, *args, **kwargs):
         logger.info(f"ActorLog: {args} {kwargs}")
 
     async def on_assign_log(self, *args, **kwargs):
         logger.info(f"AssingLog: {args} {kwargs}")
 
-    async def on_actor_change(self, status: ProvisionStatus, **kwargs):
+    async def on_actor_change(
+        self, passport: Passport, status: ProvisionStatus, **kwargs
+    ):
+        # passport is irellevant because we only every manage one actor
         if status == ProvisionStatus.ACTIVE:
             await self.change_state(ContractStatus.ACTIVE)
             if self._enter_future and not self._enter_future.done():
@@ -346,16 +371,17 @@ class actoruse(RPCContractBase):
     async def astream(
         self,
         kwargs: Dict[str, Any],
-        parent: Assignment,
+        parent: Optional[Assignment] = None,
         yield_timeout: Optional[float] = None,
-        reference: str = None,
+        reference: Optional[str] = None,
     ) -> AsyncIterator[Dict[str, Any]]:
         inputs = serialize_inputs(self._actor.definition, kwargs)
         assignment = Assignment(
-            assignation=parent.assignation,
-            parent=parent.id,
+            assignation=parent.assignation if parent else None,
+            parent=parent.id if parent else None,
             args=inputs,
             status=AssignationStatus.ASSIGNED,
+            user=parent.user if parent else None,
             reference=reference,
         )
 
@@ -369,15 +395,17 @@ class actoruse(RPCContractBase):
                 ass = await asyncio.wait_for(
                     _ass_queue.get(), timeout=yield_timeout or self.yield_timeout
                 )
+                logger.info(f"Local Stream Context: {ass}")
                 if ass.status == AssignationStatus.YIELD:
                     yield deserialize_outputs(self._actor.definition, ass.returns)
 
                 if ass.status == AssignationStatus.DONE:
-                    print("Done")
                     return
 
                 if ass.status in [AssignationStatus.CRITICAL, AssignationStatus.ERROR]:
                     raise AssignException(f"Critical error: {ass.message}")
+
+                _ass_queue.task_done()
 
         except asyncio.CancelledError as e:
             await self._actor.apass(
@@ -400,8 +428,17 @@ class actoruse(RPCContractBase):
 
             raise exc_class("Timeout error for assignation") from e
 
+        except Exception as e:
+            logger.error(exc_info=True)
+            raise e
+
     async def on_assign_change(
-        self, assignment: Assignment, status=None, returns=None, progress=None
+        self,
+        assignment: Assignment,
+        status=None,
+        returns=None,
+        progress=None,
+        message=None,
     ):
         await self._assign_queues[assignment.id].put(
             AssignmentUpdate(
@@ -409,6 +446,7 @@ class actoruse(RPCContractBase):
                 status=status,
                 returns=returns,
                 progress=progress,
+                message=message,
             )
         )
 
@@ -419,13 +457,11 @@ class actoruse(RPCContractBase):
         self._updates_queue = asyncio.Queue[AssignationChangedMessage]()
 
         self._actor = await self.supervisor.aspawn_actor(
-            self.interface,
-            ProxyActorTransport(
-                on_log=self.on_actor_log,
-                on_change=self.on_actor_change,
-                on_assign_change=self.on_assign_change,
-                on_assign_log=self.on_assign_log,
-            ),
+            self.template,
+            on_actor_log=self.on_actor_log,
+            on_actor_change=self.on_actor_change,
+            on_assign_change=self.on_assign_change,
+            on_assign_log=self.on_assign_log,
         )
 
         await self._actor.arun()
@@ -447,7 +483,7 @@ class arkiuse(RPCContractBase):
     reference: str = "default"
     binds: Optional[ReserveBindsInput] = None
     params: Optional[ReserveParamsInput] = None
-    postman: BasePostman
+    postman: BasePostman = Field(repr=False)
     reserve_timeout: Optional[int] = 100000
     assign_timeout: Optional[int] = 100000
     yield_timeout: Optional[int] = 100000
@@ -463,9 +499,9 @@ class arkiuse(RPCContractBase):
     async def aassign(
         self,
         kwargs: Dict[str, Any],
-        parent: Assignment,
+        parent: Optional[Assignment] = None,
         assign_timeout: Optional[int] = None,
-        reference: str = None,
+        reference: Optional[str] = None,
     ) -> Dict[str, Any]:
         assert self._reservation, "We never entered the context manager"
         if self.state != ContractStatus.ACTIVE:
@@ -479,7 +515,7 @@ class arkiuse(RPCContractBase):
             _ass_queue = await self.postman.aassign(
                 self._reservation.id,
                 inputs,
-                parent=parent.assignation,
+                parent=parent.assignation if parent else None,
                 reference=reference,
             )
         except PostmanException as e:
@@ -537,9 +573,9 @@ class arkiuse(RPCContractBase):
     async def astream(
         self,
         kwargs: Dict[str, Any],
-        parent: Assignment,
+        parent: Optional[Assignment] = None,
         yield_timeout: Optional[int] = None,
-        reference: str = None,
+        reference: Optional[str] = None,
     ) -> AsyncIterator[Dict[str, Any]]:
         assert self._reservation, "We never entered the context manager"
         if self.state != ContractStatus.ACTIVE:
@@ -551,7 +587,7 @@ class arkiuse(RPCContractBase):
             _ass_queue = await self.postman.aassign(
                 self._reservation.id,
                 serialize_inputs(self._definition, kwargs),
-                parent=parent.assignation,
+                parent=parent.assignation if parent else None,
                 reference=reference,
             )
         except PostmanException as e:
@@ -616,7 +652,10 @@ class arkiuse(RPCContractBase):
             while True:
                 self._reservation = await self._updates_queue.get()
                 logger.info(f"Updated Reservation {self._reservation}")
-                if self._reservation.status == ReservationStatus.ACTIVE:
+                if self._reservation.status == ReservationStatus.ROUTING:
+                    logger.info("Reservation is routing")
+
+                elif self._reservation.status == ReservationStatus.ACTIVE:
                     if self._enter_future and not self._enter_future.done():
                         logger.info("Entering future")
                         self._enter_future.set_result(True)
@@ -750,3 +789,27 @@ class mockuse(RPCContract):
     class Config:
         arbitrary_types_allowed = True
         underscore_attrs_are_private = True
+
+
+class serializingarkiuse(arkiuse):
+    structure_registry: StructureRegistry = Field(
+        default_factory=get_default_structure_registry, repr=False
+    )
+
+    async def aassign(
+        self,
+        *args,
+        parent: Optional[Assignment] = None,
+        assign_timeout: Optional[int] = None,
+        reference: Optional[str] = None,
+        **kwargs,
+    ) -> Coroutine[Any, Any, Dict[str, Any]]:
+        shrinked_kwargs = await shrink_inputs(
+            self._definition, args, kwargs, self.structure_registry
+        )
+
+        unshrunk = await super().aassign(
+            shrinked_kwargs, parent, assign_timeout, reference
+        )
+
+        return await expand_outputs(self._definition, unshrunk, self.structure_registry)
