@@ -18,7 +18,7 @@ from rekuest.definition.registry import get_default_definition_registry
 from rekuest.rath import RekuestRath
 from rekuest.definition.validate import auto_validate
 import asyncio
-from rekuest.agents.transport.base import AgentTransport, Contextual
+from rekuest.agents.transport.base import AgentTransport
 from rekuest.messages import Assignation, Unassignation, Unprovision, Provision, Inquiry
 from koil import unkoil
 from koil.composition import KoiledModel
@@ -68,44 +68,22 @@ class BaseAgent(KoiledModel):
     collector: Collector = Field(default_factory=Collector)
     managed_actors: Dict[str, Actor] = Field(default_factory=dict)
 
-    _hooks = {}
-    interface_template_map: Dict[str, TemplateFragment] = Field(default_factory=dict)
+    interface_template_map: Dict[str, TemplateFragment] = Field(
+        default_factory=dict,
+    )
     template_interface_map: Dict[str, str] = Field(default_factory=dict)
     provision_passport_map: Dict[str, Passport] = Field(default_factory=dict)
     managed_assignments: Dict[str, Assignment] = Field(default_factory=dict)
-    _provisionTaskMap: Dict[str, asyncio.Task] = Field(default_factory=dict)
-    _inqueue: Contextual[asyncio.Queue] = None
-    _errorfuture: Contextual[asyncio.Future] = None
 
-    started = False
-    running = False
+    running: bool = False
 
-    async def abroadcast(
-        self, message: Union[Assignation, Provision, Unassignation, Unprovision]
-    ):
-        await self._inqueue.put(message)
-
-    async def on_agent_error(self, exception) -> None:
-        if self._errorfuture is None or self._errorfuture.done():
-            return
-        self._errorfuture.set_exception(exception)
-        ...
-
-    async def on_definite_error(self, error: DefiniteConnectionFail) -> None:
-        if self._errorfuture is None or self._errorfuture.done():
-            return
-        self._errorfuture.set_exception(error)
-        ...
-
-    async def on_correctable_error(self, error: CorrectableConnectionFail) -> bool:
-        # Always correctable
-        return True
-        ...
+    def register_extension(self, name: str, extension: AgentExtension):
+        self.extensions[name] = extension
 
     async def process(
         self, message: Union[Assignation, Provision, Unassignation, Unprovision]
     ):
-        logger.info(f"Agent received {message}")
+        logger.info(f"Agent processes {message}")
 
         if isinstance(message, Assignation):
             if message.provision in self.provision_passport_map:
@@ -217,18 +195,6 @@ class BaseAgent(KoiledModel):
 
         else:
             raise AgentException(f"Unknown message type {type(message)}")
-
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        cancelations = [actor.acancel() for actor in self.managed_actors.values()]
-        # just stopping the actor, not cancelling the provision..
-
-        for c in cancelations:
-            try:
-                await c
-            except asyncio.CancelledError:
-                pass
-
-        await self.transport.__aexit__(exc_type, exc_val, exc_tb)
 
     async def aregister_definitions(self, instance_id: Optional[str] = None):
         """Registers the definitions that are defined in the definition registry
@@ -356,27 +322,29 @@ class BaseAgent(KoiledModel):
 
         return actor
 
-    async def await_errorfuture(self):
-        return await self._errorfuture
-
     async def astep(self):
-        queue_task = asyncio.create_task(self._inqueue.get(), name="queue_future")
-        error_task = asyncio.create_task(self.await_errorfuture(), name="error_future")
-        done, pending = await asyncio.wait(
-            [queue_task, error_task],
-            return_when=asyncio.FIRST_COMPLETED,
-        )
-
-        if self._errorfuture.done():
-            raise self._errorfuture.exception()
-        else:
-            await self.process(await done.pop())
+        await self.process(await self.transport.aget_message())
 
     async def astart(self, instance_id: Optional[str] = None):
         await self.aregister_definitions(instance_id=instance_id)
-        self._errorfuture = asyncio.Future()
         await self.transport.aconnect(instance_id or self.instance_id)
-        self.started = True
+
+    async def astop(self):
+        # Cancel all the tasks
+        cancelations = [actor.acancel() for actor in self.managed_actors.values()]
+        # just stopping the actor, not cancelling the provision..
+
+        for c in cancelations:
+            try:
+                await c
+            except asyncio.CancelledError:
+                pass
+
+        self.managed_actors = {}
+        self.provision_passport_map = {}  # Clearing the managed actors
+
+        await self.transport.adisconnect()
+        self.running = False
 
     def step(self, *args, **kwargs):
         return unkoil(self.astep, *args, **kwargs)
@@ -387,33 +355,29 @@ class BaseAgent(KoiledModel):
     def provide(self, *args, **kwargs):
         return unkoil(self.aprovide, *args, **kwargs)
 
-    async def aloop(self):
-        try:
-            while True:
-                self.running = True
-                await self.astep()
-        except asyncio.CancelledError:
-            logger.info(
-                "Provisioning task cancelled. We are running" f" {self.transport}"
-            )
-            self.running = False
-            raise
-
     async def aprovide(self, instance_id: Optional[str] = None):
         logger.info(
             f"Launching provisioning task. We are running {self.transport.instance_id}"
         )
-        await self.astart(instance_id=instance_id)
-        await self.aloop()
+        try:
+            await self.astart(instance_id=instance_id)
+            while True:
+                self.running = True
+                await self.astep()
+        except asyncio.CancelledError:
+            await self.astop()
+            logger.info("Provisioning task cancelled. We are running")
 
     async def __aenter__(self):
         self.definition_registry = (
             self.definition_registry or get_current_definition_registry()
         )
-        self._inqueue = asyncio.Queue()
-        self.transport.set_callback(self)
         await self.transport.__aenter__()
         return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        await self.astop()
+        await self.transport.__aexit__(exc_type, exc_val, exc_tb)
 
     class Config:
         arbitrary_types_allowed = True

@@ -19,6 +19,7 @@ from koil import unkoil
 from koil.composition import Composition
 from koil.decorators import koilable
 from rekuest.register import register
+from rekuest.agents.extension import AgentExtension
 
 
 @koilable(fieldname="koil", add_connectors=True)
@@ -47,6 +48,10 @@ class Rekuest(Composition):
             structure_registry=structure_registry,
             **kwargs,
         )
+
+    def register_extension(self, name: str, extension: AgentExtension) -> None:
+        """Register an extension on the agent."""
+        return self.agent.register_extension(name, extension=extension)
 
     def run(self, *args, **kwargs) -> None:
         """

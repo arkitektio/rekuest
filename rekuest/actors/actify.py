@@ -17,6 +17,7 @@ from rekuest.api.schema import PortGroupInput, DefinitionInput, WidgetInput, Eff
 from typing import Optional, Any, Dict, Union, Callable, Coroutine, Type, List, Tuple
 from rekuest.actors.base import Passport
 from rekuest.actors.transport.types import ActorTransport
+from .errors import ActifierException
 
 
 async def async_none_provide(prov: Provision):
@@ -121,4 +122,4 @@ def reactify(
             FunctionalProcessedFuncActor, **actor_attributes
         )
     else:
-        raise NotImplementedError("No way of converting this to a function")
+        raise ActifierException("No way of converting this to a function")

@@ -44,3 +44,10 @@ class ProvisionDelegateException(ActorException):
 
 class DelegateException(ActorException):
     """An exception that is raised by a delageted actor"""
+
+
+class ActifierException(ActorException):
+    """An exception that is raised by an actifier. WHen trying to convert a
+    python item (usually a function) to an actor"""
+
+    pass

@@ -27,9 +27,17 @@ def get_current_definition_registry(allow_global=True):
 
 
 class DefinitionRegistry(KoiledModel):
+    """DefinitionRegistry
+
+    The definition registry is the place where all of the definitions
+    of a given extensions can be store. It is an easy helper to build
+    actors from definitions.
+    """
+
+
     definitions: Dict[str, DefinitionInput] = Field(default_factory=dict, exclude=True)
     actor_builders: Dict[str, ActorBuilder] = Field(default_factory=dict, exclude=True)
-    structure_registry: Dict[str, StructureRegistry] = Field(
+    structure_registries: Dict[str, StructureRegistry] = Field(
         default_factory=dict, exclude=True
     )
     copy_from_default: bool = False
@@ -52,14 +60,14 @@ class DefinitionRegistry(KoiledModel):
     ):  # New Node
         self.definitions[interface] = definition
         self.actor_builders[interface] = actorBuilder
-        self.structure_registry[interface] = structure_registry
+        self.structure_registries[interface] = structure_registry
 
     def get_builder_for_interface(self, interface) -> ActorBuilder:
         return self.actor_builders[interface]
 
     def get_structure_registry_for_interface(self, interface) -> StructureRegistry:
         assert interface in self.actor_builders, "No structure_interface for interface"
-        return self.structure_registry[interface]
+        return self.structure_registries[interface]
 
     def get_definition_for_interface(self, interface) -> DefinitionInput:
         assert interface in self.definitions, "No definition for interface"

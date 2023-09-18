@@ -273,9 +273,7 @@ class actoruse(RPCContractBase):
     _actor: SerializingActor
     _enter_future: asyncio.Future = None
     _exit_future: asyncio.Future = None
-    _updates_queue: asyncio.Queue[
-        Union[AssignationChangedMessage, ProvisionChangedMessage]
-    ] = None
+    _updates_queue: asyncio.Queue = None
     _updates_watcher: asyncio.Task = None
     _assign_queues = {}
 

@@ -9,8 +9,6 @@ from rekuest.api.schema import (
     AssignationStatus,
 )
 from koil.composition import KoiledModel
-from koil.types import Contextual
-from .types import TransportCallbacks
 
 
 class AgentTransport(KoiledModel):
@@ -19,13 +17,14 @@ class AgentTransport(KoiledModel):
     A Transport is a means of communicating with an Agent. It is responsible for sending
     and receiving messages from the backend. It needs to implement the following methods:
 
-    list_provision: Getting the list of active provisions from the backend. (depends on the backend)
-    list_assignation: Getting the list of active assignations from the backend. (depends on the backend)
 
     change_assignation: Changing the status of an assignation. (depends on the backend)
     change_provision: Changing the status of an provision. (depends on the backend)
+    log_to_assignation: Logging to an assignation. (depends on the backend)
+    log_to_provision: Logging to an provision. (depends on the backend)
 
-    broadcast: Configuring the callbacks for the transport on new assignation, unassignation provision and unprovison.
+    aget_message: Getting a message from the backend. (depends on the backend)
+
 
     if it is a stateful connection it can also implement the following methods:
 
@@ -34,17 +33,9 @@ class AgentTransport(KoiledModel):
 
     """
 
-    _callback: Contextual[TransportCallbacks]
-
     @property
     def connected(self):
         return NotImplementedError("Implement this method")
-
-    @abstractmethod
-    async def list_provisions(
-        self, exclude: Optional[ProvisionStatus] = None
-    ) -> List[Provision]:
-        raise NotImplementedError("This is an abstract Base Class")
 
     @abstractmethod
     async def change_provision(
@@ -86,13 +77,13 @@ class AgentTransport(KoiledModel):
         raise NotImplementedError("This is an abstract Base Class")
 
     @abstractmethod
-    async def list_assignations(
-        self, exclude: Optional[AssignationStatus] = None
-    ) -> List[Assignation]:
+    async def aget_message(
+        self,
+    ) -> Union[Assignation, Provision, Unassignation, Unprovision]:
+        """This method should return a message from the backend. It should await until a message is received.
+        That then will be processed by the agent.
+        """
         raise NotImplementedError("This is an abstract Base Class")
-
-    def set_callback(self, callback: TransportCallbacks):
-        self._callback = callback
 
     async def __aenter__(self):
         return self

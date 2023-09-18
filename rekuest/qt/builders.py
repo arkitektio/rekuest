@@ -10,6 +10,8 @@ from rekuest.definition.define import prepare_definition, DefinitionInput
 from rekuest.actors.types import ActorBuilder, Passport
 from rekuest.collection.collector import ActorCollector
 from rekuest.actors.transport.types import ActorTransport
+import inspect
+from rekuest.actors.errors import ActifierException
 
 
 class QtInLoopBuilder(QtCore.QObject):
@@ -29,7 +31,7 @@ class QtInLoopBuilder(QtCore.QObject):
         parent=None,
         structure_registry=None,
         definition=None,
-        **actor_kwargs
+        **actor_kwargs,
     ) -> None:
         super().__init__(*args, parent=parent)
         self.coro = QtCoro(
@@ -82,7 +84,7 @@ class QtFutureBuilder(QtCore.QObject):
         parent=None,
         structure_registry=None,
         definition=None,
-        **actor_kwargs
+        **actor_kwargs,
     ) -> None:
         super().__init__(*args, parent=parent)
         self.coro = QtCoro(
@@ -124,9 +126,8 @@ def qtinloopactifier(
 ) -> Tuple[DefinitionInput, ActorBuilder]:
     """Qt Actifier
 
-    The qt actifier wraps a function and returns a builder that will create an actor
-    that runs in the same thread as the Qt instance, enabling the use of Qt widgets
-    and signals.
+    The inloop actifier ensures the actor is running in the same thread as the Qt
+    application, and will return the result of the function call to the actor.
     """
 
     definition = prepare_definition(function, structure_registry, **kwargs)
@@ -146,14 +147,28 @@ def qtinloopactifier(
     return definition, builder
 
 
+def predicate_first_param_is_future(function):
+    params = inspect.signature(function).parameters
+    future_param_name = list(params.keys())[0]
+    return future_param_name == "qtfuture"
+
+
 def qtwithfutureactifier(
     function, structure_registry, parent: QtWidgets.QWidget = None, **kwargs
 ) -> ActorBuilder:
     """Qt Actifier
 
-    The qt actifier wraps a function and returns a build that calls the function with
-    its first parameter being a future that can be resolved within the qt loop
+    The qt actifier ensures the actor is running in the same thread as the Qt instance,
+    and will pass a QT future to the actor, which can be resolved by the actor at any
+    time.
+
+
     """
+
+    if not predicate_first_param_is_future(function):
+        raise ActifierException(
+            f"We expect the first parameter to be called 'qtfuture', to use the qtwithfutureactifier. Just for convention sake. Please check {function}"
+        )
 
     definition = prepare_definition(function, structure_registry, omitfirst=1, **kwargs)
 
