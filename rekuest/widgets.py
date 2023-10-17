@@ -3,7 +3,9 @@ from rekuest.scalars import SearchQuery
 from typing import List
 
 
-def SliderWidget(min: int = None, max: int = None, **kwargs) -> WidgetInput:
+def SliderWidget(
+    min: float = None, max: float = None, step: float = None, **kwargs
+) -> WidgetInput:
     """Generate a slider widget.
 
     Args:
@@ -13,7 +15,7 @@ def SliderWidget(min: int = None, max: int = None, **kwargs) -> WidgetInput:
     Returns:
         WidgetInput: _description_
     """
-    return WidgetInput(kind="SliderWidget", min=min, max=max, **kwargs)
+    return WidgetInput(kind="SliderWidget", min=min, max=max, step=step, **kwargs)
 
 
 def SearchWidget(query: SearchQuery, ward: str, **kwargs) -> WidgetInput:
