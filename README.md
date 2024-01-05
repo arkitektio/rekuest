@@ -37,9 +37,9 @@ from herre import Herre, ClientCredentialsGrant
 
 auth = Herre(grant=ClientCredentialsGrant(client_id="ssss", client_secret="osinsoisnoein"))
 
-client = Rekuest(auth=auth)
+rekuest = Rekuest(auth=auth)
 
-@client.register()
+@rekuest.register()
 def rpc_function(x: int, name: str) -> str
     """
     A rpc function that we can
@@ -50,15 +50,11 @@ def rpc_function(x: int, name: str) -> str
 
 
 with client:
-  client.run()
+  rekuest.run()
 
 ```
 
 Run example:
-
-```bash
-arkitekt dev
-```
 
 This node is now register under the application and signed in user and can be provisioned and called to by other apps. By default users
 are only able to asign to their own apps. This can be changed on the rekuest server.
@@ -66,7 +62,7 @@ are only able to asign to their own apps. This can be changed on the rekuest ser
 ## Calling
 
 ```python
-from rekuest import Rekuest, find
+from rekuest import Rekuest, use
 from herre import Herre, ClientCredentialsGrant
 
 auth = Herre(grant=ClientCredentialsGrant(client_id="ssss", client_secret="osinsoisnoein"))
@@ -74,7 +70,7 @@ auth = Herre(grant=ClientCredentialsGrant(client_id="ssss", client_secret="osins
 client = Rekuest(auth=auth)
 
 with client:
-  node = find(interface="rpc_function") #
+  node = use(interface="rpc_function") #
 
   with node:
     node.assign(4, "johannes")
@@ -101,11 +97,11 @@ Rekuest does not impose any rules on how you handle this storage (see mikro for 
 class ComplexStructure:
     id: str # A reference for this structure on central storage
 
-    async def shrink(self):
+    async def ashrink(self):
         return self.id
 
     @classmethod
-    async def expand(cls, value):
+    async def aexpand(cls, value):
         return cls.load_from_server(value)
 
 
@@ -125,20 +121,4 @@ def complex_call(x: ComplexStrucuture) -> int:
 
 ```
 
-## Terminology
 
-**Node** A concept (documentatio) of a function that is enabled on the platform.
-
-**App**: A provider of functions, that negotiates
-access right to data and other Apps through Oauth2
-
-**Template**: An Implementation of a Node by an App.
-
-**Agent**: An active instance of this App, its the host of actors. Agents connect and disconnect.
-
-**Actor**: A stateless instance of a function that was provisioned
-
-**Provision**: A contract between arkitekt and a Agent for the usage of a specific function. As long as the provision is active the connected agent will be required to provide the resources of the function (think Deployment in Kubernetes)
-
-**Reservation**: A contract between a User and arkitekt that wants to use one or mulitple instances of functions (Actors). The platform tries to autocorrect and failure correct. Calls to the function are always address to the
-reservation no the provision (think: Exchange in RabbitMQ)
