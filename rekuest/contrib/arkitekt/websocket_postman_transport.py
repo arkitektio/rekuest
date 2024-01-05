@@ -1,12 +1,12 @@
 from typing import Any, Awaitable, Callable, Dict, Optional
 from pydantic import Field
 from rekuest.postmans.transport.websocket import WebsocketPostmanTransport
-from fakts.fakt.base import Fakt
+from pydantic import BaseModel
 from herre import Herre
 from fakts import Fakts
 
 
-class WebsocketPostmanTransportConfig(Fakt):
+class WebsocketPostmanTransportConfig(BaseModel):
     endpoint_url: str
     instance_id: str = "default"
 

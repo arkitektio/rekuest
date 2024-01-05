@@ -50,7 +50,12 @@ class Rekuest(Composition):
         )
 
     def register_extension(self, name: str, extension: AgentExtension) -> None:
-        """Register an extension on the agent."""
+        """Register an extension on the agent.
+
+        Extensions are used to allow to hook into the template registration and
+        actor registration process. This allows to add new templates and actors
+        to the agent.
+        """
         return self.agent.register_extension(name, extension=extension)
 
     def run(self, *args, **kwargs) -> None:

@@ -1,5 +1,5 @@
 from typing import Optional
-from fakts.fakt.base import Fakt
+from pydantic import BaseModel
 from fakts import Fakts
 from herre import Herre
 from rekuest.agents.transport.websocket import WebsocketAgentTransport
@@ -10,7 +10,7 @@ from typing import Any, Awaitable, Callable, Dict, Optional
 from pydantic import Field
 
 
-class WebsocketAgentTransportConfig(Fakt):
+class WebsocketAgentTransportConfig(BaseModel):
     endpoint_url: str
     instance_id: str = "default"
 
