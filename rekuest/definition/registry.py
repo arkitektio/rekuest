@@ -34,7 +34,6 @@ class DefinitionRegistry(KoiledModel):
     actors from definitions.
     """
 
-
     definitions: Dict[str, DefinitionInput] = Field(default_factory=dict, exclude=True)
     actor_builders: Dict[str, ActorBuilder] = Field(default_factory=dict, exclude=True)
     structure_registries: Dict[str, StructureRegistry] = Field(
@@ -80,8 +79,8 @@ class DefinitionRegistry(KoiledModel):
     def dump(self):
         return {
             "definitions": [
-                json.loads(x[0].json(exclude_none=True, exclude_unset=True))
-                for x in self.defined_nodes
+                json.loads(definput.json(exclude_none=True, exclude_unset=True))
+                for key, definput in self.definitions.items()
             ]
         }
 
