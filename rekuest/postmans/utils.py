@@ -427,7 +427,7 @@ class actoruse(RPCContractBase):
             raise exc_class("Timeout error for assignation") from e
 
         except Exception as e:
-            logger.error(exc_info=True)
+            logger.error("Error in assignment", exc_info=True)
             raise e
 
     async def on_assign_change(
@@ -661,10 +661,6 @@ class arkiuse(RPCContractBase):
                     await self.change_state(ContractStatus.ACTIVE)
 
                 elif self._reservation.status == ReservationStatus.DISCONNECT:
-                    if self._enter_future and not self._enter_future.done():
-                        logger.info("Entering future")
-                        self._enter_future.set_result(True)
-
                     await self.change_state(ContractStatus.INACTIVE)
 
                 else:
@@ -691,6 +687,8 @@ class arkiuse(RPCContractBase):
             reference=self.reference,
             binds=self.binds,
         )
+
+        logger.info("Successfully reserved waiting for updates")
         try:
             self._updates_watcher = asyncio.create_task(self.watch_updates())
             await asyncio.wait_for(
@@ -793,6 +791,8 @@ class serializingarkiuse(arkiuse):
     structure_registry: StructureRegistry = Field(
         default_factory=get_default_structure_registry, repr=False
     )
+    skip_shrink: bool = False
+    skip_expand: bool = False
 
     async def aassign(
         self,
@@ -802,12 +802,18 @@ class serializingarkiuse(arkiuse):
         reference: Optional[str] = None,
         **kwargs,
     ) -> Coroutine[Any, Any, Dict[str, Any]]:
-        shrinked_kwargs = await shrink_inputs(
-            self._definition, args, kwargs, self.structure_registry
-        )
+        if self.skip_shrink:
+            shrinked_kwargs = kwargs
+        else:
+            shrinked_kwargs = await shrink_inputs(
+                self._definition, args, kwargs, self.structure_registry
+            )
 
         unshrunk = await super().aassign(
             shrinked_kwargs, parent, assign_timeout, reference
         )
+
+        if self.skip_expand:
+            return unshrunk
 
         return await expand_outputs(self._definition, unshrunk, self.structure_registry)

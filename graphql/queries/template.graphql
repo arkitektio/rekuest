@@ -16,3 +16,4 @@ query search_templates($search: String, $values: [ID]) {
     value: id
   }
 }
+

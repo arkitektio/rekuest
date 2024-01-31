@@ -79,10 +79,19 @@ class Collector(BaseModel):
                 self.children_tree[assignment.parent] = [assignment.id]
 
     async def collect(self, id: str):
-        """
-        Collect data from the source.
+        """Collect and
 
-        :return: The collected data.
+        Parameters
+        ----------
+        id : str
+            _description_
+        collected_items : List[Any], optional
+            _description_, by default None
+
+        Raises
+        ------
+        e
+            _description_
         """
 
         if id in self.assignment_map:
@@ -93,10 +102,10 @@ class Collector(BaseModel):
                     )
                     await collector(value)
                 except Exception as e:
-                    logger.critical(
-                        f"Error while collecting {identifier} with value {value}"
+                    # TODO: Implement a collector that keeps track of errors
+                    logger.debug(
+                        f"Error while collecting {identifier} with value {value}. Probably already collected."
                     )
-                    raise e
 
         if id in self.children_tree:
             for child in self.children_tree[id]:

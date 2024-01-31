@@ -35,6 +35,9 @@ from rekuest.actors.types import Assignment, Unassignment
 from .transport.errors import DefiniteConnectionFail, CorrectableConnectionFail
 from rekuest.api.schema import aget_template
 from rekuest.agents.extension import AgentExtension
+from rekuest.agents.hooks import HooksRegistry, get_default_hook_registry
+from typing import Any
+
 
 logger = logging.getLogger(__name__)
 
@@ -74,8 +77,10 @@ class BaseAgent(KoiledModel):
     template_interface_map: Dict[str, str] = Field(default_factory=dict)
     provision_passport_map: Dict[str, Passport] = Field(default_factory=dict)
     managed_assignments: Dict[str, Assignment] = Field(default_factory=dict)
+    hook_registry: HooksRegistry = Field(default_factory=get_default_hook_registry)
 
     running: bool = False
+    _context: Dict[str, Any] = None
 
     def register_extension(self, name: str, extension: AgentExtension):
         self.extensions[name] = extension
@@ -326,8 +331,20 @@ class BaseAgent(KoiledModel):
         await self.process(await self.transport.aget_message())
 
     async def astart(self, instance_id: Optional[str] = None):
+        # TODO: Maybe we should check if we are already running
         await self.aregister_definitions(instance_id=instance_id)
+
+        self._context = await self.hook_registry.arun_startup()
+        await self.hook_registry.arun_background(self._context)
+
         await self.transport.aconnect(instance_id or self.instance_id)
+
+    async def aget_context(self):
+        if not self._context:
+            raise AgentException(
+                "Context not initialized. Because agent is not running"
+            )
+        return self._context
 
     async def astop(self):
         # Cancel all the tasks
@@ -339,6 +356,8 @@ class BaseAgent(KoiledModel):
                 await c
             except asyncio.CancelledError:
                 pass
+
+        await self.hook_registry.astop_background()
 
         self.managed_actors = {}
         self.provision_passport_map = {}  # Clearing the managed actors
@@ -356,9 +375,7 @@ class BaseAgent(KoiledModel):
         return unkoil(self.aprovide, *args, **kwargs)
 
     async def aprovide(self, instance_id: Optional[str] = None):
-        logger.info(
-            f"Launching provisioning task. We are running {self.transport.instance_id}"
-        )
+        logger.info(f"Launching provisioning task. We are running {instance_id}")
         try:
             await self.astart(instance_id=instance_id)
             while True:
@@ -369,9 +386,6 @@ class BaseAgent(KoiledModel):
             logger.info("Provisioning task cancelled. We are running")
 
     async def __aenter__(self):
-        self.definition_registry = (
-            self.definition_registry or get_current_definition_registry()
-        )
         await self.transport.__aenter__()
         return self
 
