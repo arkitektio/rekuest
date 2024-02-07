@@ -68,6 +68,10 @@ class HooksRegistry(BaseModel):
         except asyncio.CancelledError:
             pass
 
+    def reset(self):
+        self.background_worker = {}
+        self.startup_hooks = {}
+
     class Config:
         arbitrary_types_allowed = True
 
