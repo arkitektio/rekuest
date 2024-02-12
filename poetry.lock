@@ -5,7 +5,7 @@ name = "aenum"
 version = "3.1.15"
 description = "Advanced Enumerations (compatible with Python's stdlib Enum), NamedTuples, and NamedConstants"
 category = "main"
-optional = true
+optional = false
 python-versions = "*"
 files = [
     {file = "aenum-3.1.15-py2-none-any.whl", hash = "sha256:27b1710b9d084de6e2e695dab78fe9f269de924b51ae2850170ee7e1ca6288a5"},
@@ -1669,4 +1669,4 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.8"
-content-hash = "a9e08b2e47f32031eebacb5ce5c6dc6b90f314eef1e48816bb06c4be09ad786c"
+content-hash = "752062ada478eec731eac6b90463b2c6c8ce9a250f16654558b03ab3e00e26f5"

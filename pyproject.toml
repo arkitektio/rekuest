@@ -59,6 +59,7 @@ black = "^23.1.0"
 pytest-cov = "^4.0.0"
 pytest-aiohttp = "^1.0.4"
 ruff = "^0.0.254"
+aenum = "^3.1.15"
 
 
 [build-system]
