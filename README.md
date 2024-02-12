@@ -12,16 +12,17 @@ self-documenting asynchronous scalable RPC based on provisionable untrusted acto
 ## Idea
 
 rekuest is the python client for the rekuest server, it provides a simple interface both register and provide nodes (functionality)
-and call other nodes in async and synchronous manner. Contrary to most RPC services, Rekuest is focussed on providing functionaly on the Client, and is especially tailored for scanarios where apps can be developed to perform tasks on users behalves, therefore requiring fine grained access control.
+and call other nodes in async and synchronous manner. Contrary to most RPC services, Rekuest is focussed on providing functionaly on the Client, and is especially tailored for secnarious where apps can be developed to perform tasks on users behalves, therefore requiring fine grained access control.
 
 ## Prerequesits
 
-Requires a running instance of a rekuest server (e.g in an arkitekt deployment).
+Currently rekuest is only compatible within the context of the arkitekt platform, as it relies on "lok" for the authentication and authorization of users and applications. This is however a temporary limitation and will be removed in the future. You should then be able to use rekuest with any authentication and authorization service.
+
 
 ## Install
 
 ```python
-pip install rekuest herre #herre is an authentication layer for establihing users and applications
+pip install arkitekt[rekuest]
 ```
 
 rekuest is relying heavily on asyncio patters and therefore only supports python 3.7 and above. Its api provides sync and async
@@ -31,26 +32,30 @@ interfaces through koil.
 
 ## Get started
 
+
+Rekuest enables you to register functions (as nodes) on the rekuest server and call them from anywhere. The
+python sdk automatically takes care of serialization and deserialization of the data and provides by inspecting
+the typehints of the function.
+
+
 ```python
-from rekuest import Rekuest
+from arkitekt import easy
 from herre import Herre, ClientCredentialsGrant
 
-auth = Herre(grant=ClientCredentialsGrant(client_id="ssss", client_secret="osinsoisnoein"))
+app = easy("app_name")
 
-rekuest = Rekuest(auth=auth)
-
-@rekuest.register()
+@app.rekuest.register()
 def rpc_function(x: int, name: str) -> str
     """
     A rpc function that we can
     simple call from anywhere
 
-    ""
+    """
     print(str)
 
 
-with client:
-  rekuest.run()
+with app:
+  app.rekuest.run()
 
 ```
 
@@ -58,24 +63,6 @@ Run example:
 
 This node is now register under the application and signed in user and can be provisioned and called to by other apps. By default users
 are only able to asign to their own apps. This can be changed on the rekuest server.
-
-## Calling
-
-```python
-from rekuest import Rekuest, use
-from herre import Herre, ClientCredentialsGrant
-
-auth = Herre(grant=ClientCredentialsGrant(client_id="ssss", client_secret="osinsoisnoein"))
-
-client = Rekuest(auth=auth)
-
-with client:
-  node = use(interface="rpc_function") #
-
-  with node:
-    node.assign(4, "johannes")
-
-```
 
 ## Usage with complex Datastructures
 
