@@ -9,7 +9,7 @@ class SerializableObject(BaseModel):
 
     @classmethod
     async def aexpand(cls, value):
-        return cls(number=value)
+        return cls(number=int(value))
 
 
 class GlobalObject(BaseModel):

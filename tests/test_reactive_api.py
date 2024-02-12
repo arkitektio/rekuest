@@ -21,7 +21,7 @@ from typing import List, Any
 class MockAssignTransport(BaseModel):
     assignment: Assignment
 
-    async def change_assignation(
+    async def change(
         self,
         status: AssignationStatus = None,
         message: str = None,
@@ -30,7 +30,7 @@ class MockAssignTransport(BaseModel):
     ):
         print("Called")
 
-    async def log_to_assignation(
+    async def log(
         self,
         level: LogLevelInput = None,
         message: str = None,
@@ -66,7 +66,7 @@ async def test_reactive_assignation_api_async():
         assignment = Assignment(assignation=444, user=sleep_interval, guardian=1)
 
         with AssignationContext(
-            assignment=assignment, transport=MockAssignTransport(assignment=assignment)
+            assignment=assignment, transport=MockAssignTransport(assignment=assignment), passport=Passport(instance_id=1, provision=1)
         ):
             await asyncio.sleep(sleep_interval * 0.03)
             return function()
@@ -93,7 +93,7 @@ async def test_reactive_assignation_api_threaded_async():
         assignment = Assignment(assignation=444, user=sleep_interval, guardian=1)
 
         with AssignationContext(
-            assignment=assignment, transport=MockAssignTransport(assignment=assignment)
+            assignment=assignment, transport=MockAssignTransport(assignment=assignment), passport=Passport(instance_id=1, provision=1)
         ):
             await asyncio.sleep(sleep_interval * 0.03)
             return await run_spawned(function, pass_context=True)

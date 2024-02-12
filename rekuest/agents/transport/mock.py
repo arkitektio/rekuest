@@ -85,10 +85,12 @@ class MockAgentTransport(AgentTransport):
     def receive(self, *args, **kwargs):
         return unkoil(self.areceive, *args, **kwargs)
 
-    async def areceive(self, timeout=None):
+    async def aget_message(self, timeout=None):
         if timeout:
             return await asyncio.wait_for(self._inqueue.get(), timeout)
         return await self._inqueue.get()
+    
+
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         for item in range(self._inqueue.qsize()):

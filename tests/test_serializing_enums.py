@@ -52,7 +52,7 @@ async def test_expand_enums(simple_registry):
     definition = auto_validate(functional_definition)
 
     args = await expand_inputs(definition, ("C",), simple_registry)
-    func = args["x"]  #
+    func = args["x"].value  #
     assert func(1) == "c", "Enum function should expand to the correct function"
 
 

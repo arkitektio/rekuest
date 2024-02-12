@@ -110,7 +110,7 @@ async def shrink_inputs(
     args: List[Any],
     kwargs: Dict[str, Any],
     structure_registry: StructureRegistry,
-) -> Tuple[Any]:
+) -> Dict[str, Any]:
     """Shrinks args and kwargs
 
     Shrinks the inputs according to the Node Definition
