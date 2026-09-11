@@ -26,6 +26,8 @@ Examples:
                 panel = jsx("<Panel><Label text=\"ready\" /></Panel>")
 """
 
+import importlib.metadata
+
 from .blok.parser import jsx, parse_util_call
 from .widgets import withEffect, withValidator
 from .remote import (
@@ -87,7 +89,9 @@ except ImportError:
 
 from .builtin_structures import structure_reg
 
-__version__ = "3.0.2"
+# The version lives only in the git tag (see [tool.hatch.version]); read the
+# installed distribution metadata instead of keeping a copy here to bump.
+__version__ = importlib.metadata.version("rekuest")
 
 __all__ = [
     "Backoff",
