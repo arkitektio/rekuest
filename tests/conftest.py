@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import socket
 from dataclasses import dataclass
 from typing import Any
 from collections.abc import AsyncGenerator, Awaitable, Callable, Generator
@@ -15,7 +16,7 @@ from rekuest.agents.base import RekuestAgent
 from rekuest.postmans.graphql import GraphQLPostman
 from rekuest.agents.transport.websocket import WebsocketAgentTransport
 import os
-from dokker import local, Deployment, testing
+from dokker import Deployment, testing
 from dokker.log_watcher import LogWatcher
 from rath.links.auth import ComposedAuthLink
 from rath.links.aiohttp import AIOHttpLink
@@ -150,7 +151,52 @@ _local_override = os.path.join(project_path, "docker-compose.local.yml")
 compose_files = [docker_compose_file] + (
     [_local_override] if os.path.exists(_local_override) else []
 )
-private_key = os.path.join(project_path, "private_key.pem")
+
+
+def _reserve_free_ports(count: int) -> list[int]:
+    """Ask the OS for `count` distinct free TCP ports.
+
+    All sockets are held open until every port has been assigned, so the
+    kernel cannot hand out the same port twice within one call. They are
+    released before compose binds them -- a race in theory, but the ephemeral
+    range is large and this is what keeps concurrent runs (and the leftovers
+    of a crashed one) from colliding on a fixed port.
+    """
+    sockets: list[socket.socket] = []
+    try:
+        for _ in range(count):
+            sock = socket.socket()
+            sock.bind(("127.0.0.1", 0))
+            sockets.append(sock)
+        return [int(sock.getsockname()[1]) for sock in sockets]
+    finally:
+        for sock in sockets:
+            sock.close()
+
+
+@pytest.fixture(scope="session")
+def integration_ports() -> Generator[dict[str, int], None, None]:
+    """Pick this run's host ports and point compose at them.
+
+    The ports are reserved here rather than left to docker (`ports: - "80"`)
+    because `Deployment.spec` is rendered by `docker compose config`, which is
+    static: an unpublished port reads back as ``None`` and the test URLs would
+    quietly become ``http://localhost:None`` instead of failing loudly.
+
+    Both stack fixtures depend on this, so neither can come up on a stale port.
+    """
+    rekuest_port, minio_port = _reserve_free_ports(2)
+    env = {"REKUEST_HOST_PORT": str(rekuest_port), "MINIO_HOST_PORT": str(minio_port)}
+    previous = {key: os.environ.get(key) for key in env}
+    os.environ.update(env)
+    try:
+        yield {"rekuest": rekuest_port, "minio": minio_port}
+    finally:
+        for key, value in previous.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
 
 
 async def token_loader() -> str:
@@ -219,7 +265,7 @@ def most_basic_function(hello: str) -> str:
 
 
 @pytest.fixture(scope="session")
-def deployed_app() -> Generator[DeployedRekuest, None, None]:
+def deployed_app(integration_ports: dict[str, int]) -> Generator[DeployedRekuest, None, None]:
     """Fixture to deploy the MikroNext application with Docker Compose.
 
     This fixture sets up the MikroNext application using Docker Compose,
@@ -411,19 +457,19 @@ def build_fresh_rekuest(setup: Deployment, token: str = "test") -> RekuestNext:
 
 
 @pytest_asyncio.fixture(scope="session")
-async def deployment() -> AsyncGenerator[Deployment, None]:
+async def deployment(integration_ports: dict[str, int]) -> AsyncGenerator[Deployment, None]:
     """Bring the rekuest stack up once per session and yield the dokker setup.
 
     Tests build their own fresh ``RekuestNext`` (fresh ``AppRegistry``, unique
     instance id) against this running stack via :func:`build_fresh_rekuest`, so
     no registry state ever leaks between tests.
     """
-    setup = local(compose_files)
-    # dokker 2.8 replaced the pull_on_enter / up_on_enter / down_on_exit fields
-    # with a teardown policy plus per-call overrides. Entering the context no
-    # longer pulls or ups by itself -- this fixture already does both
-    # explicitly below -- so only the teardown needs restating, as an argument
-    # to aup().
+    # `testing()` rather than `local()`: it gives every session its own compose
+    # project, so concurrent runs cannot tear each other's stack down, and its
+    # teardown policy already downs the project on exit. `local()` derives a
+    # stable project name from the directory, which random host ports alone do
+    # not make safe to share.
+    setup = testing(compose_files)
     setup.add_health_check(
         url=lambda spec: (
             f"http://localhost:{spec.find_service('rekuest').get_port_for_internal(80).published}/graphql"
@@ -436,7 +482,7 @@ async def deployment() -> AsyncGenerator[Deployment, None]:
     async with setup:
         await setup.adown()
         await setup.apull()
-        await setup.aup(down_on_exit=True)
+        await setup.aup()
         await setup.acheck_health()
         yield setup
 

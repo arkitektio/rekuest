@@ -17,7 +17,7 @@ services:
     command: bash run-debug.sh
     stop_grace_period: 1s
     ports:
-    - 5690:80
+    - "${REKUEST_HOST_PORT:-5690}:80"
     volumes:
     - ./configs/rekuest.yaml:/workspace/config.yaml
   minio:
@@ -27,7 +27,7 @@ services:
       MINIO_ROOT_USER: crappygreysetter
     image: minio/minio:RELEASE.2025-02-18T16-25-55Z
     ports:
-    - 5691:9000
+    - "${MINIO_HOST_PORT:-5691}:9000"
   initc:
     depends_on:
       minio:
