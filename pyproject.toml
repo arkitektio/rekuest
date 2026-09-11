@@ -15,7 +15,7 @@ dependencies = [
     "rath>=3.11.1",
     "fieldz>=0.0.2",
     "jsonpatch>=1.33",
-    "koil>=3.3.1",
+    "koil>=3.3.2",
     "janus>=2.0.0",
 ]
 
@@ -53,7 +53,7 @@ dev-dependencies =  [
     "fastapi>=0.128.0",
     "httpx>=0.28.1",
     "aiosqlite>=0.22.1",
-    "dokker>=2.5",
+    "dokker>=2.8",
     "turms>=2.0.0",
     "basedpyright>=1.21",
 ]

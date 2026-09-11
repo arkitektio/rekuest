@@ -419,9 +419,11 @@ async def deployment() -> AsyncGenerator[Deployment, None]:
     no registry state ever leaks between tests.
     """
     setup = local(compose_files)
-    setup.pull_on_enter = False
-    setup.down_on_exit = True
-    setup.up_on_enter = False
+    # dokker 2.8 replaced the pull_on_enter / up_on_enter / down_on_exit fields
+    # with a teardown policy plus per-call overrides. Entering the context no
+    # longer pulls or ups by itself -- this fixture already does both
+    # explicitly below -- so only the teardown needs restating, as an argument
+    # to aup().
     setup.add_health_check(
         url=lambda spec: (
             f"http://localhost:{spec.find_service('rekuest').get_port_for_internal(80).published}/graphql"
@@ -434,7 +436,7 @@ async def deployment() -> AsyncGenerator[Deployment, None]:
     async with setup:
         await setup.adown()
         await setup.apull()
-        await setup.aup()
+        await setup.aup(down_on_exit=True)
         await setup.acheck_health()
         yield setup
 
