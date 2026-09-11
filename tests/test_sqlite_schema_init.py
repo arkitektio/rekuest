@@ -1,6 +1,6 @@
 import pytest
 
-from rekuest_next.contrib.sql_lite.retriever import SQLLiteRetriever
+from rekuest.contrib.sql_lite.retriever import SQLLiteRetriever
 
 
 @pytest.mark.asyncio

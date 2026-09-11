@@ -22,7 +22,7 @@ So rekuest splits the decision in two:
 The default is to keep running, so nothing that works today changes.
 
 ```python
-from rekuest_next import register, CancelOnDisconnect
+from rekuest import register, CancelOnDisconnect
 
 
 @register
@@ -81,7 +81,7 @@ the gap is visible rather than silently assumed away.
 How long to keep trying before giving up on the link entirely.
 
 ```python
-from rekuest_next import ConnectionPolicy, Backoff, RekuestAgent
+from rekuest import ConnectionPolicy, Backoff, RekuestAgent
 
 agent = RekuestAgent(
     connection_policy=ConnectionPolicy(

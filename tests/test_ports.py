@@ -1,6 +1,6 @@
 """Test the PortInput class  and its validation logic."""
 
-from rekuest_next.api.schema import ArgPortInput, PortKind
+from rekuest.api.schema import ArgPortInput, PortKind
 from pydantic import ValidationError
 import pytest
 

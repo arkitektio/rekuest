@@ -10,7 +10,7 @@ from dataclasses import dataclass
 import pytest
 from pydantic import ValidationError
 
-from rekuest_next.api.schema import (
+from rekuest.api.schema import (
     AgentDependencyInput,
     ImplementAgentInput,
     ImplementationInput,
@@ -21,13 +21,13 @@ from rekuest_next.api.schema import (
     StateDependencyInput,
     StateImplementationInput,
 )
-from rekuest_next.app import AppRegistry
-from rekuest_next.definition.define import prepare_definition
-from rekuest_next.definition.match import build_port_matches
-from rekuest_next.register import register_func, RegisterConfig
-from rekuest_next.state.decorator import state as state_decorator
-from rekuest_next.structures.registry import StructureRegistry
-from rekuest_next.widgets import withStateChoices
+from rekuest.app import AppRegistry
+from rekuest.definition.define import prepare_definition
+from rekuest.definition.match import build_port_matches
+from rekuest.register import register_func, RegisterConfig
+from rekuest.state.decorator import state as state_decorator
+from rekuest.structures.registry import StructureRegistry
+from rekuest.widgets import withStateChoices
 
 
 def _register_camera_state(app: AppRegistry) -> None:

@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from rekuest_next.api.schema import (
+from rekuest.api.schema import (
     AgentDependencyInput,
     ArgPortInput,
     BlokImplementationInput,
@@ -13,14 +13,14 @@ from rekuest_next.api.schema import (
     StateDependencyInput,
     StateImplementationInput,
 )
-from rekuest_next.blok.registry import (
+from rekuest.blok.registry import (
     _create_action_dependency,
     _create_state_dependency,
 )
-from rekuest_next.declare import DeclaredAgentAction, DeclaredAgentState
-from rekuest_next.definition.define import prepare_definition
-from rekuest_next.definition.match import build_port_match, build_port_matches
-from rekuest_next.app import AppRegistry
+from rekuest.declare import DeclaredAgentAction, DeclaredAgentState
+from rekuest.definition.define import prepare_definition
+from rekuest.definition.match import build_port_match, build_port_matches
+from rekuest.app import AppRegistry
 
 
 def test_build_port_match_preserves_nested_shape() -> None:

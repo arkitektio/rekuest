@@ -11,7 +11,7 @@ from typing import Annotated
 import pytest
 from annotated_types import Gt, Le, Len
 
-from rekuest_next.api.schema import (
+from rekuest.api.schema import (
     ActionArgumentInput,
     AgentProbeInput,
     EffectInput,
@@ -19,11 +19,11 @@ from rekuest_next.api.schema import (
     UtilCallInput,
     ValidatorInput,
 )
-from rekuest_next.blok.parser import coerce_util_call, parse_util_call
-from rekuest_next.definition.define import prepare_definition
-from rekuest_next.structures.registry import StructureRegistry
-from rekuest_next.traits.calls import check_pure_call, infer_dependencies
-from rekuest_next.widgets import withEffect, withValidator
+from rekuest.blok.parser import coerce_util_call, parse_util_call
+from rekuest.definition.define import prepare_definition
+from rekuest.structures.registry import StructureRegistry
+from rekuest.traits.calls import check_pure_call, infer_dependencies
+from rekuest.widgets import withEffect, withValidator
 
 from .funcs import annotated_basic_function, annotated_nested_structure_function
 
@@ -571,7 +571,7 @@ def test_definition_round_trip(simple_registry: StructureRegistry) -> None:
 @pytest.mark.define
 def test_definition_resolves_nested_dependency_paths(simple_registry: StructureRegistry) -> None:
     """A dependency ``cfg..limit`` names the child ``limit`` of the model port ``cfg``."""
-    from rekuest_next.structures.model import model
+    from rekuest.structures.model import model
 
     @model
     class Config:
@@ -615,8 +615,8 @@ def test_definition_checks_return_ports_children_and_port_groups(
     simple_registry: StructureRegistry,
 ) -> None:
     """Dependencies are checked wherever an effect can sit, not only on top-level args."""
-    from rekuest_next.api.schema import PortGroupInput
-    from rekuest_next.structures.model import model
+    from rekuest.api.schema import PortGroupInput
+    from rekuest.structures.model import model
 
     @model
     class Inner:

@@ -1,0 +1,280 @@
+"""This module mirros exactly the scalars used in the  rekuest library."""
+
+import io
+
+from graphql import (
+    DocumentNode,
+    FieldNode,
+    parse,
+    OperationDefinitionNode,
+    OperationType,
+    print_ast,
+    print_source_location,
+    GraphQLSyntaxError,
+)
+from typing import IO, Any
+
+from pydantic import GetCoreSchemaHandler
+from pydantic_core import CoreSchema, core_schema
+
+
+ActionHash = str
+QString = str
+
+ValueMap = dict[str, Any]
+
+SearchQueryCoercible = str | DocumentNode
+MediaLikeCoercible = str | IO[bytes]
+Args = dict[str, Any]
+JSONSerializable = str | int | float | bool | None | dict | list
+
+
+class Identifier(str):
+    """An identifier is a string that is used to identify a structure
+    uniquely. Structures are core data types that are used to define the
+    interface of a function. They are used to define the input and output
+    types of a function.
+    """
+
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls,
+        source_type: Any,  # noqa: ANN401
+        handler: GetCoreSchemaHandler,  # noqa: ANN401
+    ) -> CoreSchema:
+        """Get the pydantic core schema for the identifier"""
+        return core_schema.no_info_after_validator_function(cls.validate, handler(str))
+
+    @classmethod
+    def validate(cls, v: str) -> "Identifier":
+        """Validate the identifier"""
+        if "@" in v and "/" not in v:
+            raise ValueError(
+                "Identifier must contain follow '@package/module' when trying to mimic a global module "
+            )
+        return Identifier(v)
+
+
+class UISchema(dict):
+    """A UI schema is a dictionary that is used to define the UI of a function. It can contain
+    any key-value pairs that are used to define the UI of a function. The UI schema is passed
+    to the frontend and can be used to render the UI of a function."""
+
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls,
+        source_type: Any,  # noqa: ANN401
+        handler: GetCoreSchemaHandler,  # noqa: ANN401
+    ) -> CoreSchema:
+        """Get the pydantic core schema for the UI schema"""
+        return core_schema.no_info_after_validator_function(cls.validate, handler(dict))
+
+    @classmethod
+    def validate(cls, v: dict) -> "UISchema":
+        """Validate the UI schema"""
+        if not isinstance(v, dict):
+            raise ValueError("UI schema must be a dictionary")
+        return UISchema(v)
+
+
+def parse_or_raise(v: str) -> DocumentNode:
+    """Parse a string to a graphql DocumentAction. If it fails, raise a ValueError with the error message and the source location of the error.
+
+    Args:
+        v (str): The string to parse.
+    Raises:
+        ValueError: If the string cannot be parsed to a DocumentAction.
+    """
+    try:
+        return parse(v)
+    except GraphQLSyntaxError as e:
+        x = repr(e)
+        x += "\n" + v + "\n"
+        if e.locations:
+            for loc in e.locations:
+                if e.source:
+                    x += "\n" + print_source_location(e.source, loc)
+        raise ValueError("Could not parse to graphql: \n" + x) from e
+
+
+class SearchQuery(str):
+    """A search query is a string that represents a graphql query that can be used
+    to search for a specific value in a list of values. The query must be a valid
+    graphql query and must contain the following elements:
+
+    - A single operation definition
+    - A single selection set
+    - A single field with the name 'options'
+    - A variable "$search" of type String
+    - A variable "$values" of type [ID]
+
+
+
+    Optionally the query can also contain the following elements:
+
+    - Multiple variables of arribtary type that will be validated against
+    the dependencies of the widget.
+    """
+
+    def __get__(self, instance, owner) -> "SearchQuery": ...  # type: ignore  # noqa: ANN001, ANN401, D105
+
+    def __set__(self, instance, value: "SearchQueryCoercible") -> None: ...  # type: ignore  # noqa: ANN001, ANN401, D105
+
+    @classmethod
+    def __get_pydantic_core_schema__(  # noqa: D105
+        cls,
+        source_type: Any,  # noqa: ANN401
+        handler: GetCoreSchemaHandler,  # noqa: ANN401
+    ) -> CoreSchema:
+        """Get the pydantic core schema for the search query"""
+        return core_schema.no_info_after_validator_function(cls.validate, handler(str))
+
+    @classmethod
+    def validate(cls, v: SearchQueryCoercible) -> "SearchQuery":
+        """Validate the search query"""
+        if not isinstance(v, str) and not isinstance(v, DocumentNode):  # type: ignore
+            raise ValueError(
+                "Search query must be either a str or a graphql DocumentAction"
+            )
+        if isinstance(v, str):
+            v = parse_or_raise(v)
+
+        if not v.definitions or len(v.definitions) > 1:
+            raise ValueError("Only one definintion allowed")
+
+        if len(v.definitions) == 0:
+            raise ValueError("No definition found")
+
+        definition = v.definitions[0]
+        if not definition:
+            raise ValueError("Specify an operation")
+
+        if not isinstance(definition, OperationDefinitionNode):
+            raise ValueError("Needs an operation")
+
+        if not definition.operation == OperationType.QUERY:
+            raise ValueError("Needs to be operation")
+
+        if len(definition.variable_definitions) < 2:
+            raise ValueError(
+                f"At least two arguments should be provided ($search: String, $values: [ID])): Was given: {print_ast(v)}"
+            )
+
+        if (
+            definition.variable_definitions[0].variable.name.value != "search"
+            or definition.variable_definitions[0].type.kind != "named_type"
+        ):
+            raise ValueError(
+                f"First parameter of search function should be '$search: String' if you provide arguments for your options. This parameter will be filled with userinput: Was given: {print_ast(v)}"
+            )
+
+        if (
+            definition.variable_definitions[1].variable.name.value != "values"
+            or definition.variable_definitions[0].type.kind != "named_type"
+        ):
+            raise ValueError(
+                f"Seconrd parameter of search function should be '$values: [ID]' if you provide arguments for your options. This parameter will be filled with the default values: Was given: {print_ast(v)}"
+            )
+
+        wrapped_query = definition.selection_set.selections[0]
+
+        if not isinstance(wrapped_query, FieldNode):
+            raise ValueError(
+                f"Wrapped query should be a field node: Was given: {print_ast(v)}"
+            )
+
+        options_value = (
+            wrapped_query.alias.value
+            if wrapped_query.alias
+            else wrapped_query.name.value
+        )
+        if options_value != "options":
+            raise ValueError(
+                f"First element of query should be 'options':  Was given: {print_ast(v)}"
+            )
+
+        if not wrapped_query.selection_set:
+            raise ValueError(
+                f"Wrapped query should contain a selection set: Was given: {print_ast(v)}"
+            )
+
+        wrapped_selection = wrapped_query.selection_set.selections
+
+        aliases = [
+            field.alias.value if field.alias else field.name.value
+            for field in wrapped_selection
+            if isinstance(field, FieldNode)
+        ]
+        if "value" not in aliases:
+            raise ValueError(
+                "Searched query needs to contain a 'value' not that corresponds to the selected value"
+            )
+        if "label" not in aliases:
+            raise ValueError(
+                "Searched query needs to contain a 'label' that corresponds to the displayed value to the user"
+            )
+
+        return SearchQuery(print_ast(v))
+
+
+# Variables that are part of the SearchQuery contract and are supplied by the
+# ward at runtime, so they never need to be backed by a filter port or dependency.
+# ``limit``/``offset`` are the reserved pagination variables.
+RESERVED_SEARCH_VARIABLES = frozenset({"search", "values", "limit", "offset"})
+
+
+def get_search_query_variables(query: str) -> list[str]:
+    """Return the variable names declared by a search query.
+
+    This includes the mandatory ``search`` and ``values`` variables as well as
+    any additional variables the user declared (which must be backed by a filter
+    port or a dependency of the widget).
+    """
+    document = parse_or_raise(query)
+    definition = document.definitions[0]
+    if not isinstance(definition, OperationDefinitionNode):
+        return []
+    return [v.variable.name.value for v in definition.variable_definitions]
+
+
+class MediaLike:
+    """A custom scalar for wrapping of every supported array like structure on
+    the mikro platform. This scalar enables validation of various array formats
+    into a mikro api compliant xr.DataArray.."""
+
+    def __init__(self, value: IO[bytes]) -> None:
+        """Initialize the MediaLike scalar with a file-like object."""
+        self.value = value
+        self.key = str(value.name)
+        self.file_name = str(value.name)
+
+    def __get__(self, instance, owner) -> "MediaLike": ...  # noqa: ANN001, D105 # type: ignore
+
+    def __set__(self, instance, value: MediaLikeCoercible) -> None: ...  # noqa: ANN001, D105 # type: ignore
+
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls,
+        source_type: Any,  # noqa: ANN401
+        handler: GetCoreSchemaHandler,  # noqa: ANN401
+    ) -> CoreSchema:
+        """Get the pydantic core schema for the validator function"""
+        return core_schema.no_info_after_validator_function(
+            cls.validate, handler(object)
+        )
+
+    @classmethod
+    def validate(cls, v: MediaLikeCoercible) -> "MediaLike":
+        """Validate the input array and convert it to a xr.DataArray."""
+
+        if isinstance(v, str):
+            v = open(v, "rb")
+
+        if not isinstance(v, io.IOBase):
+            raise ValueError("This needs to be a instance of a file")
+
+        return cls(v)
+
+    def __repr__(self) -> str:
+        """Return a string representation of the MediaLike scalar."""
+        return f"MediaLike({self.value})"

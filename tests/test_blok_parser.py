@@ -1,7 +1,7 @@
 import pytest
 
-from rekuest_next.blok.parser import jsx
-from rekuest_next.blok.validate import validate_blok
+from rekuest.blok.parser import jsx
+from rekuest.blok.validate import validate_blok
 
 
 def test_jsx_parser_reports_line_column_and_source_context() -> None:

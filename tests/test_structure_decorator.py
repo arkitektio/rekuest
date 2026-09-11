@@ -8,10 +8,10 @@ and eagerly registers the class in a structure registry. These tests use explici
 
 import pytest
 
-from rekuest_next import structure
-from rekuest_next.structures.errors import StructureDefinitionError
-from rekuest_next.structures.registry import StructureRegistry
-from rekuest_next.structures.types import FullFilledStructure
+from rekuest import structure
+from rekuest.structures.errors import StructureDefinitionError
+from rekuest.structures.registry import StructureRegistry
+from rekuest.structures.types import FullFilledStructure
 
 
 def test_structure_decorator_registers_with_explicit_identifier() -> None:

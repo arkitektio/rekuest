@@ -10,12 +10,12 @@ from dataclasses import dataclass, field
 
 import pytest
 
-from rekuest_next.agents.base import BaseAgent
-from rekuest_next.app import AppRegistry
-from rekuest_next.state.decorator import state
-from rekuest_next.state.observable import make_evented
-from rekuest_next.state.publish import direct_publishing
-from rekuest_next.state.readonly import ReadOnlyStateError, read_only_view
+from rekuest.agents.base import BaseAgent
+from rekuest.app import AppRegistry
+from rekuest.state.decorator import state
+from rekuest.state.observable import make_evented
+from rekuest.state.publish import direct_publishing
+from rekuest.state.readonly import ReadOnlyStateError, read_only_view
 
 from .memory_transport import MemoryAgentTransport
 
@@ -137,9 +137,9 @@ async def test_readonly_annotation_reaches_an_actor_as_a_refusing_view() -> None
     failed with a missing argument. This drives the whole path: annotation -> classified
     read-only -> injected -> writes refused.
     """
-    from rekuest_next import messages
-    from rekuest_next.register import register
-    from rekuest_next.state.types import ReadOnly
+    from rekuest import messages
+    from rekuest.register import register
+    from rekuest.state.types import ReadOnly
 
     agent = BaseAgent(
         name="ro-actor", transport=MemoryAgentTransport(), app_registry=AppRegistry()

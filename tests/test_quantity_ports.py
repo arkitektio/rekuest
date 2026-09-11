@@ -16,19 +16,19 @@ from typing import Annotated  # noqa: E402
 
 from kanne import ElectricPotential, Duration, Capacitance  # noqa: E402
 
-from rekuest_next.api.schema import ArgPortInput, PortKind  # noqa: E402
-from rekuest_next.definition.define import (  # noqa: E402
+from rekuest.api.schema import ArgPortInput, PortKind  # noqa: E402
+from rekuest.definition.define import (  # noqa: E402
     prepare_definition,
     convert_object_to_argport,
     convert_object_to_returnport,
 )
-from rekuest_next import Units  # noqa: E402
-from rekuest_next.structures.registry import StructureRegistry  # noqa: E402
-from rekuest_next.structures.serialization.actor import (  # noqa: E402
+from rekuest import Units  # noqa: E402
+from rekuest.structures.registry import StructureRegistry  # noqa: E402
+from rekuest.structures.serialization.actor import (  # noqa: E402
     expand_inputs,
     shrink_outputs,
 )
-from rekuest_next.structures.quantities import (  # noqa: E402
+from rekuest.structures.quantities import (  # noqa: E402
     is_pint_quantity,
     dimension_of,
     proposed_units_of,

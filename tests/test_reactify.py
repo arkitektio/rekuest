@@ -1,10 +1,10 @@
 """Test the reactify function which converts a function or generator into an actor definition."""
 
 from collections.abc import Callable, Generator
-from rekuest_next.actors.actify import reactify
-from rekuest_next.actors.types import RegisterConfig
-from rekuest_next.api.schema import ActionKind
-from rekuest_next.structures.registry import StructureRegistry
+from rekuest.actors.actify import reactify
+from rekuest.actors.types import RegisterConfig
+from rekuest.api.schema import ActionKind
+from rekuest.structures.registry import StructureRegistry
 import pytest
 from .funcs import (
     nested_basic_function,

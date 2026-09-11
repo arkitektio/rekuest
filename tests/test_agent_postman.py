@@ -1,4 +1,4 @@
-"""Unit tests for the agent-as-caller postman (``rekuest_next.agents.caller``).
+"""Unit tests for the agent-as-caller postman (``rekuest.agents.caller``).
 
 These exercise the translation/queueing logic with a fake transport — no backend. The
 end-to-end behaviour (a real ``AssignResponse`` + mirror stream from the server) is covered
@@ -9,14 +9,14 @@ import asyncio
 
 import pytest
 
-from rekuest_next import messages
+from rekuest import messages
 
 from .memory_transport import MemoryAgentTransport
-from rekuest_next.agents.caller import AgentPostman, CallerTaskEvent
-from rekuest_next.api.schema import TaskEventKind
-from rekuest_next.postmans.errors import AssignException
-from rekuest_next.remote import _astream_raw
-from rekuest_next.errors import ErrorCallError
+from rekuest.agents.caller import AgentPostman, CallerTaskEvent
+from rekuest.api.schema import TaskEventKind
+from rekuest.postmans.errors import AssignException
+from rekuest.remote import _astream_raw
+from rekuest.errors import ErrorCallError
 
 
 def _call(**kwargs: object) -> dict:

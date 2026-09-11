@@ -3,10 +3,10 @@
 from dataclasses import dataclass
 
 
-from rekuest_next.agents.hooks.startup import ThreadedStartupHook
-from rekuest_next.agents.hooks.background import WrappedThreadedBackgroundTask
-from rekuest_next.rekuest import RekuestNext
-from rekuest_next.state.decorator import state
+from rekuest.agents.hooks.startup import ThreadedStartupHook
+from rekuest.agents.hooks.background import WrappedThreadedBackgroundTask
+from rekuest.rekuest import RekuestNext
+from rekuest.state.decorator import state
 
 
 def test_actify_class_based_function(mock_rekuest: RekuestNext) -> None:

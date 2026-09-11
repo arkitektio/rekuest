@@ -1,7 +1,7 @@
 """No-Docker checks for the consolidated lock layer.
 
 These cover the consolidation of the lock logic into
-``rekuest_next.agents.lock``: the agent builds one ``TaskLock`` per declared
+``rekuest.agents.lock``: the agent builds one ``TaskLock`` per declared
 lock key, ``LockGroup`` acquires overlapping key sets in sorted order (so
 opposite declaration orders cannot deadlock), and the actor ``concurrency``
 policy controls whether assignments to one actor run serially or in parallel.
@@ -11,9 +11,9 @@ import asyncio
 
 import pytest
 
-from rekuest_next.agents.lock import LockGroup, TaskLock
-from rekuest_next.api.schema import LockDefinitionInput, LockImplementationInput
-from rekuest_next.rekuest import RekuestNext
+from rekuest.agents.lock import LockGroup, TaskLock
+from rekuest.api.schema import LockDefinitionInput, LockImplementationInput
+from rekuest.rekuest import RekuestNext
 
 
 def test_collect_from_registry_builds_task_locks(mock_rekuest: RekuestNext) -> None:

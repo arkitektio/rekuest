@@ -3,12 +3,12 @@
 
 import pytest
 
-from rekuest_next.api.schema import ArgPortInput, PortKind
-from rekuest_next.definition.define import prepare_definition
-from rekuest_next.structures.model import model
-from rekuest_next.structures.registry import StructureRegistry
-from rekuest_next.structures.serialization.postman import ashrink_args
-from rekuest_next.structures.serialization.predication import predicate_port
+from rekuest.api.schema import ArgPortInput, PortKind
+from rekuest.definition.define import prepare_definition
+from rekuest.structures.model import model
+from rekuest.structures.registry import StructureRegistry
+from rekuest.structures.serialization.postman import ashrink_args
+from rekuest.structures.serialization.predication import predicate_port
 
 
 def test_list_port_predicates_lists_not_dicts() -> None:

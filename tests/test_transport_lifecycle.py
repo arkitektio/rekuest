@@ -17,15 +17,15 @@ import websockets
 from websockets.exceptions import ConnectionClosedError
 from websockets.frames import Close
 
-from rekuest_next import messages
-from rekuest_next.agents.policy import Backoff, ConnectionPolicy
-from rekuest_next.agents.transport.errors import (
+from rekuest import messages
+from rekuest.agents.policy import Backoff, ConnectionPolicy
+from rekuest.agents.transport.errors import (
     AgentIsAlreadyBusy,
     AgentWasKicked,
     DefiniteConnectionFail,
 )
-from rekuest_next.agents.transport.types import HandshakeParams
-from rekuest_next.agents.transport.websocket import (
+from rekuest.agents.transport.types import HandshakeParams
+from rekuest.agents.transport.websocket import (
     BUSY_CODE,
     KICK_CODE,
     WebsocketAgentTransport,

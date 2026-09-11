@@ -1,21 +1,21 @@
 from fastapi import APIRouter, FastAPI
 from fastapi.testclient import TestClient
 
-from rekuest_next.api.schema import (
+from rekuest.api.schema import (
     ImplementationInput,
     PortKind,
     ReturnPortInput,
     StateDefinitionInput,
     StateImplementationInput,
 )
-from rekuest_next.contrib.fastapi.agent import FastApiAgent
-from rekuest_next.contrib.fastapi.route_groups.implementations import (
+from rekuest.contrib.fastapi.agent import FastApiAgent
+from rekuest.contrib.fastapi.route_groups.implementations import (
     add_implementation_route,
 )
-from rekuest_next.contrib.fastapi.route_groups.schemas import build_schema_router
-from rekuest_next.contrib.fastapi.routes import add_state_detail_routes
-from rekuest_next.app import AppRegistry
-from rekuest_next.definition.define import prepare_definition
+from rekuest.contrib.fastapi.route_groups.schemas import build_schema_router
+from rekuest.contrib.fastapi.routes import add_state_detail_routes
+from rekuest.app import AppRegistry
+from rekuest.definition.define import prepare_definition
 
 
 def test_fastapi_agent_build_assign_input_defaults_flags() -> None:

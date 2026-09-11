@@ -1,13 +1,13 @@
 """General Tests for defininin actions"""
 
 import asyncio
-from rekuest_next.api.schema import (
+from rekuest.api.schema import (
     amy_implementation_at,
 )
 import pytest
-from rekuest_next.structures.registry import StructureRegistry
+from rekuest.structures.registry import StructureRegistry
 from .conftest import CONNECT_TIMEOUT, DeployedRekuest
-from rekuest_next.remote import acall
+from rekuest.remote import acall
 
 
 @pytest.mark.integration

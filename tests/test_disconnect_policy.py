@@ -16,16 +16,16 @@ from collections.abc import AsyncIterator
 import pytest
 from koil import check_cancelled
 
-from rekuest_next import messages
-from rekuest_next.actors.policy import (
+from rekuest import messages
+from rekuest.actors.policy import (
     CancelOnDisconnect,
     DisconnectPolicy,
     OnDisconnect,
 )
-from rekuest_next.agents.base import BaseAgent
-from rekuest_next.agents.policy import Backoff, ConnectionPolicy
-from rekuest_next.app import AppRegistry
-from rekuest_next.register import register
+from rekuest.agents.base import BaseAgent
+from rekuest.agents.policy import Backoff, ConnectionPolicy
+from rekuest.app import AppRegistry
+from rekuest.register import register
 
 from .memory_transport import MemoryAgentTransport
 

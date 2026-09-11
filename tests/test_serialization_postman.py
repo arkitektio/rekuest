@@ -1,9 +1,9 @@
 """Testing the serialization and deserialization of structures on the postman level."""
 
 import pytest
-from rekuest_next.definition.define import prepare_definition
-from rekuest_next.structures.serialization.postman import ashrink_args, aexpand_returns
-from rekuest_next.structures.serialization.actor import expand_inputs
+from rekuest.definition.define import prepare_definition
+from rekuest.structures.serialization.postman import ashrink_args, aexpand_returns
+from rekuest.structures.serialization.actor import expand_inputs
 from .funcs import (
     plain_basic_function,
     plain_structure_function,
@@ -12,9 +12,9 @@ from .funcs import (
     union_structure_function,
 )
 from .structures import SecondObject, SerializableObject
-from rekuest_next.structures.errors import ShrinkingError, ExpandingError
-from rekuest_next.actors.types import Shelver
-from rekuest_next.structures.registry import StructureRegistry
+from rekuest.structures.errors import ShrinkingError, ExpandingError
+from rekuest.actors.types import Shelver
+from rekuest.structures.registry import StructureRegistry
 
 
 @pytest.mark.shrink

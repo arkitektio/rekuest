@@ -11,12 +11,12 @@ from collections.abc import Generator
 
 import pytest
 
-from rekuest_next import context, state
-from rekuest_next.agents.hooks.shutdown import (
+from rekuest import context, state
+from rekuest.agents.hooks.shutdown import (
     ThreadedShutdownHook,
     WrappedShutdownHook,
 )
-from rekuest_next.rekuest import RekuestNext
+from rekuest.rekuest import RekuestNext
 
 
 @context

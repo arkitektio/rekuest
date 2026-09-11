@@ -1,12 +1,12 @@
 """Test the serialization of enums with partial functions"""
 
 import pytest
-from rekuest_next.definition.define import prepare_definition
-from rekuest_next.structures.serialization.actor import expand_inputs
-from rekuest_next.structures.registry import StructureRegistry
+from rekuest.definition.define import prepare_definition
+from rekuest.structures.serialization.actor import expand_inputs
+from rekuest.structures.registry import StructureRegistry
 from enum import Enum, member
 from functools import partial
-from rekuest_next.actors.types import Shelver
+from rekuest.actors.types import Shelver
 
 
 def alert_function_a(x: int) -> str:

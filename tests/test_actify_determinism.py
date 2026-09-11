@@ -6,9 +6,9 @@ They feed the definition (and its hash) and generated artefacts such as
 
 from dataclasses import dataclass
 
-from rekuest_next.actors.actify import derive_implementation_details
-from rekuest_next.actors.types import RegisterConfig
-from rekuest_next.state.decorator import state
+from rekuest.actors.actify import derive_implementation_details
+from rekuest.actors.types import RegisterConfig
+from rekuest.state.decorator import state
 
 
 @state(required_locks=["zeta", "alpha", "mu"])

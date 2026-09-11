@@ -8,7 +8,7 @@ spawn path is resolvable from the same registry.
 
 import pytest
 
-from rekuest_next.rekuest import RekuestNext
+from rekuest.rekuest import RekuestNext
 
 
 def test_collect_from_registry_reads_app_registry(mock_rekuest: RekuestNext) -> None:

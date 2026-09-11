@@ -2,15 +2,15 @@
 
 from typing import Annotated
 
-from rekuest_next.annotations import Provides, Requires
-from rekuest_next.api.schema import (
+from rekuest.annotations import Provides, Requires
+from rekuest.api.schema import (
     StringAssignWidgetInput,
     PortKind,
     DescriptorOperator,
 )
-from rekuest_next.definition.define import prepare_definition
-from rekuest_next.structures.model import model
-from rekuest_next.structures.registry import StructureRegistry
+from rekuest.definition.define import prepare_definition
+from rekuest.structures.model import model
+from rekuest.structures.registry import StructureRegistry
 
 TiffName = Annotated[
     str, Requires(key="filename", operator=DescriptorOperator.MATCHES, value=r".*\.tiff?")

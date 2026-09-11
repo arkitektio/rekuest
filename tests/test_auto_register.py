@@ -2,8 +2,8 @@
 
 from enum import Enum
 
-from rekuest_next.structures.registry import StructureRegistry
-from rekuest_next.structures.types import (
+from rekuest.structures.registry import StructureRegistry
+from rekuest.structures.types import (
     FullFilledEnum,
     FullFilledMemoryStructure,
     FullFilledStructure,

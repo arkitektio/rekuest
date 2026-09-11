@@ -15,8 +15,8 @@ from types import TracebackType
 from typing import Optional, Self, TypeVar
 from collections.abc import AsyncIterator
 
-from rekuest_next import messages
-from rekuest_next.agents.transport.base import AgentTransport
+from rekuest import messages
+from rekuest.agents.transport.base import AgentTransport
 
 _CLOSED = object()
 

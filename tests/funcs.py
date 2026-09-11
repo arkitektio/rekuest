@@ -4,8 +4,8 @@ import asyncio
 from collections.abc import Generator
 from .structures import SecondObject, SecondSerializableObject, SerializableObject
 from annotated_types import Le, Predicate, Gt, Len
-from rekuest_next.structures.model import model
-from rekuest_next.api.schema import CustomAssignWidgetInput
+from rekuest.structures.model import model
+from rekuest.api.schema import CustomAssignWidgetInput
 
 
 from typing import Annotated

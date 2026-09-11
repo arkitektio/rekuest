@@ -22,9 +22,9 @@ from dokker import Deployment
 from koil import check_cancelled
 from koil.errors import ThreadCancelledError
 
-from rekuest_next.api.schema import amy_implementation_at
-from rekuest_next.declare import declare
-from rekuest_next.remote import acall
+from rekuest.api.schema import amy_implementation_at
+from rekuest.declare import declare
+from rekuest.remote import acall
 
 from .conftest import CONNECT_TIMEOUT, build_fresh_rekuest
 

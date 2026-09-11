@@ -4,11 +4,11 @@ from typing import Literal
 
 import pytest
 
-from rekuest_next.actors.types import Shelver
-from rekuest_next.api.schema import PortKind
-from rekuest_next.definition.define import prepare_definition
-from rekuest_next.structures.registry import StructureRegistry
-from rekuest_next.structures.serialization.actor import expand_inputs, shrink_outputs
+from rekuest.actors.types import Shelver
+from rekuest.api.schema import PortKind
+from rekuest.definition.define import prepare_definition
+from rekuest.structures.registry import StructureRegistry
+from rekuest.structures.serialization.actor import expand_inputs, shrink_outputs
 
 
 def literal_arg_function(x: Literal["a", "b", "c"]) -> str:

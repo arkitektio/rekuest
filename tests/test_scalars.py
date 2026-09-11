@@ -1,6 +1,6 @@
 """Check the logic of the Identifier scalar"""
 
-from rekuest_next.scalars import Identifier
+from rekuest.scalars import Identifier
 import pydantic
 from pydantic import ValidationError
 import pytest

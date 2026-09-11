@@ -1,7 +1,7 @@
 
 import pytest
 
-from rekuest_next import startup, shutdown, context, state
+from rekuest import startup, shutdown, context, state
 
 
 def test_startup_decorator():

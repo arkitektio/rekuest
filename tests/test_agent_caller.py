@@ -3,7 +3,7 @@
 When an action body calls a *declared dependency* (or another action), the call should
 travel over the **agent's own WebSocket** as an ``AssignRequest`` instead of going out
 through the GraphQL postman. This mirrors ``test_app_dependencies`` but additionally proves
-the inner call went through the :class:`~rekuest_next.agents.caller.AgentPostman` (the agent
+the inner call went through the :class:`~rekuest.agents.caller.AgentPostman` (the agent
 caller) rather than the GraphQL postman.
 
 The standalone / human-induced path (a caller *outside* any actor) keeps using the GraphQL
@@ -19,10 +19,10 @@ from typing import Any, Protocol
 import pytest
 from dokker import Deployment
 
-from rekuest_next.agents.caller import AgentPostman
-from rekuest_next.api.schema import amy_implementation_at
-from rekuest_next.declare import declare
-from rekuest_next.remote import acall
+from rekuest.agents.caller import AgentPostman
+from rekuest.api.schema import amy_implementation_at
+from rekuest.declare import declare
+from rekuest.remote import acall
 
 from .conftest import CONNECT_TIMEOUT, build_fresh_rekuest
 

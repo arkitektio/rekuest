@@ -1,7 +1,7 @@
 """Functions for testing"""
 
-from rekuest_next.widgets import withChoices
-from rekuest_next import Description, Default
+from rekuest.widgets import withChoices
+from rekuest import Description, Default
 from typing import Annotated
 from annotated_types import Len
 

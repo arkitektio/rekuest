@@ -13,17 +13,17 @@ from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
 
-from rekuest_next.app import AppRegistry
-from rekuest_next.contrib.fastapi.agent import FastApiAgent
-from rekuest_next.contrib.fastapi.auth import (
+from rekuest.app import AppRegistry
+from rekuest.contrib.fastapi.agent import FastApiAgent
+from rekuest.contrib.fastapi.auth import (
     AuthenticationError,
     UserSource,
     default_expand_user_from_request,
     resolve_expand_user_from_request,
     wrap_legacy_get_user_from_request,
 )
-from rekuest_next.contrib.fastapi.models import WebSocketSubscriptionInit
-from rekuest_next.contrib.fastapi.routes import add_agent_routes
+from rekuest.contrib.fastapi.models import WebSocketSubscriptionInit
+from rekuest.contrib.fastapi.routes import add_agent_routes
 
 GOOD_TOKEN = "let-me-in"
 

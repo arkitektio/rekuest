@@ -14,8 +14,8 @@ from collections.abc import AsyncGenerator, Generator
 import pytest
 from dokker import Deployment
 
-from rekuest_next.api.schema import amy_implementation_at
-from rekuest_next.remote import aiterate
+from rekuest.api.schema import amy_implementation_at
+from rekuest.remote import aiterate
 
 from .conftest import CONNECT_TIMEOUT, build_fresh_rekuest
 

@@ -1,10 +1,10 @@
 """Test the serialization logic on the actor side"""
 
 import pytest
-from rekuest_next.actors.types import Shelver
-from rekuest_next.definition.define import prepare_definition
-from rekuest_next.structures.registry import StructureRegistry
-from rekuest_next.structures.serialization.actor import shrink_outputs, expand_inputs
+from rekuest.actors.types import Shelver
+from rekuest.definition.define import prepare_definition
+from rekuest.structures.registry import StructureRegistry
+from rekuest.structures.serialization.actor import shrink_outputs, expand_inputs
 from .funcs import (
     plain_basic_function,
     plain_structure_function,
@@ -15,8 +15,8 @@ from .funcs import (
     numeric_union_function,
 )
 from .structures import SecondObject, SecondSerializableObject, SerializableObject
-from rekuest_next.structures.errors import ShrinkingError, ExpandingError
-from rekuest_next.api.schema import (
+from rekuest.structures.errors import ShrinkingError, ExpandingError
+from rekuest.api.schema import (
     ActionKind,
     DefinitionInput,
     ArgPortInput,

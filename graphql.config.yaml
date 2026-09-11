@@ -1,10 +1,10 @@
 projects:
-  rekuest_next:
+  rekuest:
     schema: http://jhnnsrs-lab/rekuest/schema
     documents: graphql/**/**.graphql
     extensions:
       turms:
-        out_dir: rekuest_next/api
+        out_dir: rekuest/api
         always_resolve_interfaces: true
         exclude_typenames: true
         dump_configuration: true
@@ -30,30 +30,30 @@ projects:
           - type: turms.plugins.operations.OperationsPlugin
           - type: turms.plugins.funcs.FuncsPlugin
             coercible_scalars:
-              SearchQuery: rekuest_next.scalars.SearchQueryCoercible
+              SearchQuery: rekuest.scalars.SearchQueryCoercible
               ID: rath.scalars.IDCoercible
             expand_input_types:
               - input
             global_kwargs:
-              - type: rekuest_next.rath.RekuestNextRath
+              - type: rekuest.rath.RekuestNextRath
                 key: rath
                 description: The arkitekt rath client
             definitions:
               - type: subscription
                 is_async: true
-                use: rekuest_next.funcs.asubscribe
+                use: rekuest.funcs.asubscribe
               - type: query
                 is_async: true
-                use: rekuest_next.funcs.aexecute
+                use: rekuest.funcs.aexecute
               - type: mutation
                 is_async: true
-                use: rekuest_next.funcs.aexecute
+                use: rekuest.funcs.aexecute
               - type: subscription
-                use: rekuest_next.funcs.subscribe
+                use: rekuest.funcs.subscribe
               - type: query
-                use: rekuest_next.funcs.execute
+                use: rekuest.funcs.execute
               - type: mutation
-                use: rekuest_next.funcs.execute
+                use: rekuest.funcs.execute
         processors:
           - type: turms.processors.disclaimer.DisclaimerProcessor
         scalar_definitions:
@@ -61,43 +61,43 @@ projects:
           Callback: str
           Any: typing.Any
           AnyInput: typing.Any
-          JSONSerializable: rekuest_next.scalars.JSONSerializable
-          UISchema: rekuest_next.scalars.UISchema
+          JSONSerializable: rekuest.scalars.JSONSerializable
+          UISchema: rekuest.scalars.UISchema
           AnyDefault: typing.Any
-          Args: rekuest_next.scalars.Args
-          ValueMap: rekuest_next.scalars.ValueMap
-          MediaLike: rekuest_next.scalars.MediaLike
+          Args: rekuest.scalars.Args
+          ValueMap: rekuest.scalars.ValueMap
+          MediaLike: rekuest.scalars.MediaLike
           ID: rath.scalars.ID
-          ActionHash: rekuest_next.scalars.ActionHash
+          ActionHash: rekuest.scalars.ActionHash
           Arg: typing.Any
-          Identifier: rekuest_next.scalars.Identifier
-          SearchQuery: rekuest_next.scalars.SearchQuery
+          Identifier: rekuest.scalars.Identifier
+          SearchQuery: rekuest.scalars.SearchQuery
         additional_bases:
           Action:
-            - rekuest_next.traits.action.Callable
+            - rekuest.traits.action.Callable
           AnnotationInput:
-            - rekuest_next.traits.ports.AnnotationInputTrait
+            - rekuest.traits.ports.AnnotationInputTrait
           ArgPortInput:
-            - rekuest_next.traits.ports.PortTrait
+            - rekuest.traits.ports.PortTrait
           ReturnPortInput:
-            - rekuest_next.traits.ports.PortTrait
+            - rekuest.traits.ports.PortTrait
           SearchAssignWidgetInput:
-            - rekuest_next.traits.ports.SearchWidgetInputTrait
+            - rekuest.traits.ports.SearchWidgetInputTrait
           SliderAssignWidgetInput:
-            - rekuest_next.traits.ports.SliderWidgetInputTrait
+            - rekuest.traits.ports.SliderWidgetInputTrait
           StateChoiceAssignWidgetInput:
-            - rekuest_next.traits.ports.StateChoiceWidgetInputTrait
+            - rekuest.traits.ports.StateChoiceWidgetInputTrait
           CreateBlokInput:
-            - rekuest_next.traits.blok.CreateBlokInputTrait
+            - rekuest.traits.blok.CreateBlokInputTrait
           ImplementationInput:
-            - rekuest_next.traits.implementation.ImplementationInputTrait
+            - rekuest.traits.implementation.ImplementationInputTrait
           BlokImplementationInput:
-            - rekuest_next.traits.blok.BlokImplementationInputTrait
+            - rekuest.traits.blok.BlokImplementationInputTrait
           ImplementAgentInput:
-            - rekuest_next.traits.agent.ImplementAgentInputTrait
+            - rekuest.traits.agent.ImplementAgentInputTrait
           ValidatorInput:
-            - rekuest_next.traits.ports.ValidatorInputTrait
+            - rekuest.traits.ports.ValidatorInputTrait
           EffectInput:
-            - rekuest_next.traits.ports.EffectInputTrait
+            - rekuest.traits.ports.EffectInputTrait
           DefinitionInput:
-            - rekuest_next.traits.ports.DefinitionInputTrait
+            - rekuest.traits.ports.DefinitionInputTrait

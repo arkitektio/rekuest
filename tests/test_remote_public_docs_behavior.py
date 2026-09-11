@@ -1,7 +1,7 @@
 import pytest
 
-import rekuest_next.remote as remote
-from rekuest_next.api.schema import Action
+import rekuest.remote as remote
+from rekuest.api.schema import Action
 
 
 @pytest.mark.asyncio

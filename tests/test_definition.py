@@ -1,10 +1,10 @@
 """General Tests for defininin actions"""
 
 
-from rekuest_next.api.schema import DefinitionInput, PortKind
+from rekuest.api.schema import DefinitionInput, PortKind
 import pytest
-from rekuest_next.definition.define import prepare_definition
-from rekuest_next.structures.registry import StructureRegistry
+from rekuest.definition.define import prepare_definition
+from rekuest.structures.registry import StructureRegistry
 from .funcs import (
     plain_basic_function,
     plain_structure_function,

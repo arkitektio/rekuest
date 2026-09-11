@@ -1,8 +1,8 @@
 """Test if functions can be registered in the registry."""
 
-from rekuest_next.app import AppRegistry
-from rekuest_next.register import register_func
-from rekuest_next.structures.registry import StructureRegistry
+from rekuest.app import AppRegistry
+from rekuest.register import register_func
+from rekuest.structures.registry import StructureRegistry
 
 
 def test_register_function(simple_registry: StructureRegistry) -> None:

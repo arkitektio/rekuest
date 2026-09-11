@@ -1,9 +1,9 @@
-"""Test annotation for rekuest_next library."""
+"""Test annotation for rekuest library."""
 
 from enum import Enum
 import pytest
-from rekuest_next.definition.define import prepare_definition
-from rekuest_next.api.schema import (
+from rekuest.definition.define import prepare_definition
+from rekuest.api.schema import (
     ActionArgumentInput,
     AgentProbeInput,
     ChoiceInput,
@@ -11,9 +11,9 @@ from rekuest_next.api.schema import (
     ValidatorInput,
     EffectKind,
 )
-from rekuest_next.blok.parser import parse_util_call
-from rekuest_next.structures.registry import StructureRegistry
-from rekuest_next.widgets import ChoiceWidget, withEffect, withValidator
+from rekuest.blok.parser import parse_util_call
+from rekuest.structures.registry import StructureRegistry
+from rekuest.widgets import ChoiceWidget, withEffect, withValidator
 from typing import Annotated
 
 

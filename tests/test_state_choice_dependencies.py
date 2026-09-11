@@ -9,7 +9,7 @@ reference (``dependency=None``) points at the function's own state and is always
 import pytest
 from pydantic import ValidationError
 
-from rekuest_next.api.schema import (
+from rekuest.api.schema import (
     AgentDependencyInput,
     ImplementationInput,
     PortKind,
@@ -17,13 +17,13 @@ from rekuest_next.api.schema import (
     StateDemandInput,
     StateDependencyInput,
 )
-from rekuest_next.declare import declare, declare_state
-from rekuest_next.definition.define import prepare_definition
-from rekuest_next.definition.match import build_port_matches
-from rekuest_next.app import AppRegistry
-from rekuest_next.register import register_func, RegisterConfig
-from rekuest_next.structures.registry import StructureRegistry
-from rekuest_next.widgets import withStateChoices
+from rekuest.declare import declare, declare_state
+from rekuest.definition.define import prepare_definition
+from rekuest.definition.match import build_port_matches
+from rekuest.app import AppRegistry
+from rekuest.register import register_func, RegisterConfig
+from rekuest.structures.registry import StructureRegistry
+from rekuest.widgets import withStateChoices
 
 
 def _camera_dependency() -> AgentDependencyInput:

@@ -1,11 +1,11 @@
-# rekuest-next
+# rekuest
 
-[![codecov](https://codecov.io/gh/arkitektio/rekuest-next/graph/badge.svg?token=xzxX2AQPmS)](https://codecov.io/gh/arkitektio/rekuest-next)
-[![PyPI version](https://badge.fury.io/py/rekuest-next.svg)](https://pypi.org/project/rekuest-next/)
-[![Maintenance](https://img.shields.io/badge/Maintained%3F-yes-green.svg)](https://pypi.org/project/rekuest-next/)
+[![codecov](https://codecov.io/gh/arkitektio/rekuest/graph/badge.svg?token=xzxX2AQPmS)](https://codecov.io/gh/arkitektio/rekuest)
+[![PyPI version](https://badge.fury.io/py/rekuest.svg)](https://pypi.org/project/rekuest/)
+[![Maintenance](https://img.shields.io/badge/Maintained%3F-yes-green.svg)](https://pypi.org/project/rekuest/)
 ![Maintainer](https://img.shields.io/badge/maintainer-jhnnsrs-blue)
-[![PyPI pyversions](https://img.shields.io/pypi/pyversions/rekuest-next.svg)](https://pypi.python.org/pypi/rekuest-next/)
-[![PyPI status](https://img.shields.io/pypi/status/rekuest-next.svg)](https://pypi.python.org/pypi/rekuest-next/)
+[![PyPI pyversions](https://img.shields.io/pypi/pyversions/rekuest.svg)](https://pypi.python.org/pypi/rekuest/)
+[![PyPI status](https://img.shields.io/pypi/status/rekuest.svg)](https://pypi.python.org/pypi/rekuest/)
 
 **Self-documenting, asynchronous, scalable RPC for untrusted actors** — accessible
 through FastAPI or deployed on the [Arkitekt](https://arkitekt.live) platform.
@@ -60,9 +60,9 @@ A running rekuest server (most easily obtained through an
 
 ## Install
 
-rekuest-next is usually consumed through the Arkitekt platform, which wires up the
+rekuest is usually consumed through the Arkitekt platform, which wires up the
 server connection, authentication and lifecycle for you. Installing `arkitekt-next`
-pulls in `rekuest-next` as well:
+pulls in `rekuest` as well:
 
 ```bash
 pip install arkitekt-next
@@ -117,7 +117,7 @@ invoke it with `call` (sync) or `acall` (async):
 
 ```python
 from arkitekt_next import easy
-from rekuest_next import find, call
+from rekuest import find, call
 
 
 with easy("my_app") as app:
@@ -131,8 +131,8 @@ When you already know which agent provides an implementation, you can address it
 directly and await the result:
 
 ```python
-from rekuest_next.api.schema import amy_implementation_at
-from rekuest_next.remote import acall
+from rekuest.api.schema import amy_implementation_at
+from rekuest.remote import acall
 
 impl = await amy_implementation_at(instance_id, "add_greeting")
 result = await acall(impl, x=1, name="world")
@@ -154,7 +154,7 @@ Store the object in central storage and pass only a reference. Make a class a
 `ashrink`/`aexpand` methods:
 
 ```python
-from rekuest_next import structure
+from rekuest import structure
 
 
 @structure(identifier="myapp/image")
@@ -219,7 +219,7 @@ remember something *across* calls (a connection, a counter, a loaded model), dec
 
 ```python
 from dataclasses import dataclass
-from rekuest_next import state, startup
+from rekuest import state, startup
 
 
 @state
@@ -256,7 +256,7 @@ reverse of the order they were registered. Like actions, they take the live stat
 context objects by **type-hinting a parameter**, and they return nothing:
 
 ```python
-from rekuest_next import shutdown
+from rekuest import shutdown
 
 
 @shutdown
@@ -284,7 +284,7 @@ class so that its public methods become *action demands* and its `@declare_state
 attributes become *state demands*:
 
 ```python
-from rekuest_next import declare, declare_state
+from rekuest import declare, declare_state
 
 
 @declare_state
@@ -326,8 +326,8 @@ automatically:
 
 ```python
 from typing import Annotated
-from rekuest_next import register, withEffect, withValidator
-from rekuest_next.api.schema import EffectKind
+from rekuest import register, withEffect, withValidator
+from rekuest.api.schema import EffectKind
 
 @register
 def crop(
@@ -358,7 +358,7 @@ write it as a JSX/XML string; `jsx(...)` parses it into a component tree (with h
 line/column errors when it can't):
 
 ```python
-from rekuest_next import jsx
+from rekuest import jsx
 
 panel = jsx(
     """

@@ -12,9 +12,9 @@ from collections.abc import Generator
 import pytest
 from fastapi import FastAPI
 
-from rekuest_next.app import AppRegistry
-from rekuest_next.contrib.fastapi.routes import configure_fastapi
-from rekuest_next.contrib.fastapi.testing import AsyncAgentTestClient
+from rekuest.app import AppRegistry
+from rekuest.contrib.fastapi.routes import configure_fastapi
+from rekuest.contrib.fastapi.testing import AsyncAgentTestClient
 
 
 def _build_app(tmp_path: Path) -> FastAPI:

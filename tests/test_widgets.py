@@ -1,6 +1,6 @@
-"""Test the widgets for rekuest_next"""
+"""Test the widgets for rekuest"""
 
-from rekuest_next.widgets import SearchWidget, SliderWidget
+from rekuest.widgets import SearchWidget, SliderWidget
 from pydantic import ValidationError
 import pytest
 
@@ -60,7 +60,7 @@ def test_custom_widgets_render_catalog_components() -> None:
     """Custom widgets name a catalog component and carry pure props; members enforce their fields."""
     from pydantic import ValidationError
 
-    from rekuest_next.api.schema import (
+    from rekuest.api.schema import (
         ActionArgumentInput,
         ChoiceInput,
         ChoiceReturnWidgetInput,
@@ -68,7 +68,7 @@ def test_custom_widgets_render_catalog_components() -> None:
         CustomAssignWidgetInput,
         UtilCallInput,
     )
-    from rekuest_next.widgets import CustomReturnWidget, CustomWidget, StringWidget
+    from rekuest.widgets import CustomReturnWidget, CustomWidget, StringWidget
 
     widget = CustomWidget(
         "Gauge",
@@ -101,7 +101,7 @@ def test_custom_widgets_render_catalog_components() -> None:
 
 def test_choice_widgets_carry_choices_off_the_wire() -> None:
     """Choice widgets keep the choices for the port but never serialise them."""
-    from rekuest_next.widgets import ChoiceReturnWidget, ChoiceWidget, withChoices
+    from rekuest.widgets import ChoiceReturnWidget, ChoiceWidget, withChoices
 
     widget = ChoiceWidget(["a", "b"])
     assert [c.value for c in widget.choices] == ["a", "b"]
@@ -112,7 +112,7 @@ def test_choice_widgets_carry_choices_off_the_wire() -> None:
 
 def test_state_choice_needs_exactly_one_pointer() -> None:
     """A state choice widget is either a static pointer or a computed one."""
-    from rekuest_next.api.schema import (
+    from rekuest.api.schema import (
         ActionArgumentInput,
         StateChoiceAssignWidgetInput,
         UtilCallInput,

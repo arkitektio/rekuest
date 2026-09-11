@@ -7,13 +7,13 @@ from typing import Any
 from collections.abc import AsyncGenerator, Awaitable, Callable, Generator
 from uuid import uuid4
 import pytest
-from rekuest_next.app import AppRegistry
-from rekuest_next.structures.registry import StructureRegistry
-from rekuest_next.rekuest import RekuestNext, RekuestNextRath
+from rekuest.app import AppRegistry
+from rekuest.structures.registry import StructureRegistry
+from rekuest.rekuest import RekuestNext, RekuestNextRath
 from rath.links.testing.direct_succeeding_link import DirectSucceedingLink
-from rekuest_next.agents.base import RekuestAgent
-from rekuest_next.postmans.graphql import GraphQLPostman
-from rekuest_next.agents.transport.websocket import WebsocketAgentTransport
+from rekuest.agents.base import RekuestAgent
+from rekuest.postmans.graphql import GraphQLPostman
+from rekuest.agents.transport.websocket import WebsocketAgentTransport
 import os
 from dokker import local, Deployment, testing
 from dokker.log_watcher import LogWatcher
@@ -331,7 +331,7 @@ class _FreshRekuestNext(RekuestNext):
     ) -> None:
         import time as _time
 
-        from rekuest_next.agents.errors import AgentException
+        from rekuest.agents.errors import AgentException
 
         started = _time.monotonic()
         deadline = started + REGISTRATION_DRAIN_TIMEOUT

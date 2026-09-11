@@ -1,0 +1,151 @@
+"""Decorator to register a class as a state."""
+
+from rekuest.actors.types import (
+    AnyFunction,
+    PreparedAppContextReturns,
+    PreparedAppContextVariables,
+    PreparedStateReturns,
+    PreparedStateVariables,
+)
+from rekuest.definition.define import (
+    get_non_null_variants,
+    is_none_type,
+    is_tuple,
+)
+from rekuest.state.predicate import (
+    get_state_locks,
+    get_state_name,
+    is_app_context,
+    is_read_only_state,
+    get_read_only_state_type,
+    is_state,
+)
+from typing import get_type_hints
+import inspect
+
+
+def is_empty_type(cls: type) -> bool:
+    """Check if the annotation is an empty type.
+
+    Args:
+        annotation (object): The annotation to check.
+    Returns:
+        bool: True if the annotation is an empty type, False otherwise.
+    """
+    return cls is inspect.Signature.empty
+
+
+def get_return_length(signature: inspect.Signature) -> int:
+    """Get the length of the return annotation of a function signature.
+
+    Args:
+        signature (inspect.Signature): The function signature.
+    Returns:
+        int: The length of the return annotation.
+    """
+    returns = signature.return_annotation
+
+    if is_tuple(returns):
+        return len(get_non_null_variants(returns))
+    if is_none_type(returns):
+        return 0
+    if is_empty_type(returns):
+        return 0
+    else:
+        return 1
+
+
+def prepare_state_variables(
+    function: AnyFunction,
+) -> tuple[PreparedStateVariables, PreparedStateReturns]:
+    """Prepare the state variables for the function.
+
+    Args:
+        function (Callable): The function to prepare the state variables for.
+
+    Returns:
+        Tuple[PreparedStateVariables, PreparedStateReturns]: The state variables and state returns for the function.
+
+    """
+    sig = inspect.signature(function)
+    parameters = sig.parameters
+
+    try:
+        hints = get_type_hints(function, include_extras=True)
+    except Exception:
+        hints = {}
+
+    write_state_variables: dict[str, str] = {}
+    read_only_variables: dict[str, str] = {}
+    required_state_locks: dict[str, list[str]] = {}
+    state_returns: dict[int, str] = {}
+
+    for key, value in parameters.items():
+        annotation = hints.get(key, value.annotation)
+        if is_state(annotation):
+            write_state_variables[key] = get_state_name(annotation)
+            required_state_locks[key] = get_state_locks(annotation)
+        elif is_read_only_state(annotation):
+            # ReadOnly[SomeState] is an Annotated wrapper, so the state itself has to be
+            # unwrapped before its name and locks can be read off it.
+            real_state = get_read_only_state_type(annotation)
+            read_only_variables[key] = get_state_name(real_state)
+            required_state_locks[key] = get_state_locks(real_state)
+
+    returns = hints.get("return", sig.return_annotation)
+    if is_tuple(returns):
+        for index, cls in enumerate(get_non_null_variants(returns)):
+            if is_state(cls):
+                state_returns[index] = get_state_name(cls)
+    else:
+        if is_state(returns):
+            state_returns[0] = get_state_name(returns)
+
+    return PreparedStateVariables(
+        write_state_variables=write_state_variables,
+        read_only_variables=read_only_variables,
+        required_state_locks=required_state_locks,
+    ), PreparedStateReturns(state_returns=state_returns)
+
+
+def prepare_appcontext(
+    function: AnyFunction,
+) -> tuple[PreparedAppContextVariables, PreparedAppContextReturns]:
+    """Prepare the state variables for the function.
+
+    Args:
+        function (Callable): The function to prepare the state variables for.
+
+    Returns:
+        Tuple[PreparedStateVariables, PreparedStateReturns]: The state variables and state returns for the function.
+
+    """
+    sig = inspect.signature(function)
+    parameters = sig.parameters
+
+    try:
+        hints = get_type_hints(function, include_extras=True)
+    except Exception:
+        hints = {}
+
+    write_app_context_variables: dict[str, str] = {}
+    for key, value in parameters.items():
+        annotation = hints.get(key, value.annotation)
+        if is_app_context(annotation):
+            write_app_context_variables[key] = annotation.__rekuest_app_context__
+
+    returns = hints.get("return", sig.return_annotation)
+
+    app_context_returns: dict[int, str] = {}
+
+    if is_tuple(returns):
+        for index, cls in enumerate(get_non_null_variants(returns)):
+            if is_app_context(cls):
+                app_context_returns[index] = cls.__rekuest_app_context__
+    else:
+        if is_app_context(returns):
+            app_context_returns[0] = returns.__rekuest_app_context__
+
+    return PreparedAppContextVariables(
+        app_context_variables=write_app_context_variables,
+    ), PreparedAppContextReturns(app_context_returns=app_context_returns)

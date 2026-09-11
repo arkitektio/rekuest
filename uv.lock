@@ -380,7 +380,7 @@ wheels = [
 
 [[package]]
 name = "dokker"
-version = "2.5.0"
+version = "2.8.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp" },
@@ -388,9 +388,9 @@ dependencies = [
     { name = "koil" },
     { name = "pydantic" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/50/eb/95a55ae2346a4f71f164bc3fcccce2bb7c4c5655270e5c4d9f579f2d1b2e/dokker-2.5.0.tar.gz", hash = "sha256:cc2a677d4ad36a087f98a4d4992468a1334dc9d3feffa2c871bbcabaac90dc59", size = 23278, upload-time = "2026-06-11T21:53:21.01Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/16/cd/c2f2bce83499b97cd5490eb7f68b4e4991d7851baed4e4266fedce2450b7/dokker-2.8.0.tar.gz", hash = "sha256:7b7b5b45590e558bb7f681ca8c374b3551d448cf2fdb682ad36b554b5328fd0e", size = 62482, upload-time = "2026-09-05T15:33:31.614Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/23/a7/54e5720169b9c6356f46f8d9eecee39f9a40b262ab04142a3def4a924aa7/dokker-2.5.0-py3-none-any.whl", hash = "sha256:e9b89b4284494f5c050a47714954ab81a3156f7277d72fb2e3c83d5f88599aba", size = 29038, upload-time = "2026-06-11T21:53:20.17Z" },
+    { url = "https://files.pythonhosted.org/packages/20/b5/71ca0fdaa6db0e867b9aa3f0d92718491136e1d5f6b208dd427bf6065c8e/dokker-2.8.0-py3-none-any.whl", hash = "sha256:9644f3e6f568c1fd0e6cdda2d77a055425c3b4008cba50094677ff7eacbac1a7", size = 71949, upload-time = "2026-09-05T15:33:30.537Z" },
 ]
 
 [[package]]
@@ -403,19 +403,18 @@ wheels = [
 ]
 
 [[package]]
-name = "fakts-next"
-version = "4.0.0"
+name = "fakts"
+version = "2.0.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp" },
     { name = "certifi" },
     { name = "koil" },
-    { name = "oauthlib" },
     { name = "pydantic" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/7d/5d/e00c1cab38721b7231bf80334af837d88ae480b7617abb642961a0726f0e/fakts_next-4.0.0.tar.gz", hash = "sha256:dd52d261d2fd26d516fb398e7299f7105d397105274c7663cd6f3866e032518d", size = 48718, upload-time = "2026-06-24T12:27:31.697Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/cc/8a/51bc35d234a1513f727c7845a96cb4a4835d7f84f699808088792f147721/fakts-2.0.0.tar.gz", hash = "sha256:379c5a3479bcb8b66fd3ae940493925bffad7a970ba2f774401a2b3fa2c85af2", size = 72890, upload-time = "2026-09-11T10:31:07.199Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/fb/a6/b476a8fff622ae052bf8b4914e6b64d50b7ef84ad1bf59676953df1335da/fakts_next-4.0.0-py3-none-any.whl", hash = "sha256:28e92d81ed456c44789ee6180b906489ae6a295e4738144bb2c85a0894efb2d6", size = 69744, upload-time = "2026-06-24T12:27:30.417Z" },
+    { url = "https://files.pythonhosted.org/packages/86/95/9225ea24e15ebac0a3d733d89bffebed2b38361f11d374fce5f6cc0840ad/fakts-2.0.0-py3-none-any.whl", hash = "sha256:0acbca458339aed58f360009903c121f824e3ec98a9bb4cbb54646194936c065", size = 90421, upload-time = "2026-09-11T10:31:06.144Z" },
 ]
 
 [[package]]
@@ -709,14 +708,14 @@ wheels = [
 
 [[package]]
 name = "koil"
-version = "3.3.1"
+version = "3.3.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pydantic" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/f6/f2/c803075854fda0c08201a280358a694206b4dcbc1c1f19981eec73b0f107/koil-3.3.1.tar.gz", hash = "sha256:18415e55b9f87651127db9aed284fca5bdfdd8d9c5fa9e44b0acdfdccf7fccf6", size = 40936, upload-time = "2026-06-11T14:59:26.835Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/c3/15/5f88e495d03f4a75a4b20ee174c34ebb4deba9c3431e8103164fa6e6683d/koil-3.3.2.tar.gz", hash = "sha256:0d8cdb2f96264d105376924a0ede2976f1c03750cef1a24519662e8f579a5257", size = 41955, upload-time = "2026-07-07T11:40:06.151Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/64/0b/af9f50f28c16a5378f23096766a7983b0904026fad24eee09a1b1eb17265/koil-3.3.1-py3-none-any.whl", hash = "sha256:603bb640c85bb70e9c9f08bbb90b2bf3196c8e15a3f287d79525539d5e34c3ab", size = 47270, upload-time = "2026-06-11T14:59:27.885Z" },
+    { url = "https://files.pythonhosted.org/packages/cc/ad/9c2553d38abcf601aa2a42c55659b84122263fc20401478407132ee89bd3/koil-3.3.2-py3-none-any.whl", hash = "sha256:4cbbebea4cf2357728ee81efd894cf63dddfb66d15805fb92f5cda8294b0cb2e", size = 48268, upload-time = "2026-07-07T11:40:05.217Z" },
 ]
 
 [[package]]
@@ -888,15 +887,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/04/96/d931255cf9d11a84d6b54d882dba7434646467d568ccf070ea3418638df3/nodejs_wheel_binaries-24.16.0-py2.py3-none-musllinux_1_2_x86_64.whl", hash = "sha256:f1a3d8f7b4491cbbd023ba3fc4e901fcca2d9fb80d57f24ba3890de8b1dbac03", size = 62841759, upload-time = "2026-05-30T16:51:59.407Z" },
     { url = "https://files.pythonhosted.org/packages/a2/7b/8b7a3f41bc255411be30b6d7d288aab8ffd9ea2055db8555ced3548007b9/nodejs_wheel_binaries-24.16.0-py2.py3-none-win_amd64.whl", hash = "sha256:bb136be9944f0662dcf1120f45193a6b75b13fac378971a95cc42c9f879a81aa", size = 42027734, upload-time = "2026-05-30T16:52:03.348Z" },
     { url = "https://files.pythonhosted.org/packages/17/66/1ed71f1f529b8ca727d42c7ceb9db0bef145ce4a13dfc86fb50aa44f3be6/nodejs_wheel_binaries-24.16.0-py2.py3-none-win_arm64.whl", hash = "sha256:8308940b5edd0a50dc5267ea36ba21c9f668e83fe0d9f293937174d3a7e31c36", size = 39714528, upload-time = "2026-05-30T16:52:06.421Z" },
-]
-
-[[package]]
-name = "oauthlib"
-version = "3.3.1"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/0b/5f/19930f824ffeb0ad4372da4812c50edbd1434f678c90c2733e1188edfc63/oauthlib-3.3.1.tar.gz", hash = "sha256:0f0f8aa759826a193cf66c12ea1af1637f87b9b4622d46e866952bb022e538c9", size = 185918, upload-time = "2025-06-19T22:48:08.269Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/be/9c/92789c596b8df838baa98fa71844d84283302f7604ed565dafe5a6b5041a/oauthlib-3.3.1-py3-none-any.whl", hash = "sha256:88119c938d2b8fb88561af5f6ee0eec8cc8d552b7bb1f712743136eb7523b7a1", size = 160065, upload-time = "2025-06-19T22:48:06.508Z" },
 ]
 
 [[package]]
@@ -1313,7 +1303,7 @@ wheels = [
 ]
 
 [[package]]
-name = "rekuest-next"
+name = "rekuest"
 version = "2.3.1"
 source = { editable = "." }
 dependencies = [
@@ -1347,7 +1337,7 @@ dev = [
     { name = "basedpyright" },
     { name = "black" },
     { name = "dokker" },
-    { name = "fakts-next" },
+    { name = "fakts" },
     { name = "fastapi" },
     { name = "httpx" },
     { name = "pytest" },
@@ -1386,7 +1376,7 @@ dev = [
     { name = "basedpyright", specifier = ">=1.21" },
     { name = "black", specifier = ">=23.1.0,<24" },
     { name = "dokker", specifier = ">=2.5" },
-    { name = "fakts-next", specifier = ">=4" },
+    { name = "fakts", specifier = ">=2" },
     { name = "fastapi", specifier = ">=0.128.0" },
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "pytest", specifier = ">=8.3.5" },

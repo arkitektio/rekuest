@@ -8,9 +8,9 @@ default a state demand inherits its ``app`` from the protocol's core app and its
 
 from typing import Annotated, Any
 
-from rekuest_next import declare, declare_state, demand_state
-from rekuest_next.api.schema import AgentDependencyInput, StateDemandInput
-from rekuest_next.declare import DeclaredAgentProtocol
+from rekuest import declare, declare_state, demand_state
+from rekuest.api.schema import AgentDependencyInput, StateDemandInput
+from rekuest.declare import DeclaredAgentProtocol
 
 
 def _dependency_of(cls: Any) -> AgentDependencyInput:

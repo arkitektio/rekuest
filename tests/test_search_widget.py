@@ -10,10 +10,10 @@ definition is built.
 from pydantic import ValidationError
 import pytest
 
-from rekuest_next.widgets import SearchWidget
-from rekuest_next.api.schema import ArgPortInput, PortKind
-from rekuest_next.definition.define import prepare_definition
-from rekuest_next.structures.registry import StructureRegistry
+from rekuest.widgets import SearchWidget
+from rekuest.api.schema import ArgPortInput, PortKind
+from rekuest.definition.define import prepare_definition
+from rekuest.structures.registry import StructureRegistry
 
 
 # A query that declares one extra variable ($dataset) on top of the mandatory ones.

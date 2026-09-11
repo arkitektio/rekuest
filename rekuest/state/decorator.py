@@ -1,0 +1,199 @@
+"""Decorator to register a class as a state."""
+
+from dataclasses import dataclass
+from typing import (
+    TYPE_CHECKING,
+    Optional,
+    TypeVar,
+    overload,
+    get_type_hints,
+)
+from collections.abc import Callable
+from rekuest.api.schema import (
+    ReturnPortInput,
+    StateImplementationInput,
+    StateDefinitionInput,
+)
+from rekuest.state.observable import StateConfig, make_evented
+from rekuest.structures.registry import StructureRegistry
+from rekuest.structures.default import get_default_structure_registry
+from fieldz import fields, Field
+
+if TYPE_CHECKING:
+    from rekuest.app import AppRegistry
+
+T = TypeVar("T")
+
+
+def inspect_state(
+    cls: type[T], structure_registry: StructureRegistry
+) -> StateImplementationInput:
+    """Inspect the state schema of a class."""
+    from rekuest.definition.define import convert_object_to_returnport
+
+    ports: list[ReturnPortInput] = []
+
+    try:
+        resolved_hints = get_type_hints(cls, include_extras=True)
+    except Exception:
+        resolved_hints = {}
+
+    for field in fields(cls):  # type: ignore
+        type_ = resolved_hints.get(field.name) or field.type or field.annotated_type
+        if type_ is None:
+            raise ValueError(
+                f"Field {field.name} has no type annotation. Please add a type annotation."
+            )
+
+        port = convert_object_to_returnport(
+            cls=type_,
+            key=field.name,
+            description=field.description or field.metadata.get("description", None),
+            validators=field.metadata.get("validators", None),
+            label=field.metadata.get("label", None),
+            default=field.default if field.default != Field.MISSING else None,
+            registry=structure_registry,
+        )
+        ports.append(port)
+
+    return StateImplementationInput(
+        interface=getattr(cls, "__rekuest_state__", cls.__name__),
+        definition=StateDefinitionInput(
+            ports=tuple(ports), name=getattr(cls, "__rekuest_state__")
+        ),
+    )
+
+
+def statify(
+    cls: type[T],
+    required_locks: list[str] | None = None,
+    structure_registry: StructureRegistry | None = None,
+    publish_interval: float = 0.1,
+) -> tuple[type[T], StateImplementationInput]:
+    if structure_registry is None:
+        structure_registry = get_default_structure_registry()
+
+    state_schema = inspect_state(cls, structure_registry)
+
+    config = StateConfig(
+        definition=state_schema.definition,
+        state_name=getattr(cls, "__rekuest_state__", cls.__name__),
+        publish_interval=publish_interval,
+        required_locks=required_locks or [],
+        structure_registry=structure_registry,
+    )
+
+    original_init = getattr(cls, "__init__", lambda self: None)
+
+    def new_init(self, *args, **kwargs):
+        original_init(self, *args, **kwargs)
+        # make_evented swaps the instance's __class__ in place; the return value
+        # is the same object, so we intentionally do not rebind ``self``.
+        make_evented(self, config, "")
+
+    cls.__init__ = new_init
+
+    setattr(cls, "__rekuest_state_config__", config)
+
+    return cls, state_schema
+
+
+# --- 5. The State Decorator ---
+
+
+@overload
+def state(*function: type[T]) -> type[T]: ...
+
+
+@overload
+def state(
+    *,
+    name: str | None = None,
+    required_locks: list[str] | None = None,
+    publish_interval: float = 0.1,
+    registry: Optional["AppRegistry"] = None,
+    structure_reg: StructureRegistry | None = None,
+) -> Callable[[T], T]: ...
+
+
+def state(
+    *function: type[T],
+    name: str | None = None,
+    required_locks: list[str] | None = None,
+    publish_interval: float = 0.1,
+    registry: Optional["AppRegistry"] = None,
+    structure_reg: StructureRegistry | None = None,
+) -> type[T] | Callable[[type[T]], type[T]]:
+    """Register a class as an observable agent state.
+
+    The decorator ensures the class is a dataclass, assigns a rekuest state
+    name, converts the class into an evented state object through ``statify``,
+    and registers the resulting schema in the selected :class:`AppRegistry`.
+    The injected ``__init__`` wrapper wires state changes into the publishing
+    machinery used by the agent runtime.
+
+    Args:
+        *function: Class to decorate when used as ``@state`` without
+            parentheses.
+        name: Explicit exported state name. Defaults to the class name.
+        required_locks: Locks that must be held while mutating this state.
+        publish_interval: Debounce interval for published state updates.
+        registry: App registry to populate. Defaults to the global registry.
+        structure_reg: Structure registry used while inspecting the state
+            schema.
+
+    Returns:
+        The decorated class, or a decorator configured with the provided
+        metadata.
+
+    Raises:
+        ValueError: If more than one class is passed at once.
+
+    Examples:
+        Register a state class that is observable by the runtime::
+
+            @state(name="camera_state", required_locks=["camera"])
+            class CameraState:
+                connected: bool = False
+                exposure_ms: float = 10.0
+    """
+    from rekuest.app import get_default_app_registry
+
+    registry = registry or get_default_app_registry()
+    structure_registry = structure_reg or get_default_structure_registry()
+
+    if len(function) == 1:
+        cls = function[0]
+        return state(
+            name=name or cls.__name__,
+            required_locks=required_locks,
+            publish_interval=publish_interval,
+            registry=registry,
+            structure_reg=structure_reg,
+        )(cls)
+
+    if len(function) == 0:
+
+        def wrapper(cls: type[T]) -> type[T]:
+            # Ensure it's a dataclass
+            try:
+                fields(cls)
+            except TypeError:
+                cls = dataclass(cls)
+
+            setattr(cls, "__rekuest_state__", cls.__name__ if name is None else name)
+
+            # Apply Statify Logic
+            cls, state_schema = statify(
+                cls,
+                required_locks=required_locks,
+                structure_registry=structure_registry,
+                publish_interval=publish_interval,
+            )
+
+            registry.register_state(cls, state_schema, structure_registry)
+            return cls
+
+        return wrapper
+
+    raise ValueError("You can only register one class at a time.")

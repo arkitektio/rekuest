@@ -13,7 +13,7 @@ from typing import Annotated
 import pytest
 from dokker import Deployment
 
-from rekuest_next.api.schema import (
+from rekuest.api.schema import (
     ActionArgumentInput,
     CatalogArgumentInput,
     CatalogOperationInput,
@@ -27,10 +27,10 @@ from rekuest_next.api.schema import (
     amy_implementation_at,
     aregister_ui_catalog,
 )
-from rekuest_next.blok.parser import parse_util_call
-from rekuest_next.definition.define import prepare_definition
-from rekuest_next.remote import acall
-from rekuest_next.widgets import withEffect, withValidator
+from rekuest.blok.parser import parse_util_call
+from rekuest.definition.define import prepare_definition
+from rekuest.remote import acall
+from rekuest.widgets import withEffect, withValidator
 
 from .conftest import CONNECT_TIMEOUT, build_fresh_rekuest
 

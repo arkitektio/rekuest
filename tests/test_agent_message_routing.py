@@ -12,12 +12,12 @@ from collections.abc import AsyncIterator
 
 import pytest
 
-from rekuest_next import messages
-from rekuest_next.agents.base import BaseAgent
-from rekuest_next.app import AppRegistry
-from rekuest_next.agents.hooks.registry import StartupHookReturns
+from rekuest import messages
+from rekuest.agents.base import BaseAgent
+from rekuest.app import AppRegistry
+from rekuest.agents.hooks.registry import StartupHookReturns
 
-from rekuest_next.agents.errors import AgentException
+from rekuest.agents.errors import AgentException
 
 from .memory_transport import MemoryAgentTransport
 
@@ -90,7 +90,7 @@ async def test_interrupt_reaches_the_actor_and_reports_interrupted(
         await asyncio.sleep(60)
         return x
 
-    from rekuest_next.register import register
+    from rekuest.register import register
 
     register(
         aslow,
@@ -262,7 +262,7 @@ async def test_teardown_cancels_in_flight_actor_work(
             raise
         return x
 
-    from rekuest_next.register import register
+    from rekuest.register import register
 
     register(
         blocker,
@@ -408,7 +408,7 @@ async def test_a_completed_task_is_not_reported_as_still_running(
         """Finish immediately."""
         return x
 
-    from rekuest_next.register import register
+    from rekuest.register import register
 
     register(
         quick,
@@ -465,7 +465,7 @@ async def test_a_liveness_inquiry_does_not_contradict_a_replayed_report(
         """Finish immediately."""
         return x
 
-    from rekuest_next.register import register
+    from rekuest.register import register
 
     register(
         quick,

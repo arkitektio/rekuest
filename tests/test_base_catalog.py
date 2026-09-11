@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from rekuest_next.catalogs import (
+from rekuest.catalogs import (
     BASE_CATALOG_VERSION,
     base_operation,
     base_operations,
@@ -24,7 +24,7 @@ def test_base_manifest_loads_via_importlib_resources() -> None:
 
     assert catalog is load_base_catalog()
     assert catalog.name == "base" and catalog.version == BASE_CATALOG_VERSION == 1
-    assert resources.files("rekuest_next.catalogs").joinpath("base_v1.json").is_file()
+    assert resources.files("rekuest.catalogs").joinpath("base_v1.json").is_file()
     gt = base_operation("gt")
     assert gt is not None and gt.keys == ("a", "b") and gt.returns == "BOOL"
     assert base_operation("len_between").required_keys == ("value", "min")
@@ -35,15 +35,15 @@ def test_base_manifest_loads_via_importlib_resources() -> None:
 
 def test_loader_does_not_import_the_generated_schema() -> None:
     """``traits`` imports the loader while the generated module is still importing, so the
-    loader itself must not depend on ``rekuest_next.api`` (the package ``__init__`` does, which
+    loader itself must not depend on ``rekuest.api`` (the package ``__init__`` does, which
     is why this is a source-level check rather than a ``sys.modules`` one)."""
-    import rekuest_next.catalogs as catalogs
+    import rekuest.catalogs as catalogs
 
     imports = [line for line in Path(catalogs.__file__).read_text().splitlines() if line.startswith(("import ", "from "))]
-    assert not [line for line in imports if "rekuest_next" in line], imports
+    assert not [line for line in imports if "rekuest" in line], imports
 
     # and the whole import chain works from a cold interpreter
-    code = "import rekuest_next.traits.calls, rekuest_next.catalogs as c; print(c.base_operation('gt').keys)"
+    code = "import rekuest.traits.calls, rekuest.catalogs as c; print(c.base_operation('gt').keys)"
     output = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, check=True).stdout.strip()
     assert output == "('a', 'b')"
 
@@ -52,5 +52,5 @@ def test_vendored_manifest_matches_server() -> None:
     """The client copy is byte-identical to the server's source of truth."""
     if not SERVER_MANIFEST.exists():
         pytest.skip("server tree not checked out next to the client")
-    vendored = resources.files("rekuest_next.catalogs").joinpath("base_v1.json").read_bytes()
+    vendored = resources.files("rekuest.catalogs").joinpath("base_v1.json").read_bytes()
     assert vendored == SERVER_MANIFEST.read_bytes()

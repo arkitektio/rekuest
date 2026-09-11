@@ -1,6 +1,6 @@
-# rekuest-next docs
+# rekuest docs
 
-Focused guides for rekuest-next patterns that aren't obvious from the API surface
+Focused guides for rekuest patterns that aren't obvious from the API surface
 alone.
 
 - [Agent dependencies](./agent-dependencies.md) — declare the actions and states

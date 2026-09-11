@@ -1,8 +1,8 @@
 """Integration tests for ``Requires`` / ``Provides`` port annotations.
 
-A function can annotate its inputs with :class:`~rekuest_next.annotations.Requires`
+A function can annotate its inputs with :class:`~rekuest.annotations.Requires`
 descriptors (constraints the bound value must satisfy, e.g. a filename matching
-``.*\\.tiff?``) and its outputs with :class:`~rekuest_next.annotations.Provides`
+``.*\\.tiff?``) and its outputs with :class:`~rekuest.annotations.Provides`
 descriptors (guarantees about the produced value, e.g. an ``x`` dimension ``>= 1``).
 
 These descriptors are part of the action *definition*: they ride along on the
@@ -22,12 +22,12 @@ from typing import Annotated
 import pytest
 from dokker import Deployment
 
-from rekuest_next.annotations import Provides, Requires
-from rekuest_next.api.schema import (
+from rekuest.annotations import Provides, Requires
+from rekuest.api.schema import (
     DescriptorOperator,
     amy_implementation_at,
 )
-from rekuest_next.remote import acall
+from rekuest.remote import acall
 
 from .conftest import CONNECT_TIMEOUT, build_fresh_rekuest
 

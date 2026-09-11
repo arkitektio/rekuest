@@ -11,7 +11,7 @@ satisfies it — either automatically (`auto_resolvable`) or by asking the user 
 pick one when your implementation is set up.
 
 ```python
-from rekuest_next import declare, declare_state
+from rekuest import declare, declare_state
 
 
 @declare_state
@@ -114,7 +114,7 @@ a camera protocol but delegates image opening to `imagej`'s `open_image` action.
 Decorate the method to override its demand target:
 
 ```python
-from rekuest_next import declare, demand
+from rekuest import declare, demand
 
 
 @declare(app="mymicroscope")
@@ -154,7 +154,7 @@ Instead, place a `demand_state(...)` marker inside `typing.Annotated`:
 ```python
 from typing import Annotated
 
-from rekuest_next import declare, declare_state, demand_state
+from rekuest import declare, declare_state, demand_state
 
 
 @declare_state
@@ -248,12 +248,12 @@ for matching actions and agents.
 
 | Symbol                                | Import                        |
 | ------------------------------------- | ----------------------------- |
-| `declare(app=..., ...)`               | `from rekuest_next import declare` |
-| `declare_state`                       | `from rekuest_next import declare_state` |
-| `demand(*, app=..., key=..., ...)`    | `from rekuest_next import demand` |
-| `demand_state(*, app=..., key=..., ...)` | `from rekuest_next import demand_state` |
+| `declare(app=..., ...)`               | `from rekuest import declare` |
+| `declare_state`                       | `from rekuest import declare_state` |
+| `demand(*, app=..., key=..., ...)`    | `from rekuest import demand` |
+| `demand_state(*, app=..., key=..., ...)` | `from rekuest import demand_state` |
 
 The override dataclasses (`ActionDemandOverride`, `StateDemandOverride`) and the
 low-level builders (`build_action_dependency_input`,
-`build_state_dependency_input`) live in `rekuest_next.definition.demands` and
-`rekuest_next.definition.dependencies` respectively.
+`build_state_dependency_input`) live in `rekuest.definition.demands` and
+`rekuest.definition.dependencies` respectively.

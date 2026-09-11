@@ -22,15 +22,15 @@ from collections.abc import AsyncGenerator, Callable, Sequence
 import pytest
 from pydantic import PrivateAttr
 
-from rekuest_next import messages
+from rekuest import messages
 
 from .memory_transport import MemoryAgentTransport
-from rekuest_next.agents.caller import AgentPostman
-from rekuest_next.api.schema import TaskEventChange, TaskEventKind
-from rekuest_next.postmans.errors import RootOnlyAssignError
-from rekuest_next.postmans.graphql import GraphQLPostman
-from rekuest_next.rath import RekuestNextRath
-from rekuest_next.remote import aiterate_raw
+from rekuest.agents.caller import AgentPostman
+from rekuest.api.schema import TaskEventChange, TaskEventKind
+from rekuest.postmans.errors import RootOnlyAssignError
+from rekuest.postmans.graphql import GraphQLPostman
+from rekuest.rath import RekuestNextRath
+from rekuest.remote import aiterate_raw
 
 from rath.links.testing.direct_succeeding_link import DirectSucceedingLink
 

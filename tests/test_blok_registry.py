@@ -5,9 +5,9 @@ from typing import Protocol
 
 import pytest
 
-from rekuest_next.app import AppRegistry
-from rekuest_next.declare import declare, declare_state
-from rekuest_next.state.decorator import state
+from rekuest.app import AppRegistry
+from rekuest.declare import declare, declare_state
+from rekuest.state.decorator import state
 
 
 @declare_state

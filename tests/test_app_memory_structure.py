@@ -22,8 +22,8 @@ import asyncio
 import pytest
 from dokker import Deployment
 
-from rekuest_next.api.schema import amy_implementation_at
-from rekuest_next.remote import acall
+from rekuest.api.schema import amy_implementation_at
+from rekuest.remote import acall
 
 from .conftest import CONNECT_TIMEOUT, build_fresh_rekuest
 
@@ -174,7 +174,7 @@ async def test_memory_structure_round_trips_through_dependency(
     """
     from typing import Protocol
 
-    from rekuest_next.declare import declare
+    from rekuest.declare import declare
 
     provider = build_fresh_rekuest(deployment, token="atest_token")
 

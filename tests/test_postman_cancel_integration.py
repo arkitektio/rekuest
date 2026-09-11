@@ -13,8 +13,8 @@ import uuid
 import pytest
 from dokker import Deployment
 
-from rekuest_next.api.schema import TaskEventKind, amy_implementation_at, arequests
-from rekuest_next.remote import acall
+from rekuest.api.schema import TaskEventKind, amy_implementation_at, arequests
+from rekuest.remote import acall
 
 from .conftest import CONNECT_TIMEOUT, build_fresh_rekuest
 
