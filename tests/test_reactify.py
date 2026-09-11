@@ -1,10 +1,22 @@
-from rekuest.actors.actify import reactify
-from rekuest.definition.define import prepare_definition
-from rekuest.api.schema import NodeKind
+"""Test the reactify function which converts a function or generator into an actor definition."""
+
+from collections.abc import Callable, Generator
+from rekuest_next.actors.actify import reactify
+from rekuest_next.actors.types import RegisterConfig
+from rekuest_next.api.schema import ActionKind
+from rekuest_next.structures.registry import StructureRegistry
+import pytest
+from .funcs import (
+    nested_basic_function,
+    nested_structure_asyncgenerator,
+    nested_structure_function,
+)
 
 
-def test_actify_function(simple_registry):
-    def func():
+def test_actify_function(simple_registry: StructureRegistry) -> None:
+    """Test if the function is correctly buildable into an actor definition."""
+
+    def func() -> int:
         """This function
 
         This function is a test function
@@ -13,12 +25,29 @@ def test_actify_function(simple_registry):
 
         return 1
 
-    defi, actorBuilder = reactify(func, simple_registry)
-    assert defi.kind == NodeKind.FUNCTION
+    defi, impl_d, actor_builder = reactify(func, simple_registry)
+    assert defi.kind == ActionKind.FUNCTION
 
 
-def test_actify_generator(simple_registry):
-    def gen():
+def test_actify_stateful_config(simple_registry: StructureRegistry) -> None:
+    """A stateless function is not stateful by default, but honors stateful=True
+    from the config. Guards against the previously-buggy always-truthy state check."""
+
+    def func() -> int:
+        """A stateless function."""
+        return 1
+
+    plain, _, _ = reactify(func, simple_registry)
+    assert plain.stateful is False
+
+    forced, _, _ = reactify(func, simple_registry, RegisterConfig(stateful=True))
+    assert forced.stateful is True
+
+
+def test_actify_generator(simple_registry: StructureRegistry) -> None:
+    """Test if the generator is correctly buildable into an actor definition."""
+
+    def gen() -> Generator[int, None, None]:
         """This function
 
         This function is a test function
@@ -27,5 +56,21 @@ def test_actify_generator(simple_registry):
 
         yield 1
 
-    defi, actorBuilder = reactify(gen, simple_registry)
-    assert defi.kind == NodeKind.GENERATOR
+    defi, impl_d, actor_builder = reactify(gen, simple_registry)
+    assert defi.kind == ActionKind.GENERATOR
+
+
+@pytest.mark.parametrize(
+    "func",
+    [
+        nested_structure_asyncgenerator,
+        nested_structure_function,
+        nested_basic_function,
+    ],
+)
+def test_actify_matrix_functions(
+    simple_registry: StructureRegistry, func: Callable
+) -> None:
+    """Test if different function types are correctly buildable into actor definitions."""
+
+    defi, impl_d, actor_builder = reactify(func, simple_registry)

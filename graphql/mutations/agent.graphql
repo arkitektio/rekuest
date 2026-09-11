@@ -1,0 +1,12 @@
+mutation EnsureAgent($input: AgentInput!) {
+  ensureAgent(input: $input) {
+    ...Agent
+  }
+}
+
+
+mutation ImplementAgent($input: ImplementAgentInput!) {
+  implementAgent(input: $input) {
+    ...Agent
+  }
+}

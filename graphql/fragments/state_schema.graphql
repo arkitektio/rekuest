@@ -1,0 +1,7 @@
+fragment StateDefinition on StateDefinition {
+  id
+  name
+  ports {
+    ...ReturnPort
+  }
+}

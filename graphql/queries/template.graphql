@@ -1,19 +1,25 @@
-query get_template($id: ID!) {
-  template(id: $id) {
-    ...Template
-  }
-}
 
-query mytemplatefor($hash: String!, $instance_id: ID!) {
-  mytemplatefor(hash: $hash, instanceId: $instance_id) {
-    ...Template
-  }
-}
-
-query search_templates($search: String, $values: [ID]) {
-  options: templates(search: $search, limit: 20, ids: $values) {
+query SearchImplementations($search: String, $values: [ID!]) {
+  options: implementations(
+    filters: { interface: { iContains: $search }, ids: $values }
+    pagination: { limit: 10 }
+  ) {
     label: name
     value: id
   }
 }
 
+query ImplementationsFor($hash: ActionHash!) {
+  implementations(filters: { actionHash: $hash }) {
+    ...Implementation
+  }
+}
+
+query MyImplementationAt($interface: String, $actionId: ID) {
+  myImplementationAt(
+    interface: $interface
+    actionId: $actionId
+  ) {
+    ...Implementation
+  }
+}

@@ -1,0 +1,15 @@
+query ListToolboxes(
+  $pagination: OffsetPaginationInput
+  $filters: ToolboxFilter
+  $ordering: [ToolboxOrder!]
+) {
+  toolboxes(ordering: $ordering, pagination: $pagination, filters: $filters) {
+    ...ListToolbox
+  }
+}
+
+query GetToolbox($id: ID!) {
+  toolbox(id: $id) {
+    ...Toolbox
+  }
+}

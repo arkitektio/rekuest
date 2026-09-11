@@ -1,46 +1,40 @@
-from rekuest.api.schema import PortInput, PortKind, ChildPortInput, Scope
+"""Test the PortInput class  and its validation logic."""
+
+from rekuest_next.api.schema import ArgPortInput, PortKind
 from pydantic import ValidationError
 import pytest
 
 
-def test_argport_input_errors():
+def test_argport_input_errors() -> None:
+    """Test invalid PortInput instances"""
     with pytest.raises(ValidationError):
         # kind is required and only accepts PortKind
-        PortInput(kind="lala")
-
-    with pytest.raises(ValidationError):
-        # key and nullable are required
-        PortInput(kind=PortKind.BOOL)
-
-    with pytest.raises(ValidationError):
-        # nullable is required
-        PortInput(kind=PortKind.BOOL, key="search")
+        ArgPortInput(kind="lala")
 
     with pytest.raises(ValidationError):
         # identifier is required for STRUCTURE
-        PortInput(kind=PortKind.STRUCTURE, key="search", nullable=False)
+        ArgPortInput(kind=PortKind.STRUCTURE, key="search")
 
     with pytest.raises(ValidationError):
         # child is required for List
-        PortInput(kind=PortKind.LIST, key="search", nullable=False)
+        ArgPortInput(kind=PortKind.LIST, key="search")
 
 
-def test_argport():
-    PortInput(kind=PortKind.BOOL, key="search", nullable=False, scope=Scope.GLOBAL)
-    PortInput(kind=PortKind.STRING, key="search", nullable=False, scope=Scope.GLOBAL)
+def test_argport() -> None:
+    """Test valid PortInput instances"""
+    ArgPortInput(kind=PortKind.BOOL, key="search", nullable=False)
+    ArgPortInput(kind=PortKind.STRING, key="search", nullable=False)
 
-    PortInput(
+    ArgPortInput(
         kind=PortKind.STRUCTURE,
         identifier="hm/karl",
         key="search",
         nullable=False,
-        scope=Scope.GLOBAL,
     )
 
-    PortInput(
+    ArgPortInput(
         kind=PortKind.LIST,
-        child=ChildPortInput(kind=PortKind.BOOL, nullable=False, scope=Scope.GLOBAL),
-        scope=Scope.GLOBAL,
+        children=(ArgPortInput(key="0", kind=PortKind.BOOL, nullable=False),),
         nullable=False,
         key="search",
     )

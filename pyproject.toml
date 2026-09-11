@@ -1,83 +1,91 @@
-[tool.poetry]
-name = "rekuest"
-version = "0.2.29"
+[project]
+name = "rekuest-next"
+version = "2.3.1" 
+readme = "README.md"
+readme-content-type = "text/markdown"
+homepage = "https://arkitekt.live"
 description = "rpc and node backbone"
-authors = ["jhnnsrs <jhnnsrs@gmail.com>"]
-license = "CC BY-NC 3.0"
-packages = [{ include = "rekuest" }]
-
-[tool.poetry.dependencies]
-python = "^3.8"
-docstring-parser = ">=0.11"
-inflection = "^0.5.1"
-websockets = "^10.0"
-pydantic = ">=1.9.0,<=2.0"
-annotated-types = "^0.4.0"
-rath = ">=0.5.0"
-aenum = { version = "^3.1.15", optional = true }
-
-
-[tool.ruff]
-extend-select = []
-
-# Exclude a variety of commonly ignored directories.
-exclude = [
-    ".bzr",
-    ".direnv",
-    ".eggs",
-    ".git",
-    ".hg",
-    ".mypy_cache",
-    ".nox",
-    ".pants.d",
-    ".pytype",
-    ".ruff_cache",
-    ".svn",
-    ".tox",
-    ".venv",
-    "__pypackages__",
-    "_build",
-    "buck-out",
-    "build",
-    "dist",
-    "node_modules",
-    "venv",
+authors = [{ name = "jhnnsrs", email = "jhnnsrs@gmail.com" }]
+requires-python = ">=3.11, <4.0"
+license = "GPL-3.0-or-later"
+dependencies = [
+    "docstring-parser>=0.11",
+    "inflection>=0.5.1",
+    "websockets>=12.0",
+    "pydantic>=2",
+    "rath>=3.11.1",
+    "fieldz>=0.0.2",
+    "jsonpatch>=1.33",
+    "koil>=3.3.1",
+    "janus>=2.0.0",
 ]
 
-# Same as Black.
-line-length = 100
+[project.optional-dependencies]
+types = [
+    "annotated-types>=0.5.0",
+]
+# Physical-quantity ports (PortKind.QUANTITY): kanne provides the pint-backed
+# dimension types used to derive a port's unit/dimension and to expand wire
+# strings back into live quantities. Optional — quantity ports simply require it.
+units = [
+    "kanne>=2.2",
+]
+# Installed inside the semantic-release Docker action so build_command has uv.
+build = ["uv>=0.7.12"]
 
-[tool.poetry.group.dev.dependencies]
-testcontainers = "3.7.0"
-autoflake = "^1.7.7"
-pytest = "^7.2.0"
-pytest-asyncio = "^0.20.2"
-turms = { version = ">=0.3.1", python = "^3.9" }
-aiohttp = "^3.8.3"
-websockets = "^10.4"
-black = "^23.1.0"
-pytest-cov = "^4.0.0"
-pytest-aiohttp = "^1.0.4"
-ruff = "^0.0.254"
-aenum = "^3.1.15"
+[tool.uv]
+dev-dependencies =  [
+    "pytest-asyncio>=0.26.0",
+    "pytest-cov>=6.1.1",
+    "pytest>=8.3.5",
+    "python-semantic-release>=9.21.0",
+    "testcontainers==3.7.0",
+    "autoflake>=1.7.7,<2",
+    "aiohttp>=3.8.3,<4",
+    "black>=23.1.0,<24",
+    "pytest-aiohttp>=1.0.4,<2",
+    "ruff>0.11",
+    "qtpy>=2.4.3",
+    "fakts-next>=4",
+    "fastapi>=0.128.0",
+    "httpx>=0.28.1",
+    "aiosqlite>=0.22.1",
+    "dokker>=2.5",
+    "turms>=2.0.0",
+    "basedpyright>=1.21",
+]
 
+[tool.basedpyright]
+include = ["rekuest_next"]
+exclude = ["**/__pycache__", "tests"]
+typeCheckingMode = "standard"
+
+[tool.hatch.build.targets.sdist]
+include = ["rekuest_next"]
+
+[tool.hatch.build.targets.wheel]
+include = ["rekuest_next"]
+
+[tool.hatch.version]
+path = "rekuest_next/__init__.py"
 
 [build-system]
-requires = ["poetry-core>=1.0.0"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [tool.pytest.ini_options]
-asyncio_mode = "auto"
-qt_api = "pyqt5"
 markers = [
     "integration: marks tests that require a running server",
-    "qt: marks tests that require a running qt application",
     "define: marks tests that concern to definining a funcionality",
     "shrink: marks tests that concern to serializing inputs to requests to an actor",
     "expand: marks tests that concern to serializing outputs from answers of an actor",
     "actor: marks tests that concern actors",
 ]
 
+testpaths = ["tests"]
+
+[tool.coverage.run]
+source = ["rekuest_next"]
 
 [[tool.pydoc-markdown.loaders]]
 type = "python"
@@ -86,3 +94,60 @@ search_path = ["arkitekt"]
 [tool.pydoc-markdown.renderer]
 type = "docusaurus"
 docs_base_path = "website/docs"
+
+
+[tool.semantic_release]
+version_toml = ["pyproject.toml:project.version"]
+# The semantic-release GitHub Action runs in a Docker container without uv, so
+# install it first (the `build` extra). After PSR bumps the version in
+# pyproject.toml, re-sync just this package's entry in uv.lock and stage it so
+# the release commit carries a consistent lock. $PACKAGE_NAME is injected by PSR.
+build_command = """
+    python -m pip install -e '.[build]'
+    uv lock --upgrade-package "$PACKAGE_NAME"
+    git add uv.lock
+    uv build
+"""
+commit_message = "chore(release): v{version} [skip ci]"
+
+# main -> stable X.Y.Z. next -> prereleases X.Y.Z-rc.N. N.x -> maintenance.
+[tool.semantic_release.branches.main]
+match = "main"
+prerelease = false
+
+[tool.semantic_release.branches.next]
+match = "next"
+prerelease = true
+prerelease_token = "rc"
+
+# Maintenance branches (1.x, 2.x, ...) cut stable patch/minor releases for an
+# older major after a new major has shipped from main.
+[tool.semantic_release.branches.maintenance]
+match = '^\d+\.x$'
+prerelease = false
+
+# Keep the changelog focused on user-facing changes. These patterns only filter
+# what's rendered — they do not affect version bumps.
+[tool.semantic_release.changelog]
+exclude_commit_patterns = [
+    '^chore(?:\([^)]*\))?: ',
+    '^ci(?:\([^)]*\))?: ',
+    '^build(?:\([^)]*\))?: ',
+    '^style(?:\([^)]*\))?: ',
+    '^test(?:\([^)]*\))?: ',
+    '^Merge ',
+]
+
+
+[tool.ruff]
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "UP"]
+# UP038: rule is deprecated in ruff and ``isinstance(x, A | B)`` is slower than a tuple.
+# UP037: some quoted annotations guard TYPE_CHECKING-only imports in pydantic models.
+ignore = ["UP038", "UP037"]
+
+[tool.ruff.lint.per-file-ignores]
+# Generated by turms; its typing imports are not ours to modernise.
+"rekuest_next/api/schema.py" = ["UP035"]

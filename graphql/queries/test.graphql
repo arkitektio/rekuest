@@ -1,24 +1,30 @@
-query get_testcase($id: ID!) {
-  testcase(id: $id) {
+query GetTestCase($id: ID!) {
+  testCase(id: $id) {
     ...TestCase
   }
 }
 
-query get_testresult($id: ID!) {
-  testresult(id: $id) {
+query GetTestResult($id: ID!) {
+  testResult(id: $id) {
     ...TestResult
   }
 }
 
-query search_testcases($search: String, $values: [ID]) {
-  options: testcases(search: $search, limit: 20, ids: $values) {
+query SearchTestCases($search: String, $values: [ID!]) {
+  options: testCases(
+    filters: { name: { iContains: $search }, ids: $values }
+    pagination: { limit: 10 }
+  ) {
     label: name
     value: id
   }
 }
 
-query search_testresults($search: String, $values: [ID]) {
-  options: testresults(search: $search, limit: 20, ids: $values) {
+query SearchTestResults($search: String, $values: [ID!]) {
+  options: testResults(
+    filters: { name: { iContains: $search }, ids: $values }
+    pagination: { limit: 10 }
+  ) {
     label: createdAt
     value: id
   }

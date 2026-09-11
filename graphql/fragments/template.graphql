@@ -1,21 +1,17 @@
-fragment Template on Template {
+fragment Implementation on Implementation {
   id
-  interface
   agent {
-    registry {
-      name
-      app {
-        version
-        identifier
-      }
-      user {
-        username
-      }
-    }
+    id
   }
-  node {
-    ...Node
+  action {
+    ...Action
   }
-  extensions
   params
+  interface
+  diagnostics {
+    level
+    code
+    message
+    path
+  }
 }

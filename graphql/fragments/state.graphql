@@ -1,0 +1,10 @@
+fragment State on State {
+  id
+  definition {
+    ...StateDefinition
+  }
+  agent {
+    id
+  }
+  interface
+}

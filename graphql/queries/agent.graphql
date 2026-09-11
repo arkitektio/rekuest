@@ -1,10 +1,19 @@
-query get_agent($id: ID!) {
+query GetAgent($id: ID!) {
   agent(id: $id) {
-    registry {
-      id
-      name
-    }
-    name
-    instanceId
+    ...Agent
+  }
+}
+
+
+query ListAgents($filters: AgentFilter, $pagination: OffsetPaginationInput) {
+  agents(filters: $filters, pagination: $pagination) {
+    ...Agent
+  }
+}
+
+
+query GetAgentByIdentifiers($app: String!, $version: String, $deviceId: String) {
+  agent(app: $app, version: $version, deviceId: $deviceId) {
+    ...Agent
   }
 }

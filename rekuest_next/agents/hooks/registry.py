@@ -1,0 +1,125 @@
+"""Hooks for the agent"""
+
+from dataclasses import dataclass
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Protocol,
+    runtime_checkable,
+)
+from pydantic import BaseModel, ConfigDict, Field
+
+if TYPE_CHECKING:
+    from rekuest_next.state.publish import StateHolder
+
+
+@runtime_checkable
+class BackgroundTask(Protocol):
+    """Background task that runs in the background
+    This task is used to run a function in the background
+    It is run in the order they are registered.
+    """
+
+    async def arun(
+        self,
+        agent: "StateHolder",
+        contexts: dict[str, Any],
+        states: dict[str, Any],
+        app_context: Any = None,  # noqa: ANN401
+    ) -> None:
+        """Run the background task in the event loop
+        Args:
+            agent (Agent): The agent running the background task
+            contexts (Dict[str, Any]): The contexts of the agent
+            states (Dict[str, Any]): The state variables of the agent
+            app_context (Any): The app context the agent was started with, if any
+        Returns:
+            None
+        """
+        ...
+
+
+@dataclass
+class StartupHookReturns:
+    """Startup hook returns
+    This is the return type of the startup hook.
+    It contains the state variables and contexts that are used by the agent.
+    """
+
+    states: dict[str, Any]
+    contexts: dict[str, Any]
+
+
+@runtime_checkable
+class StartupHook(Protocol):
+    """Startup hook that runs when the agent starts up.
+    This hook is used to setup the state variables and contexts that are used by the agent.
+    It is run in the order they are registered.
+    """
+
+    async def arun(self, app_context: Any) -> StartupHookReturns:
+        """Should return a dictionary of state variables"""
+        ...
+
+
+@runtime_checkable
+class ShutdownHook(Protocol):
+    """Shutdown hook that runs when the agent tears down.
+    This hook is used to release whatever the app acquired during its lifetime.
+    It is run in the reverse of the order they are registered.
+    """
+
+    async def arun(
+        self,
+        agent: "StateHolder",
+        contexts: dict[str, Any],
+        states: dict[str, Any],
+        app_context: Any,
+    ) -> None:
+        """Run the shutdown hook in the event loop"""
+        ...
+
+
+class HooksRegistry(BaseModel):
+    """Hook Registry
+
+    Hooks are functions that are run as the agent starts up.
+    They can setup the state variables and contexts that are used by the agent.
+    They are run in the order they are registered.
+
+    """
+
+    background_worker: dict[str, BackgroundTask] = Field(default_factory=dict)
+    startup_hooks: dict[str, StartupHook] = Field(default_factory=dict)
+    shutdown_hooks: dict[str, ShutdownHook] = Field(default_factory=dict)
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    def register_background(self, name: str, task: BackgroundTask) -> None:
+        """Register a background task in the registry."""
+        self.background_worker[name] = task
+
+    def register_startup(self, name: str, hook: StartupHook) -> None:
+        """Register a startup hook in the registry."""
+        self.startup_hooks[name] = hook
+
+    def register_shutdown(self, name: str, hook: ShutdownHook) -> None:
+        """Register a shutdown hook in the registry."""
+        self.shutdown_hooks[name] = hook
+
+    def reset(self) -> None:
+        """Reset the registry"""
+        self.background_worker = {}
+        self.startup_hooks = {}
+        self.shutdown_hooks = {}
+
+
+def get_default_hook_registry() -> HooksRegistry:
+    """Return the default hook registry (the app registry's).
+
+    Returns:
+        HooksRegistry: The hooks registry of the global app registry.
+    """
+    from rekuest_next.app import get_default_app_registry
+
+    return get_default_app_registry().hooks_registry

@@ -1,13 +1,20 @@
+"""Integration test utilities."""
+
 import requests
 from requests.exceptions import ConnectionError
 import time
 
 
 class RetryExceededError(Exception):
+    """Custom exception for retry limit exceeded."""
+
     pass
 
 
-def wait_for_http_response(url, status_code=200, retry=0, max_retries=10):
+def wait_for_http_response(
+    url: str, status_code: int = 200, retry: int = 0, max_retries: int = 10
+) -> requests.Response:
+    """Wait for an HTTP response with a specific status code."""
     if retry > max_retries:
         raise RetryExceededError("Max retries exceeded")
     time.sleep(retry * retry * 0.5)

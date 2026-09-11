@@ -1,12 +1,15 @@
-from rekuest.definition.define import prepare_definition
-from rekuest.definition.registry import DefinitionRegistry
-from rekuest.register import register_structure, register_func
+"""Test if functions can be registered in the registry."""
+
+from rekuest_next.app import AppRegistry
+from rekuest_next.register import register_func
+from rekuest_next.structures.registry import StructureRegistry
 
 
-def test_register_function(simple_registry):
-    defi = DefinitionRegistry()
+def test_register_function(simple_registry: StructureRegistry) -> None:
+    """Test if the function is correctly registered in the registry."""
+    defi = AppRegistry()
 
-    def func():
+    def func() -> int:
         """This function
 
         This function is a test function
@@ -17,4 +20,4 @@ def test_register_function(simple_registry):
 
     register_func(func, simple_registry, defi)
 
-    assert defi.definitions["func"]
+    assert defi.actor_builders["func"]

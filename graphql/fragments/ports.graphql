@@ -1,45 +1,250 @@
-fragment IsPredicate on IsPredicate {
-  predicate
+fragment ActionArgumentLeaf on ActionArgument {
+  key
+  valueLiteral
+  valuePath
+  utilCall {
+    operation
+  }
 }
 
-fragment ValueRange on ValueRange {
-  min
-  max
+fragment ActionArgumentNested on ActionArgument {
+  key
+  valueLiteral
+  valuePath
+  utilCall {
+    operation
+    arguments {
+      ...ActionArgumentLeaf
+    }
+  }
+  valueList {
+    ...ActionArgumentLeaf
+  }
+  valueDict {
+    ...ActionArgumentLeaf
+  }
 }
 
-fragment Annotation on Annotation {
+fragment ActionArgument on ActionArgument {
+  key
+  valueLiteral
+  valuePath
+  utilCall {
+    operation
+    arguments {
+      ...ActionArgumentNested
+    }
+  }
+  valueList {
+    ...ActionArgumentNested
+  }
+  valueDict {
+    ...ActionArgumentNested
+  }
+}
+
+fragment UtilCall on UtilCall {
+  operation
+  arguments {
+    ...ActionArgument
+  }
+}
+
+fragment ArgChildPortNested on ArgPort {
+  key
   kind
-  ...IsPredicate
-  ...ValueRange
-}
-
-fragment ChildPortNested on ChildPort {
-  kind
-  child {
+  children {
+    key
     identifier
     nullable
     kind
+    referenceUnit
+    proposedUnits
+    dimension
+  }
+  choices {
+    value
+    label
+    description
   }
   identifier
   nullable
-  annotations {
-    ...Annotation
-  }
+  default
+  referenceUnit
+  proposedUnits
+  dimension
 }
 
-fragment ChildPort on ChildPort {
+fragment ArgChildPort on ArgPort {
+  key
   kind
   identifier
-  child {
-    ...ChildPortNested
+  children {
+    ...ArgChildPortNested
+  }
+  choices {
+    value
+    label
+    description
   }
   nullable
-  annotations {
-    ...Annotation
+  default
+  referenceUnit
+  proposedUnits
+  dimension
+}
+
+
+fragment ReturnChildPortNested on ReturnPort {
+  key
+  kind
+  children {
+    key
+    identifier
+    nullable
+    kind
+    referenceUnit
+    proposedUnits
+    dimension
+  }
+  choices {
+    value
+    label
+    description
+  }
+  identifier
+  nullable
+  referenceUnit
+  proposedUnits
+  dimension
+}
+
+fragment ReturnChildPort on ReturnPort {
+  key
+  kind
+  identifier
+  children {
+    ...ReturnChildPortNested
+  }
+  choices {
+    value
+    label
+    description
+  }
+  nullable
+  referenceUnit
+  proposedUnits
+  dimension
+}
+
+fragment CustomEffect on CustomEffect {
+  __typename
+  kind
+}
+
+fragment MessageEffect on MessageEffect {
+  __typename
+  kind
+  message
+}
+
+fragment PortEffect on Effect {
+  __typename
+  kind
+  dependencies
+  call {
+    ...UtilCall
+  }
+  callJson
+  source
+  ...CustomEffect
+  ...MessageEffect
+}
+
+fragment StringAssignWidget on StringAssignWidget {
+  __typename
+  kind
+  placeholder
+  asParagraph
+}
+
+fragment SliderAssignWidget on SliderAssignWidget {
+  __typename
+  kind
+  min
+  max
+  step
+}
+
+fragment SearchAssignWidget on SearchAssignWidget {
+  __typename
+  kind
+  query
+  ward
+  dependencies
+}
+
+fragment ComponentProp on ComponentProp {
+  key
+  staticValue
+  dynamicValue {
+    literal
+    path
+  }
+  declaresValue
+  utilCall {
+    ...UtilCall
   }
 }
 
-fragment Port on Port {
+fragment CustomAssignWidget on CustomAssignWidget {
+  __typename
+  kind
+  component
+  props {
+    ...ComponentProp
+  }
+  dependencies
+}
+
+fragment ChoiceAssignWidget on ChoiceAssignWidget {
+  __typename
+  kind
+  placeholder
+}
+
+fragment PortAssignWidget on AssignWidget {
+  __typename
+  kind
+  ...StringAssignWidget
+  ...SearchAssignWidget
+  ...SliderAssignWidget
+  ...ChoiceAssignWidget
+  ...CustomAssignWidget
+}
+
+fragment CustomReturnWidget on CustomReturnWidget {
+  __typename
+  kind
+  component
+  props {
+    ...ComponentProp
+  }
+}
+
+fragment ChoiceReturnWidget on ChoiceReturnWidget {
+  __typename
+  kind
+}
+
+fragment ReturnWidget on ReturnWidget {
+  __typename
+  kind
+  ...CustomReturnWidget
+  ...ChoiceReturnWidget
+}
+
+fragment ArgPort on ArgPort {
   __typename
   key
   label
@@ -48,13 +253,59 @@ fragment Port on Port {
   default
   kind
   identifier
-  child {
-    ...ChildPort
+  referenceUnit
+  proposedUnits
+  dimension
+  children {
+    ...ArgChildPort
   }
-  variants {
-    ...ChildPort
+  widget {
+    ...PortAssignWidget
   }
-  annotations {
-    ...Annotation
+  choices {
+    value
+    label
+    description
+  }
+  validators {
+    call {
+      ...UtilCall
+    }
+    callJson
+    source
+    errorMessage
+    dependencies
+    label
+  }
+  effects {
+    ...PortEffect
+  }
+}
+
+
+fragment ReturnPort on ReturnPort {
+  __typename
+  key
+  label
+  nullable
+  description
+  kind
+  identifier
+  referenceUnit
+  proposedUnits
+  dimension
+  children {
+    ...ReturnChildPort
+  }
+  widget {
+    ...ReturnWidget
+  }
+  choices {
+    value
+    label
+    description
+  }
+  effects {
+    ...PortEffect
   }
 }

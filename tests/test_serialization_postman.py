@@ -1,8 +1,9 @@
+"""Testing the serialization and deserialization of structures on the postman level."""
+
 import pytest
-from rekuest.definition.define import prepare_definition
-from rekuest.definition.validate import auto_validate
-from rekuest.structures.serialization.postman import shrink_inputs, expand_outputs
-from rekuest.structures.serialization.actor import expand_inputs, shrink_outputs
+from rekuest_next.definition.define import prepare_definition
+from rekuest_next.structures.serialization.postman import ashrink_args, aexpand_returns
+from rekuest_next.structures.serialization.actor import expand_inputs
 from .funcs import (
     plain_basic_function,
     plain_structure_function,
@@ -11,52 +12,73 @@ from .funcs import (
     union_structure_function,
 )
 from .structures import SecondObject, SerializableObject
-from rekuest.structures.errors import ShrinkingError, ExpandingError
+from rekuest_next.structures.errors import ShrinkingError, ExpandingError
+from rekuest_next.actors.types import Shelver
+from rekuest_next.structures.registry import StructureRegistry
 
 
 @pytest.mark.shrink
 @pytest.mark.asyncio
-async def test_shrinking_nullable(simple_registry):
+async def test_shrinking_nullable(
+    simple_registry: StructureRegistry, mock_shelver: Shelver
+) -> None:
+    """Test if we can shrink a nullable input."""
     functional_definition = prepare_definition(
         null_function, structure_registry=simple_registry
     )
 
-    definition = auto_validate(functional_definition)
-
-    args = await shrink_inputs(definition, (None,), {}, simple_registry)
+    args = await ashrink_args(
+        functional_definition,
+        (None,),
+        {},
+        structure_registry=simple_registry,
+    )
     assert args == {"x": None}
 
-    args = await shrink_inputs(definition, (1,), {}, simple_registry)
-    assert args =={'x': 1}
+    args = await ashrink_args(
+        functional_definition,
+        (1,),
+        {},
+        structure_registry=simple_registry,
+    )
+    assert args == {"x": 1}
 
 
 @pytest.mark.shrink
 @pytest.mark.asyncio
-async def test_shrinking_basic(simple_registry):
+async def test_shrinking_basic(
+    simple_registry: StructureRegistry, mock_shelver: Shelver
+) -> None:
+    """Test if we can shrink a basic input."""
+
     functional_definition = prepare_definition(
         plain_basic_function, structure_registry=simple_registry
     )
 
-    definition = auto_validate(functional_definition)
-
-    args = await shrink_inputs(definition, ("hallo", "zz"), {}, simple_registry)
-    assert args =={'name': 'zz', 'rep': 'hallo'}
+    args = await ashrink_args(
+        functional_definition,
+        ("hallo", "zz"),
+        {},
+        structure_registry=simple_registry,
+    )
+    assert args == {"name": "zz", "rep": "hallo"}
 
 
 @pytest.mark.shrink
 @pytest.mark.asyncio
-async def test_rountdrip_structure(simple_registry):
+async def test_rountdrip_structure(
+    simple_registry: StructureRegistry, mock_shelver: Shelver
+) -> None:
+    """Test if we can shrink a structure input."""
     functional_definition = prepare_definition(
         plain_structure_function, structure_registry=simple_registry
     )
 
-    definition = auto_validate(functional_definition)
-
-    args = await shrink_inputs(
-        definition,
+    args = await ashrink_args(
+        functional_definition,
         (SerializableObject(number=3), SerializableObject(number=3)),
         {},
-        simple_registry,
+        structure_registry=simple_registry,
     )
 
     for arg in args:
@@ -64,108 +86,162 @@ async def test_rountdrip_structure(simple_registry):
 
 
 @pytest.mark.asyncio
-async def test_shrink_union(simple_registry):
+async def test_shrink_union(
+    simple_registry: StructureRegistry, mock_shelver: Shelver
+) -> None:
+    """Test if we can shrink a union input."""
     functional_definition = prepare_definition(
         union_structure_function, structure_registry=simple_registry
     )
 
-    definition = auto_validate(functional_definition)
-
-    args = await shrink_inputs(
-        definition,
+    args = await ashrink_args(
+        functional_definition,
         (SerializableObject(number=3),),
         {},
-        simple_registry,
+        structure_registry=simple_registry,
     )
 
-    assert args["rep"]["use"] == 0, "Should use the first union type"
+    assert args["rep"]["__use"] == 0, "Should use the first union type"
+
+
+@pytest.mark.asyncio
+async def test_roundtrip_union_cross_path(
+    simple_registry: StructureRegistry, mock_shelver: Shelver
+) -> None:
+    """A union arg shrunk by the postman path expands cleanly on the actor path.
+
+    This is the boundary that motivated unifying the wire format: postman shrinks
+    args, the backend forwards them, and the agent (actor path) expands them.
+    """
+    functional_definition = prepare_definition(
+        union_structure_function, structure_registry=simple_registry
+    )
+
+    shrinked_args = await ashrink_args(
+        functional_definition,
+        (SerializableObject(number=3),),
+        {},
+        structure_registry=simple_registry,
+    )
+    assert shrinked_args["rep"]["__use"] == 0
+
+    expanded_args = await expand_inputs(
+        functional_definition,
+        shrinked_args,
+        structure_registry=simple_registry,
+        shelver=mock_shelver,
+    )
+    assert expanded_args["rep"] == SerializableObject(number=3)
 
 
 @pytest.mark.shrink
 @pytest.mark.asyncio
-@pytest.mark.skip(reason="Not implemented")
-async def test_roundtrip(simple_registry):
+async def test_roundtrip(
+    simple_registry: StructureRegistry, mock_shelver: Shelver
+) -> None:
+    """Test if we can shrink a structure input and expand it back."""
     functional_definition = prepare_definition(
         plain_structure_function, structure_registry=simple_registry
     )
 
-    definition = auto_validate(functional_definition)
-
-    shrinked_args = await shrink_inputs(
-        definition,
+    shrinked_args = await ashrink_args(
+        functional_definition,
         (SerializableObject(number=3), SerializableObject(number=3)),
         {},
-        simple_registry,
+        structure_registry=simple_registry,
     )
 
-    expanded_args = await expand_inputs(definition, shrinked_args, simple_registry)
+    expanded_args = await expand_inputs(
+        functional_definition,
+        shrinked_args,
+        structure_registry=simple_registry,
+        shelver=mock_shelver,
+    )
     assert expanded_args["rep"].number == 3, "Should be"
 
 
 @pytest.mark.shrink
 @pytest.mark.asyncio
-async def test_shrinking_structure_error(simple_registry):
+async def test_shrinking_structure_error(
+    simple_registry: StructureRegistry, mock_shelver: Shelver
+) -> None:
+    """Test if we can shrink a structure input with an error."""
     functional_definition = prepare_definition(
         plain_structure_function, structure_registry=simple_registry
     )
 
-    definition = auto_validate(functional_definition)
-
     with pytest.raises(ShrinkingError):
-        await shrink_inputs(
-            definition,
+        await ashrink_args(
+            functional_definition,
             (SerializableObject(number=3), SecondObject(id=4)),
             {},
-            simple_registry,
+            structure_registry=simple_registry,
         )
 
 
 @pytest.mark.shrink
 @pytest.mark.asyncio
-async def test_shrinking_nested_structure(simple_registry):
+async def test_shrinking_nested_structure(
+    simple_registry: StructureRegistry, mock_shelver: Shelver
+) -> None:
+    """Test if we can shrink a nested structure input."""
     functional_definition = prepare_definition(
         nested_structure_function, structure_registry=simple_registry
     )
 
-    definition = auto_validate(functional_definition)
-
-    args = await shrink_inputs(
-        definition,
+    args = await ashrink_args(
+        functional_definition,
         ([SerializableObject(number=3)], {"hallo": SerializableObject(number=3)}),
         {},
-        simple_registry,
+        structure_registry=simple_registry,
     )
-    assert args
+
+    assert args, "Args should not be None"
+    assert "name" in args, f"Args should have a 'name' key got: {args}"
+
+    assert isinstance(args["name"]["hallo"], dict), (
+        "Should be a dict with __identifier and object keys {args}"
+    )
+    assert isinstance(args["rep"][0], dict), (
+        "Should be a dict with __identifier and object keys"
+    )
+
+    assert args == {
+        "name": {"hallo": {"__identifier": "mock/serializable", "object": "3"}},
+        "rep": [{"__identifier": "mock/serializable", "object": "3"}],
+    }, f"Should be the shrinked version of the input is: {args}"
 
 
 @pytest.mark.expand
 @pytest.mark.asyncio
-async def test_expand_basic(simple_registry):
+async def test_expand_basic(
+    simple_registry: StructureRegistry, mock_shelver: Shelver
+) -> None:
+    """Test if we can expand a basic input."""
     functional_definition = prepare_definition(
         plain_basic_function, structure_registry=simple_registry
     )
 
-    definition = auto_validate(functional_definition)
-
-    await expand_outputs(
-        definition,
-        {"return0": "return1"},
-        simple_registry,
+    await aexpand_returns(
+        functional_definition,
+        {"return0": "hallo"},
+        structure_registry=simple_registry,
     )
 
 
 @pytest.mark.expand
 @pytest.mark.asyncio
-async def test_expand_nested_structure_error(simple_registry):
+async def test_expand_nested_structure_error(
+    simple_registry: StructureRegistry, mock_shelver: Shelver
+) -> None:
+    """Test if we can expand a nested structure input with an error."""
     functional_definition = prepare_definition(
         nested_structure_function, structure_registry=simple_registry
     )
 
-    definition = auto_validate(functional_definition)
-
     with pytest.raises(ExpandingError):
-        await expand_outputs(
-            definition,
+        await aexpand_returns(
+            functional_definition,
             ([SerializableObject(number=3)], {"hallo": SerializableObject(number=3)}),
-            simple_registry,
+            structure_registry=simple_registry,
         )

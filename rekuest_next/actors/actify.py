@@ -1,0 +1,192 @@
+"""Actifier
+
+This module contains the actify function, which is used to convert a function
+into an actor.
+"""
+
+import inspect
+import warnings
+from functools import partial
+from typing import Any
+
+from rekuest_next.actors.functional import (
+    FUNC,
+    GEN,
+    THREADED_FUNC,
+    THREADED_GEN,
+    FunctionalActor,
+)
+from rekuest_next.actors.types import (
+    ActorBuilder,
+    AnyFunction,
+    ImplementationDetails,
+    RegisterConfig,
+)
+from rekuest_next.agents.context import (
+    prepare_context_variables,
+)
+from rekuest_next.api.schema import (
+    DefinitionInput,
+)
+from rekuest_next.definition.define import (
+    prepare_definition,
+)
+from rekuest_next.state.utils import (
+    prepare_state_variables,
+)
+from rekuest_next.agents.dependency import prepare_dependency_variables
+from rekuest_next.structures.registry import StructureRegistry
+
+
+def derive_implementation_details(
+    function: AnyFunction,
+    config: RegisterConfig,
+) -> ImplementationDetails:
+    """Inspect a function's state/context/dependency variables and resolve the
+    implementation metadata.
+
+    Explicit ``config.locks``/``config.manipulates`` win; otherwise locks are
+    inferred from the required state/context locks (when ``config.auto_locks``)
+    and manipulates from the written state variables.
+    """
+    state_variables, state_returns = prepare_state_variables(function)
+    context_variables, context_returns = prepare_context_variables(function)
+    dependency_variables = prepare_dependency_variables(function)
+
+    locks = config.locks
+    if locks is None and config.auto_locks:
+        newlocks: list[str] = []
+        for lock in context_variables.required_context_locks.values():
+            newlocks.extend(lock)
+        for lock in state_variables.required_state_locks.values():
+            newlocks.extend(lock)
+        # Sorted so the definition (and its hash) is identical across processes;
+        # ``set`` order depends on the hash seed.
+        locks = sorted(set(newlocks))
+
+    manipulates = config.manipulates
+    if manipulates is None:
+        manipulates = sorted(set(state_variables.write_state_variables.values()))
+
+    return ImplementationDetails(
+        state_variables=state_variables,
+        state_returns=state_returns,
+        context_variables=context_variables,
+        context_returns=context_returns,
+        dependency_variables=dependency_variables,
+        locks=locks,
+        tracks=config.tracks,
+        manipulates=manipulates,
+    )
+
+
+def prepare_definition_from_config(
+    function: AnyFunction,
+    structure_registry: StructureRegistry,
+    config: RegisterConfig,
+    details: ImplementationDetails | None = None,
+    **prepare_overrides: Any,
+) -> DefinitionInput:
+    """Build the definition for a function from its bundled RegisterConfig.
+
+    ``details`` (when given) marks the definition stateful if the function
+    uses state variables. ``prepare_overrides`` are forwarded to
+    ``prepare_definition`` (e.g. ``omitfirst`` for the Qt actifiers).
+    """
+    stateful = config.stateful or bool(details and details.state_variables.count)
+
+    return prepare_definition(
+        function,
+        structure_registry,
+        widgets=config.widgets,
+        port_groups=config.port_groups,
+        collections=config.collections,
+        stateful=stateful,
+        validators=config.validators,
+        effects=config.effects,
+        is_test_for=config.is_test_for,
+        name=config.name,
+        description=config.description,
+        return_widgets=config.return_widgets,
+        key=config.key,
+        version=config.version,
+        catalogs=config.catalogs,
+        **prepare_overrides,
+    )
+
+
+def reactify(
+    function: AnyFunction,
+    structure_registry: StructureRegistry,
+    config: RegisterConfig | None = None,
+) -> tuple[DefinitionInput, ImplementationDetails, ActorBuilder]:
+    """Reactify a function
+
+    This function takes a callable (of type async or sync function or generator) and
+    returns a builder function that creates an actor that makes the function callable
+    from the rekuest server.
+
+    All registration options are read from the bundled ``config``
+    (:class:`~rekuest_next.actors.types.RegisterConfig`); ``config`` defaults to an
+    empty config so ``reactify(func, registry)`` keeps working.
+    """
+    config = config or RegisterConfig()
+
+    implementation_details = derive_implementation_details(function, config)
+    definition = prepare_definition_from_config(
+        function, structure_registry, config, implementation_details
+    )
+
+    is_coroutine = inspect.iscoroutinefunction(function)
+    is_asyncgen = inspect.isasyncgenfunction(function)
+    is_method = inspect.ismethod(function)
+
+    is_generatorfunction = inspect.isgeneratorfunction(function)
+    is_function = inspect.isfunction(function)
+
+    actor_attributes: dict[str, Any] = {
+        "assign": function,
+        "expand_inputs": not config.bypass_expand,
+        "shrink_outputs": not config.bypass_shrink,
+        "structure_registry": structure_registry,
+        "definition": definition,
+        "state_variables": implementation_details.state_variables,
+        "state_returns": implementation_details.state_returns,
+        "context_variables": implementation_details.context_variables,
+        "context_returns": implementation_details.context_returns,
+        "dependency_variables": implementation_details.dependency_variables,
+        "locks": implementation_details.locks,
+        "concurrency": config.concurrency,
+        "policy": config.policy,
+    }
+
+    if is_coroutine:
+        iterator = FUNC
+    elif is_asyncgen:
+        iterator = GEN
+    elif is_generatorfunction and not config.in_process:
+        iterator = THREADED_GEN
+    elif (is_function or is_method) and not config.in_process:
+        iterator = THREADED_FUNC
+    else:
+        raise NotImplementedError("No way of converting this to a function")
+
+    if config.policy.cancels_on_disconnect and iterator in (
+        THREADED_FUNC,
+        THREADED_GEN,
+    ):
+        # Warn rather than raise: a threaded action that *does* poll is perfectly
+        # valid, and we cannot tell from the outside whether this one does.
+        warnings.warn(
+            f"{getattr(function, '__name__', function)!r} asks to be cancelled on "
+            "disconnect but runs in a worker thread, which cannot be force-killed. "
+            "It will only stop if its body calls koil.check_cancelled().",
+            UserWarning,
+            stacklevel=3,
+        )
+
+    return (
+        definition,
+        implementation_details,
+        partial(FunctionalActor, iterator=iterator, **actor_attributes),
+    )

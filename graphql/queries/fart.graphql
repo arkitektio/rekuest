@@ -1,0 +1,6 @@
+query GetMeActions {
+  actions {
+    id
+    name
+  }
+}

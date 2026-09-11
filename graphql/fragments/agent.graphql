@@ -1,10 +1,13 @@
 fragment Agent on Agent {
-  registry {
-    client {
-      id
-    }
-    user {
-      id
-    }
+  id
+  hash
+  client {
+    id
+  }
+  user {
+    sub
+  }
+  memoryShelve {
+    id
   }
 }

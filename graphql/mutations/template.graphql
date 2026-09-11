@@ -1,17 +1,5 @@
-mutation createTemplate(
-  $interface: String!
-  $definition: DefinitionInput!
-  $instance_id: ID!
-  $params: GenericScalar
-  $extensions: [String]
-) {
-  createTemplate(
-    definition: $definition
-    interface: $interface
-    params: $params
-    extensions: $extensions
-    instanceId: $instance_id
-  ) {
-    ...Template
+mutation createImplementation($input: CreateImplementationInput!) {
+  createImplementation(input: $input) {
+    ...Implementation
   }
 }

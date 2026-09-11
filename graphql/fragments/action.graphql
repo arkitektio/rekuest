@@ -1,0 +1,48 @@
+fragment Definition on Action {
+  args {
+    ...ArgPort
+  }
+  returns {
+    ...ReturnPort
+  }
+  kind
+  name
+  description
+  collections {
+    name
+  }
+  isDev
+  isTestFor {
+    id
+  }
+  portGroups {
+    key
+  }
+  stateful
+}
+
+fragment Action on Action {
+  hash
+  id
+  ...Definition
+}
+
+fragment PrimaryAction on Action {
+  name
+  id
+  hash
+  description
+}
+
+fragment ListAction on Action {
+  id
+  name
+  description
+  args {
+    ...ArgPort
+  }
+  returns {
+    ...ReturnPort
+  }
+  stateful
+}
