@@ -18,6 +18,14 @@ jobs:
   release:
     runs-on: ubuntu-latest
 
+    # `uv run pytest` below runs the integration tests too, and they pull the
+    # backend image from docker-compose's `jhnnsrs/rekuest:${REKUEST_SERVICE_TAG:-next}`.
+    # Without this the release job silently tests the stable line against the
+    # `next` image -- the prerelease backend -- and fails on drift that is
+    # already fixed. integration.yaml pins the same expression.
+    env:
+      REKUEST_SERVICE_TAG: ${{ github.ref_name == 'main' && 'latest' || 'next' }}
+
     steps:
       - uses: actions/checkout@v4
         with:
