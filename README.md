@@ -7,6 +7,10 @@
 [![PyPI pyversions](https://img.shields.io/pypi/pyversions/rekuest.svg)](https://pypi.python.org/pypi/rekuest/)
 [![PyPI status](https://img.shields.io/pypi/status/rekuest.svg)](https://pypi.python.org/pypi/rekuest/)
 
+> **Renamed.** This client was published as `rekuest-next` up to 2.3.1. From 3.0.0 it
+> is published as `rekuest` again, and the import root is `rekuest` (`rekuest_next` is
+> gone). Install `rekuest>=3` and update imports.
+
 **Self-documenting, asynchronous, scalable RPC for untrusted actors** — accessible
 through FastAPI or deployed on the [Arkitekt](https://arkitekt.live) platform.
 
@@ -69,7 +73,7 @@ pip install arkitekt
 ```
 
 > Doing image analysis? The Arkitekt platform ships ready-made data structures for
-> imaging (see [mikro](https://github.com/arkitektio/mikro-next)).
+> imaging (see [mikro](https://github.com/arkitektio/mikro)).
 
 ## Providing an action
 
