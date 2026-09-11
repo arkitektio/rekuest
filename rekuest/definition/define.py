@@ -3,7 +3,7 @@
 import collections
 from enum import Enum
 from typing import Union, get_type_hints
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from rekuest.structures.model import (
     is_model,
     inspect_model_class,
@@ -29,6 +29,7 @@ from rekuest.api.schema import (
 import inspect
 from docstring_parser import parse, DocstringStyle
 from rekuest.definition.errors import DefinitionError, NonSufficientDocumentation
+from rekuest.traits.calls import OWN_VALUE
 import datetime as dt
 from rekuest.structures.registry import (
     StructureRegistry,
@@ -481,6 +482,31 @@ def snake_to_title_case(snake_str: str) -> str:
     return title_case_str
 
 
+def _reject_reserved_port_keys(
+    ports: "Sequence[ArgPortInput | ReturnPortInput]", function_name: str
+) -> None:
+    """Refuse an action port keyed ``value`` (recursively, children included).
+
+    Inside a port's calls -- validators and effects -- ``value`` names that
+    port's own value, so a port of that name would be unaddressable. The server
+    rejects such an implementation at registration; catching it here turns a
+    round-trip failure into a local one. Scoped to action ports because that is
+    where the rule is known to apply; ``@state`` fields go through the same
+    converter but are not checked here.
+    """
+    for port in ports:
+        if port.key == OWN_VALUE:
+            raise DefinitionError(
+                f"Port {port.key!r} of function {function_name!r} uses a reserved "
+                "key: inside a port's calls (validators, effects) 'value' names "
+                "that port's own value, so a port keyed 'value' would be "
+                "unaddressable. Rename the parameter."
+            )
+        children = getattr(port, "children", None)
+        if children:
+            _reject_reserved_port_keys(children, function_name)
+
+
 def prepare_definition(
     function: Callable[..., Any],
     structure_registry: StructureRegistry,
@@ -745,6 +771,9 @@ def prepare_definition(
         raise DefinitionError(
             f"Could not find the following ports for the return widgets in the function {function_name}: {','.join(return_widgets.keys())}. Did you forget the type hint?"
         )
+
+    _reject_reserved_port_keys(args, function_name)
+    _reject_reserved_port_keys(returns, function_name)
 
     definition = DefinitionInput(
         key=definition_key,

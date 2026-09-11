@@ -56,8 +56,8 @@ def test_declared_action_and_blok_registry_build_same_action_dependency(
     simple_registry,
 ) -> None:
     class DemoProtocol:
-        def run(self, value: str) -> str:
-            return value
+        def run(self, item: str) -> str:
+            return item
 
     declared = DeclaredAgentAction(DemoProtocol.run, "demo", "run")
 
@@ -87,7 +87,7 @@ def test_declared_state_and_blok_registry_build_same_state_dependency(
     simple_registry,
 ) -> None:
     class DemoState:
-        value: str
+        item: str
 
     declared = DeclaredAgentState(DemoState, "demo", "status")
 
@@ -201,7 +201,7 @@ def test_blok_models_accept_matching_demo_state(model_cls, base_kwargs) -> None:
                     matches=build_port_matches(
                         (
                             ReturnPortInput(
-                                key="value",
+                                key="item",
                                 kind=PortKind.STRING,
                                 nullable=False,
                             ),
@@ -215,7 +215,7 @@ def test_blok_models_accept_matching_demo_state(model_cls, base_kwargs) -> None:
     model = model_cls(
         **base_kwargs,
         dependencies=(dependency,),
-        demo_state={"service": {"status": {"value": "ready"}}},
+        demo_state={"service": {"status": {"item": "ready"}}},
     )
 
-    assert model.demo_state == {"service": {"status": {"value": "ready"}}}
+    assert model.demo_state == {"service": {"status": {"item": "ready"}}}

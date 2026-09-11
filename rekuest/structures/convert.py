@@ -31,9 +31,16 @@ from rekuest.structures.utils import build_instance_predicate
 
 
 def cls_to_identifier(cls: type[Any]) -> Identifier:
-    """Derive an identifier string from a class's module and name."""
+    """Derive an identifier string from a class's module and name.
+
+    The server requires ``@package/key`` (``^@[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$``)
+    and rejects an implementation whose structure ports carry anything else, so
+    the module goes in the package slot and the class name in the key slot.
+    Dots are legal in both slots, so this is a pure reshaping of the old
+    ``module.name`` form and keeps identifiers exactly as unique as before.
+    """
     try:
-        return Identifier.validate(f"{cls.__module__.lower()}.{cls.__name__.lower()}")
+        return Identifier.validate(f"@{cls.__module__.lower()}/{cls.__name__.lower()}")
     except AttributeError as e:
         raise StructureDefinitionError(
             f"Cannot convert {cls} to identifier. The class needs to have a"

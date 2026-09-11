@@ -23,7 +23,7 @@ def test_fastapi_agent_build_assign_input_defaults_flags() -> None:
 
     assign_input = agent.build_assign_input(
         {
-            "args": {"value": "hello"},
+            "args": {"item": "hello"},
             "capture": True,
         },
         interface="echo",
@@ -42,7 +42,7 @@ def test_fastapi_agent_build_assign_input_drops_retired_flags() -> None:
     agent = FastApiAgent()
     assign_input = agent.build_assign_input(
         {
-            "args": {"value": "hello"},
+            "args": {"item": "hello"},
             "cached": False,
             "log": True,
             "ephemeral": True,
@@ -58,7 +58,7 @@ def test_fastapi_agent_build_assign_message_uses_normalized_assign_input() -> No
     agent = FastApiAgent()
     assign_input = agent.build_assign_input(
         {
-            "args": {"value": "hello"},
+            "args": {"item": "hello"},
             "reference": "ref-1",
             "capture": True,
             "cached": True,
@@ -77,7 +77,7 @@ def test_fastapi_agent_build_assign_message_uses_normalized_assign_input() -> No
     assert assign_message.action == "api_call"
     assert assign_message.reference == "ref-1"
     assert assign_message.capture is True
-    assert assign_message.args == {"value": "hello"}
+    assert assign_message.args == {"item": "hello"}
 
 
 def test_add_state_detail_routes_uses_current_agent_state_accessor() -> None:
@@ -101,7 +101,7 @@ def test_schema_router_uses_app_registry_states() -> None:
             name="DemoState",
             ports=(
                 ReturnPortInput(
-                    key="value",
+                    key="item",
                     kind=PortKind.STRING,
                     nullable=False,
                 ),
@@ -151,8 +151,8 @@ def test_implementation_route_reuses_fastapi_assign_builder(simple_registry) -> 
 
     object.__setattr__(agent.transport, "asubmit", capture_submit)
 
-    def echo(value: str) -> str:
-        return value
+    def echo(item: str) -> str:
+        return item
 
     implementation = ImplementationInput(
         definition=prepare_definition(echo, structure_registry=simple_registry),
@@ -168,7 +168,7 @@ def test_implementation_route_reuses_fastapi_assign_builder(simple_registry) -> 
     with TestClient(app) as client:
         response = client.post(
             "/echo",
-            json={"args": {"value": "hello"}},
+            json={"args": {"item": "hello"}},
         )
 
     assert response.status_code == 200

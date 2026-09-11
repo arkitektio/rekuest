@@ -82,4 +82,4 @@ def test_auto_register_memory_structure_fallback() -> None:
     registry = StructureRegistry()
     fullfilled = registry.get_fullfilled_type_for_cls(PlainThing)
     assert isinstance(fullfilled, FullFilledMemoryStructure)
-    assert fullfilled.identifier == f"{PlainThing.__module__.lower()}.plainthing"
+    assert fullfilled.identifier == f"@{PlainThing.__module__.lower()}/plainthing"

@@ -33,40 +33,40 @@ class Point:
     y: int
 
 
-def point_or_int(value: Point | int) -> int:
+def point_or_int(item: Point | int) -> int:
     """Accepts a Point or an int."""
     return 1
 
 
-def list_or_str(value: list[int] | str) -> int:
+def list_or_str(item: list[int] | str) -> int:
     """Accepts a list of ints or a str."""
     return 1
 
 
 @pytest.mark.asyncio
 async def test_union_shrink_selects_model_branch() -> None:
-    """A model value passed to a ``Model | int`` union picks the model branch."""
+    """A model item passed to a ``Model | int`` union picks the model branch."""
     registry = StructureRegistry()
     definition = prepare_definition(point_or_int, structure_registry=registry)
 
     shrunk = await ashrink_args(
         definition, (Point(x=1, y=2),), {}, structure_registry=registry
     )
-    assert shrunk["value"]["__use"] == 0
-    assert shrunk["value"]["__value"]["x"] == 1
+    assert shrunk["item"]["__use"] == 0
+    assert shrunk["item"]["__value"]["x"] == 1
 
     shrunk = await ashrink_args(definition, (7,), {}, structure_registry=registry)
-    assert shrunk["value"] == {"__use": 1, "__value": 7}
+    assert shrunk["item"] == {"__use": 1, "__value": 7}
 
 
 @pytest.mark.asyncio
 async def test_union_shrink_selects_list_branch() -> None:
-    """A list value passed to a ``List[int] | str`` union picks the list branch."""
+    """A list item passed to a ``List[int] | str`` union picks the list branch."""
     registry = StructureRegistry()
     definition = prepare_definition(list_or_str, structure_registry=registry)
 
     shrunk = await ashrink_args(definition, ([1, 2],), {}, structure_registry=registry)
-    assert shrunk["value"] == {"__use": 0, "__value": [1, 2]}
+    assert shrunk["item"] == {"__use": 0, "__value": [1, 2]}
 
     shrunk = await ashrink_args(definition, ("s",), {}, structure_registry=registry)
-    assert shrunk["value"] == {"__use": 1, "__value": "s"}
+    assert shrunk["item"] == {"__use": 1, "__value": "s"}

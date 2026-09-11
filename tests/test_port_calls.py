@@ -21,6 +21,7 @@ from rekuest.api.schema import (
 )
 from rekuest.blok.parser import coerce_util_call, parse_util_call
 from rekuest.definition.define import prepare_definition
+from rekuest.definition.errors import DefinitionError
 from rekuest.structures.registry import StructureRegistry
 from rekuest.traits.calls import check_pure_call, infer_dependencies
 from rekuest.widgets import withEffect, withValidator
@@ -653,16 +654,32 @@ def test_definition_checks_return_ports_children_and_port_groups(
 
 
 @pytest.mark.define
-def test_port_named_value_is_allowed_and_shadowed_in_calls(
-    simple_registry: StructureRegistry,
-) -> None:
-    """A port may be called ``value``; inside a call ``value`` is always the port's own value."""
+def test_port_named_value_is_rejected(simple_registry: StructureRegistry) -> None:
+    """No port may be keyed ``value``: inside a call that name is the port's own value.
 
-    def func(value: int, n: Annotated[int, withValidator("gt(a=value, b=0)")]) -> int:
+    A port keyed ``value`` would therefore be unaddressable from any validator or
+    effect. The server refuses such an implementation at registration; defining
+    refuses it here so it fails locally instead.
+    """
+
+    def func(value: int, n: int) -> int:
         return value + n
 
+    with pytest.raises(DefinitionError, match="reserved key"):
+        prepare_definition(func, structure_registry=simple_registry)
+
+
+@pytest.mark.define
+def test_value_in_a_call_is_the_ports_own_value(
+    simple_registry: StructureRegistry,
+) -> None:
+    """Inside a call ``value`` is the port's own value, never a sibling port."""
+
+    def func(base: int, n: Annotated[int, withValidator("gt(a=value, b=0)")]) -> int:
+        return base + n
+
     definition = prepare_definition(func, structure_registry=simple_registry)
-    assert [port.key for port in definition.args] == ["value", "n"]
+    assert [port.key for port in definition.args] == ["base", "n"]
     validators = definition.args[1].validators
     assert validators is not None
     assert validators[0].dependencies == ()  # own value, not the sibling port

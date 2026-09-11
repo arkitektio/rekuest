@@ -29,6 +29,8 @@ from rekuest.api.schema import (
 )
 from rekuest.blok.parser import parse_util_call
 from rekuest.definition.define import prepare_definition
+from rekuest.definition.errors import DefinitionError
+from rekuest.definition.define import prepare_definition
 from rekuest.remote import acall
 from rekuest.widgets import withEffect, withValidator
 
@@ -52,8 +54,18 @@ def crop(
     return stop - start
 
 
-def offset(value: int, n: Annotated[int, withValidator("gt(a=value, b=0)", error_message="positive")]) -> int:
+def offset(base: int, n: Annotated[int, withValidator("gt(a=value, b=0)", error_message="positive")]) -> int:
     """Offset.
+
+    Args:
+        base: base
+        n: amount
+    """
+    return base + n
+
+
+def offset_with_reserved_port(value: int, n: int) -> int:
+    """Offset, but with a port keyed `value`.
 
     Args:
         value: base
@@ -150,12 +162,21 @@ async def test_port_calls_round_trip(deployment: Deployment) -> None:
         assert [a["utilCall"]["operation"] for a in effect["call"]["arguments"]] == ["gt", "gt"]
         assert effect["callJson"]["arguments"][1]["util_call"]["arguments"][0]["value_path"] == "start"
 
-        # a port may be named ``value``; in ``offset``'s validator ``value`` is n's own value
+        # ``value`` names a port's own value inside its calls, so no port may be
+        # keyed that way -- in ``offset``'s validator ``value`` is n's own value.
+        # The server rejects such an implementation; we reject it while defining
+        # so it fails locally instead of at registration.
         impl = await amy_implementation_at("offset", rath=app.rath)
-        value_port, n_port = impl.action.args
-        assert value_port.key == "value"
+        base_port, n_port = impl.action.args
+        assert base_port.key == "base"
         assert n_port.validators[0].dependencies == ()
-        assert await acall(impl, postman=app.postman, structure_registry=app.structure_registry, value=2, n=3) == 5
+        assert await acall(impl, postman=app.postman, structure_registry=app.structure_registry, base=2, n=3) == 5
+
+        with pytest.raises(DefinitionError, match="reserved key"):
+            prepare_definition(
+                offset_with_reserved_port,
+                structure_registry=app.structure_registry,
+            )
 
         # the function itself is unaffected
         impl = await amy_implementation_at("crop", rath=app.rath)
