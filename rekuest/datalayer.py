@@ -7,7 +7,7 @@ Example:
     You can define all of the logic within the context manager
 
     ```python
-    from mikro_next imports Datalayer
+    from mikro imports Datalayer
 
     dl = Datalayer(access_key="XXXX", secret_key="XXXX", endpoint_url="s3.amazonaws.com")
 
@@ -19,7 +19,7 @@ Example:
     Async Usage:
 
     ```python
-    from mikro_nextdatalayer import Datalayer
+    from mikrodatalayer import Datalayer
 
     dl = Datalayer(access_key="XXXX", secret_key="XXXX", endpoint_url="s3.amazonaws.com")
 
