@@ -87,7 +87,7 @@ except ImportError:
 
 from .builtin_structures import structure_reg
 
-__version__ = "3.0.0"
+__version__ = "3.0.1"
 
 __all__ = [
     "Backoff",
