@@ -20,9 +20,9 @@ from rekuest.postmans.graphql import GraphQLPostman
 from rekuest.links.upload import UploadLink
 from .structures.default import get_default_structure_registry
 from fakts.models import Requirement
-from arkitekt_next.service_registry import Params, BaseArkitektService
+from arkitekt.service_registry import Params, BaseArkitektService
 from rath.links.compose import compose
-from arkitekt_next.service_registry import (
+from arkitekt.service_registry import (
     get_default_service_registry,
 )
 

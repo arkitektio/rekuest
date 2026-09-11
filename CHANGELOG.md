@@ -592,7 +592,7 @@ Co-authored-by: Copilot <copilot@github.com>
 - Update dependencies and improve code quality
   ([`318c13a`](https://github.com/arkitektio/rekuest-next/commit/318c13ac9a6cf3c2fb995dc2ca5074d7fcd2ee56))
 
-- Updated `rath` dependency to version 3.5.1 in `pyproject.toml`. - Updated `arkitekt-next`
+- Updated `rath` dependency to version 3.5.1 in `pyproject.toml`. - Updated `arkitekt`
   dependency to version 0.17 in `pyproject.toml`. - Removed unused file `2`. - Improved exception
   handling in `rekuest_next/__init__.py`. - Refactored `Actor` class in
   `rekuest_next/actors/base.py` for better readability and consistency. - Added type ignore comments

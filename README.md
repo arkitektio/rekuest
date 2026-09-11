@@ -61,11 +61,11 @@ A running rekuest server (most easily obtained through an
 ## Install
 
 rekuest is usually consumed through the Arkitekt platform, which wires up the
-server connection, authentication and lifecycle for you. Installing `arkitekt-next`
+server connection, authentication and lifecycle for you. Installing `arkitekt`
 pulls in `rekuest` as well:
 
 ```bash
-pip install arkitekt-next
+pip install arkitekt
 ```
 
 > Doing image analysis? The Arkitekt platform ships ready-made data structures for
@@ -76,7 +76,7 @@ pip install arkitekt-next
 Register a typed function — its signature and docstring become the schema:
 
 ```python
-from arkitekt_next import register, easy
+from arkitekt import register, easy
 
 
 @register
@@ -103,7 +103,7 @@ with easy("my_app") as app:
 Run it during development with:
 
 ```bash
-arkitekt-next run dev
+arkitekt run dev
 ```
 
 The action is now registered under your app and signed-in user, and can be
@@ -116,7 +116,7 @@ Resolve an action with `find` (by its id, or pass an `Action` straight through),
 invoke it with `call` (sync) or `acall` (async):
 
 ```python
-from arkitekt_next import easy
+from arkitekt import easy
 from rekuest import find, call
 
 
