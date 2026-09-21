@@ -38,8 +38,12 @@ PyPI marks `…-rc.N` versions as prereleases, so a plain
 `integration.yaml` runs on `main` and `next` and sets `REKUEST_SERVICE_TAG`
 (`latest` on `main`, `next` elsewhere). `tests/integration/docker-compose.yml`
 resolves the rekuest backend image via
-`jhnnsrs/rekuest:${REKUEST_SERVICE_TAG:-next}`, so the prerelease line is tested
+`jhnnsrs/rekuest:${REKUEST_SERVICE_TAG:-latest}`, so the prerelease line is tested
 against the prerelease backend and the stable line against `:latest`.
+
+CI always sets the tag explicitly, so the `:-latest` fallback is what a bare local
+`pytest -m integration` gets: the released backend, not the prerelease one. Export the
+variable to override it.
 
 ## Day-to-day
 
