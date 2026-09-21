@@ -22,8 +22,9 @@ models so that they stay usable from anywhere -- see the import rule below.
    ``rekuest`` import here is a cycle. ``tests/test_base_catalog.py`` enforces it as a
    source-level substring check, which is why even a sibling ``rekuest.catalogs.x`` import is
    refused and everything schema-free lives in this one file. Code that needs the generated
-   models goes in a sibling module this one never imports (``rekuest.catalogs.remote``,
-   ``rekuest.blok.validate``, ``rekuest.definition.catalogs``).
+   models lives elsewhere: ``rekuest.client.catalogs`` for the half that speaks to the server,
+   ``rekuest.blok.validate`` and ``rekuest.definition.catalogs`` for the rest. This package is
+   now a leaf -- it is ``__init__.py`` and ``base_v1.json``, and nothing else.
 """
 
 import functools

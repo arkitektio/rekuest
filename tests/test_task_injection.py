@@ -76,7 +76,7 @@ async def test_an_injected_rekuest_client_parents_its_calls_to_the_task(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Child calls belong to the rekuest *service*, viewed for this task."""
-    from rekuest.rekuest import Rekuest
+    from rekuest.client.client import Rekuest
 
     app = FakeApp("A")
     agent = build_agent(app)
@@ -94,7 +94,7 @@ async def test_an_injected_rekuest_client_parents_its_calls_to_the_task(
         seen.update(kwargs, target=target, args=args)
         return "child-result"
 
-    monkeypatch.setattr("rekuest.remote.acall", fake_acall)
+    monkeypatch.setattr("rekuest.client.remote.acall", fake_acall)
 
     async def parent(x: int, rekuest: Rekuest, task: Task) -> str:
         """Calls a child through the injected client."""
@@ -116,7 +116,7 @@ async def test_an_injected_rekuest_client_parents_its_calls_to_the_task(
 async def test_outside_a_task_the_rekuest_client_calls_over_its_own_postman(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from rekuest.rekuest import Rekuest
+    from rekuest.client.client import Rekuest
 
     agent = build_agent(FakeApp("A"))
     rekuest = Rekuest.model_construct(
@@ -130,7 +130,7 @@ async def test_outside_a_task_the_rekuest_client_calls_over_its_own_postman(
         seen.update(kwargs)
         return "ok"
 
-    monkeypatch.setattr("rekuest.remote.acall", fake_acall)
+    monkeypatch.setattr("rekuest.client.remote.acall", fake_acall)
     assert await rekuest.acall(ACTION) == "ok"
     assert seen["postman"] == "graphql-postman" and "parent" not in seen
 

@@ -2,7 +2,7 @@
 
 from typing import TypeVar
 from rekuest.protocols import AnyFunction
-from rekuest.rath import RekuestRath
+from rekuest.client.rath import RekuestRath
 from rekuest.api.schema import RekuestApi
 from rekuest.postmans.types import Postman
 from koil import unkoil, unkoil_gen
@@ -108,7 +108,7 @@ class Rekuest(Composition, RekuestApi):
 
     async def acall(self, target: Any, *args: Any, **kwargs: Any) -> Any:  # noqa: ANN401
         """Call an action through this client (a child of the task, on a task view)."""
-        from rekuest.remote import acall
+        from rekuest.client.remote import acall
 
         return await acall(
             await self.aresolve(target), *args, **self._call_options(kwargs)
@@ -125,21 +125,21 @@ class Rekuest(Composition, RekuestApi):
         return kwargs
 
     async def acall_raw(self, **kwargs: Any) -> Any:  # noqa: ANN401
-        """Call with already-serialized arguments (see ``rekuest.remote.acall_raw``)."""
-        from rekuest.remote import acall_raw
+        """Call with already-serialized arguments (see ``rekuest.client.remote.acall_raw``)."""
+        from rekuest.client.remote import acall_raw
 
         return await acall_raw(**self._raw_options(kwargs))
 
     async def aiterate_raw(self, **kwargs: Any) -> Any:  # noqa: ANN401
-        """Stream with already-serialized arguments (see ``rekuest.remote.aiterate_raw``)."""
-        from rekuest.remote import aiterate_raw
+        """Stream with already-serialized arguments (see ``rekuest.client.remote.aiterate_raw``)."""
+        from rekuest.client.remote import aiterate_raw
 
         async for value in aiterate_raw(**self._raw_options(kwargs)):
             yield value
 
     async def aiterate(self, target: Any, *args: Any, **kwargs: Any) -> Any:  # noqa: ANN401
         """Stream an action's yields through this client."""
-        from rekuest.remote import aiterate
+        from rekuest.client.remote import aiterate
 
         async for value in aiterate(
             await self.aresolve(target), *args, **self._call_options(kwargs)

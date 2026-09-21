@@ -1,7 +1,7 @@
 """What a call names as its target reaches the postman as an id.
 
 The translation happens once, at the boundary between the two halves of the call
-surface: ``rekuest.remote`` holds the fetched ``Action``/``Implementation`` and
+surface: ``rekuest.client.remote`` holds the fetched ``Action``/``Implementation`` and
 reads ``.id`` off it, ``rekuest.calls`` only ever sees the id. Every other test
 that drives these helpers leaves the target unset, so both sides of that
 boundary were unguarded.
@@ -94,7 +94,7 @@ async def test_a_call_with_no_target_sends_neither_id() -> None:
 
 
 async def _iterate(postman: RecordingPostman, **kwargs: Any) -> list[Any]:  # noqa: ANN401
-    from rekuest.remote import aiterate_raw
+    from rekuest.client.remote import aiterate_raw
 
     return [item async for item in aiterate_raw(postman=postman, **kwargs)]
 

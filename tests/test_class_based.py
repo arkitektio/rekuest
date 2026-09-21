@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from rekuest.agents.hooks.startup import ThreadedStartupHook
 from rekuest.agents.hooks.background import WrappedThreadedBackgroundTask
 from rekuest.agents.base import RekuestAgent
-from rekuest.rekuest import Rekuest
+from rekuest.client.client import Rekuest
 from rekuest.state.decorator import state
 from rekuest.app import AppRegistry
 

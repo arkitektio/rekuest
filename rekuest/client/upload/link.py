@@ -2,7 +2,7 @@ import asyncio
 from rath.links.parsing import ParsingLink
 from rath.operation import Operation, opify
 from typing import Any
-from rekuest.io.upload import (
+from rekuest.client.upload.media import (
     astore_media_file,
 )
 from pydantic import Field

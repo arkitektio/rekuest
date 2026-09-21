@@ -16,7 +16,7 @@ from rath.origin import origin_context
 from rath.turms.funcs import TOperation
 
 from rekuest.api.schema import RekuestApi
-from rekuest.rath import RekuestRath
+from rekuest.client.rath import RekuestRath
 
 
 class RekuestGraphQL(RekuestApi):

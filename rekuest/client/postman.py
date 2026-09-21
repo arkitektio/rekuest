@@ -4,7 +4,7 @@ from types import TracebackType
 from typing import Any
 from collections.abc import AsyncGenerator, Sequence
 from rath.scalars import ID
-from rekuest.graphql import RekuestGraphQL
+from rekuest.client.graphql import RekuestGraphQL
 from rekuest.api.schema import (
     HookInput,
     ResolvedDependencyInput,
@@ -18,8 +18,8 @@ import asyncio
 import uuid
 from pydantic import Field, PrivateAttr
 import logging
-from .errors import PostmanException, RootOnlyAssignError
-from rekuest.rath import RekuestRath
+from rekuest.postmans.errors import PostmanException, RootOnlyAssignError
+from rekuest.client.rath import RekuestRath
 from koil.composition import KoiledModel
 
 logger = logging.getLogger(__name__)

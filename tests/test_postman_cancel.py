@@ -28,9 +28,9 @@ from .memory_transport import MemoryAgentTransport
 from rekuest.agents.caller import AgentPostman
 from rekuest.api.schema import TaskEventChange, TaskEventKind
 from rekuest.postmans.errors import RootOnlyAssignError
-from rekuest.postmans.graphql import GraphQLPostman
-from rekuest.rath import RekuestRath
-from rekuest.remote import aiterate_raw
+from rekuest.client.postman import GraphQLPostman
+from rekuest.client.rath import RekuestRath
+from rekuest.client.remote import aiterate_raw
 
 from rath.links.testing.direct_succeeding_link import DirectSucceedingLink
 

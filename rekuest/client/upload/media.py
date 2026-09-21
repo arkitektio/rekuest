@@ -3,7 +3,7 @@
 from typing import TYPE_CHECKING
 
 from rekuest.scalars import MediaLike
-from .errors import PermissionsError
+from rekuest.client.upload.errors import PermissionsError
 
 from rekuest.datalayer import DataLayer
 

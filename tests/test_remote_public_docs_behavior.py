@@ -6,7 +6,7 @@ There is no current client, postman or parent task to fall back to: a
 
 import pytest
 
-import rekuest.remote as remote
+import rekuest.client.remote as remote
 from rekuest.api.schema import Action
 
 

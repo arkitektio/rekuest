@@ -34,10 +34,10 @@ from rekuest.api.schema import (
 from rekuest.app import AppRegistry
 from rekuest.agents.transport.websocket import WebsocketAgentTransport
 from rekuest.datalayer import DataLayer
-from rekuest.links.upload import UploadLink
-from rekuest.postmans.graphql import GraphQLPostman
-from rekuest.rath import RekuestRath
-from rekuest.rekuest import Rekuest
+from rekuest.client.upload.link import UploadLink
+from rekuest.client.postman import GraphQLPostman
+from rekuest.client.rath import RekuestRath
+from rekuest.client.client import Rekuest
 from rekuest.widgets import SearchWidget
 
 def build_relative_path(*path: str) -> str:

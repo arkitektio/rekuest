@@ -11,6 +11,6 @@ class RekuestRath(rath.Rath):
     for authentication, retrying, and shrinking of requests.
 
     Entering it does not make it "the current client". Only the rekuest service
-    that owns it is current while entered (see :class:`rekuest.rekuest.Rekuest`);
+    that owns it is current while entered (see :class:`rekuest.client.client.Rekuest`);
     a client used on its own is passed where it is needed, as ``rath=``.
     """

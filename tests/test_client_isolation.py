@@ -7,9 +7,9 @@ the arkitekt side, where a real app can be built.
 
 
 from rekuest.app import AppRegistry
-from rekuest.postmans.graphql import GraphQLPostman
-from rekuest.rath import RekuestRath
-from rekuest.rekuest import Rekuest
+from rekuest.client.postman import GraphQLPostman
+from rekuest.client.rath import RekuestRath
+from rekuest.client.client import Rekuest
 from rekuest.structures.registry import StructureRegistry
 
 from .conftest import DirectSucceedingLink

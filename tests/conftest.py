@@ -10,10 +10,10 @@ from uuid import uuid4
 import pytest
 from rekuest.app import AppRegistry
 from rekuest.structures.registry import StructureRegistry
-from rekuest.rekuest import Rekuest, RekuestRath
+from rekuest.client.client import Rekuest, RekuestRath
 from rath.links.testing.direct_succeeding_link import DirectSucceedingLink
 from rekuest.agents.base import RekuestAgent
-from rekuest.postmans.graphql import GraphQLPostman
+from rekuest.client.postman import GraphQLPostman
 from rekuest.agents.transport.websocket import WebsocketAgentTransport
 import os
 from dokker import Deployment, testing

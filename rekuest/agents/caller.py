@@ -5,7 +5,7 @@ the call should travel over the agent's own WebSocket as an ``AssignRequest`` in
 going out through the GraphQL postman. ``AgentPostman`` is the object that makes that work:
 it satisfies the :class:`~rekuest.postmans.types.Postman` protocol (``aassign`` →
 ``AsyncGenerator`` of task events), so every existing call path in
-:mod:`rekuest.remote` (``acall`` / ``aiterate``) and :mod:`rekuest.calls`
+:mod:`rekuest.client.remote` (``acall`` / ``aiterate``) and :mod:`rekuest.calls`
 (``acall_dependency``) routes through it unchanged: a per-task ``Rekuest`` view
 (``Rekuest.for_task``) and the dependency proxies pass it as ``postman=``.
 

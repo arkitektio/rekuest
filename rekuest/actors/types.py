@@ -270,7 +270,7 @@ class ActorContext(Shelver, LockHost, Capturable, Protocol):
 class AgentLifecycle(Protocol):
     """Driving the agent itself — what the composition root uses, not what actors use.
 
-    Called only from :class:`~rekuest.rekuest.Rekuest` and the FastAPI routes.
+    Called only from :class:`~rekuest.client.client.Rekuest` and the FastAPI routes.
     """
 
     force: bool | None

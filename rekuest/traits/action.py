@@ -25,7 +25,7 @@ class Callable(KoiledModel):
         Returns:
             AsyncIterator[Any]: The result of the action.
         """
-        from rekuest.remote import iterate
+        from rekuest.client.remote import iterate
         from rekuest.api.schema import ActionKind
 
         assert self.get_action_kind() == ActionKind.GENERATOR, (
@@ -40,7 +40,7 @@ class Callable(KoiledModel):
         Returns:
             Any: The result of the action.
         """
-        from rekuest.remote import call
+        from rekuest.client.remote import call
         from rekuest.api.schema import ActionKind
 
         if self.get_action_kind() == ActionKind.GENERATOR:
@@ -58,7 +58,7 @@ class Callable(KoiledModel):
         Returns:
             AsyncIterator[Any]: The result of the action.
         """
-        from rekuest.remote import aiterate
+        from rekuest.client.remote import aiterate
         from rekuest.api.schema import ActionKind
 
         assert self.get_action_kind() == ActionKind.GENERATOR, (
@@ -73,7 +73,7 @@ class Callable(KoiledModel):
         Returns:
             Any: The result of the action.
         """
-        from rekuest.remote import acall
+        from rekuest.client.remote import acall
         from rekuest.api.schema import ActionKind
 
         assert self.get_action_kind() == ActionKind.FUNCTION, (

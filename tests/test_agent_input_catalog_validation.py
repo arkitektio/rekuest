@@ -13,7 +13,7 @@ from rekuest.api.schema import (
 )
 from rekuest.blok import bsx
 from rekuest.catalogs import UNKNOWN_CATALOG, UNKNOWN_OPERATION
-from rekuest.catalogs.remote import DEFAULT_CATALOG_NAME, validate_agent_input
+from rekuest.client.catalogs import DEFAULT_CATALOG_NAME, validate_agent_input
 from rekuest.widgets import withValidator
 
 from .catalog_cases import BOX, ELECTRON, NAMED_ONLY, SLIDER

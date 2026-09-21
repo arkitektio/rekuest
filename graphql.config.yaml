@@ -36,7 +36,7 @@ projects:
             client_class: RekuestApi
             # Everything Rekuest defines itself (fields, call helpers, register...).
             reserved_from:
-              - rekuest.rekuest.Rekuest
+              - rekuest.client.client.Rekuest
             coercible_scalars:
               SearchQuery: rekuest.scalars.SearchQueryCoercible
               ID: rath.scalars.IDCoercible
