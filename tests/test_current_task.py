@@ -15,11 +15,13 @@ import asyncio
 import threading
 import time
 from collections.abc import AsyncGenerator, Generator
+from types import SimpleNamespace
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 import pytest
-from rath.task import current_task
+from koil import unkoil
+from rath.task import current_task, token_of
 
 from rekuest import messages
 from rekuest.agents.base import BaseAgent
@@ -229,3 +231,84 @@ async def test_what_does_not_carry() -> None:
     """
     result = await run_one(spawns_its_own_threads, token="t1")
     assert result == {"return0": "None,None,t1"}
+
+
+# --------------------------------------------------------------------------- #
+# End to end: the token actually reaches the request
+# --------------------------------------------------------------------------- #
+
+
+class RecordingRath:
+    """As much of a rath as a generated client uses, remembering the headers."""
+
+    middlewares: list[Any] = []
+
+    def __init__(self) -> None:
+        self.headers: list[Any] = []
+
+    async def aquery(
+        self, document: str, variables: dict[str, Any], headers: Any = None  # noqa: ANN401
+    ) -> Any:  # noqa: ANN401
+        self.headers.append(headers)
+        return SimpleNamespace(data={"ok": True})
+
+
+class StampingClient:
+    """A client shaped like the generated ones: it stamps the task per call."""
+
+    TASK_HEADER = "Rekuest-Task"
+
+    def __init__(self) -> None:
+        self.rath = RecordingRath()
+
+    async def acall_something(self, task: Any = None) -> str:  # noqa: ANN401
+        token = token_of(task)
+        headers = {self.TASK_HEADER: token} if token else None
+        await self.rath.aquery("query { ok }", {}, headers=headers)
+        return str(token)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "func_name", ["e2e_async", "e2e_threaded", "e2e_async_gen", "e2e_threaded_gen"]
+)
+async def test_the_token_reaches_the_request_for_every_strategy(func_name: str) -> None:
+    """The gate: a real assignment, a real client call, the exact header on it.
+
+    Every unit test above checks what `current_task` says. This checks what goes
+    out -- the only thing the server sees, and the only thing a wrong answer here
+    would show up in.
+    """
+    client = StampingClient()
+
+    async def e2e_async() -> str:
+        """An async action."""
+        return await client.acall_something()
+
+    def e2e_threaded() -> str:
+        """A sync action."""
+        return unkoil(client.acall_something)
+
+    async def e2e_async_gen() -> AsyncGenerator[str, None]:
+        """An async generator action."""
+        yield await client.acall_something()
+
+    def e2e_threaded_gen() -> Generator[str, None, None]:
+        """A sync generator action."""
+        yield unkoil(client.acall_something)
+
+    func = {
+        "e2e_async": e2e_async,
+        "e2e_threaded": e2e_threaded,
+        "e2e_async_gen": e2e_async_gen,
+        "e2e_threaded_gen": e2e_threaded_gen,
+    }[func_name]
+
+    agent = build_agent()
+    agent.app_registry.register(func)
+    agent.collect_from_registry()
+    await run_assignment(agent, assign(func_name, token="tok-1"))
+
+    assert client.rath.headers == [{"Rekuest-Task": "tok-1"}], (
+        "the task must reach the outgoing request, not just the contextvar"
+    )
