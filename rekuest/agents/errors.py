@@ -19,12 +19,6 @@ class StateRequirementsNotMet(AgentException):
     """
 
 
-class ContextRequirementsNotMet(AgentException):
-    """
-    Raised when the context requirements are not met
-    """
-
-
 class MissingServiceWarning(UserWarning):
     """A registered function uses a structure whose service the app does not have.
 

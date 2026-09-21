@@ -342,8 +342,3 @@ def iterate(*args: Any, **kwargs: Any) -> Generator[Any, None, None]:  # noqa: A
     adapts the async iterator through ``unkoil_gen``.
     """
     return unkoil_gen(aiterate, *args, **kwargs)
-
-
-def call_raw(*args: Any, **kwargs: Any) -> Any:  # noqa: ANN401
-    """Synchronously execute a low-level remote call with already serialized arguments."""
-    return unkoil(acall_raw, *args, **kwargs)

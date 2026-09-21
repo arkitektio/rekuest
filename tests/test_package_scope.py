@@ -13,8 +13,10 @@ from pathlib import Path
 import rekuest
 
 PACKAGE = Path(rekuest.__file__).parent
+#: The one module allowed to import arkitekt. There used to be a
+#: ``contrib/arkitekt`` package beside it; it is gone, and keeping its exemption
+#: would have silently pre-authorised anything dropped back in there.
 INTEGRATION_MODULES = {PACKAGE / "arkitekt.py"}
-INTEGRATION_PACKAGES = {PACKAGE / "contrib" / "arkitekt"}
 
 
 def _module_scope_imports(tree: ast.Module) -> list[str]:
@@ -45,9 +47,7 @@ def _module_scope_imports(tree: ast.Module) -> list[str]:
 
 
 def _is_integration(path: Path) -> bool:
-    return path in INTEGRATION_MODULES or any(
-        parent in INTEGRATION_PACKAGES for parent in path.parents
-    )
+    return path in INTEGRATION_MODULES
 
 
 def test_no_module_imports_arkitekt_at_module_scope() -> None:

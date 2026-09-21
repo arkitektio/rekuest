@@ -1,9 +1,10 @@
 """Only the client layer may speak the generated client surface.
 
-``rekuest/api/schema.py`` holds two unrelated things: the *protocol vocabulary*
-an app speaks (inputs, enums) and the *client surface* (fragments, operations
-and the ``RekuestApi`` mixin). An agent needs the first and never the second --
-it registers by connecting, and nothing in its path calls the GraphQL API.
+The generated schema is two modules: ``rekuest/protocol/schema.py`` holds the
+*protocol vocabulary* an app speaks (inputs, enums), and ``rekuest/api/schema.py``
+holds the *client surface* (fragments, operations and the ``RekuestApi`` mixin).
+An agent needs the first and never the second -- it registers by connecting, and
+nothing in its path calls the GraphQL API.
 
 The rule, in one sentence:
 
@@ -12,9 +13,9 @@ The rule, in one sentence:
     speaks the protocol vocabulary, and importing ``rekuest`` must not load the
     client surface at all.
 
-Until the generated module is split in two, the first assertion is the one that
-bites; the rest come with the split and are written so they cannot pass on the
-leaky state they exist to catch.
+Two of the assertions below are about re-export back doors, and are written so
+they cannot pass on the leaky state they exist to catch -- see the note on
+*defined* versus *imported* names.
 """
 
 import ast
@@ -22,8 +23,6 @@ import os
 import subprocess
 import sys
 from pathlib import Path
-
-import pytest
 
 import rekuest
 
@@ -39,7 +38,7 @@ PACKAGE = Path(rekuest.__file__).parent
 CLIENT_PACKAGES = {PACKAGE / "client", PACKAGE / "api"}
 CLIENT_MODULES = {PACKAGE / "arkitekt.py", PACKAGE / "traits" / "action.py"}
 
-#: Where the split puts the protocol vocabulary. Absent until then.
+#: The two generated modules the rule is about.
 PROTOCOL_MODULE = PACKAGE / "protocol" / "schema.py"
 CLIENT_SCHEMA_MODULE = PACKAGE / "api" / "schema.py"
 
@@ -108,10 +107,9 @@ def _agnostic_modules() -> list[Path]:
 
 
 def test_nothing_outside_the_client_layer_imports_it() -> None:
-    """The half of the rule that holds today, before the generated module is split.
+    """A module that needs a rath, a postman or an operation is a client module.
 
-    A module that needs a rath, a postman or an operation is a client module. The
-    agnostic runtime reaches none of them -- not even for a type annotation.
+    The agnostic runtime reaches none of them -- not even for a type annotation.
     """
     offenders = {}
     for path in _agnostic_modules():
@@ -131,14 +129,10 @@ def test_nothing_outside_the_client_layer_imports_it() -> None:
 
 
 def test_only_the_client_layer_names_the_generated_client_surface() -> None:
-    """The other half: it needs the generated module split first.
-
-    Until then ``rekuest.api.schema`` holds the wire vocabulary too, so every
-    module that describes a port names it and the rule cannot be met.
+    """The other half: the vocabulary lives in ``rekuest.protocol.schema`` now, so
+    a module naming ``rekuest.api.schema`` is asking for a fragment or an
+    operation -- and belongs in the client layer if it really needs one.
     """
-    if not PROTOCOL_MODULE.exists():
-        pytest.skip("the generated module is not split yet")
-
     offenders = [
         str(path.relative_to(PACKAGE))
         for path in _agnostic_modules()
@@ -179,9 +173,6 @@ def test_importing_rekuest_does_not_load_the_client_surface() -> None:
     time this runs in-process ``rekuest.api.schema`` is already in ``sys.modules``
     and the assertion could never fail.
     """
-    if not PROTOCOL_MODULE.exists():
-        pytest.skip("the generated module is not split yet")
-
     code = (
         "import sys, rekuest; "
         "print(sorted(m for m in sys.modules if m.startswith('rekuest.')))"
@@ -209,9 +200,6 @@ def test_importing_rekuest_does_not_load_the_client_surface() -> None:
 
 def test_the_two_generated_modules_define_disjoint_names() -> None:
     """One definition each, or pydantic builds every input model twice."""
-    if not PROTOCOL_MODULE.exists():
-        pytest.skip("the generated module is not split yet")
-
     overlap = _defines(PROTOCOL_MODULE) & _defines(CLIENT_SCHEMA_MODULE)
 
     assert not overlap, (
@@ -227,9 +215,6 @@ def test_no_protocol_name_is_reached_through_the_client_module() -> None:
     which makes ``rekuest.api.schema.ArgPortInput`` resolve. That is a shim by
     another name, and this is what stops one appearing.
     """
-    if not PROTOCOL_MODULE.exists():
-        pytest.skip("the generated module is not split yet")
-
     protocol_names = _defines(PROTOCOL_MODULE)
     offenders: dict[str, list[str]] = {}
     for path in _agnostic_modules():

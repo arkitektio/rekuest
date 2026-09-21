@@ -21,18 +21,6 @@ class KickError(AgentTransportException):
     """
 
 
-class ProvisionListDeniedError(AgentTransportException):
-    """
-    Raised when the backend is not able to list the provisions.
-    """
-
-
-class TaskListDeniedError(AgentTransportException):
-    """
-    Raised when the backend is not able to list the tasks.
-    """
-
-
 class CorrectableConnectionFail(AgentTransportException):
     """Raised when the connection to the agent is lost but can be restored."""
 

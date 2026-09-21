@@ -15,18 +15,6 @@ class AssignException(PostmanException):
     """
 
 
-class RecoverableAssignException(AssignException):
-    """
-    Raised when an error occurs during the assignment of a task to an agent.
-    """
-
-
-class IncorrectReserveState(AssignException):
-    """
-    Raised when a task during an incorect reservation state for this contract
-    """
-
-
 class RootOnlyAssignError(PostmanException):
     """Raised when a non-root call is handed to a transport that only creates roots.
 

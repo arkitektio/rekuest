@@ -136,7 +136,8 @@ class WithVariables:
                 )
             kwargs[key] = app_context
 
-        # No task view here: a hook runs for no assignment.
+        # No task is passed: a hook runs for no assignment, so its calls are
+        # attributed to whatever is ambient, which at startup is nothing.
         kwargs.update(
             resolve_service_clients(
                 self.injected_variables.service_client_variables,

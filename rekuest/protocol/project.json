@@ -75,9 +75,6 @@
             "type_annotation_style": "auto",
             "external_modules": [],
             "additional_bases": {
-                "AnnotationInput": [
-                    "rekuest.traits.ports.AnnotationInputTrait"
-                ],
                 "ArgPortInput": [
                     "rekuest.traits.ports.PortTrait"
                 ],

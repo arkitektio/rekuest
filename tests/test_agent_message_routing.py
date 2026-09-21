@@ -61,7 +61,7 @@ async def test_interrupt_for_an_unknown_task_does_not_kill_the_agent(
 
     That exception unwinds the message consumer and tears the whole agent down, so a
     single interrupt escalation against this agent would take the process's other work
-    with it. ``escalate_to_interrupt`` is public API all through ``remote.py``, and
+    with it. ``escalate_to_interrupt`` is public API all through the call surface, and
     ``Interrupted`` was already listed as a terminal report the agent retains -- so the
     report path was designed and only the inbound half was missing.
     """

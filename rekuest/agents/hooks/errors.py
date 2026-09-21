@@ -15,12 +15,6 @@ class StartupHookError(HookError):
     """
 
 
-class BackgroundHookError(HookError):
-    """
-    Raised when a background hook fails
-    """
-
-
 class ShutdownHookError(HookError):
     """
     Raised when a shutdown hook fails

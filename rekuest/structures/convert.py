@@ -210,20 +210,3 @@ def fullfilled_structure_from_cls(cls: type[Any]) -> FullFilledStructure:
         if hasattr(cls, "get_default_returnwidget")
         else None,
     )
-
-
-def fullfilled_memory_structure_from_cls(
-    cls: type[Any],
-) -> FullFilledMemoryStructure:
-    """Build a FullFilledMemoryStructure for a class kept in the local shelve."""
-    if hasattr(cls, "get_identifier"):
-        identifier = cls.get_identifier()
-    else:
-        identifier = cls_to_identifier(cls)
-
-    return FullFilledMemoryStructure(
-        cls=cls,
-        identifier=identifier,
-        predicate=build_instance_predicate(cls),
-        description=None,
-    )

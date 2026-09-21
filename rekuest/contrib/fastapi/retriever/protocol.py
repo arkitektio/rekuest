@@ -6,12 +6,6 @@ from rekuest.messages import JSONSerializable
 
 
 @dataclass
-class SessionInfo:
-    session_id: str
-    created_at: datetime
-
-
-@dataclass
 class Snapshot:
     timepoint: datetime
     data: JSONSerializable

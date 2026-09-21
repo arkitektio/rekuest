@@ -1,8 +1,10 @@
 """A parameter annotated `Task` receives the task it runs for.
 
-Everything the module-level helpers reach through context variables -- logging,
-progress, pause points, child calls, per-task client views -- is a method of an
-object the action was handed.
+Logging, progress, pause points and child calls are all methods of an object
+the action was handed, rather than module-level helpers reaching for whatever is
+current. (The task a *client* attributes its requests to is ambient -- see
+``rath.task`` and ``tests/test_current_task.py`` -- but the ``Task`` itself is
+passed.)
 """
 
 import asyncio

@@ -60,8 +60,6 @@ projects:
           Identifier: rekuest.scalars.Identifier
           SearchQuery: rekuest.scalars.SearchQuery
         additional_bases:
-          AnnotationInput:
-            - rekuest.traits.ports.AnnotationInputTrait
           ArgPortInput:
             - rekuest.traits.ports.PortTrait
           ReturnPortInput:
@@ -117,7 +115,6 @@ projects:
           - type: turms.stylers.default.DefaultStyler
           - type: turms.stylers.appender.AppenderStyler
             append_fragment: ""
-        plugins:
         plugins:
           - type: turms.plugins.fragments.FragmentsPlugin
           - type: turms.plugins.operations.OperationsPlugin

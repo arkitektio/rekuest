@@ -80,8 +80,8 @@ def resolve_service_clients(
 
     The one place a client-typed parameter is turned into a client. Actions,
     hooks and a structure's expander all inject the same way, and each used to
-    spell this loop out again -- two of them had already drifted apart on whether
-    a task view applies.
+    spell this loop out again -- two of them had already drifted apart on how the
+    client was handed over.
 
     Args:
         variables: Parameter name to the client class it wants, from

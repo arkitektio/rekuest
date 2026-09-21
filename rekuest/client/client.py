@@ -93,7 +93,7 @@ class Rekuest(Composition, RekuestApi):
         )
 
     async def acall(self, target: Any, *args: Any, **kwargs: Any) -> Any:  # noqa: ANN401
-        """Call an action through this client (a child of the task, on a task view)."""
+        """Call an action through this client, as a child of the running task."""
         from rekuest.client.remote import acall
 
         return await acall(
@@ -101,7 +101,7 @@ class Rekuest(Composition, RekuestApi):
         )
 
     def call(self, target: Any, *args: Any, **kwargs: Any) -> Any:  # noqa: ANN401
-        """Call an action through this client (a child of the task, on a task view)."""
+        """Call an action through this client, as a child of the running task."""
         return unkoil(self.acall, target, *args, **kwargs)
 
     def _raw_options(self, kwargs: dict[str, Any]) -> dict[str, Any]:

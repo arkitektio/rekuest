@@ -1,7 +1,7 @@
 """The remote-call engine takes everything it uses from its caller.
 
-There is no current client, postman or parent task to fall back to: a
-``Rekuest`` client (or a per-task view of one) passes its own.
+There is no current client or postman to fall back to: a ``Rekuest`` client
+passes its own, and takes the parent task from the one that is running.
 """
 
 import pytest
