@@ -22,8 +22,8 @@ from rekuest.api.schema import (
     ChoiceAssignWidgetInput,
     ChoiceReturnWidgetInput,
     ChoiceInput,
-    Identifier,
 )
+from rekuest.scalars import Identifier
 from rekuest.structures.errors import StructureDefinitionError
 from rekuest.structures.types import (
     FullFilledEnum,

@@ -5,9 +5,9 @@ the call should travel over the agent's own WebSocket as an ``AssignRequest`` in
 going out through the GraphQL postman. ``AgentPostman`` is the object that makes that work:
 it satisfies the :class:`~rekuest.postmans.types.Postman` protocol (``aassign`` →
 ``AsyncGenerator`` of task events), so every existing call path in
-:mod:`rekuest.remote` (``acall`` / ``aiterate`` / ``acall_dependency``) routes through
-it unchanged: a per-task ``Rekuest`` view (``Rekuest.for_task``) and the dependency
-proxies pass it as ``postman=``.
+:mod:`rekuest.remote` (``acall`` / ``aiterate``) and :mod:`rekuest.calls`
+(``acall_dependency``) routes through it unchanged: a per-task ``Rekuest`` view
+(``Rekuest.for_task``) and the dependency proxies pass it as ``postman=``.
 
 The translation is:
 
@@ -16,7 +16,7 @@ The translation is:
 - inbound: the backend answers with an ``AssignResponse`` (carrying the durable task id) and
   then streams ``ExecutionEvent`` mirrors for that task. Each surfaced mirror is adapted into a
   :class:`CallerTaskEvent` that exposes exactly the ``.kind`` / ``.returns`` / ``.message``
-  attributes ``rekuest.remote._astream_raw`` reads.
+  attributes ``rekuest.calls._astream_raw`` reads.
 
 The agent's message loop (``BaseAgent.process``) forwards ``AssignResponse`` /
 ``ControlResponse`` / ``ExecutionEvent`` here via the ``handle_*`` methods.
@@ -47,7 +47,7 @@ logger = logging.getLogger(__name__)
 class CallerTaskEvent:
     """A minimal ``TaskEvent`` look-alike.
 
-    ``rekuest.remote._astream_raw`` only ever reads ``.kind`` (compared against
+    ``rekuest.calls._astream_raw`` only ever reads ``.kind`` (compared against
     :class:`TaskEventKind`), ``.returns`` and ``.message`` — so this three-field adapter is
     enough to drive the existing call machinery without constructing a full (frozen,
     field-heavy) GraphQL ``TaskEvent``.

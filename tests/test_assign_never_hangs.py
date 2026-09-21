@@ -20,7 +20,7 @@ from rekuest.api.schema import TaskEventChange, TaskEventKind
 from rekuest.app import AppRegistry
 from rekuest.errors import CriticalCallError
 from rekuest.register import register
-from rekuest.remote import _astream_raw
+from rekuest.calls import _astream_raw
 from rekuest.state.decorator import state
 
 from .memory_transport import MemoryAgentTransport

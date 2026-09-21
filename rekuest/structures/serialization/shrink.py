@@ -11,7 +11,8 @@ from enum import Enum
 from typing import Any, cast
 from collections.abc import Sequence
 
-from rekuest.api.schema import Action, DefinitionInput, PortKind
+from rekuest.api.schema import PortKind
+from rekuest.structures.serialization.protocols import SerializableDefinition
 from rekuest.structures.errors import (
     PortShrinkingError,
     ShrinkingError,
@@ -261,7 +262,7 @@ async def ashrink_arg(
 
 
 async def ashrink_args(
-    definition: DefinitionInput | Action,
+    definition: SerializableDefinition,
     args: Sequence[Any],
     kwargs: dict[str, Any],
     structure_registry: StructureRegistry,
@@ -289,7 +290,7 @@ async def ashrink_args(
         except StopIteration as e:
             if port.key in kwargs:
                 arg = kwargs[port.key]
-            elif port.nullable or port.default is not None:
+            elif port.nullable or getattr(port, "default", None) is not None:
                 arg = None  # defaults will be set by the agent
             else:
                 raise ShrinkingError(

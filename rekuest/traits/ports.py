@@ -10,14 +10,20 @@ from rekuest.messages import JSONSerializable
 
 if TYPE_CHECKING:
     from rekuest.api.schema import (
-        PortInput,
+        ArgPortInput,
         DefinitionInput,
         EffectInput,
+        ReturnPortInput,
         ValidatorInput,
         SearchAssignWidgetInput,
         SliderAssignWidgetInput,
         StateChoiceAssignWidgetInput,
     )
+
+    #: A port on the way *to* the server. There is no single generated
+    #: ``PortInput``: ``PortTrait`` is the base of both spellings, so the
+    #: validators below see either one.
+    PortInput = ArgPortInput | ReturnPortInput
 
 
 class PortTrait(BaseModel):

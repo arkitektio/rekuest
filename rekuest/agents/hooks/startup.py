@@ -28,7 +28,7 @@ from rekuest.protocols import (
     ThreadedStartupFunction,
     StartupFunction,
 )
-from rekuest.remote import ensure_return_as_tuple
+from rekuest.calls import ensure_return_as_tuple
 from rekuest.state.utils import get_return_length
 
 

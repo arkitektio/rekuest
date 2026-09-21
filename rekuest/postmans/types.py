@@ -20,7 +20,7 @@ from rekuest.api.schema import (
 class TaskEventLike(Protocol):
     """The parts of a task event that the call machinery actually reads.
 
-    ``rekuest.remote._astream_raw`` only ever looks at ``.kind`` (compared against
+    ``rekuest.calls._astream_raw`` only ever looks at ``.kind`` (compared against
     :class:`TaskEventKind`), ``.returns`` and ``.message``. Typing :meth:`Postman.aassign`
     against this instead of the concrete GraphQL ``TaskEventChange`` is what lets the
     agent-as-caller postman — which yields a lightweight

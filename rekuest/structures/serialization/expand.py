@@ -13,7 +13,8 @@ from collections.abc import Sequence
 
 from rath.scalars import ID
 
-from rekuest.api.schema import Action, DefinitionInput, PortKind
+from rekuest.api.schema import PortKind
+from rekuest.structures.serialization.protocols import SerializableDefinition
 from rekuest.structures.errors import (
     StructureRegistryError,
     ExpandingError,
@@ -280,7 +281,7 @@ async def aexpand_return(
 
 
 async def aexpand_returns(
-    definition: DefinitionInput | Action,
+    definition: SerializableDefinition,
     returns: dict[str, JSONSerializable],
     structure_registry: StructureRegistry,
 ) -> tuple[Any, ...]:

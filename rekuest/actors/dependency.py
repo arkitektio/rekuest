@@ -19,7 +19,7 @@ from rath.scalars import ID
 
 from rekuest.actors.types import ActorContext
 from rekuest.declare import DeclaredAgentAction, DeclaredAgentProtocol
-from rekuest.remote import acall_dependency, call_dependency
+from rekuest.calls import acall_dependency, call_dependency
 from rekuest.structures.registry import StructureRegistry
 from rekuest.task import Task
 
