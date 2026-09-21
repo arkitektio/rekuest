@@ -577,7 +577,7 @@ class SerializingActor(Actor):
         for them by annotation. ``task`` is the one the actor made for this
         assignment; the dependency proxies are made for the same object.
 
-        A client is handed out as ``client.for_task(task)`` when it offers that:
+        A client is handed out as itself -- one shared instance per app:
         one client is shared by every concurrent task, so the view is what lets
         what it does be attributed to this one (mikro stamps the task's token on
         its requests, rekuest parents its calls to the task).

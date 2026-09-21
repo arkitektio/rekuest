@@ -8,6 +8,7 @@ from rekuest.postmans.types import Postman
 from koil import unkoil, unkoil_gen
 from koil.composition import Composition
 from rath.origin import origin_context
+from rath.task import current_task
 from rath.turms.funcs import TOperation
 from pydantic import Field
 
@@ -25,17 +26,16 @@ class Rekuest(Composition, RekuestApi):
     """The rekuest client: every rekuest operation is a method of it, and it calls
     actions (``rekuest.call(...)``).
 
-    A service builds it; it knows nothing about any agent. An action asks for it by
-    annotation (``rekuest: Rekuest``) and is handed :meth:`for_task`: a view whose
-    calls go over the socket of the agent running the task, as children of it.
+    A service builds it; it knows nothing about any agent. An action asks for it
+    by annotation (``rekuest: Rekuest``) and is handed this one shared instance;
+    what makes its calls children of the running task, over that agent's socket,
+    is the ambient task -- see :meth:`_raw_options`.
     """
 
     rath: RekuestRath
     postman: Postman
     structure_registry: StructureRegistry = Field(exclude=True)
     """The registry of the run this client belongs to: what its calls (de)serialize with."""
-    parent: Any = Field(default=None, exclude=True)
-    """The assignment this view calls on behalf of; set on a per-task view only."""
 
     def _serialize(self, operation: type[TOperation], variables: dict[str, Any]) -> dict[str, Any]:
         return operation.Arguments(**variables).model_dump(by_alias=True, exclude_unset=True)
@@ -68,20 +68,6 @@ class Rekuest(Composition, RekuestApi):
                 event.data, context=origin_context(client=self, rath=self.rath)
             )
 
-    def for_task(self, task: Any) -> "Rekuest":  # noqa: ANN401
-        """A view of this client whose calls are children of ``task``.
-
-        They go over the socket of the agent running the task (the only transport
-        that carries a parent) and are parented to the task's assignment. rekuest
-        hands an injected ``rekuest: Rekuest`` out through this. A task no agent
-        runs (``Task.local()``) gets the client itself: its calls are roots.
-        """
-        agent = getattr(task, "agent", None)
-        if agent is None:
-            return self
-        return self.model_copy(
-            update={"parent": task.assignment, "postman": agent.caller_postman}
-        )
 
     def _call_options(self, kwargs: dict[str, Any]) -> dict[str, Any]:
         kwargs.setdefault("structure_registry", self.structure_registry)
@@ -119,9 +105,24 @@ class Rekuest(Composition, RekuestApi):
         return unkoil(self.acall, target, *args, **kwargs)
 
     def _raw_options(self, kwargs: dict[str, Any]) -> dict[str, Any]:
-        if self.parent is not None:
-            kwargs.setdefault("parent", self.parent)
-        kwargs.setdefault("postman", self.postman)
+        """Whose child this call is, and which socket it goes over.
+
+        The task running right now, or one named as ``task=``. A call made outside
+        any task -- or under a ``Task.local()``, which no agent runs -- is a root:
+        it goes over this client's own postman with no parent. An explicit
+        ``parent=``/``postman=`` from the caller still wins, as it always did.
+        """
+        task = kwargs.pop("task", None)
+        if task is None:  # not `or`: a task must not lose to its own __bool__
+            task = current_task.get()
+        agent = getattr(task, "agent", None)
+        if agent is not None:
+            assignment = getattr(task, "assignment", None)
+            if assignment is not None:
+                kwargs.setdefault("parent", assignment)
+            kwargs.setdefault("postman", agent.caller_postman)
+        else:
+            kwargs.setdefault("postman", self.postman)
         return kwargs
 
     async def acall_raw(self, **kwargs: Any) -> Any:  # noqa: ANN401

@@ -5,7 +5,7 @@
 
 ``camera`` is an :class:`AgentDependencyProxy` the actor made for the task the
 action runs in, handed the ``Task`` and the agent the way an injected client is
-(``client.for_task(task)``); nothing is looked up from context. Each attribute is
+(the task it runs for is ambient, see :mod:`rath.task`). Each attribute is
 one of the protocol's declared actions, an :class:`AgentMethodProxy`, and calling
 it sends the call over the agent's socket as a child of that task, (de)serialized
 with the actor's structure registry.

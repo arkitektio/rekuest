@@ -2,18 +2,21 @@
 
     def segment(image: ArrayDataset, task: Task, mikro: Mikro):
         task.progress(10, "thresholding")
-        mask = mikro.for_task(task).threshold(image)   # attributed to this task
+        mask = mikro.threshold(image)   # attributed to this task automatically
         ...
 
 A ``Task`` is about the task only: what it is (id, user, org, token) and what
 it reports (logs, progress, pause points, hooks). The app's clients are services
-and are injected as their own parameters, each handed out as a view of this
-task (``client.for_task(task)``) so what they do is attributed to it. A task
+and are injected as their own parameters -- the one shared instance of each, not
+a per-task copy. What attributes their requests to this task is
+:data:`rath.task.current_task`, which the actor sets around the body. A task
 knows no service: it speaks the agent protocol (:mod:`rekuest.messages`) and
 nothing of any client, which is what lets ``arkitekt`` export it as its own.
 
-Nothing is looked up, so a ``Task`` works the same in the loop, in a worker
-thread and in code the action hands it to.
+The ``Task`` object itself looks nothing up, so it works the same in the loop, in
+a worker thread and in code the action hands it to. The *ambient* task does not
+reach a thread the action starts itself; pass ``task=`` to a call, or carry the
+context, when you do that (see :mod:`rath.task`).
 """
 
 import logging
@@ -81,8 +84,8 @@ class Task:
     def agent(self) -> Any:  # noqa: ANN401 - ActorContext
         """The agent running this task's actor; ``None`` for a :meth:`local` task.
 
-        A client's task view calls through it (``client.for_task(task)`` makes
-        child calls over the agent's socket), and a dependency proxy is made for it.
+        A client's calls are parented through it -- child calls go over the
+        agent's socket -- and a dependency proxy is made for it.
         """
         return self._helper.agent
 

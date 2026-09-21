@@ -2,8 +2,8 @@
 
 `def segment(x: int, mikro: Mikro)`: `mikro` is not a port, because a service
 declared on the registry returns a `Mikro`; the agent fills it with its bound
-app's `Mikro` — as a per-task view when the task carries a provenance token,
-since one client is shared by every concurrent task.
+app's `Mikro` — the one shared instance, not a per-task copy. What makes its
+requests attributable is the ambient task, which the actor sets around the body.
 """
 
 import asyncio
@@ -18,6 +18,7 @@ from rekuest.protocol.schema import PortKind
 from rekuest.app import AppRegistry
 from rekuest.definition.define import prepare_definition
 from rekuest.structures.registry import StructureRegistry
+from rath.task import current_task, token_of
 
 from .memory_transport import MemoryAgentTransport
 from .agent_helpers import run_assignment
@@ -31,8 +32,9 @@ class FakeClient:
         self.owner = owner
         self.token = token
 
-    def for_task(self, task: Any) -> "FakeClient":  # noqa: ANN401
-        return FakeClient(self.owner, task.token)
+    def seen_token(self) -> str | None:
+        """What this call would be attributed to, as `_headers` decides it."""
+        return token_of(None)
 
 
 class OtherClient:
@@ -148,15 +150,15 @@ async def test_async_and_threaded_functions_receive_their_apps_client() -> None:
 
 
 @pytest.mark.asyncio
-async def test_each_task_gets_a_view_carrying_its_own_token() -> None:
-    """Three agents on one app share its one client; each task's view is its own."""
+async def test_each_task_attributes_its_own_calls() -> None:
+    """Three agents on one app share its one client; each task attributes its own."""
     app = FakeApp("A", FakeClient("A"))
     agents = [build_agent(app) for _ in range(3)]
 
     async def who(client: FakeClient) -> str:
-        """Reports the token its client carries."""
+        """Reports what a call through its client would be attributed to."""
         await asyncio.sleep(0.01)
-        return str(client.token)
+        return str(client.seen_token())
 
     for agent in agents:
         agent.app_registry.register(who)
@@ -169,6 +171,7 @@ async def test_each_task_gets_a_view_carrying_its_own_token() -> None:
     )
     assert results == [{"return0": "t1"}, {"return0": "t2"}, {"return0": "None"}]
     assert app.get(FakeClient).token is None, "the shared client is never mutated"
+    assert current_task.get() is None, "no task outlives its assignment"
 
 
 @pytest.mark.asyncio

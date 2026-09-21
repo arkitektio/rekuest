@@ -88,9 +88,10 @@ def resolve_service_clients(
             ``prepare_injected_variables``.
         bound_app: The app the agent belongs to, or ``None`` when it has none.
         whose: What is asking, for the error message ("action 'segment'").
-        task: The assignment being run, when there is one. A client that offers
-            ``for_task`` is handed out as a view of it, so that what one of many
-            concurrent tasks does can be attributed to it.
+        task: The assignment being run, when there is one. Kept for the error
+            messages and for callers that still pass it; attribution itself is
+            ambient now (:data:`rath.task.current_task`), so every task gets the
+            same shared client and still attributes its own requests.
 
     Returns:
         The kwargs, one per parameter.
@@ -118,9 +119,10 @@ def resolve_service_clients(
                 f"{whose} asks for a {cls.__name__} as '{key}', but the app was "
                 "built without one. Add its service to the app."
             )
-        for_task = getattr(client, "for_task", None)
-        if task is not None and callable(for_task):
-            client = for_task(task)
+        # The one shared client, not a per-task copy of it. What attributes its
+        # requests to this task is `rath.task.current_task`, which the actor sets
+        # around the body -- so an object the call returns remembers the client
+        # rather than a view that dies with the assignment.
         kwargs[key] = client
     return kwargs
 

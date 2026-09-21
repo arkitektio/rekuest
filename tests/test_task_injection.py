@@ -75,7 +75,7 @@ async def test_reports_through_the_injected_task_in_loop_and_thread() -> None:
 async def test_an_injected_rekuest_client_parents_its_calls_to_the_task(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Child calls belong to the rekuest *service*, viewed for this task."""
+    """Child calls belong to the rekuest *service*, parented to the running task."""
     from rekuest.client.client import Rekuest
 
     app = FakeApp("A")
@@ -85,7 +85,6 @@ async def test_an_injected_rekuest_client_parents_its_calls_to_the_task(
     rekuest = Rekuest.model_construct(
         postman="graphql-postman",
         structure_registry=agent.app_registry.structure_registry,
-        parent=None,
     )
     app.services["rekuest"] = rekuest
     seen: dict[str, Any] = {}
@@ -109,7 +108,7 @@ async def test_an_injected_rekuest_client_parents_its_calls_to_the_task(
     assert seen["postman"] is agent.caller_postman
     assert seen["structure_registry"] is agent.app_registry.structure_registry
     assert (seen["target"], seen["args"], seen["reference"]) == (ACTION, (1,), "r")
-    assert rekuest.parent is None, "the shared client is never changed"
+    assert "parent" not in Rekuest.model_fields, "the client carries no task state"
 
 
 @pytest.mark.asyncio
@@ -122,7 +121,6 @@ async def test_outside_a_task_the_rekuest_client_calls_over_its_own_postman(
     rekuest = Rekuest.model_construct(
         postman="graphql-postman",
         structure_registry=agent.app_registry.structure_registry,
-        parent=None,
     )
     seen: dict[str, Any] = {}
 
@@ -134,8 +132,13 @@ async def test_outside_a_task_the_rekuest_client_calls_over_its_own_postman(
     assert await rekuest.acall(ACTION) == "ok"
     assert seen["postman"] == "graphql-postman" and "parent" not in seen
 
-    # A local task runs under no agent: its view is the client itself, calling roots.
-    assert rekuest.for_task(Task.local()) is rekuest
+    # A local task runs under no agent, so its calls are roots too.
+    from rath.task import task_scope
+
+    seen.clear()
+    with task_scope(Task.local()):
+        assert await rekuest.acall(ACTION) == "ok"
+    assert seen["postman"] == "graphql-postman" and "parent" not in seen
 
 
 @pytest.mark.asyncio
