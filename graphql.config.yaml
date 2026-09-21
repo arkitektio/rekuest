@@ -1,3 +1,15 @@
+# Two projects over one schema. Regenerate BOTH together:
+#
+#   turms gen                      # against the live schema below
+#   turms gen --config <copy>      # with `schema:` pointed at rekuest/api/schema.graphql
+#
+# The second form is what you want while refactoring -- generating from the snapshot
+# keeps a drifting server out of your diff. Either way turms writes the schema it
+# generated from into the dumped project.json, so check `git diff rekuest/*/project.json`
+# and restore the `schema` key to this URL before committing: rekuest/arkitekt.py ships
+# rekuest/api/project.json to downstream code generation.
+#
+# Needs turms >= 2.1.0, for `external_modules`.
 projects:
   # The wire vocabulary: every enum and input in the schema, woven with the
   # hand-written traits. An app speaks only this; importing rekuest loads it

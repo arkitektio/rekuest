@@ -118,30 +118,25 @@ apps; this can be relaxed on the rekuest server.
 
 ## Calling an action
 
-Resolve an action with `find` (by its id, or pass an `Action` straight through), then
-invoke it with `call` (sync) or `acall` (async):
+Calls go through the `Rekuest` client, which an action asks for by annotation.
+`aresolve` takes an id, an `Action` or an `Implementation`; `call`/`acall` invoke it:
 
 ```python
-from arkitekt import easy
-from rekuest import find, call
+from rekuest.client.client import Rekuest
 
 
-with easy("my_app") as app:
-    action = find(action_id)            # action_id discovered via search / the platform
-
-    result = call(action, x=1, name="world")
-    print(result)                       # "Hello world, your number is 1"
+@app.register
+async def greet_through(action_id: str, rekuest: Rekuest) -> str:
+    """Call another action and return what it said."""
+    action = await rekuest.aresolve(action_id)
+    return await rekuest.acall(action, x=1, name="world")
 ```
 
-When you already know which agent provides an implementation, you can address it
-directly and await the result:
+When you already know which agent provides an implementation, address it directly:
 
 ```python
-from rekuest.api.schema import amy_implementation_at
-from rekuest.remote import acall
-
-impl = await amy_implementation_at(instance_id, "add_greeting")
-result = await acall(impl, x=1, name="world")
+impl = await rekuest.amy_implementation_at(instance_id, "add_greeting")
+result = await rekuest.acall(impl, x=1, name="world")
 ```
 
 ## Working with complex data structures
@@ -328,7 +323,7 @@ automatically:
 ```python
 from typing import Annotated
 from rekuest import withEffect, withValidator
-from rekuest.api.schema import EffectKind
+from rekuest.protocol.schema import EffectKind
 
 @app.register
 def crop(

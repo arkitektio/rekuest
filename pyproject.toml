@@ -59,7 +59,11 @@ dev-dependencies =  [
     "httpx>=0.28.1",
     "aiosqlite>=0.22.1",
     "dokker>=2.8",
-    "turms>=2.1.0",  # external_modules: the api project imports the protocol project's types
+    # Regenerating needs turms >= 2.1.0, for the `external_modules` the api project
+    # declares: an older turms refuses the config outright ("does not conform with
+    # turms"), which is loud enough. The pin stays at 2.0.0 until 2.1.0 is published,
+    # because `uv sync --dev` in CI resolves this from PyPI.
+    "turms>=2.0.0",
     "basedpyright>=1.21",
 ]
 
