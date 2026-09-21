@@ -1,1 +1,1 @@
-"""Qt helpers for Rekuest Next"""
+"""Qt helpers for Rekuest"""

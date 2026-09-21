@@ -1,4 +1,5 @@
 import pytest
+from rekuest.structures.registry import StructureRegistry
 from pydantic import ValidationError
 
 from rekuest.api.schema import (
@@ -59,7 +60,7 @@ def test_declared_action_and_blok_registry_build_same_action_dependency(
         def run(self, item: str) -> str:
             return item
 
-    declared = DeclaredAgentAction(DemoProtocol.run, "demo", "run")
+    declared = DeclaredAgentAction(DemoProtocol.run, "demo", "run", simple_registry)
 
     definition_registry = AppRegistry()
     definition_registry.register_at_interface(
@@ -89,7 +90,7 @@ def test_declared_state_and_blok_registry_build_same_state_dependency(
     class DemoState:
         item: str
 
-    declared = DeclaredAgentState(DemoState, "demo", "status")
+    declared = DeclaredAgentState(DemoState, "demo", "status", simple_registry)
 
     state_registry = AppRegistry()
     state_registry.register_state(

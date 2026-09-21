@@ -32,6 +32,7 @@ from rekuest.definition.define import (
     prepare_definition,
 )
 from rekuest.state.utils import (
+    prepare_injected_variables,
     prepare_state_variables,
 )
 from rekuest.agents.dependency import prepare_dependency_variables
@@ -41,6 +42,7 @@ from rekuest.structures.registry import StructureRegistry
 def derive_implementation_details(
     function: AnyFunction,
     config: RegisterConfig,
+    structure_registry: StructureRegistry | None = None,
 ) -> ImplementationDetails:
     """Inspect a function's state/context/dependency variables and resolve the
     implementation metadata.
@@ -49,9 +51,10 @@ def derive_implementation_details(
     inferred from the required state/context locks (when ``config.auto_locks``)
     and manipulates from the written state variables.
     """
-    state_variables, state_returns = prepare_state_variables(function)
-    context_variables, context_returns = prepare_context_variables(function)
-    dependency_variables = prepare_dependency_variables(function)
+    state_variables, state_returns = prepare_state_variables(function, structure_registry)
+    context_variables, context_returns = prepare_context_variables(function, structure_registry)
+    dependency_variables = prepare_dependency_variables(function, structure_registry)
+    injected_variables = prepare_injected_variables(function, structure_registry)
 
     locks = config.locks
     if locks is None and config.auto_locks:
@@ -77,6 +80,7 @@ def derive_implementation_details(
         locks=locks,
         tracks=config.tracks,
         manipulates=manipulates,
+        injected_variables=injected_variables,
     )
 
 
@@ -132,7 +136,7 @@ def reactify(
     """
     config = config or RegisterConfig()
 
-    implementation_details = derive_implementation_details(function, config)
+    implementation_details = derive_implementation_details(function, config, structure_registry)
     definition = prepare_definition_from_config(
         function, structure_registry, config, implementation_details
     )
@@ -150,12 +154,7 @@ def reactify(
         "shrink_outputs": not config.bypass_shrink,
         "structure_registry": structure_registry,
         "definition": definition,
-        "state_variables": implementation_details.state_variables,
-        "state_returns": implementation_details.state_returns,
-        "context_variables": implementation_details.context_variables,
-        "context_returns": implementation_details.context_returns,
-        "dependency_variables": implementation_details.dependency_variables,
-        "locks": implementation_details.locks,
+        **implementation_details.actor_kwargs(),
         "concurrency": config.concurrency,
         "policy": config.policy,
     }

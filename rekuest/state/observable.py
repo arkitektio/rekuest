@@ -2,13 +2,13 @@ import dataclasses
 from typing import Any, Generic, TypeVar, overload, SupportsIndex
 from collections.abc import Callable, Iterable
 
-from rekuest.actors.vars import (
-    get_current_task_id_or_none,
-)
+import contextlib
+import threading
+from collections.abc import Iterator
+
 from rekuest.api.schema import ReturnPortInput, StateDefinitionInput
-from rekuest.state.lock import get_acquired_locks
-from rekuest.state.publish import Patch, get_current_publisher
-from rekuest.structures.registry import StructureRegistry
+from rekuest.state.publish import Patch, StateHolder
+from rekuest.structures.types import StateDeclaration
 
 # --- JSON Pointer Utilities (RFC 6901) ---
 
@@ -32,24 +32,108 @@ def _make_path(base: str, key: str | int) -> str:
 # --- Configuration ---
 
 
+@dataclasses.dataclass(frozen=True)
+class Mutation:
+    """Who is changing a state: the task (for the patches' correlation) and the
+    locks it holds. ``locks=None`` means unrestricted: a state being constructed."""
+
+    correlation_id: str | None = None
+    locks: frozenset[str] | None = frozenset()
+
+
+UNRESTRICTED = Mutation(locks=None)
+"""What a state is changed as before an agent adopts it (its startup hook builds it)."""
+
+UNLOCKED = Mutation()
+"""What an adopted state is changed as outside a task: no task, no locks held."""
+
+
 @dataclasses.dataclass
 class StateConfig:
-    """Configuration for evented objects, storing the state interface name and schema."""
+    """Configuration for evented objects, storing the state interface name and schema.
+
+    One per state *instance*, shared by all of its evented children, so it is also
+    where that instance's publisher and the mutation in progress live.
+    """
 
     state_name: str
     definition: StateDefinitionInput
-    structure_registry: StructureRegistry
     publish_interval: float = (
         0.1  # Optional: Minimum interval between patches to prevent flooding
     )
     required_locks: list[str] = dataclasses.field(default_factory=list)
+    publisher: StateHolder | None = dataclasses.field(default=None, compare=False)
+    """Where patches go: the agent that adopted the state. None until then."""
+    default_mutation: Mutation = dataclasses.field(default=UNRESTRICTED, compare=False)
+    """What a change made on the object itself (not through a task's view) counts as."""
+    active: Mutation | None = dataclasses.field(default=None, init=False, compare=False)
+    """The mutation a task's write view is making right now, for one operation."""
+    lock: threading.RLock = dataclasses.field(
+        default_factory=threading.RLock, init=False, compare=False, repr=False
+    )
+    """Serializes changes: tasks in worker threads write the same instance."""
+
+    @classmethod
+    def for_declaration(cls, declaration: StateDeclaration) -> "StateConfig":
+        """A fresh config for one instance of a declared state."""
+        return cls(
+            state_name=declaration.interface,
+            definition=declaration.definition,
+            publish_interval=declaration.publish_interval,
+            required_locks=list(declaration.required_locks),
+        )
+
+    @property
+    def mutation(self) -> Mutation:
+        return self.active or self.default_mutation
+
+    @contextlib.contextmanager
+    def mutating(self, mutation: Mutation) -> Iterator[None]:
+        """Make one synchronous operation count as ``mutation`` (a task's view calls this)."""
+        with self.lock:
+            previous = self.active
+            self.active = mutation
+            try:
+                yield
+            finally:
+                self.active = previous
+
+
+def config_of(obj: Any) -> StateConfig | None:  # noqa: ANN401
+    """The config of an evented state object or container, if it is one."""
+    return getattr(obj, "_event_config", None) or getattr(obj, "_config", None)
+
+
+def evented(obj: Any, declaration: StateDeclaration) -> Any:  # noqa: ANN401
+    """Make ``obj`` an evented instance of the declared state, with a config of its own.
+
+    What an agent does to a startup hook's return before adopting it. A plain
+    instance of the class is nothing but a dataclass until then: the class is
+    not changed by being registered, so this is where the rules of the app that
+    adopts it are attached.
+    """
+    return make_evented(obj, StateConfig.for_declaration(declaration), "")
+
+
+def adopt(obj: Any, publisher: StateHolder) -> None:  # noqa: ANN401
+    """An agent takes a state over: its patches go to ``publisher`` from now on, and a
+    change made outside a task holds no locks."""
+    config = config_of(obj)
+    if config is None:
+        return
+    config.publisher = publisher
+    config.default_mutation = UNLOCKED
 
 
 def _publish_patch(config: StateConfig, patch: Patch) -> None:
-    """Helper to publish a patch through the current publisher."""
-    publisher = get_current_publisher()
-    if publisher:
-        publisher.publish_patch(config.state_name, patch)  # type: ignore
+    """Publish a patch to the state's publisher, if an agent has adopted it.
+
+    It is stamped with the task making the change, which is the mutation in
+    progress (a task's write view), not something looked up.
+    """
+    patch.correlation_id = config.mutation.correlation_id
+    if config.publisher is not None:
+        config.publisher.publish_patch(config.state_name, patch)
 
 
 def _resolve_child_port(
@@ -78,15 +162,12 @@ def _make_patch(
     port: ReturnPortInput | None,
 ) -> Patch:
     """Create a patch carrying the already resolved schema port."""
-
-    task_id = get_current_task_id_or_none()
     return Patch(
         op=op,
         path=path,
         value=value,
         old_value=old_value,
         port=port,
-        correlation_id=task_id,
     )
 
 
@@ -97,8 +178,10 @@ V = TypeVar("V")
 
 
 def _require_locks(config: StateConfig, path: str) -> None:
-    """Raise unless every lock the state config requires is currently held."""
-    acquired_locks = get_acquired_locks()
+    """Raise unless the mutation in progress holds every lock the state requires."""
+    acquired_locks = config.mutation.locks
+    if acquired_locks is None:
+        return
     missing_locks = [
         lock for lock in config.required_locks if lock not in acquired_locks
     ]
@@ -598,7 +681,7 @@ def make_evented(
         def setattr_hook(self, name, value):
             _require_locks(self._event_config, self._event_path)
             if name.startswith("_"):
-                super(self.__class__, self).__setattr__(name, value)
+                super(EventedClass, self).__setattr__(name, value)
                 return
 
             old_value = getattr(self, name, None)
@@ -619,7 +702,7 @@ def make_evented(
                     port=current_port,
                 )
 
-                super(self.__class__, self).__setattr__(name, value)
+                super(EventedClass, self).__setattr__(name, value)
 
                 # Publish the patch
                 _publish_patch(

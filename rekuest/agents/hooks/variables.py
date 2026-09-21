@@ -7,12 +7,22 @@ what they may return (see :meth:`WithVariables.validate_returns`).
 """
 
 import inspect
+from typing import TYPE_CHECKING
 from typing import Any
 
+from rekuest.agents.types import BoundApp, resolve_service_clients
 from rekuest.agents.context import prepare_context_variables
 from rekuest.agents.errors import StateRequirementsNotMet
 from rekuest.protocols import AnyFunction
-from rekuest.state.utils import prepare_appcontext, prepare_state_variables
+from rekuest.state.utils import (
+    prepare_appcontext,
+    prepare_injected_variables,
+    prepare_state_variables,
+)
+
+if TYPE_CHECKING:
+    from rekuest.structures.registry import StructureRegistry
+
 
 
 class WithVariables:
@@ -27,12 +37,20 @@ class WithVariables:
     #: hook. Startup hooks run before any state exists, so only the app context
     #: can be injected there.
     injects_states: bool = True
+    #: Tells the agent this hook accepts ``bound_app=`` in ``arun``. Hook classes
+    #: written against the bare protocols do not, and are called as before.
+    takes_bound_app: bool = True
 
-    def __init__(self, func: AnyFunction) -> None:
+    def __init__(
+        self, func: AnyFunction, structure_registry: "StructureRegistry | None" = None
+    ) -> None:
         self.func = func
-        self.state_variables, self.state_returns = prepare_state_variables(func)
-        self.app_context_variables, self.app_context_returns = prepare_appcontext(func)
-        self.context_variables, self.context_returns = prepare_context_variables(func)
+        self.state_variables, self.state_returns = prepare_state_variables(func, structure_registry)
+        self.app_context_variables, self.app_context_returns = prepare_appcontext(func, structure_registry)
+        self.context_variables, self.context_returns = prepare_context_variables(func, structure_registry)
+        # The registry says which annotations are a service's client; a hook
+        # registered without one can take no client.
+        self.injected_variables = prepare_injected_variables(func, structure_registry)
         self.pass_app_context = self.app_context_variables.count > 0
 
         self._validate_arguments(func)
@@ -42,7 +60,15 @@ class WithVariables:
 
     def _validate_arguments(self, func: AnyFunction) -> None:
         parameters = inspect.signature(func).parameters
+        # The app's clients exist before any state does, so every hook kind can
+        # take them. A hook runs for no task, so it cannot take a Task.
         injectable = list(self.app_context_variables.app_context_variables.keys())
+        injectable += list(self.injected_variables.service_client_variables)
+        if self.injected_variables.task_variables:
+            raise ValueError(
+                f"{self.hook_kind} function {func.__name__} asks for a Task, but a "
+                "hook runs for no task. Report through a service client instead."
+            )
         if self.injects_states:
             injectable += list(self.state_variables.variable_keys) + list(
                 self.context_variables.context_variables.keys()
@@ -71,8 +97,16 @@ class WithVariables:
         contexts: dict[str, Any],
         states: dict[str, Any],
         app_context: Any = None,  # noqa: ANN401
+        bound_app: BoundApp | None = None,
     ) -> dict[str, Any]:
-        """Build the call kwargs from the agent's live contexts, states and app context."""
+        """Build the call kwargs from the agent's live contexts, states, app context and app.
+
+        ``app_context`` is the object the caller passed to ``run(context=...)``;
+        ``bound_app`` is the app the agent belongs to, which supplies the clients
+        the hook asks for by annotation. A hook that asks for the app context gets
+        exactly the declared kind: the agent refuses to start otherwise, and this
+        is the last line of defence for a hook driven by hand.
+        """
         kwargs: dict[str, Any] = {}
         for key, value in self.context_variables.context_variables.items():
             try:
@@ -94,11 +128,21 @@ class WithVariables:
                         f"State requirements not met: {e}. Available are {list(states.keys())}"
                     ) from e
 
-        for key, value in self.app_context_variables.app_context_variables.items():
-            if getattr(app_context, "__rekuest_app_context__", None) != value:
+        for key, cls in self.app_context_variables.app_context_variables.items():
+            if not isinstance(app_context, cls):
                 raise StateRequirementsNotMet(
-                    f"App context requirements not met: the agent was not started with a {value} app context"
+                    "App context requirements not met: the agent was not started "
+                    f"with a {cls.__name__} app context"
                 )
             kwargs[key] = app_context
+
+        # No task view here: a hook runs for no assignment.
+        kwargs.update(
+            resolve_service_clients(
+                self.injected_variables.service_client_variables,
+                bound_app,
+                whose=f"{self.hook_kind} function {self.func.__name__}",
+            )
+        )
 
         return kwargs

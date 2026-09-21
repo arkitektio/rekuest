@@ -1,22 +1,38 @@
-"""Utils for Rekuest Next"""
+"""Utils for Rekuest"""
 
 import inflection
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from rekuest.structures.registry import StructureRegistry
 
 
-def is_local_var(type_: Any) -> bool:  # noqa: ANN401
+def is_local_var(type_: Any, structure_registry: "StructureRegistry | None" = None) -> bool:  # noqa: ANN401
     """Check if the type is a local variable (context or state).
 
     Local variables are injected by the agent, so they must not become ports on the
     definition. ``ReadOnly[SomeState]`` counts too: it is an ``Annotated`` wrapper, so
     ``is_state`` does not see through it, and without this a read-only state parameter
     was published as a required argument the caller could never supply.
+
+    So is one annotated with a client a registered service returns (``mikro:
+    Mikro``), which the agent supplies from the app it is bound to -- known only
+    through ``structure_registry`` -- one annotated ``Task``, and one annotated with
+    the class the app declared as its app context (handed in by ``run(context=...)``).
     """
 
-    from rekuest.state.predicate import is_read_only_state, is_state
+    from rekuest.task import is_task
+    from rekuest.state.predicate import is_app_context, is_read_only_state, is_state
     from rekuest.agents.context import is_context
 
-    return is_context(type_) or is_state(type_) or is_read_only_state(type_)
+    return (
+        is_context(type_, structure_registry)
+        or is_app_context(type_, structure_registry)
+        or is_state(type_, structure_registry)
+        or is_read_only_state(type_, structure_registry)
+        or (structure_registry is not None and structure_registry.is_client(type_))
+        or is_task(type_)
+    )
 
 
 def interface_name(func: Any) -> str:  # noqa: ANN401

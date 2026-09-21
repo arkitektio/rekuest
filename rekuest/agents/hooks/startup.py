@@ -2,20 +2,25 @@
 
 import inspect
 from typing import (
+    TYPE_CHECKING,
     Any,
     TypeVar,
     cast,
     overload,
 )
 from collections.abc import Callable
+from rekuest.agents.types import BoundApp
 from koil.bridge import run_threaded
+from rekuest.errors import NoRegistryError
 from rekuest.agents.hooks.errors import StartupHookError
 from rekuest.agents.hooks.registry import (
     HooksRegistry,
     StartupHookReturns,
-    get_default_hook_registry,
 )
 from rekuest.agents.hooks.variables import WithVariables
+
+if TYPE_CHECKING:
+    from rekuest.structures.registry import StructureRegistry
 from rekuest.protocols import (
     AnyFunction,
     AsyncStartupFunction,
@@ -33,6 +38,14 @@ class StartupWithVariables(WithVariables):
     hook_kind = "Startup"
     injects_states = False
 
+    def get_startup_kwargs(self, app_context: Any, bound_app: BoundApp | None) -> dict[str, Any]:  # noqa: ANN401
+        """Bind the app context and the app by parameter name.
+
+        By name rather than by position, so one hook can take both. No state or
+        context exists yet, hence the empty mappings.
+        """
+        return self.get_kwargs({}, {}, app_context, bound_app=bound_app)
+
     def validate_returns(self, func: AnyFunction) -> None:
         allowed_return_types = self.state_returns.count + self.context_returns.count
         if get_return_length(inspect.signature(func)) > allowed_return_types:
@@ -45,26 +58,30 @@ class StartupWithVariables(WithVariables):
 class WrappedStartupHook(StartupWithVariables):
     """Startup hook that runs in the event loop"""
 
-    def __init__(self, func: AsyncStartupFunction) -> None:
+    def __init__(
+        self, func: AsyncStartupFunction, structure_registry: "StructureRegistry | None" = None
+    ) -> None:
         """Initialize the startup hook
 
         Args:
             func (Callable[[str, Any], AnyContext]): The function to run in the startup hook
             func (Callable): The function to run in the startup hook
         """
-        super().__init__(func)
+        super().__init__(func, structure_registry)
 
-    async def arun(self, app_context: Any) -> StartupHookReturns:
+    async def arun(
+        self,
+        app_context: Any,  # noqa: ANN401
+        bound_app: BoundApp | None = None,
+    ) -> StartupHookReturns:
         """Run the startup hook in the event loop
         Args:
             app_context (Any): The context for the startup hook
+            bound_app (Any): The app the agent belongs to, if any
         Returns:
             Optional[Dict[str, Any]]: The state variables and contexts
         """
-        if self.pass_app_context:
-            parsed_returns = await self.func(app_context)
-        else:
-            parsed_returns = await self.func()
+        parsed_returns = await self.func(**self.get_startup_kwargs(app_context, bound_app))
 
         returns = ensure_return_as_tuple(parsed_returns)
 
@@ -87,30 +104,34 @@ class WrappedStartupHook(StartupWithVariables):
 class ThreadedStartupHook(StartupWithVariables):
     """Startup hook that runs in the event loop"""
 
-    def __init__(self, func: ThreadedStartupFunction) -> None:
+    def __init__(
+        self, func: ThreadedStartupFunction, structure_registry: "StructureRegistry | None" = None
+    ) -> None:
         """Initialize the startup hook
 
         Args:
             func (Callable[[str], AnyContext]): The function to run in the startup hook
             func (Callable): The function to run in the startup hook
         """
-        super().__init__(func)
+        super().__init__(func, structure_registry)
 
-    def run_func_with_context(self, app_context: Any) -> Any:
-        if self.pass_app_context:
-            return self.func(app_context)
-        else:
-            return self.func()
-
-    async def arun(self, app_context: Any) -> StartupHookReturns:
+    async def arun(
+        self,
+        app_context: Any,  # noqa: ANN401
+        bound_app: BoundApp | None = None,
+    ) -> StartupHookReturns:
         """Run the startup hook in the event loop
         Args:
             app_context (Any): The context for the startup hook
+            bound_app (Any): The app the agent belongs to, if any
         Returns:
             Optional[Dict[str, Any]]: The state variables and contexts
         """
 
-        parsed_returns = await run_threaded(self.run_func_with_context, app_context)
+        parsed_returns = await run_threaded(
+            self.func,
+            **self.get_startup_kwargs(app_context, bound_app),  # type: ignore[arg-type]
+        )
 
         returns = ensure_return_as_tuple(parsed_returns)
 
@@ -142,13 +163,16 @@ def startup(*args: TStartup) -> TStartup:
 
 @overload
 def startup(
-    *, name: str | None = None, registry: HooksRegistry | None = None
+    *,
+    name: str | None = None,
+    registry: HooksRegistry | None = None,
+    structure_registry: "StructureRegistry | None" = None,
 ) -> Callable[[TStartup], TStartup]:
     """Decorator to register a startup hook
 
     Args:
         name (str): The name of the startup hook. If not provided, the function name will be used.
-        registry (HooksRegistry): The registry to use. If not provided, the default registry will be used.
+        registry (HooksRegistry): The registry to register into. Required.
     """
     ...
 
@@ -158,6 +182,7 @@ def startup(
     *args: TStartup,
     name: str | None = None,
     registry: HooksRegistry | None = None,
+    structure_registry: "StructureRegistry | None" = None,
 ) -> TStartup | Callable[[TStartup], TStartup]:
     """Decorator to register a startup hook"""
 
@@ -167,6 +192,7 @@ def startup(
     *args: TStartup,
     name: str | None = None,
     registry: HooksRegistry | None = None,
+    structure_registry: "StructureRegistry | None" = None,
 ) -> TStartup | Callable[[TStartup], TStartup]:
     """Register a startup hook on the selected hook registry.
 
@@ -183,8 +209,8 @@ def startup(
         *args: Startup function to register when used as ``@startup`` without
             parentheses.
         name: Explicit registry key. Defaults to the function name.
-        registry: Hook registry to populate. Defaults to the global hook
-            registry.
+        registry: Hook registry to populate. Required: without one this raises
+            ``NoRegistryError``, since hooks go through an app (``@app.startup``).
 
     Returns:
         The original function, or a decorator configured with the provided
@@ -193,10 +219,13 @@ def startup(
     Raises:
         ValueError: If more than one function is passed at once.
 
+    Reached through ``AppRegistry.startup``; call it directly only with
+    ``registry=``.
+
     Examples:
         Register an async startup hook that returns initial state::
 
-            @startup
+            @app.startup
             async def boot(app_context: MyAppContext) -> MyState:
                 return MyState(counter=0)
     """
@@ -206,11 +235,14 @@ def startup(
 
     if len(args) == 1:
         func = args[0]
-        registry = registry or get_default_hook_registry()
+        if registry is None:
+            raise NoRegistryError.for_decorator(
+                "Hooks go", "startup", "async def my_hook(): ...", "registry"
+            )
 
         if inspect.iscoroutinefunction(func):
             a = cast(AsyncStartupFunction, func)
-            registry.register_startup(name or a.__name__, WrappedStartupHook(a))
+            registry.register_startup(name or a.__name__, WrappedStartupHook(a, structure_registry))
 
         else:
             assert inspect.isfunction(func) or inspect.ismethod(func), (
@@ -218,12 +250,12 @@ def startup(
             )
             t = cast(ThreadedStartupFunction, func)
 
-            registry.register_startup(name or t.__name__, ThreadedStartupHook(t))
+            registry.register_startup(name or t.__name__, ThreadedStartupHook(t, structure_registry))
 
         return cast(TStartup, func)
     else:
 
         def decorator(func: TStartup) -> TStartup:
-            return cast(TStartup, startup(func, name=name, registry=registry))
+            return cast(TStartup, startup(func, name=name, registry=registry, structure_registry=structure_registry))
 
         return decorator

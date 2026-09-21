@@ -4,10 +4,7 @@ import collections
 from enum import Enum
 from typing import Union, get_type_hints
 from collections.abc import Callable, Sequence
-from rekuest.structures.model import (
-    is_model,
-    inspect_model_class,
-)
+from rekuest.structures.model import inspect_model_class
 from .utils import is_local_var
 from rekuest.annotations import extract_annotations, PortAnnotations
 from rekuest.api.schema import (
@@ -31,6 +28,7 @@ from docstring_parser import parse, DocstringStyle
 from rekuest.definition.errors import DefinitionError, NonSufficientDocumentation
 from rekuest.traits.calls import OWN_VALUE
 import datetime as dt
+from rekuest.structures.errors import StructureRegistryError
 from rekuest.structures.registry import (
     StructureRegistry,
 )
@@ -132,25 +130,23 @@ def is_float(cls: Any) -> bool:  # noqa: ANN401
     return False
 
 
-def is_dependency_type(cls: Any) -> bool:  # noqa: ANN401
-    """Check if a class is a dependency type"""
-    if hasattr(cls, "__rekuest__dependency__"):
-        dependency = getattr(cls, "__rekuest__dependency__")
-        if getattr(dependency, "to_dependency_input", None) and callable(
-            dependency.to_dependency_input
-        ):
-            return True
-        else:
-            raise DefinitionError(
-                f"Class {cls} has a __rekuest__dependency__ attribute but it does not have a callable to_dependency_input method. Please fix this."
-            )
-    return False
+def is_dependency_type(cls: Any, structure_registry: "StructureRegistry | None") -> bool:  # noqa: ANN401
+    """Whether ``cls`` is a protocol the app declared (``@app.declare``).
+
+    Without a registry nothing is: a protocol is a declaration on an app, not a
+    property of the class.
+    """
+    return structure_registry is not None and structure_registry.is_protocol(cls)
 
 
-def dependency_to_dependency_input(key: str, cls: Any) -> AgentDependencyInput:
-    """Convert a dependency class to a DependencyInput"""
-    dependency = getattr(cls, "__rekuest__dependency__")
-    return dependency.to_dependency_input(key)
+def dependency_to_dependency_input(
+    key: str, cls: Any, structure_registry: "StructureRegistry"
+) -> AgentDependencyInput:
+    """The declared protocol ``cls`` as a dependency under ``key``.
+
+    Its ports were built when the app declared it, against ``structure_registry``.
+    """
+    return structure_registry.protocol_for(cls).to_dependency_input(key)
 
 
 def is_none_type(cls: Any) -> bool:  # noqa: ANN401
@@ -311,9 +307,9 @@ def _convert_object_to_port(
             proposed_units=proposed_units,
         )
 
-    if is_model(cls):
-        inspected_model = inspect_model_class(cls)
-        registry.register_as_model(cls, inspected_model.identifier)
+    fullfilled_model = registry.model_for(cls)
+    if fullfilled_model is not None:
+        inspected_model = inspect_model_class(cls, fullfilled_model.identifier)
         children = [
             recurse(
                 arg.cls,
@@ -330,8 +326,10 @@ def _convert_object_to_port(
             PortKind.MODEL,
             children=tuple(children),
             default=None,
-            description=description or inspected_model.description,
-            identifier=inspected_model.identifier,
+            description=description
+            or fullfilled_model.description
+            or inspected_model.description,
+            identifier=fullfilled_model.identifier,
         )
 
     if is_annotated(cls):
@@ -645,10 +643,10 @@ def prepare_definition(
                 f"Could not find type hint for {key} in {function_name}. Please provide a type hint (or default) for this argument."
             )
 
-        if is_dependency_type(cls):
+        if is_dependency_type(cls, structure_registry):
             continue
 
-        if is_local_var(cls):
+        if is_local_var(cls, structure_registry):
             continue
 
         try:
@@ -668,8 +666,11 @@ def prepare_definition(
                 )
             )
         except Exception as e:
+            # A registry refusal says what to do about it (which service to add,
+            # what to declare), so it goes in the message, not only in the cause.
+            reason = f". {e}" if isinstance(e, StructureRegistryError) else ""
             raise DefinitionError(
-                f"Could not convert Argument of function {function_name} to ArgPort: {value}"
+                f"Could not convert Argument of function {function_name} to ArgPort: {value}{reason}"
             ) from e
 
     function_outs_annotation = type_hints.get("return", None)
@@ -703,7 +704,7 @@ def prepare_definition(
             if is_generator_type(function_outs_annotation):
                 function_outs_annotation = get_args(function_outs_annotation)[0]
 
-            if is_dependency_type(function_outs_annotation):
+            if is_dependency_type(function_outs_annotation, structure_registry):
                 raise DefinitionError(
                     f"Function {function_name} has a return type that is a dependency. This is not allowed. Please change the return type."
                 )

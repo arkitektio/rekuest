@@ -572,9 +572,7 @@ def test_definition_round_trip(simple_registry: StructureRegistry) -> None:
 @pytest.mark.define
 def test_definition_resolves_nested_dependency_paths(simple_registry: StructureRegistry) -> None:
     """A dependency ``cfg..limit`` names the child ``limit`` of the model port ``cfg``."""
-    from rekuest.structures.model import model
-
-    @model
+    @simple_registry.model
     class Config:
         limit: int
         label: str
@@ -617,9 +615,8 @@ def test_definition_checks_return_ports_children_and_port_groups(
 ) -> None:
     """Dependencies are checked wherever an effect can sit, not only on top-level args."""
     from rekuest.api.schema import PortGroupInput
-    from rekuest.structures.model import model
 
-    @model
+    @simple_registry.model
     class Inner:
         n: Annotated[int, withEffect(EffectKind.HIDE, "gt(missing, 0)")]
 

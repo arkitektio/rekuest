@@ -20,9 +20,6 @@ import pytest
 from dokker import Deployment
 
 from rekuest.agents.caller import AgentPostman
-from rekuest.api.schema import amy_implementation_at
-from rekuest.declare import declare
-from rekuest.remote import acall
 
 from .conftest import CONNECT_TIMEOUT, build_fresh_rekuest
 
@@ -59,7 +56,7 @@ async def test_actor_internal_dependency_call_uses_agent(
     # --- Workflow app: declares a dependency and calls it from inside an actor
     workflow_app = build_fresh_rekuest(deployment, token="workflow_token")
 
-    @declare(app="atest", auto_resolvable=True, min=1)
+    @workflow_app.declare(app="atest", auto_resolvable=True, min=1)
     class ATestLike(Protocol):
         def do_stuff(self, printer: str) -> str:
             """Stitch a list of images."""
@@ -78,11 +75,10 @@ async def test_actor_internal_dependency_call_uses_agent(
         workflow_task = asyncio.create_task(workflow_app.aloop())
 
         # The OUTER assign (human-induced) goes through the GraphQL postman.
-        impl = await amy_implementation_at(
+        impl = await workflow_app.amy_implementation_at(
             "single_workflow",
-            rath=workflow_app.rath,
         )
-        answer = await acall(
+        answer = await workflow_app.acall(
             impl,
             postman=workflow_app.postman,
             structure_registry=workflow_app.structure_registry,

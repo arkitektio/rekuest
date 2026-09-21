@@ -17,7 +17,6 @@ from rekuest.api.schema import (
     StateDemandInput,
     StateDependencyInput,
 )
-from rekuest.declare import declare, declare_state
 from rekuest.definition.define import prepare_definition
 from rekuest.definition.match import build_port_matches
 from rekuest.app import AppRegistry
@@ -144,14 +143,12 @@ def test_self_state_choice_needs_no_dependency(
     assert widget.dependency is None
 
 
-@declare_state
 class CameraState:
     """State exposed by a declared camera protocol dependency."""
 
     exposure_ms: float = 0.0
 
 
-@declare(app="lab")
 class CameraProtocol:
     """A declared agent protocol exposing a camera state."""
 
@@ -161,6 +158,8 @@ class CameraProtocol:
 def test_register_with_state_choices_exposes_dependency(
     simple_registry: StructureRegistry,
 ) -> None:
+    simple_registry.declare(app="lab")(CameraProtocol)
+
     def adjust(camera: CameraProtocol, exposure: float) -> None:
         """Adjust the exposure of the camera."""
 
@@ -181,6 +180,8 @@ def test_register_with_state_choices_exposes_dependency(
 def test_register_with_unknown_state_choice_dependency_is_rejected(
     simple_registry: StructureRegistry,
 ) -> None:
+    simple_registry.declare(app="lab")(CameraProtocol)
+
     def adjust(camera: CameraProtocol, exposure: float) -> None:
         """Adjust the exposure of the camera."""
 

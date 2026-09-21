@@ -2,6 +2,7 @@
 
 import inspect
 from typing import (
+    TYPE_CHECKING,
     Any,
     TypeVar,
     cast,
@@ -11,13 +12,17 @@ from typing import (
 from collections.abc import Callable
 import asyncio
 
+from rekuest.agents.types import BoundApp
 from koil.bridge import run_threaded
+from rekuest.errors import NoRegistryError
 from rekuest.state.publish import StateHolder
 from rekuest.agents.hooks.registry import (
     HooksRegistry,
-    get_default_hook_registry,
 )
 from rekuest.agents.hooks.variables import WithVariables
+
+if TYPE_CHECKING:
+    from rekuest.structures.registry import StructureRegistry
 from rekuest.protocols import (
     AnyFunction,
     AsyncShutdownFunction,
@@ -25,7 +30,6 @@ from rekuest.protocols import (
     ThreadedShutdownFunction,
 )
 from rekuest.definition.define import is_none_type
-from rekuest.state.publish import direct_publishing
 from rekuest.state.utils import is_empty_type
 
 
@@ -53,13 +57,15 @@ class ShutdownWithVariables(WithVariables):
 class WrappedShutdownHook(ShutdownWithVariables):
     """Shutdown hook that runs in the event loop"""
 
-    def __init__(self, func: AsyncShutdownFunction) -> None:
+    def __init__(
+        self, func: AsyncShutdownFunction, structure_registry: "StructureRegistry | None" = None
+    ) -> None:
         """Initialize the shutdown hook
 
         Args:
             func (Callable): The function to run when the agent tears down
         """
-        super().__init__(func)
+        super().__init__(func, structure_registry)
 
     async def arun(
         self,
@@ -67,27 +73,28 @@ class WrappedShutdownHook(ShutdownWithVariables):
         contexts: dict[str, Any],
         states: dict[str, Any],
         app_context: Any,
+        bound_app: BoundApp | None = None,
     ) -> None:
         """Run the shutdown hook in the event loop"""
-        kwargs = self.get_kwargs(contexts, states, app_context)
-        with direct_publishing(agent):
-            await self.func(**kwargs)
+        kwargs = self.get_kwargs(contexts, states, app_context, bound_app=bound_app)
+        await self.func(**kwargs)
 
 
 class ThreadedShutdownHook(ShutdownWithVariables):
     """Shutdown hook that runs in a thread"""
 
-    def __init__(self, func: ThreadedShutdownFunction) -> None:
+    def __init__(
+        self, func: ThreadedShutdownFunction, structure_registry: "StructureRegistry | None" = None
+    ) -> None:
         """Initialize the shutdown hook
 
         Args:
             func (Callable): The function to run when the agent tears down
         """
-        super().__init__(func)
+        super().__init__(func, structure_registry)
 
     def run_with_publishing(self, agent: StateHolder, **kwargs: Any) -> None:
-        with direct_publishing(agent):
-            self.func(**kwargs)
+        self.func(**kwargs)
 
     async def arun(
         self,
@@ -95,9 +102,10 @@ class ThreadedShutdownHook(ShutdownWithVariables):
         contexts: dict[str, Any],
         states: dict[str, Any],
         app_context: Any,
+        bound_app: BoundApp | None = None,
     ) -> None:
         """Run the shutdown hook in a thread"""
-        kwargs = self.get_kwargs(contexts, states, app_context)
+        kwargs = self.get_kwargs(contexts, states, app_context, bound_app=bound_app)
         await run_threaded(
             self.run_with_publishing,
             agent,
@@ -117,13 +125,16 @@ def shutdown(*args: TShutdown) -> TShutdown:
 
 @overload
 def shutdown(
-    *, name: str | None = None, registry: HooksRegistry | None = None
+    *,
+    name: str | None = None,
+    registry: HooksRegistry | None = None,
+    structure_registry: "StructureRegistry | None" = None,
 ) -> Callable[[TShutdown], TShutdown]:
     """Decorator to register a shutdown hook
 
     Args:
         name (str): The name of the shutdown hook. If not provided, the function name will be used.
-        registry (HooksRegistry): The registry to use. If not provided, the default registry will be used.
+        registry (HooksRegistry): The registry to register into. Required.
     """
     ...
 
@@ -133,6 +144,7 @@ def shutdown(
     *args: TShutdown,
     name: str | None = None,
     registry: HooksRegistry | None = None,
+    structure_registry: "StructureRegistry | None" = None,
 ) -> TShutdown | Callable[[TShutdown], TShutdown]:
     """Decorator to register a shutdown hook"""
 
@@ -142,6 +154,7 @@ def shutdown(
     *args: TShutdown,
     name: str | None = None,
     registry: HooksRegistry | None = None,
+    structure_registry: "StructureRegistry | None" = None,
 ) -> TShutdown | Callable[[TShutdown], TShutdown]:
     """Register a shutdown hook on the selected hook registry.
 
@@ -157,8 +170,8 @@ def shutdown(
 
     Async shutdown hooks run directly in the event loop. Synchronous shutdown hooks
     are wrapped in ``ThreadedShutdownHook`` and executed through ``run_threaded`` so
-    they do not block the loop. Both run inside ``direct_publishing`` so state
-    mutations are propagated immediately.
+    they do not block the loop. State changes they make publish to the agent that
+    adopted the state, as changes made outside a task.
 
     A hook that raises is logged and the remaining hooks still run: teardown never
     fails because of a shutdown hook.
@@ -167,8 +180,8 @@ def shutdown(
         *args: Shutdown function to register when used as ``@shutdown`` without
             parentheses.
         name: Explicit registry key. Defaults to the function name.
-        registry: Hook registry to populate. Defaults to the global hook
-            registry.
+        registry: Hook registry to populate. Required: without one this raises
+            ``NoRegistryError``, since hooks go through an app (``@app.shutdown``).
 
     Returns:
         The original function, or a decorator configured with the provided
@@ -177,10 +190,13 @@ def shutdown(
     Raises:
         ValueError: If more than one function is passed at once.
 
+    Reached through ``AppRegistry.shutdown``; call it directly only with
+    ``registry=``.
+
     Examples:
         Close a client that a startup hook put on a context::
 
-            @shutdown
+            @app.shutdown
             async def teardown(my_context: MyContext) -> None:
                 await my_context.client.aclose()
     """
@@ -190,11 +206,14 @@ def shutdown(
 
     if len(args) == 1:
         func = args[0]
-        registry = registry or get_default_hook_registry()
+        if registry is None:
+            raise NoRegistryError.for_decorator(
+                "Hooks go", "shutdown", "async def my_hook(): ...", "registry"
+            )
 
         if asyncio.iscoroutinefunction(func):
             a = cast(AsyncShutdownFunction, func)
-            registry.register_shutdown(name or a.__name__, WrappedShutdownHook(a))
+            registry.register_shutdown(name or a.__name__, WrappedShutdownHook(a, structure_registry))
 
         else:
             assert inspect.isfunction(func) or inspect.ismethod(func), (
@@ -202,12 +221,12 @@ def shutdown(
             )
             t = cast(ThreadedShutdownFunction, func)
 
-            registry.register_shutdown(name or t.__name__, ThreadedShutdownHook(t))
+            registry.register_shutdown(name or t.__name__, ThreadedShutdownHook(t, structure_registry))
 
         return cast(TShutdown, func)
     else:
 
         def decorator(func: TShutdown) -> TShutdown:
-            return cast(TShutdown, shutdown(func, name=name, registry=registry))
+            return cast(TShutdown, shutdown(func, name=name, registry=registry, structure_registry=structure_registry))
 
         return decorator

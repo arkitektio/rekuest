@@ -31,6 +31,8 @@ class MemoryAgentTransport(AgentTransport):
 
     _in_queue: Optional["asyncio.Queue[object]"] = None
     _connected: bool = False
+    _host: object | None = None
+    """The agent that installed itself, for transports that ask it for the handshake."""
 
     def model_post_init(self, __context: object) -> None:
         """Give every instance its own recording list and queue."""
@@ -79,6 +81,10 @@ class MemoryAgentTransport(AgentTransport):
         return [m for m in self.sent if isinstance(m, kind)]
 
     # -- lifecycle -----------------------------------------------------------------
+
+    def set_transport_host(self, host: object) -> None:
+        """Remember the agent; there is no connection to hand its policy to."""
+        self._host = host
 
     @property
     def connected(self) -> bool:

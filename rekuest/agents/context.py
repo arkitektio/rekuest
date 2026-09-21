@@ -1,119 +1,39 @@
-"""Context management for Rekuest Next."""
+"""Contexts: what an agent holds for its lifetime, handed out by annotation.
 
-from typing import (
-    TypeVar,
-    overload,
-    get_type_hints,
-)
-from collections.abc import Callable
+A context class is declared on an app (``@app.context``); what the app knows
+about it -- its name and the locks its use requires -- lives on that app's
+structure registry, and nothing is written on the class. A startup hook
+returning one publishes it; an action or hook annotated with it is handed it.
+"""
+
+from typing import TYPE_CHECKING, Any, get_type_hints
 import inspect
 from dataclasses import dataclass
-import inflection
 
 from rekuest.definition.define import get_non_null_variants, is_tuple
-from rekuest.protocols import AnyContext, AnyFunction
+from rekuest.protocols import AnyFunction
+
+if TYPE_CHECKING:
+    from rekuest.structures.registry import StructureRegistry
 
 
-T = TypeVar("T", bound=AnyContext)
+def is_context(annotation: Any, structure_registry: "StructureRegistry | None") -> bool:  # noqa: ANN401
+    """Whether ``annotation`` is a class the app declared as a context.
 
-
-def is_context(cls: object) -> bool:
-    """Checks if the class is a context."""
-    x = getattr(cls, "__rekuest_context__", False)
-    return x is not False
-
-
-def get_context_name(cls: object) -> str:
-    """Returns the context name of the class."""
-
-    x = getattr(cls, "__rekuest_context__", None)
-    if x is None:
-        raise ValueError(f"Class {cls} is not a context")
-    return x
-
-
-def get_context_locks(cls: object) -> list[str]:
-    """Returns the context locks of the class."""
-
-    x = getattr(cls, "__rekuest_context_locks__", [])
-    return x
-
-
-@overload
-def context(
-    *function: type[T],
-) -> type[T]:
-    """Decorator to register a class as a context."""
-    ...
-
-
-@overload
-def context(
-    *,
-    name: str | None = None,
-    locks: list[str] | None = None,
-) -> Callable[[T], T]:
-    """Decorator to register a class as a context with optional locks.
-
-    Args:
-        name (Optional[str]): The name of the context. If None, the class name will be used.
-        local_only (bool): If True, the context will only be available locally.
-        locks (Optional[list[str]]): A list of locks for the context. If None, no locks will be used.
+    Without a registry nothing is: being a context is a declaration on an app,
+    not a property of the class.
     """
-    ...
+    return structure_registry is not None and structure_registry.is_context(annotation)
 
 
-def context(  # type: ignore[valid-type]
-    *function: type[T],
-    name: str | None = None,
-    locks: list[str] | None = None,
-) -> type[T] | Callable[[type[T]], type[T]]:
-    """Mark a class as agent context metadata.
+def get_context_name(cls: Any, structure_registry: "StructureRegistry") -> str:  # noqa: ANN401
+    """The name the app keeps the context ``cls`` under."""
+    return structure_registry.context_for(cls).name
 
-    The decorator does not wrap the class behavior. Instead, it annotates the
-    class with ``__rekuest_context__`` and ``__rekuest_context_locks__`` so
-    startup hooks, background tasks, and action signatures can request the
-    context by type. Lock names declared here are collected during signature
-    inspection and used to serialize access where needed.
 
-    Args:
-        *function: Class to decorate when used as ``@context`` without
-            parentheses.
-        name: Explicit exported context name. Defaults to the snake_case class
-            name.
-        locks: Optional lock names required when this context is injected.
-
-    Returns:
-        The decorated class, or a decorator configured with the provided
-        metadata.
-
-    Raises:
-        ValueError: If more than one class is passed at once.
-
-    Examples:
-        Register a shared context class::
-
-            @context(name="camera_session", locks=["camera"])
-            class CameraSession:
-                device_id: str
-    """
-
-    if len(function) == 1:
-        cls = function[0]
-        return context(name=cls.__name__)(cls)
-
-    if len(function) == 0:
-
-        def wrapper(cls: type[T]) -> type[T]:
-            setattr(
-                cls, "__rekuest_context__", inflection.underscore(name or cls.__name__)
-            )
-            setattr(cls, "__rekuest_context_locks__", locks or [])
-            return cls
-
-        return wrapper
-
-    raise ValueError("You can only register one class at a time.")
+def get_context_locks(cls: Any, structure_registry: "StructureRegistry") -> list[str]:  # noqa: ANN401
+    """The locks the app requires while a parameter of ``cls`` is held."""
+    return list(structure_registry.context_for(cls).locks)
 
 
 @dataclass
@@ -138,15 +58,19 @@ class PreparedContextReturns:
 
 
 def prepare_context_variables(
-    function: AnyFunction,
+    function: AnyFunction, structure_registry: "StructureRegistry | None" = None
 ) -> tuple[PreparedContextVariables, PreparedContextReturns]:
-    """Prepares the context variables for a function.
+    """The context parameters and returns of ``function``, by name and index.
+
+    A parameter is a context when its annotation is a class the app declared
+    one on ``structure_registry``; without a registry no parameter is.
 
     Args:
-        function (Callable): The function to prepare the context variables for.
+        function: The function to inspect.
+        structure_registry: The app's structures, which hold its contexts.
 
     Returns:
-        Dict[str, Any]: A dictionary of context variables.
+        The context parameters (with their locks) and the context returns.
     """
     sig = inspect.signature(function)
     parameters = sig.parameters
@@ -162,19 +86,22 @@ def prepare_context_variables(
 
     for key, value in parameters.items():
         cls = hints.get(key, value.annotation)
-        if is_context(cls):
-            state_variables[key] = cls.__rekuest_context__
-            required_locks[key] = get_context_locks(cls)
+        if is_context(cls, structure_registry):
+            assert structure_registry is not None
+            state_variables[key] = get_context_name(cls, structure_registry)
+            required_locks[key] = get_context_locks(cls, structure_registry)
 
     returns = hints.get("return", sig.return_annotation)
 
     if is_tuple(returns):
         for index, cls in enumerate(get_non_null_variants(returns)):
-            if is_context(cls):
-                state_returns[index] = cls.__rekuest_context__
+            if is_context(cls, structure_registry):
+                assert structure_registry is not None
+                state_returns[index] = get_context_name(cls, structure_registry)
     else:
-        if is_context(returns):
-            state_returns[0] = returns.__rekuest_context__
+        if is_context(returns, structure_registry):
+            assert structure_registry is not None
+            state_returns[0] = get_context_name(returns, structure_registry)
 
     return (
         PreparedContextVariables(

@@ -1,4 +1,4 @@
-"""Utility functions for Rekuest Next structures."""
+"""Utility functions for Rekuest structures."""
 
 from .types import Predicator
 
@@ -12,7 +12,6 @@ async def id_shrink(
 
     Args:
         value (object): The value to be shrunk.
-        structure_registry (StructureRegistry): The structure registry.
 
     Returns:
         object: The shrunk value.
@@ -26,3 +25,4 @@ async def id_shrink(
 def build_instance_predicate(cls: type[object]) -> Predicator:
     """Build a predicate function that checks if an object is an instance of the given class."""
     return lambda value: isinstance(value, cls)
+

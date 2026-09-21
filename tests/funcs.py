@@ -4,7 +4,6 @@ import asyncio
 from collections.abc import Generator
 from .structures import SecondObject, SecondSerializableObject, SerializableObject
 from annotated_types import Le, Predicate, Gt, Len
-from rekuest.structures.model import model
 from rekuest.api.schema import CustomAssignWidgetInput
 
 
@@ -221,7 +220,6 @@ async def nested_structure_asyncgenerator(
         yield "tested", {"peter": SecondObject(6)}
 
 
-@model
 class Karl:
     """Karl"""
 

@@ -11,7 +11,7 @@ class SerializableObject(BaseModel):
     @classmethod
     def get_identifier(cls) -> str:
         """Get the identifier of the object."""
-        return "mock/serializable"
+        return "@mock/serializable"
 
     async def ashrink(self) -> str:
         """Shrink the object to its id."""
@@ -39,7 +39,7 @@ class SecondSerializableObject:
     @classmethod
     def get_identifier(cls) -> str:
         """Get the identifier of the object."""
-        return "mock/secondserializable"
+        return "@mock/secondserializable"
 
     async def ashrink(self) -> str:
         """Shrink the object to its id."""
@@ -60,7 +60,7 @@ class IdentifiableSerializableObject(BaseModel):
     @classmethod
     def get_identifier(cls) -> str:
         """Get the identifier of the object."""
-        return "mock/identifiable"
+        return "@mock/identifiable"
 
     async def ashrink(self) -> str:
         """Shrink the object to its id."""
@@ -88,7 +88,7 @@ class SecondObject:
     @classmethod
     def get_identifier(cls) -> str:
         """Get the identifier of the object."""
-        return "mock/secondobject"
+        return "@mock/secondobject"
 
     async def ashrink(self) -> str:
         """Shrink the object to its id."""
@@ -98,3 +98,30 @@ class SecondObject:
     async def aexpand(cls, value: str) -> "SecondObject":
         """Expand the object from its id."""
         return cls(id=value)
+
+
+def test_registry(**kwargs: object) -> "StructureRegistry":
+    """A structure registry holding the structures in this module.
+
+    Nothing registers itself any more, so a test that builds a bare
+    ``StructureRegistry()`` and then names one of these in a signature gets a
+    refusal. This is the preregistration those tests need, in one place.
+    """
+    from rekuest.structures.registry import StructureRegistry
+
+    registry = StructureRegistry(**kwargs)
+    register_test_structures(registry)
+    return registry
+
+
+def register_test_structures(registry: "StructureRegistry") -> None:
+    """Register every structure in this module into ``registry``."""
+    for cls in (
+        SerializableObject,
+        SecondSerializableObject,
+        IdentifiableSerializableObject,
+        SecondObject,
+    ):
+        registry.register_from_protocol(cls)
+    # The one that cannot fetch itself, and so lives on the agent's shelve.
+    registry.register_as_memory_structure(GlobalObject)

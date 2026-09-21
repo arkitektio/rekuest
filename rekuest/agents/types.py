@@ -5,25 +5,130 @@ containers live in :mod:`rekuest.agents.dataclasses`; behaviour lives on
 :class:`rekuest.agents.base.BaseAgent`.
 """
 
-from typing import TypeVar
-
-
-class AppContext:
-    """Protocol for the app context that is passed to the hooks."""
-
-    __rekuest_app_context__: str
-
+from collections.abc import Mapping
+from typing import Any, Protocol, TypeVar, runtime_checkable
 
 T = TypeVar("T")
 
 
-def app_context(
-    cls: type[T],
-) -> type[T]:
-    """Decorator to register a class as an app context."""
+@runtime_checkable
+class BoundApp(Protocol):
+    """What an agent is bound to: the running app, answering for its clients.
 
-    setattr(cls, "__rekuest_app_context__", cls.__name__)
-    return cls
+    Three ways to ask, because three things ask differently:
+
+    * ``get(Mikro)`` -- by class, which is how an action, a hook and a
+      structure's expander name the client they want.
+    * ``clients`` -- by service name (``{"mikro": <Mikro>}``), which is how a
+      *declared* structure finds the client that expands it: its service is
+      recorded on it, not the class.
+    * ``services`` -- the service names the app declares, which is how the agent
+      reports a structure whose service the app lacks. Declared, not built, so a
+      service whose client was never constructed still counts.
+
+    arkitekt's Runtime is one; a test can pass anything that answers.
+    """
+
+    services: Mapping[str, Any]
+    clients: Mapping[str, Any]
+
+    def get(self, key: type[T]) -> T | None:
+        """The app's client of class ``key``, or ``None``."""
+        ...
 
 
-__all__ = ["AppContext", "T", "app_context"]
+AppContext = Any
+"""The app context: whatever object the caller hands to ``run(context=...)``.
+
+Its class is declared with ``@app.app_context``; nothing is written on it.
+"""
+
+
+def unwrap_injectable(annotation: object) -> object:
+    """Strip ``Annotated[...]`` and ``Optional[...]`` from an injectable annotation.
+
+    ``Optional[Mikro]`` still asks for the client; the ``None`` only says the author
+    guards for its absence. Any other union is returned as is and is not injectable.
+    Whether the class *is* a client is the structure registry's to say
+    (:meth:`~rekuest.structures.registry.StructureRegistry.is_client`): it is one
+    when a registered service returns it.
+    """
+    import types
+    import typing
+
+    while True:
+        origin = typing.get_origin(annotation)
+        if origin is typing.Annotated:
+            annotation = typing.get_args(annotation)[0]
+            continue
+        if origin is typing.Union or origin is types.UnionType:
+            args = [a for a in typing.get_args(annotation) if a is not type(None)]
+            if len(args) == 1:
+                annotation = args[0]
+                continue
+        return annotation
+
+
+def resolve_service_clients(
+    variables: Mapping[str, type],
+    bound_app: "BoundApp | None",
+    *,
+    whose: str,
+    task: Any = None,  # noqa: ANN401
+) -> dict[str, Any]:
+    """Fill each parameter with the app's client of the class it asked for.
+
+    The one place a client-typed parameter is turned into a client. Actions,
+    hooks and a structure's expander all inject the same way, and each used to
+    spell this loop out again -- two of them had already drifted apart on whether
+    a task view applies.
+
+    Args:
+        variables: Parameter name to the client class it wants, from
+            ``prepare_injected_variables``.
+        bound_app: The app the agent belongs to, or ``None`` when it has none.
+        whose: What is asking, for the error message ("action 'segment'").
+        task: The assignment being run, when there is one. A client that offers
+            ``for_task`` is handed out as a view of it, so that what one of many
+            concurrent tasks does can be attributed to it.
+
+    Returns:
+        The kwargs, one per parameter.
+
+    Raises:
+        StateRequirementsNotMet: If the app has no client of a wanted class.
+            Passing ``None`` instead would only move the failure into the
+            function body, away from its cause.
+    """
+    from rekuest.agents.errors import StateRequirementsNotMet
+
+    if not variables:
+        return {}
+    if bound_app is None:
+        raise StateRequirementsNotMet(
+            f"{whose} asks for a client, but this agent is not bound to an app "
+            "that has any."
+        )
+
+    kwargs: dict[str, Any] = {}
+    for key, cls in variables.items():
+        client = bound_app.get(cls)
+        if client is None:
+            raise StateRequirementsNotMet(
+                f"{whose} asks for a {cls.__name__} as '{key}', but the app was "
+                "built without one. Add its service to the app."
+            )
+        for_task = getattr(client, "for_task", None)
+        if task is not None and callable(for_task):
+            client = for_task(task)
+        kwargs[key] = client
+    return kwargs
+
+
+__all__ = [
+    "BoundApp",
+    "AppContext",
+    "T",
+    "resolve_service_clients",
+    "unwrap_injectable",
+]

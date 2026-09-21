@@ -1,13 +1,16 @@
 """Per-call context threaded through the kind-dispatch tables."""
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from typing import Any
 from collections.abc import Awaitable, Callable, Sequence
 
+from rath.scalars import ID
 from rekuest.actors.types import Shelver
 from rekuest.api.schema import PortKind
 from rekuest.structures.registry import StructureRegistry
+from rekuest.structures.serialization.batching import ExpandBatcher
 from rekuest.structures.serialization.protocols import SerializablePort
+from rekuest.structures.types import FullFilledStructure
 
 
 @dataclass(frozen=True)
@@ -16,13 +19,18 @@ class SerializationContext:
 
     ``path``/``depth`` only feed error messages; ``shelver`` is only present on
     the actor side, where memory structures are resolved against the local
-    shelve.
+    shelve. ``batcher`` collects the structure expansions of this call, so that
+    ids expanded together are fetched together; nested contexts share it.
+
+    Which client an expansion uses is not carried here: an assignment runs pinned
+    to its agent's app, so the expanders resolve it from what is current.
     """
 
     registry: StructureRegistry
     shelver: Shelver | None = None
     path: tuple[str, ...] = ()
     depth: int = 0
+    batcher: ExpandBatcher = field(default_factory=ExpandBatcher)
 
     @classmethod
     def build(
@@ -31,10 +39,19 @@ class SerializationContext:
         shelver: Shelver | None = None,
         path: Sequence[str] | None = None,
         depth: int = 0,
+        batcher: ExpandBatcher | None = None,
     ) -> "SerializationContext":
         return cls(
-            registry=registry, shelver=shelver, path=tuple(path or ()), depth=depth
+            registry=registry,
+            shelver=shelver,
+            path=tuple(path or ()),
+            depth=depth,
+            batcher=batcher or ExpandBatcher(),
         )
+
+    async def load(self, structure: FullFilledStructure, id: ID) -> Any:  # noqa: ANN401
+        """Expand ``id`` as ``structure``, batched with its siblings where it can be."""
+        return await self.batcher.load(structure, id)
 
     def child(self, *parts: str) -> "SerializationContext":
         """Context for a nested port one level down."""

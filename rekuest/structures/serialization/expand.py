@@ -15,12 +15,14 @@ from rath.scalars import ID
 
 from rekuest.api.schema import Action, DefinitionInput, PortKind
 from rekuest.structures.errors import (
+    StructureRegistryError,
     ExpandingError,
     PortExpandingError,
     StructureExpandingError,
 )
 from rekuest.structures.quantities import expand_quantity
 from rekuest.structures.registry import StructureRegistry
+from rekuest.structures.serialization.batching import ExpandBatcher
 from rekuest.structures.serialization.context import (
     KindTable,
     SerializationContext,
@@ -40,7 +42,13 @@ async def _expand(
 ) -> Any:  # noqa: ANN401
     """Recursive entry point used by the container handlers."""
     return await aexpand_return(
-        port, value, structure_registry=ctx.registry, path=ctx.path, depth=ctx.depth
+        port,
+        value,
+        structure_registry=ctx.registry,
+        path=ctx.path,
+        depth=ctx.depth,
+        # Nested ports expand in the same batches as the return value they are part of.
+        batcher=ctx.batcher,
     )
 
 
@@ -50,10 +58,10 @@ async def _dict(port: SerializablePort, value: Any, ctx: SerializationContext) -
     child = single_child(port)
     if child is None:
         raise PortExpandingError(f"Port {port.identifier} must have exactly one child")
-    return {
-        key: await _expand(child, item, ctx.child(port.key, key))
-        for key, item in value.items()
-    }
+    expanded = await asyncio.gather(
+        *[_expand(child, item, ctx.child(port.key, key)) for key, item in value.items()]
+    )
+    return dict(zip(value.keys(), expanded))
 
 
 async def _list(port: SerializablePort, value: Any, ctx: SerializationContext) -> Any:  # noqa: ANN401
@@ -147,12 +155,17 @@ async def _structure(
         raise PortExpandingError(
             f"Structure {port.identifier} not found. Was it ever registered?"
         ) from e
+    except StructureRegistryError as e:
+        # It is registered, but not for this app: another service's structure.
+        raise PortExpandingError(f"Can't expand {port.identifier}. {e}") from e
     try:
-        return await fstruc.aexpand(ID.validate(object))
-    except Exception:
+        return await ctx.load(fstruc, ID.validate(object))
+    except Exception as e:
+        # Chained, not suppressed: the reason (which id was not found, what the
+        # service said) is the useful half of this message.
         raise StructureExpandingError(
-            f"Error expanding {repr(value)} with Structure {port.identifier}"
-        ) from None
+            f"Error expanding {repr(value)} with Structure {port.identifier}: {e}"
+        ) from e
 
 
 async def _model(port: SerializablePort, value: Any, ctx: SerializationContext) -> Any:  # noqa: ANN401
@@ -189,17 +202,13 @@ async def _enum(port: SerializablePort, value: Any, ctx: SerializationContext) -
         raise PortExpandingError(
             f"Enum {port.identifier} not found. Was it ever registered?"
         ) from e
-    if isinstance(value, str):
-        if value in fenum.cls.__members__:
-            return fenum.cls[value]
-        attr = getattr(fenum.cls, value, None)  # partial() members on 3.13+
-        if attr is not None:
-            return attr
-        raise PortExpandingError(
-            f"Enum {port.identifier} does not have {value} as member"
-        )
-    if isinstance(value, int):
-        return fenum.cls(value)
+    if isinstance(value, (str, int)):
+        try:
+            return fenum.expand(value)
+        except KeyError:
+            raise PortExpandingError(
+                f"Enum {port.identifier} does not have {value} as member"
+            ) from None
     raise PortExpandingError(
         f"Expected enum value to be a str or int, but got {type(value)}"
     )
@@ -242,8 +251,11 @@ async def aexpand_return(
     structure_registry: StructureRegistry,
     path: Sequence[str] | None = None,
     depth: int = 0,
+    batcher: ExpandBatcher | None = None,
 ) -> Any:  # noqa: ANN401
     """Expand a JSON wire value back into a Python value through ``port``.
+
+    The expanders resolve their client from whichever app is current.
 
     Raises:
         ExpandingError: If the value does not fit the port.
@@ -261,7 +273,9 @@ async def aexpand_return(
     return await handler(
         port,
         value,
-        SerializationContext.build(structure_registry, path=path, depth=depth),
+        SerializationContext.build(
+            structure_registry, path=path, depth=depth, batcher=batcher
+        ),
     )
 
 
@@ -292,7 +306,9 @@ async def aexpand_returns(
         try:
             expanded_returns.append(
                 await aexpand_return(
-                    port, returns[port.key], structure_registry=structure_registry
+                    port,
+                    returns[port.key],
+                    structure_registry=structure_registry,
                 )
             )
         except Exception as e:

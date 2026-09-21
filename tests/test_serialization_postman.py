@@ -207,8 +207,8 @@ async def test_shrinking_nested_structure(
     )
 
     assert args == {
-        "name": {"hallo": {"__identifier": "mock/serializable", "object": "3"}},
-        "rep": [{"__identifier": "mock/serializable", "object": "3"}],
+        "name": {"hallo": {"__identifier": "@mock/serializable", "object": "3"}},
+        "rep": [{"__identifier": "@mock/serializable", "object": "3"}],
     }, f"Should be the shrinked version of the input is: {args}"
 
 

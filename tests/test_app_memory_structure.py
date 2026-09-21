@@ -1,6 +1,6 @@
 """Integration tests for piping a *memory structure* between calls.
 
-Each test stands up its **own** ``RekuestNext`` with a **fresh** ``AppRegistry``
+Each test stands up its **own** ``Rekuest`` with a **fresh** ``AppRegistry``
 (via :func:`build_fresh_rekuest`) against the shared, already-running deployment,
 registers its functions, runs the agent, and drives real calls with ``acall`` --
 exactly like ``test_app_run`` does, just with a per-test app instead of a shared
@@ -22,8 +22,6 @@ import asyncio
 import pytest
 from dokker import Deployment
 
-from rekuest.api.schema import amy_implementation_at
-from rekuest.remote import acall
 
 from .conftest import CONNECT_TIMEOUT, build_fresh_rekuest
 
@@ -59,6 +57,9 @@ async def test_pipe_memory_structure_between_calls(deployment: Deployment) -> No
     """Output of one call is piped into another, resolving the live instance."""
 
     app = build_fresh_rekuest(deployment, token="standalone_token")
+    # Memory structures are asked for now, never inferred from a signature.
+    app.register_memory_structure(Image)
+    app.register_memory_structure(Mask)
 
     def make_image(size: int) -> Image:
         """Create an in-memory image."""
@@ -75,11 +76,11 @@ async def test_pipe_memory_structure_between_calls(deployment: Deployment) -> No
         await app.aconnect(timeout=CONNECT_TIMEOUT)
         task = asyncio.create_task(app.aloop())
 
-        make_impl = await amy_implementation_at("make_image")
-        reference = await acall(make_impl, size=5)
+        make_impl = await app.amy_implementation_at("make_image")
+        reference = await app.acall(make_impl, size=5)
 
-        count_impl = await amy_implementation_at("count_pixels")
-        result = await acall(count_impl, image=_drawer(reference))
+        count_impl = await app.amy_implementation_at("count_pixels")
+        result = await app.acall(count_impl, image=_drawer(reference))
 
         assert result == 5, f"Expected the piped image to have 5 pixels, got {result}"
 
@@ -96,6 +97,9 @@ async def test_three_stage_memory_pipeline(deployment: Deployment) -> None:
     """Chain three calls, threading memory structures all the way through."""
 
     app = build_fresh_rekuest(deployment, token="standalone_token")
+    # Memory structures are asked for now, never inferred from a signature.
+    app.register_memory_structure(Image)
+    app.register_memory_structure(Mask)
 
     def make_image(size: int) -> Image:
         """Create an in-memory image."""
@@ -117,14 +121,14 @@ async def test_three_stage_memory_pipeline(deployment: Deployment) -> None:
         await app.aconnect(timeout=CONNECT_TIMEOUT)
         task = asyncio.create_task(app.aloop())
 
-        make_impl = await amy_implementation_at("make_image")
-        image_ref = await acall(make_impl, size=10)
+        make_impl = await app.amy_implementation_at("make_image")
+        image_ref = await app.acall(make_impl, size=10)
 
-        threshold_impl = await amy_implementation_at("threshold_image")
-        mask_ref = await acall(threshold_impl, image=_drawer(image_ref), at=4)
+        threshold_impl = await app.amy_implementation_at("threshold_image")
+        mask_ref = await app.acall(threshold_impl, image=_drawer(image_ref), at=4)
 
-        measure_impl = await amy_implementation_at("measure_mask")
-        area = await acall(measure_impl, mask=_drawer(mask_ref))
+        measure_impl = await app.amy_implementation_at("measure_mask")
+        area = await app.acall(measure_impl, mask=_drawer(mask_ref))
 
         # pixels 4..9 are >= 4 -> area 6, computed on the real piped objects.
         assert area == 6, f"Expected mask area 6, got {area}"
@@ -147,6 +151,9 @@ async def test_each_test_gets_a_fresh_app_registry(deployment: Deployment) -> No
     """
 
     app = build_fresh_rekuest(deployment, token="standalone_token")
+    # Memory structures are asked for now, never inferred from a signature.
+    app.register_memory_structure(Image)
+    app.register_memory_structure(Mask)
 
     assert app.agent.app_registry.implementations == {}
 
@@ -174,9 +181,10 @@ async def test_memory_structure_round_trips_through_dependency(
     """
     from typing import Protocol
 
-    from rekuest.declare import declare
-
+    
     provider = build_fresh_rekuest(deployment, token="atest_token")
+    provider.register_memory_structure(Image)
+    provider.register_memory_structure(Mask)
 
     def make_image(size: int) -> Image:
         """Create an in-memory image."""
@@ -190,8 +198,10 @@ async def test_memory_structure_round_trips_through_dependency(
     provider.register(count_pixels)
 
     workflow_app = build_fresh_rekuest(deployment, token="workflow_token")
+    workflow_app.register_memory_structure(Image)
+    workflow_app.register_memory_structure(Mask)
 
-    @declare(app="atest", auto_resolvable=True, min=1)
+    @workflow_app.declare(app="atest", auto_resolvable=True, min=1)
     class ImageProvider(Protocol):
         def make_image(self, size: int) -> Image:
             """Create an in-memory image."""
@@ -217,14 +227,12 @@ async def test_memory_structure_round_trips_through_dependency(
         await workflow_app.aconnect(timeout=CONNECT_TIMEOUT)
         workflow_task = asyncio.create_task(workflow_app.aloop())
 
-        impl = await amy_implementation_at(
-            "pipe_through_dependency", rath=workflow_app.rath
+        impl = await workflow_app.amy_implementation_at(
+            "pipe_through_dependency"
         )
-        result = await acall(
+        result = await workflow_app.acall(
             impl,
             size=7,
-            postman=workflow_app.postman,
-            structure_registry=workflow_app.structure_registry,
         )
         assert result == 7, (
             f"Expected 7 pixels counted via the dependency, got {result}"

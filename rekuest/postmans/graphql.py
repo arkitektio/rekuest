@@ -4,16 +4,13 @@ from types import TracebackType
 from typing import Any
 from collections.abc import AsyncGenerator, Sequence
 from rath.scalars import ID
+from rekuest.graphql import RekuestGraphQL
 from rekuest.api.schema import (
     HookInput,
     ResolvedDependencyInput,
     TaskChange,
     TaskEventChange,
     TaskEventKind,
-    aassign,
-    awatch_my_tasks,
-    acancel,
-    ainterrupt,
     AssignInput,
 )
 from rekuest.scalars import ActionHash
@@ -22,11 +19,17 @@ import uuid
 from pydantic import Field, PrivateAttr
 import logging
 from .errors import PostmanException, RootOnlyAssignError
-from rekuest.rath import RekuestNextRath
+from rekuest.rath import RekuestRath
 from koil.composition import KoiledModel
-from .vars import current_postman
 
 logger = logging.getLogger(__name__)
+
+
+class _FeedLost:
+    """Queue sentinel: the task change feed died, so no event will ever arrive again."""
+
+    def __init__(self, reason: str) -> None:
+        self.reason = reason
 
 
 class GraphQLPostman(KoiledModel):
@@ -39,7 +42,7 @@ class GraphQLPostman(KoiledModel):
 
     """
 
-    rath: RekuestNextRath
+    rath: RekuestRath
     connected: bool = Field(default=False)
     tasks: dict[str, TaskChange] = Field(default_factory=dict)
     cancel_timeout: float = Field(
@@ -47,7 +50,7 @@ class GraphQLPostman(KoiledModel):
         description="Maximum seconds to wait for the server to confirm cancellation of a task when an assign stream is cancelled. Bounds cancellation so cancelling a call can never hang.",
     )
 
-    _ass_update_queues: dict[str, asyncio.Queue[TaskEventChange]] = PrivateAttr(
+    _ass_update_queues: dict[str, asyncio.Queue[TaskEventChange | _FeedLost]] = PrivateAttr(
         default_factory=lambda: {}
     )
     # The change feed (TaskEventChange) only carries the task id, not the
@@ -160,7 +163,7 @@ class GraphQLPostman(KoiledModel):
         queue = self._ass_update_queues[assign_reference]
 
         try:
-            task = await aassign(**assign_input.model_dump(), rath=self.rath)
+            task = await RekuestGraphQL(self.rath).aassign(**assign_input.model_dump())
         except Exception as e:
             raise PostmanException(f"Cannot Assign: {e}") from e
 
@@ -172,6 +175,12 @@ class GraphQLPostman(KoiledModel):
         try:
             while True:
                 signal = await queue.get()
+                if isinstance(signal, _FeedLost):
+                    # The change feed this call depends on is gone: no further event
+                    # can ever arrive on this queue. Fail instead of waiting forever.
+                    raise PostmanException(
+                        f"Lost the task event feed while waiting for task {task.id}: {signal.reason}"
+                    )
                 yield signal
                 queue.task_done()
 
@@ -191,6 +200,10 @@ class GraphQLPostman(KoiledModel):
             finally:
                 self._cleanup_reference(assign_reference)
             raise e
+        finally:
+            # Also the ordinary way out: the consumer stops iterating once it has seen
+            # a terminal event, which closes this generator. Idempotent.
+            self._cleanup_reference(assign_reference)
 
     def _cleanup_reference(self, reference: str) -> None:
         """Drop all per-call state for a finished/cancelled assignation."""
@@ -203,7 +216,7 @@ class GraphQLPostman(KoiledModel):
     async def _confirm_cancellation(
         self,
         task_id: str,
-        queue: "asyncio.Queue[TaskEventChange]",
+        queue: "asyncio.Queue[TaskEventChange | _FeedLost]",
         escalate_to_interrupt: bool,
         timeout: float,
     ) -> None:
@@ -236,7 +249,7 @@ class GraphQLPostman(KoiledModel):
         """Request a graceful cancel of the task (best-effort, bounded)."""
         try:
             await asyncio.wait_for(
-                acancel(task=task_id, rath=self.rath), timeout=timeout
+                RekuestGraphQL(self.rath).acancel(task=task_id), timeout=timeout
             )
         except Exception:
             logger.warning(
@@ -247,7 +260,7 @@ class GraphQLPostman(KoiledModel):
         """Request a forceful interrupt of the task (best-effort, bounded)."""
         try:
             await asyncio.wait_for(
-                ainterrupt(task=task_id, rath=self.rath), timeout=timeout
+                RekuestGraphQL(self.rath).ainterrupt(task=task_id), timeout=timeout
             )
         except Exception:
             logger.warning(
@@ -256,7 +269,7 @@ class GraphQLPostman(KoiledModel):
 
     async def _await_kind(
         self,
-        queue: "asyncio.Queue[TaskEventChange]",
+        queue: "asyncio.Queue[TaskEventChange | _FeedLost]",
         kinds: "set[TaskEventKind]",
         timeout: float,
     ) -> bool:
@@ -275,6 +288,8 @@ class GraphQLPostman(KoiledModel):
                 event = await asyncio.wait_for(queue.get(), timeout=remaining)
             except TimeoutError:
                 return False
+            if isinstance(event, _FeedLost):
+                return False  # no confirmation can arrive any more — stop waiting
             if event.kind in kinds:
                 return True
 
@@ -287,7 +302,7 @@ class GraphQLPostman(KoiledModel):
         and route on ``event``, buffering events whose task id is not yet bound.
         """
         try:
-            async for change in awatch_my_tasks(rath=self.rath):
+            async for change in RekuestGraphQL(self.rath).awatch_my_tasks():
                 self._received_something = True
                 if change.create and change.create.reference:
                     self._bind(change.create.id, change.create.reference)
@@ -307,9 +322,27 @@ class GraphQLPostman(KoiledModel):
                             change.event.task, []
                         ).append(change.event)
 
+        except asyncio.CancelledError:
+            raise  # ``stop_watching``: an orderly shutdown, nobody is left waiting
         except Exception as e:
             logger.error("Watching Tasks failed", exc_info=True)
+            self._fail_pending(f"{type(e).__name__}: {e}")
             raise e
+        else:
+            # The subscription ended without an error (the server closed the stream).
+            # Same consequence for everyone still waiting on it.
+            self._fail_pending("the subscription ended")
+
+    def _fail_pending(self, reason: str) -> None:
+        """The change feed died: wake every call waiting on it, and allow a restart.
+
+        Nothing consumes this task's result, so an exception here used to vanish —
+        while every in-flight ``aassign`` kept awaiting a queue that could never be
+        fed again. ``_watching`` is reset so the next call starts a fresh feed.
+        """
+        self._watching = False
+        for queue in list(self._ass_update_queues.values()):
+            queue.put_nowait(_FeedLost(reason))
 
     async def start_watching(self) -> None:
         """Start watching for updates"""
@@ -335,7 +368,6 @@ class GraphQLPostman(KoiledModel):
     async def __aenter__(self) -> "GraphQLPostman":
         """Enter the postman"""
         self._lock = asyncio.Lock()
-        current_postman.set(self)
         return self
 
     async def __aexit__(
@@ -347,5 +379,4 @@ class GraphQLPostman(KoiledModel):
         """Exit the context manager"""
         if self._watching:
             await self.stop_watching()
-        current_postman.set(None)
         return await super().__aexit__(exc_type, exc_val, exc_tb)

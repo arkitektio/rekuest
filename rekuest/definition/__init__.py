@@ -1,1 +1,1 @@
-"""Stuff for defining Rekuest Next API endpoints."""
+"""Stuff for defining Rekuest API endpoints."""

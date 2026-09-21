@@ -305,13 +305,23 @@ class WebsocketAgentTransport(AgentTransport):
         Heartbeats are answered on the spot; ``Bounce``/``Kick`` are raised so the
         receive loop's ``except`` arms classify them; everything else is handed to the
         agent through the inbound queue. Frames that fail to parse are logged and
-        dropped, never fatal.
+        dropped, never fatal — but never *silently* when they carried work: an
+        ``Assign`` we cannot read is answered with a ``Critical`` for its task, because
+        otherwise the backend has dispatched a task this agent will never mention again.
         """
         assert self._in_queue is not None, "Should be entered"
         try:
-            payload = InMessagePayload(message=json.loads(message))
-        except pydantic.ValidationError:
-            logger.error(f"Received non-json message: {message}", exc_info=True)
+            raw = json.loads(message)
+        except ValueError:
+            # ``json.JSONDecodeError`` is a ValueError, not a pydantic error: it used
+            # to escape this handler and tear the whole agent down over one bad frame.
+            logger.error(f"Received non-json message: {message!r}", exc_info=True)
+            return
+        try:
+            payload = InMessagePayload(message=raw)
+        except pydantic.ValidationError as e:
+            logger.error(f"Received a message that does not match the schema: {message}", exc_info=True)
+            await self._arefuse_unreadable_assign(raw, e)
             return
         logger.debug(f"<<<< {payload}")
 
@@ -325,6 +335,22 @@ class WebsocketAgentTransport(AgentTransport):
             )
         else:
             self._in_queue.put_nowait(payload.message)
+
+    async def _arefuse_unreadable_assign(
+        self, raw: object, error: pydantic.ValidationError
+    ) -> None:
+        """Report a task whose ``Assign`` frame we could not parse, so it does not hang."""
+        if not isinstance(raw, dict):
+            return
+        task = raw.get("task")
+        if raw.get("type") != messages.ToAgentMessageType.ASSIGN.value or not isinstance(task, str):
+            return
+        await self.asend(
+            messages.Critical(
+                task=task,
+                error=f"The agent could not read this Assign (protocol mismatch?): {error.error_count()} validation error(s)",
+            )
+        )
 
     @staticmethod
     def _classify_close(e: ConnectionClosedError) -> Exception:
@@ -374,11 +400,17 @@ class WebsocketAgentTransport(AgentTransport):
                         self._client = client
                         logger.info("Agent on Websockets connected")
 
+                        declaration = (
+                            handshake.declaration.model_dump()
+                            if handshake.declaration is not None
+                            else {}
+                        )
                         await client.send(
                             messages.Register(
                                 token=token,
                                 force=bool(handshake.force),
                                 session_id=handshake.session_id,
+                                **declaration,
                             ).model_dump_json()
                         )
 

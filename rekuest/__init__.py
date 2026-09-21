@@ -1,78 +1,55 @@
 """Top-level public API for rekuest.
 
-Import application-facing decorators, runtime helpers, remote-call utilities,
-and registry helpers from this module instead of reaching into internal
-subpackages. The imported names below are the supported convenience surface for
-agent applications.
+Everything an app offers is declared on the app: ``AppRegistry`` (arkitekt's
+``App`` delegates to it) is the one declaration surface, and there is no
+process-wide registry to fall back to::
 
-The exports are grouped loosely into four categories:
+    from rekuest import AppRegistry, Task, model_field
 
-- registration decorators such as ``declare``, ``state``, ``startup``,
-    ``shutdown``, and ``background``
-- runtime helpers such as ``log``, ``progress``, ``pausepoint``, and ``context``
-- remote execution helpers such as ``find``, ``call``, ``acall``, and
-    ``iterate``
-- registry helpers such as ``AppRegistry`` and the default-app-registry accessors
+    app = AppRegistry()
 
-Examples:
-        Import the common decorators and helpers from one place::
+    @app.startup
+    async def boot() -> None: ...
 
-                from rekuest import background, declare, jsx, log, startup
+    @app.register
+    def measure(x: int, task: Task) -> int: ...
 
-                @startup
-                async def boot() -> None:
-                        log("agent starting")
+Declared through the app: ``@app.register`` (actions), ``@app.state``,
+``@app.context``, ``@app.app_context``, ``@app.model``, ``@app.startup``,
+``@app.shutdown``, ``@app.background``, ``@app.declare`` (protocols another
+app fulfils), ``@app.structure``, ``@app.service``, ``app.register_blok`` and
+``app.register_memory_structure``.
 
-                panel = jsx("<Panel><Label text=\"ready\" /></Panel>")
+What this module exports are values that go inside a declaration, not
+declarations of their own: ``Task`` (inject it as ``task: Task`` to log, report
+progress and pause), ``model_field`` for a model's fields, ``bsx`` and
+``parse_util_call`` for bloks, ``withValidator``/``withEffect`` and the
+``Requires``/``Provides``/``Description``/``Default``/``Units`` markers for
+``Annotated`` ports, and the connection and disconnect policies. Demand
+overrides for a declared protocol come from ``rekuest.declare`` (``demand``,
+``demand_state``). Calling other actions goes through the ``Rekuest`` client
+an action is handed (``rekuest: Rekuest`` -> ``rekuest.call(...)``).
+
+Importing this package loads the declaration surface only. The rekuest service
+and its agent provider live in :mod:`rekuest.arkitekt` (``rekuest_service``,
+``rekuest_provider``), which is what brings in the socket runtime and the
+GraphQL client; ``arkitekt`` re-exports everything here, so an app author
+imports ``arkitekt`` alone.
 """
 
 import importlib.metadata
 
-from .blok.parser import jsx, parse_util_call
+from .blok.parser import bsx, parse_util_call
 from .widgets import withEffect, withValidator
-from .remote import (
-    acall,
-    call,
-    acall_raw,
-    acall_dependency,
-    acall_dependency_raw,
-    call_dependency_raw,
-    call_dependency,
-    call_raw,
-    aiterate,
-    iterate,
-    find,
-)
-from .agents.context import context
-from .agents.hooks.startup import startup
-from .agents.hooks.shutdown import shutdown
-from .agents.hooks.background import background
-from .actors.context import (
-    log,
-    alog,
-    progress,
-    aprogress,
-    apausepoint,
-    pausepoint,
-    install_hook,
-)
+from .task import Task
 from .actors.policy import (
     CancelOnDisconnect,
     DisconnectPolicy,
     OnDisconnect,
 )
 from .agents.policy import Backoff, ConnectionPolicy
-from .declare import declare, declare_state
-from .definition.demands import demand, demand_state
-from .structures.model import model, model_field
-from .structures.decorator import structure
-from .state.decorator import state
-from .app import (
-    AppRegistry,
-    get_default_app_registry,
-    set_default_app_registry,
-    reset_default_app_registry,
-)
+from .structures.model import model_field
+from .app import AppRegistry
 from rekuest.annotations import (
     Requires,
     Provides,
@@ -81,13 +58,7 @@ from rekuest.annotations import (
     Units,
 )
 
-try:
-    from .arkitekt import RekuestNextService
-except ImportError:
-    pass
 
-
-from .builtin_structures import structure_reg
 
 # The version lives only in the git tag (see [tool.hatch.version]); read the
 # installed distribution metadata instead of keeping a copy here to bump.
@@ -99,53 +70,19 @@ __all__ = [
     "ConnectionPolicy",
     "DisconnectPolicy",
     "OnDisconnect",
-    # registration decorators
-    "declare",
-    "declare_state",
-    "demand",
-    "demand_state",
-    "state",
-    "context",
-    "startup",
-    "shutdown",
-    "background",
-    "model",
+    # values that go inside a declaration
     "model_field",
-    "structure",
-    "jsx",
+    "bsx",
     "parse_util_call",
     "withValidator",
     "withEffect",
-    # runtime helpers
-    "log",
-    "alog",
-    "progress",
-    "aprogress",
-    "pausepoint",
-    "apausepoint",
-    "install_hook",
-    # remote execution helpers
-    "find",
-    "call",
-    "acall",
-    "call_raw",
-    "acall_raw",
-    "call_dependency",
-    "acall_dependency",
-    "acall_dependency_raw",
-    "call_dependency_raw",
-    "iterate",
-    "aiterate",
+    # the task an action runs for (inject it: `task: Task`)
+    "Task",
     # registry helpers
     "AppRegistry",
-    "structure_reg",
-    "get_default_app_registry",
-    "set_default_app_registry",
-    "reset_default_app_registry",
     "Requires",
     "Provides",
     "Description",
     "Default",
     "Units",
-    "RekuestNextService",
 ]

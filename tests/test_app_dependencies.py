@@ -1,6 +1,6 @@
 """Integration tests for cross-app dependencies (``declare`` + ``register``).
 
-These tests stand up several independent ``RekuestNext`` apps (each with its own
+These tests stand up several independent ``Rekuest`` apps (each with its own
 fresh ``AppRegistry`` and unique instance id, via :func:`build_fresh_rekuest`)
 against the shared docker deployment. One app registers a plain action, another
 registers a "workflow" action that ``declare``s a dependency on the first app's
@@ -22,9 +22,6 @@ from dokker import Deployment
 from koil import check_cancelled
 from koil.errors import ThreadCancelledError
 
-from rekuest.api.schema import amy_implementation_at
-from rekuest.declare import declare
-from rekuest.remote import acall
 
 from .conftest import CONNECT_TIMEOUT, build_fresh_rekuest
 
@@ -50,8 +47,8 @@ async def test_single_app_with_app_token(deployment: Deployment) -> None:
         await provider.aconnect(timeout=CONNECT_TIMEOUT)
         task = asyncio.create_task(provider.aloop())
 
-        impl = await amy_implementation_at("do_stuff")
-        answer = await acall(impl, printer="x")
+        impl = await provider.amy_implementation_at("do_stuff")
+        answer = await provider.acall(impl, printer="x")
         assert answer == "stitched-x", f"Unexpected result: {answer!r}"
 
         task.cancel()
@@ -82,7 +79,7 @@ async def test_workflow_calls_single_dependency(deployment: Deployment) -> None:
     # --- Workflow app: declares a dependency on the provider's protocol ------
     workflow_app = build_fresh_rekuest(deployment, token="workflow_token")
 
-    @declare(app="atest", auto_resolvable=True, min=1)
+    @workflow_app.declare(app="atest", auto_resolvable=True, min=1)
     class ATestLike(Protocol):
         def do_stuff(self, printer: str) -> str:
             """Stitch a list of images."""
@@ -105,12 +102,11 @@ async def test_workflow_calls_single_dependency(deployment: Deployment) -> None:
 
         # With two apps entered, the ambient rath/postman context is ambiguous,
         # so address every remote call explicitly to the workflow app.
-        impl = await amy_implementation_at(
+        impl = await workflow_app.amy_implementation_at(
             "single_workflow",
-            rath=workflow_app.rath,
         )
 
-        answer = await acall(
+        answer = await workflow_app.acall(
             impl,
             postman=workflow_app.postman,
             structure_registry=workflow_app.structure_registry,
@@ -156,13 +152,13 @@ async def test_workflow_calls_two_separate_apps(deployment: Deployment) -> None:
     # --- Workflow app: depends on both providers -----------------------------
     workflow_app = build_fresh_rekuest(deployment, token="workflow_token")
 
-    @declare(app="atest", auto_resolvable=True, min=1)
+    @workflow_app.declare(app="atest", auto_resolvable=True, min=1)
     class ATestLike(Protocol):
         def do_stuff(self, printer: str) -> str:
             """Stitch a list of images."""
             ...
 
-    @declare(app="btest", auto_resolvable=True, min=1)
+    @workflow_app.declare(app="btest", auto_resolvable=True, min=1)
     class BTestLike(Protocol):
         def do_another_stuff(self, ptiner: str) -> str:
             """Segment an image."""
@@ -192,12 +188,11 @@ async def test_workflow_calls_two_separate_apps(deployment: Deployment) -> None:
 
         # Address every remote call explicitly to the workflow app, since the
         # ambient rath/postman context is ambiguous with three apps entered.
-        impl = await amy_implementation_at(
+        impl = await workflow_app.amy_implementation_at(
             "two_app_workflow",
-            rath=workflow_app.rath,
         )
 
-        answer = await acall(
+        answer = await workflow_app.acall(
             impl,
             postman=workflow_app.postman,
             structure_registry=workflow_app.structure_registry,
@@ -275,7 +270,7 @@ async def test_workflow_cancel_propagates_to_dependency(
     # --- Workflow app: declares a dependency on the provider and awaits it ----
     workflow_app = build_fresh_rekuest(deployment, token="workflow_token")
 
-    @declare(app="atest", auto_resolvable=True, min=1)
+    @workflow_app.declare(app="atest", auto_resolvable=True, min=1)
     class ATestLike(Protocol):
         async def slow_stuff(self, printer: str) -> str:
             """Slowly stitch images."""
@@ -295,15 +290,14 @@ async def test_workflow_cancel_propagates_to_dependency(
         await workflow_app.aconnect(timeout=CONNECT_TIMEOUT)
         workflow_task = asyncio.create_task(workflow_app.aloop())
 
-        impl = await amy_implementation_at(
+        impl = await workflow_app.amy_implementation_at(
             "cancel_workflow",
-            rath=workflow_app.rath,
         )
 
         # Launch the workflow but do NOT await it to completion: we want to
         # cancel it mid-flight.
         call_task = asyncio.create_task(
-            acall(
+            workflow_app.acall(
                 impl,
                 postman=workflow_app.postman,
                 structure_registry=workflow_app.structure_registry,
@@ -380,13 +374,13 @@ async def test_workflow_calls_two_separate_apps_async(deployment: Deployment) ->
     # --- Workflow app: depends on both providers -----------------------------
     workflow_app = build_fresh_rekuest(deployment, token="workflow_token")
 
-    @declare(app="atest", auto_resolvable=True, min=1)
+    @workflow_app.declare(app="atest", auto_resolvable=True, min=1)
     class ATestLike(Protocol):
         async def do_stuff(self, printer: str) -> str:
             """Stitch a list of images."""
             ...
 
-    @declare(app="btest", auto_resolvable=True, min=1)
+    @workflow_app.declare(app="btest", auto_resolvable=True, min=1)
     class BTestLike(Protocol):
         async def do_another_stuff(self, ptiner: str) -> str:
             """Segment an image."""
@@ -420,12 +414,11 @@ async def test_workflow_calls_two_separate_apps_async(deployment: Deployment) ->
 
         # Address every remote call explicitly to the workflow app, since the
         # ambient rath/postman context is ambiguous with three apps entered.
-        impl = await amy_implementation_at(
+        impl = await workflow_app.amy_implementation_at(
             "two_app_workflow",
-            rath=workflow_app.rath,
         )
 
-        answer = await acall(
+        answer = await workflow_app.acall(
             impl,
             postman=workflow_app.postman,
             structure_registry=workflow_app.structure_registry,

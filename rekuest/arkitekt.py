@@ -1,127 +1,179 @@
-"""ArkitektNextRekuestNext class."""
+"""The rekuest service and provider of an arkitekt app, and the types rekuest sends by id.
 
-import json
+Declared on one registry: the service first, then the provider that builds the
+agent from the client it returns, then the structures whose expanders ask for
+that client. An app takes all of it in with ``App(providers=[rekuest_provider])``
+-- or implicitly, on its first offering.
+"""
+
 import os
-from typing import TYPE_CHECKING, Any
-from rath.links.split import SplitLink
-from fakts.contrib.rath.aiohttp import FaktsAIOHttpLink
-from fakts.contrib.rath.graphql_ws import FaktsGraphQLWSLink
+from typing import Annotated
+
+from fakts import Alias, Fakts, Require, TokenLoader
 from fakts.contrib.rath.auth import FaktsAuthLink
-from rekuest.contrib.arkitekt.datalayer import FaktsDataLayer
-from rekuest.rath import RekuestNextRath
-from rekuest.rekuest import RekuestNext
 from graphql import OperationType
-from rekuest.contrib.arkitekt.websocket_agent_transport import (
-    ArkitektWebsocketAgentTransport,
-)
-from rekuest.agents.base import RekuestAgent
-from fakts import Fakts
-from rekuest.postmans.graphql import GraphQLPostman
-from rekuest.links.upload import UploadLink
-from .structures.default import get_default_structure_registry
-from fakts.models import Requirement
-from arkitekt.service_registry import Params, BaseArkitektService
+from rath.links.aiohttp import AIOHttpLink
 from rath.links.compose import compose
-from arkitekt.service_registry import (
-    get_default_service_registry,
+from rath.links.graphql_ws import GraphQLWSLink
+from rath.links.split import SplitLink
+
+from rekuest.agents.base import RekuestAgent
+from rekuest.api.schema import (
+    Action,
+    Implementation,
+    SearchActionsQuery,
+    SearchImplementationsQuery,
+    SearchShortcutsQuery,
+    SearchTestCasesQuery,
+    SearchTestResultsQuery,
+    Shortcut,
+    TaskEvent,
+    TestCase,
+    TestResult,
 )
-
-
-if TYPE_CHECKING:
-    pass
-
+from rekuest.app import AppRegistry
+from rekuest.agents.transport.websocket import WebsocketAgentTransport
+from rekuest.datalayer import DataLayer
+from rekuest.links.upload import UploadLink
+from rekuest.postmans.graphql import GraphQLPostman
+from rekuest.rath import RekuestRath
+from rekuest.rekuest import Rekuest
+from rekuest.widgets import SearchWidget
 
 def build_relative_path(*path: str) -> str:
-    """Build a relative path to the current file."""
+    """Build a path relative to this file, for the files shipped beside it."""
     return os.path.join(os.path.dirname(__file__), *path)
 
 
-class RekuestNextService(BaseArkitektService):
-    """Service for RekuestNext."""
+registry = AppRegistry()
+"""What rekuest brings to an app: its service, and the types it can send by id."""
 
-    def __init__(self) -> None:
-        """Initialize the RekuestNextService."""
-        self.structure_reg = get_default_structure_registry()
 
-    def get_service_name(self) -> str:
-        """Get the service name."""
-        return "rekuest"
+@registry.service(
+    schema=build_relative_path("api", "schema.graphql"),
+    turms=build_relative_path("api", "project.json"),
+)
+def rekuest(
+    rekuest: Annotated[
+        Alias,
+        Require(
+            "live.arkitekt.rekuest", "Where this app's actions are offered and assigned"
+        ),
+    ],
+    s3: Annotated[
+        Alias,
+        Require("live.arkitekt.s3", "Where this app's uploads are stored"),
+    ],
+    tokens: TokenLoader,
+    registry: AppRegistry,
+) -> Rekuest:
+    """Rekuest: call other apps' actions, and offer this app's through :func:`rekuest_agent`.
 
-    def build_service(self, fakts: Fakts, params: Params) -> "RekuestNext":
-        """Build the service."""
-        force = params.get("force", False)
-        datalayer = FaktsDataLayer(fakts_group="s3", fakts=fakts)
-
-        rath = RekuestNextRath(
-            link=compose(
-                UploadLink(
-                    datalayer=datalayer,
-                ),
-                FaktsAuthLink(
-                    fakts=fakts,
-                ),
-                SplitLink(
-                    left=FaktsAIOHttpLink(
-                        fakts_group="rekuest",
-                        fakts=fakts,
-                        endpoint_url="FAKE_URL",
-                    ),
-                    right=FaktsGraphQLWSLink(
-                        fakts_group="rekuest",
-                        fakts=fakts,
-                        ws_endpoint_url="FAKE_URL",
-                    ),
-                    split=lambda o: o.node.operation != OperationType.SUBSCRIPTION,
-                ),
-            )
-        )
-
-        agent = RekuestAgent(
-            transport=ArkitektWebsocketAgentTransport(
-                fakts_group="rekuest",
-                fakts=fakts,
-                endpoint_url="FAKE_URL",
-                token_loader=fakts.aget_token,
-                force=force,
-            ),
-            rath=rath,
-            name=f"{fakts.manifest.identifier}:{fakts.manifest.version}",
-        )
-
-        return RekuestNext(
-            rath=rath,
-            agent=agent,
-            postman=GraphQLPostman(
-                rath=rath,
+    Takes the run's ``registry`` because that is what its calls (de)serialize
+    with. It builds no agent: the provider beside it does, and the run owns that
+    agent. Anything that needs this API -- listing the deployment's actions,
+    finding one, calling raw -- takes this client by annotation; the agent never
+    does.
+    """
+    rath = RekuestRath(
+        link=compose(
+            UploadLink(datalayer=DataLayer.from_alias(s3)),
+            FaktsAuthLink(token_loader=tokens),
+            SplitLink(
+                left=AIOHttpLink(endpoint_url=rekuest.to_http_path("graphql")),
+                right=GraphQLWSLink(ws_endpoint_url=rekuest.to_ws_path("graphql")),
+                split=lambda o: o.node.operation != OperationType.SUBSCRIPTION,
             ),
         )
-
-    def get_requirements(self) -> list[Requirement]:
-        """Get the requirements for this service."""
-        return [
-            Requirement(
-                key="rekuest",
-                service="live.arkitekt.rekuest",
-                description="An instance of ArkitektNext Rekuest to assign to actions",
-            ),
-            Requirement(
-                key="s3",
-                service="live.arkitekt.s3",
-                description="An instance of ArkitektNext Rekuest to assign to actions",
-            ),
-        ]
-
-    def get_graphql_schema(self) -> str:
-        """Get the GraphQL schema for this service."""
-        schema_graphql_path = build_relative_path("api", "schema.graphql")
-        with open(schema_graphql_path) as f:
-            return f.read()
-
-    def get_turms_project(self) -> dict[str, Any]:
-        """Get the turms project for this service."""
-        turms_prject = build_relative_path("api", "project.json")
-        with open(turms_prject) as f:
-            return json.loads(f.read())
+    )
+    return Rekuest(
+        rath=rath,
+        postman=GraphQLPostman(rath=rath),
+        structure_registry=registry.structure_registry,
+    )
 
 
-get_default_service_registry().register(RekuestNextService())
+@registry.provider()
+def rekuest_agent(
+    rekuest: Annotated[
+        Alias,
+        Require(
+            "live.arkitekt.rekuest", "Where this app's actions are offered and assigned"
+        ),
+    ],
+    fakts: Fakts,
+    registry: AppRegistry,
+) -> RekuestAgent:
+    """The agent that provides this app's actions to rekuest.
+
+    Built by a run after its clients: it serves the run's ``registry`` over the
+    agent socket of the resolved rekuest service, authenticating with the run's
+    token, and registers under the app's manifest name. Everything it needs --
+    registering, state, dependencies, the shelve -- goes over that socket, so it
+    takes no client. The run binds it and drives it; nothing is started here.
+    """
+    return RekuestAgent(
+        transport=WebsocketAgentTransport(
+            endpoint_url=rekuest.to_ws_path("agi"),
+            token_loader=fakts.aget_token,
+        ),
+        name=f"{fakts.manifest.identifier}:{fakts.manifest.version}",
+        app_registry=registry,
+    )
+
+
+def _search(query: object) -> SearchWidget:
+    """The widget that picks one of these out of the deployment."""
+    return SearchWidget(query=query.Meta.document, ward="rekuest")  # type: ignore[attr-defined]
+
+
+@registry.structure(
+    "@rekuest/implementation", widget=_search(SearchImplementationsQuery)
+)
+async def expand_implementation(id: str, rekuest: Rekuest) -> Implementation:
+    """An implementation, by id."""
+    return await rekuest.aget_implementation(id)
+
+
+@registry.structure("@rekuest/action", widget=_search(SearchActionsQuery))
+async def expand_action(id: str, rekuest: Rekuest) -> Action:
+    """An action, by id.
+
+    ``find`` is a multi-argument finder -- ``find(id, implementation, hash,
+    matching)``, all optional -- so the id is passed by name rather than relying
+    on it happening to be first.
+    """
+    return await rekuest.afind(id=id)
+
+
+@registry.structure("@rekuest/shortcut", widget=_search(SearchShortcutsQuery))
+async def expand_shortcut(id: str, rekuest: Rekuest) -> Shortcut:
+    """A shortcut, by id."""
+    return await rekuest.aget_shortcut(id)
+
+
+@registry.structure("@rekuest/testcase", widget=_search(SearchTestCasesQuery))
+async def expand_test_case(id: str, rekuest: Rekuest) -> TestCase:
+    """A test case, by id."""
+    return await rekuest.aget_test_case(id)
+
+
+@registry.structure("@rekuest/testresult", widget=_search(SearchTestResultsQuery))
+async def expand_test_result(id: str, rekuest: Rekuest) -> TestResult:
+    """A test result, by id."""
+    return await rekuest.aget_test_result(id)
+
+
+@registry.structure("@rekuest/taskevent")
+async def expand_task_event(id: str, rekuest: Rekuest) -> TaskEvent:
+    """A task event, by id. Its query is ``get_event``."""
+    return await rekuest.aget_event(id)
+
+
+# The service is named after its function ("rekuest": what the app's clients are
+# keyed by and what its structure expanders are bound to); these are the names the
+# package exports them under, for `App(services=[rekuest_service])` and the run.
+rekuest_service = rekuest
+rekuest_provider = rekuest_agent
+
+__all__ = ["registry", "rekuest_service", "rekuest_provider"]

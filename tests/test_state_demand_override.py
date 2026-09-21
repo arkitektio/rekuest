@@ -1,6 +1,6 @@
 """Tests for the ``demand_state`` marker on agent-dependency protocol attributes.
 
-A ``@declare`` protocol's ``@declare_state`` attributes become state demands. By
+A declared protocol's public annotated attributes become state demands. By
 default a state demand inherits its ``app`` from the protocol's core app and its
 ``key`` from the attribute name. An :func:`demand_state` marker (placed in
 ``typing.Annotated``) redirects it to *another* state.
@@ -8,14 +8,16 @@ default a state demand inherits its ``app`` from the protocol's core app and its
 
 from typing import Annotated, Any
 
-from rekuest import declare, declare_state, demand_state
+from rekuest.declare import demand_state
 from rekuest.api.schema import AgentDependencyInput, StateDemandInput
-from rekuest.declare import DeclaredAgentProtocol
+from rekuest.structures.registry import StructureRegistry
 
 
 def _dependency_of(cls: Any) -> AgentDependencyInput:
-    protocol: DeclaredAgentProtocol[Any] = getattr(cls, "__rekuest__dependency__")
-    return protocol.to_dependency_input("dep")
+    """Declare ``cls`` on an app directed at ``mymicroscope`` and read the demand back."""
+    registry = StructureRegistry()
+    registry.declare(app="mymicroscope")(cls)
+    return registry.protocol_for(cls).to_dependency_input("dep")
 
 
 def _state_demand_for(
@@ -32,11 +34,9 @@ def _state_slot_for(dependency: AgentDependencyInput, slot_key: str):
 
 
 def test_state_demand_inherits_app_and_attr_key_by_default() -> None:
-    @declare_state
     class CameraState:
         connected: bool
 
-    @declare(app="mymicroscope")
     class Deps:
         camera: CameraState
 
@@ -49,11 +49,9 @@ def test_state_demand_inherits_app_and_attr_key_by_default() -> None:
 
 
 def test_demand_state_overrides_app_and_key_to_another_state() -> None:
-    @declare_state
     class ViewerState:
         open: bool
 
-    @declare(app="mymicroscope")
     class Deps:
         viewer: Annotated[ViewerState, demand_state(app="imagej", key="viewer_state")]
 
@@ -66,11 +64,9 @@ def test_demand_state_overrides_app_and_key_to_another_state() -> None:
 
 
 def test_demand_state_can_pin_by_hash_and_disable_port_matching() -> None:
-    @declare_state
     class StatusState:
         ready: bool
 
-    @declare(app="mymicroscope")
     class Deps:
         status: Annotated[StatusState, demand_state(hash="abc123", match_ports=False)]
 
@@ -82,15 +78,12 @@ def test_demand_state_can_pin_by_hash_and_disable_port_matching() -> None:
 
 
 def test_mixed_default_and_overridden_states_coexist() -> None:
-    @declare_state
     class CameraState:
         connected: bool
 
-    @declare_state
     class ViewerState:
         open: bool
 
-    @declare(app="mymicroscope")
     class Deps:
         camera: CameraState
         viewer: Annotated[ViewerState, demand_state(app="imagej", key="viewer_state")]
@@ -104,15 +97,12 @@ def test_mixed_default_and_overridden_states_coexist() -> None:
 
 
 def test_state_slots_are_required_by_default_and_optional_when_marked() -> None:
-    @declare_state
     class CameraState:
         connected: bool
 
-    @declare_state
     class TelemetryState:
         uptime: float
 
-    @declare(app="mymicroscope")
     class Deps:
         camera: CameraState
         telemetry: Annotated[TelemetryState, demand_state(optional=True)]

@@ -1,223 +1,154 @@
-"""The base client for rekuest next"""
+"""The base client for rekuest"""
 
 from typing import TypeVar
-from koil.bridge import unkoil_task
-from koil import KoilFuture
-from pydantic import Field
-from rekuest.agents.hooks.background import background
-from rekuest.protocols import (
-    AnyFunction,
-    BackgroundFunction,
-    ShutdownFunction,
-    StartupFunction,
-)
-from rekuest.rath import RekuestNextRath
-from rekuest.actors.types import Agent
+from rekuest.protocols import AnyFunction
+from rekuest.rath import RekuestRath
+from rekuest.api.schema import RekuestApi
 from rekuest.postmans.types import Postman
-from koil import unkoil
+from koil import unkoil, unkoil_gen
 from koil.composition import Composition
+from rath.origin import origin_context
+from rath.turms.funcs import TOperation
+from pydantic import Field
 
 from typing import (
     Any,
 )
-from collections.abc import Sequence
-from rekuest.actors.types import ActorBuilder
-from rekuest.structures.default import get_default_structure_registry
+from collections.abc import AsyncGenerator, Generator
 from rekuest.structures.registry import StructureRegistry
-from rekuest.register import register
-from rekuest.agents.hooks.startup import startup
-from rekuest.agents.hooks.shutdown import shutdown
-from rekuest.api.schema import (
-    AgentDependencyInput,
-    DefinitionInput,
-)
 
 
 T = TypeVar("T", bound=AnyFunction)
 
 
-class RekuestNext(Composition):
-    """The main rekuest next client class"""
+class Rekuest(Composition, RekuestApi):
+    """The rekuest client: every rekuest operation is a method of it, and it calls
+    actions (``rekuest.call(...)``).
 
-    structure_registry: StructureRegistry = Field(
-        default_factory=get_default_structure_registry
-    )
-    rath: RekuestNextRath
-    agent: Agent
+    A service builds it; it knows nothing about any agent. An action asks for it by
+    annotation (``rekuest: Rekuest``) and is handed :meth:`for_task`: a view whose
+    calls go over the socket of the agent running the task, as children of it.
+    """
+
+    rath: RekuestRath
     postman: Postman
+    structure_registry: StructureRegistry = Field(exclude=True)
+    """The registry of the run this client belongs to: what its calls (de)serialize with."""
+    parent: Any = Field(default=None, exclude=True)
+    """The assignment this view calls on behalf of; set on a per-task view only."""
 
-    def register(
-        self,
-        *args,
-        **kwargs,
-    ) -> tuple[DefinitionInput, ActorBuilder]:
-        """Register a function or actor with optional configuration parameters.
+    def _serialize(self, operation: type[TOperation], variables: dict[str, Any]) -> dict[str, Any]:
+        return operation.Arguments(**variables).model_dump(by_alias=True, exclude_unset=True)
 
-        This overload supports usage of `@register(...)` as a configurable decorator.
+    def execute(self, operation: type[TOperation], variables: dict[str, Any]) -> TOperation:
+        """Executes a query or mutation in a blocking way."""
+        return unkoil(self.aexecute, operation, variables)
 
-        Args:
-            func (T): Function to register.
-            actifier (Actifier, optional): Function to wrap callables into actors.
-            interface (Optional[str], optional): Interface name override.
-            stateful (bool, optional): Whether the actor maintains internal state.
-            widgets (Optional[Dict[str, AssignWidgetInput]], optional): Mapping of parameter names to widgets.
-            dependencies (Optional[List[DependencyInput]], optional): List of external dependencies.
-            collections (Optional[List[str]], optional): Groupings for organizational purposes.
-            port_groups (Optional[List[PortGroupInput]], optional): Port group assignments.
-            effects (Optional[Dict[str, List[EffectInput]]], optional): Mapping of effects per port.
-            is_test_for (Optional[List[TestTargetInput]], optional): Actions this function serves as
-                a test for, each identified by hash or by (app, key, version).
-            validators (Optional[Dict[str, List[ValidatorInput]]], optional): Input validation rules.
-            structure_registry (Optional[StructureRegistry], optional): Custom structure registry instance.
-            implementation_registry (Optional[DefinitionRegistry], optional): Custom implementation registry instance.
-            in_process (bool, optional): Execute actor in the same process.
-            concurrency (Literal["parallel", "serial"], optional): Whether assignments to the actor
-                may run concurrently ("parallel") or one at a time ("serial", the default).
-
-        Returns:
-            function: A decorator that registers the given function or actor.
-        """
-
-        return register(
-            *args,
-            implementation_registry=self.agent.app_registry,
-            structure_registry=self.agent.app_registry.structure_registry,
-            **kwargs,
+    async def aexecute(self, operation: type[TOperation], variables: dict[str, Any]) -> TOperation:
+        """Executes a query or mutation in a non-blocking way."""
+        x = await self.rath.aquery(operation.Meta.document, self._serialize(operation, variables))
+        return operation.model_validate(
+            x.data, context=origin_context(client=self, rath=self.rath)
         )
 
-    def register_startup(
-        self, function: StartupFunction, name: str | None = None
-    ) -> None:
-        """Register a startup function that will be called when the agent starts.
+    def subscribe(
+        self, operation: type[TOperation], variables: dict[str, Any]
+    ) -> Generator[TOperation, None, None]:
+        """Subscribes to an operation in a blocking way."""
+        return unkoil_gen(self.asubscribe, operation, variables)
 
-        Args:
-            function (AnyFunction): The startup function to register.
+    async def asubscribe(
+        self, operation: type[TOperation], variables: dict[str, Any]
+    ) -> AsyncGenerator[TOperation, None]:
+        """Subscribes to an operation in a non-blocking way."""
+        async for event in self.rath.asubscribe(
+            operation.Meta.document, self._serialize(operation, variables)
+        ):
+            yield operation.model_validate(
+                event.data, context=origin_context(client=self, rath=self.rath)
+            )
+
+    def for_task(self, task: Any) -> "Rekuest":  # noqa: ANN401
+        """A view of this client whose calls are children of ``task``.
+
+        They go over the socket of the agent running the task (the only transport
+        that carries a parent) and are parented to the task's assignment. rekuest
+        hands an injected ``rekuest: Rekuest`` out through this. A task no agent
+        runs (``Task.local()``) gets the client itself: its calls are roots.
         """
-        startup(
-            function,
-            name=name or function.__name__,
-            registry=self.agent.app_registry.hooks_registry,
+        agent = getattr(task, "agent", None)
+        if agent is None:
+            return self
+        return self.model_copy(
+            update={"parent": task.assignment, "postman": agent.caller_postman}
         )
 
-    def register_shutdown(
-        self, function: ShutdownFunction, name: str | None = None
-    ) -> None:
-        """Register a shutdown function that will be called when the agent tears down.
+    def _call_options(self, kwargs: dict[str, Any]) -> dict[str, Any]:
+        kwargs.setdefault("structure_registry", self.structure_registry)
+        return self._raw_options(kwargs)
 
-        Args:
-            function (ShutdownFunction): The shutdown function to register.
-        """
-        shutdown(
-            function,
-            name=name or function.__name__,
-            registry=self.agent.app_registry.hooks_registry,
+    async def aresolve(self, target: Any) -> Any:  # noqa: ANN401
+        """What to call: an action, an implementation, an action id, or a function
+        registered on this client's app (its implementation there)."""
+        from rath.scalars import ID
+
+        from rekuest.api.schema import Action, Implementation
+        from rekuest.register import WrappedFunction
+
+        if isinstance(target, (Action, Implementation)):
+            return target
+        if isinstance(target, WrappedFunction):
+            return await self.amy_implementation_at(target.interface)
+        if isinstance(target, (ID, str)):
+            return await self.afind(target)
+        raise ValueError(
+            "A call target is an Action, an Implementation, an action id, or a "
+            f"function registered on this app; got {type(target).__name__}"
         )
 
-    def register_background(
-        self, function: BackgroundFunction, name: str | None = None
-    ) -> None:
-        """Register a background function that will be run in the background.
+    async def acall(self, target: Any, *args: Any, **kwargs: Any) -> Any:  # noqa: ANN401
+        """Call an action through this client (a child of the task, on a task view)."""
+        from rekuest.remote import acall
 
-        Args:
-            function (BackgroundFunction): The background function to register.
-        """
-        background(
-            function,
-            name=name or function.__name__,
-            registry=self.agent.app_registry.hooks_registry,
+        return await acall(
+            await self.aresolve(target), *args, **self._call_options(kwargs)
         )
 
-    def register_blok(
-        self,
-        name: str | None = None,
-        component: str | None = None,
-        description: str | None = None,
-        demo_state: dict[str, Any] | None = None,
-        dependencies: Sequence[AgentDependencyInput] | None = None,
-    ) -> None:
-        """Register a blok with the given name and optional JSX content.
+    def call(self, target: Any, *args: Any, **kwargs: Any) -> Any:  # noqa: ANN401
+        """Call an action through this client (a child of the task, on a task view)."""
+        return unkoil(self.acall, target, *args, **kwargs)
 
-        Args:
-            name (str | None): The name of the blok. If None, the function name will be used.
-            component (Optional[str]): Optional component content to associate with the blok.
-            description (Optional[str]): Optional description for the blok.
-            demo_state (Dict[str, Any] | None): Optional demo state for the blok.
-            dependencies (Sequence[AgentDependencyInput] | None): Dependencies the blok
-                references that this agent does not implement itself, e.g.
-                ``SomeProtocol.to_dependency("key")``. Anything omitted is inferred
-                from the agent's own actions and states.
-        """
-        self.agent.app_registry.register_blok(
-            name=name,
-            component=component,
-            description=description,
-            demo_state=demo_state,
-            dependencies=dependencies,
-        )
+    def _raw_options(self, kwargs: dict[str, Any]) -> dict[str, Any]:
+        if self.parent is not None:
+            kwargs.setdefault("parent", self.parent)
+        kwargs.setdefault("postman", self.postman)
+        return kwargs
 
-    def state(self, *args, **kwargs):
-        """Decorator to define a state class."""
-        from rekuest.state.decorator import state
+    async def acall_raw(self, **kwargs: Any) -> Any:  # noqa: ANN401
+        """Call with already-serialized arguments (see ``rekuest.remote.acall_raw``)."""
+        from rekuest.remote import acall_raw
 
-        return state(*args, **kwargs)
+        return await acall_raw(**self._raw_options(kwargs))
 
-    def run(self, context: Any | None = None, *, force: bool | None = None) -> None:
-        """
-        Run the application.
+    async def aiterate_raw(self, **kwargs: Any) -> Any:  # noqa: ANN401
+        """Stream with already-serialized arguments (see ``rekuest.remote.aiterate_raw``)."""
+        from rekuest.remote import aiterate_raw
 
-        If ``force`` is set, it overrides the agent's takeover policy for this run
-        (kicking any existing connection for this agent and taking over).
-        """
-        return unkoil(self.arun, context=context, force=force)
+        async for value in aiterate_raw(**self._raw_options(kwargs)):
+            yield value
 
-    def run_detached(
-        self, context: Any | None = None, *, force: bool | None = None
-    ) -> KoilFuture[None]:
-        """
-        Run the application detached.
+    async def aiterate(self, target: Any, *args: Any, **kwargs: Any) -> Any:  # noqa: ANN401
+        """Stream an action's yields through this client."""
+        from rekuest.remote import aiterate
 
-        See :meth:`run` for the ``force`` override semantics.
-        """
-        return unkoil_task(self.arun, context=context, force=force)
+        async for value in aiterate(
+            await self.aresolve(target), *args, **self._call_options(kwargs)
+        ):
+            yield value
 
-    def _maybe_override_force(self, force: bool | None) -> None:
-        """Override the agent's takeover policy for this run.
+    def iterate(self, target: Any, *args: Any, **kwargs: Any) -> Any:  # noqa: ANN401
+        """Stream an action's yields through this client."""
+        from koil import unkoil_gen
 
-        ``force`` is a registration policy the agent owns and hands to its transport in
-        the per-attempt handshake, so this is a plain assignment — no duck typing needed.
-        """
-        if force is not None:
-            self.agent.force = force
+        return unkoil_gen(self.aiterate, target, *args, **kwargs)
 
-    async def arun(
-        self, context: Any | None = None, *, force: bool | None = None
-    ) -> None:
-        """
-        Run the application.
-
-        If ``force`` is not None it overrides the agent's takeover policy for this run.
-        """
-        self._maybe_override_force(force)
-        await self.agent.aprovide(context=context)
-
-    async def aconnect(
-        self,
-        context: Any | None = None,
-        *,
-        force: bool | None = None,
-        timeout: float | None = None,
-    ) -> None:
-        """Start the agent and connect, returning once the server acknowledges it.
-
-        This is the first phase of :meth:`arun`. Run :meth:`aloop` afterwards (e.g.
-        as a background task) to process incoming messages. If ``timeout`` is set
-        and the server does not acknowledge in time, ``asyncio.TimeoutError`` is
-        raised. See :meth:`arun` for the ``force`` override semantics.
-        """
-        self._maybe_override_force(force)
-        await self.agent.aconnect(context=context, timeout=timeout)
-
-    async def aloop(self) -> None:
-        """Process incoming messages after :meth:`aconnect`. The ongoing second
-        phase of :meth:`arun`."""
-        await self.agent.aloop()

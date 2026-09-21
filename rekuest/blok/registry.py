@@ -50,6 +50,7 @@ def build_declared_bloks(
             components=(declaration.component,),
             description=declaration.description,
             demo_state=demo_state,
+            catalog=declaration.catalog,
         )
 
     return declared_bloks
@@ -101,6 +102,12 @@ class _ReferenceCollector(BlokVisitor):
             action_key_for(call)
         )
 
+    def visit_component(
+        self, node: ComponentNodeInput, scope: dict[str, Any], context: str
+    ) -> None:
+        # Components carry no references; only their props do.
+        return None
+
     def visit_util_call(
         self, call: UtilCallInput, scope: dict[str, Any], context: str
     ) -> None:
@@ -125,8 +132,7 @@ def _build_dependencies_for_component(
     Dependencies referenced by the tree but not declared explicitly are inferred
     from the agent's *own* implementations and states. A dependency satisfied by
     another app cannot be inferred that way -- pass it in via
-    ``register_blok(dependencies=[...])``, typically from a declared protocol's
-    ``to_dependency()``.
+    ``register_blok(dependencies={"key": DeclaredProtocol})``.
     """
     explicit_by_key = {
         dependency.key: dependency for dependency in explicit_dependencies

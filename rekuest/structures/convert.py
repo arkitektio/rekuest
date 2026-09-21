@@ -1,12 +1,15 @@
 """Converters that turn plain Python classes into FullFilled types.
 
-These implement the auto-registration dispatch of the structure registry:
-enums become FullFilledEnum, classes implementing the global structure
-protocol (get_identifier/ashrink/aexpand) become FullFilledStructure, and
-everything else becomes a FullFilledMemoryStructure kept in the local shelve.
+The structure registry calls these when a class is registered or derived:
+enums (and ``Literal``) become FullFilledEnum, classes implementing the structure
+protocol (get_identifier/ashrink/aexpand) become FullFilledStructure when
+registered with ``register_from_protocol``, and classes registered as memory
+structures become FullFilledMemoryStructure, kept in the local shelve. Nothing
+is converted unasked: only enums are derived without being registered first.
 """
 
-from enum import Enum, IntEnum, StrEnum
+import re
+from enum import Enum
 from typing import (
     Any,
     Literal,
@@ -104,6 +107,7 @@ def fullfilled_enum_from_cls(cls: type[Enum]) -> FullFilledEnum:
         cls=cls,
         identifier=cls_to_identifier(cls),
         choices=choices,
+        members=dict(cls.__members__),
         predicate=build_instance_predicate(cls),
         description=cls.__doc__,
         convert_default=make_enum_converter(cls),
@@ -122,48 +126,62 @@ def _literal_identifier(values: tuple[Any, ...]) -> Identifier:
 
     Same literal members (in the same order) always produce the same
     identifier, so the same ``Literal[...]`` used across functions resolves to
-    the same enum on the wire.
+    the same enum on the wire. The server takes ``@package/key`` only, so the
+    package is ``literal`` and anything outside its alphabet becomes ``_``.
     """
-    slug = "_".join(str(value).lower().replace(" ", "_") for value in values)
-    return Identifier.validate(f"literal.{slug}")
+    slug = "_".join(str(value).lower() for value in values)
+    return Identifier.validate(f"@literal/{re.sub(r'[^A-Za-z0-9_.-]', '_', slug)}")
+
+
+def _is_literal_member(value: Any, values: tuple[Any, ...]) -> bool:  # noqa: ANN401
+    """Whether ``value`` is one of the literal's members.
+
+    Compared by type as well as equality, so ``True`` is not a member of
+    ``Literal[1]`` and ``1`` is not a member of ``Literal[True]``.
+    """
+    return any(type(value) is type(member) and value == member for member in values)
+
+
+def _literal_default_converter(values: tuple[Any, ...]) -> Callable[[Any], str]:
+    """Create a converter that maps a literal default to its choice name."""
+
+    def converter(value: Any) -> str:  # noqa: ANN401
+        if not _is_literal_member(value, values):
+            raise StructureDefinitionError(
+                f"Default {value!r} is not one of the literal's members {values}"
+            )
+        return str(value)
+
+    return converter
 
 
 def fullfilled_enum_from_literal(cls: Any) -> FullFilledEnum:  # noqa: ANN401
     """Build a FullFilledEnum from a ``typing.Literal[...]`` annotation.
 
-    The literal members are turned into a dynamically created enum so the
-    existing enum serialization machinery (expand/shrink/predication) handles
-    them without any special casing. We use ``StrEnum``/``IntEnum`` for
-    homogeneous string/int literals so members stringify to their bare value
-    (a plain ``(str, Enum)`` would stringify as ``"Enum.member"``), and fall
-    back to a plain ``Enum`` for anything else.
+    The Literal stays a Literal. It is the enum's ``cls``, and its members are
+    the literal values themselves, so a function annotated ``Literal["a", "b"]``
+    is handed the bare ``"a"``. On the wire it is a rekuest enum whose choices
+    are the stringified values; the same members in the same order share an
+    identifier across functions.
     """
     values = get_args(cls)
     if not values:
         raise StructureDefinitionError(f"Literal {cls} has no members")
 
     members = {str(value): value for value in values}
-
-    if all(isinstance(value, str) for value in values):
-        base: type[Enum] = StrEnum
-    elif all(
-        isinstance(value, int) and not isinstance(value, bool) for value in values
-    ):
-        base = IntEnum
-    else:
-        base = Enum
-
-    enum_cls: type[Enum] = base("Literal", members)  # type: ignore[call-overload]
-
-    choices = [ChoiceInput(label=key, value=key) for key in members]
+    if len(members) != len(values):
+        raise StructureDefinitionError(
+            f"Literal {cls} has members that stringify alike: {values}"
+        )
 
     return FullFilledEnum(
-        cls=enum_cls,
+        cls=cls,
         identifier=_literal_identifier(values),
-        choices=choices,
-        predicate=build_instance_predicate(enum_cls),
+        choices=[ChoiceInput(label=key, value=key) for key in members],
+        members=members,
+        predicate=lambda value: _is_literal_member(value, values),
         description=None,
-        convert_default=make_enum_converter(enum_cls),
+        convert_default=_literal_default_converter(values),
         default_widget=ChoiceAssignWidgetInput(),
         default_returnwidget=ChoiceReturnWidgetInput(),
     )

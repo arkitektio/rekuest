@@ -1,4 +1,4 @@
-"""Decorator to register a class as a state."""
+"""Register a class as a state of an app."""
 
 from dataclasses import dataclass
 from typing import (
@@ -9,14 +9,13 @@ from typing import (
     get_type_hints,
 )
 from collections.abc import Callable
+from rekuest.errors import NoRegistryError
 from rekuest.api.schema import (
     ReturnPortInput,
     StateImplementationInput,
     StateDefinitionInput,
 )
-from rekuest.state.observable import StateConfig, make_evented
 from rekuest.structures.registry import StructureRegistry
-from rekuest.structures.default import get_default_structure_registry
 from fieldz import fields, Field
 
 if TYPE_CHECKING:
@@ -26,9 +25,9 @@ T = TypeVar("T")
 
 
 def inspect_state(
-    cls: type[T], structure_registry: StructureRegistry
+    cls: type[T], name: str, structure_registry: StructureRegistry
 ) -> StateImplementationInput:
-    """Inspect the state schema of a class."""
+    """The schema of a state class, its ports built against ``structure_registry``."""
     from rekuest.definition.define import convert_object_to_returnport
 
     ports: list[ReturnPortInput] = []
@@ -57,48 +56,9 @@ def inspect_state(
         ports.append(port)
 
     return StateImplementationInput(
-        interface=getattr(cls, "__rekuest_state__", cls.__name__),
-        definition=StateDefinitionInput(
-            ports=tuple(ports), name=getattr(cls, "__rekuest_state__")
-        ),
+        interface=name,
+        definition=StateDefinitionInput(ports=tuple(ports), name=name),
     )
-
-
-def statify(
-    cls: type[T],
-    required_locks: list[str] | None = None,
-    structure_registry: StructureRegistry | None = None,
-    publish_interval: float = 0.1,
-) -> tuple[type[T], StateImplementationInput]:
-    if structure_registry is None:
-        structure_registry = get_default_structure_registry()
-
-    state_schema = inspect_state(cls, structure_registry)
-
-    config = StateConfig(
-        definition=state_schema.definition,
-        state_name=getattr(cls, "__rekuest_state__", cls.__name__),
-        publish_interval=publish_interval,
-        required_locks=required_locks or [],
-        structure_registry=structure_registry,
-    )
-
-    original_init = getattr(cls, "__init__", lambda self: None)
-
-    def new_init(self, *args, **kwargs):
-        original_init(self, *args, **kwargs)
-        # make_evented swaps the instance's __class__ in place; the return value
-        # is the same object, so we intentionally do not rebind ``self``.
-        make_evented(self, config, "")
-
-    cls.__init__ = new_init
-
-    setattr(cls, "__rekuest_state_config__", config)
-
-    return cls, state_schema
-
-
-# --- 5. The State Decorator ---
 
 
 @overload
@@ -124,13 +84,14 @@ def state(
     registry: Optional["AppRegistry"] = None,
     structure_reg: StructureRegistry | None = None,
 ) -> type[T] | Callable[[type[T]], type[T]]:
-    """Register a class as an observable agent state.
+    """Register a class as an observable state of an app.
 
-    The decorator ensures the class is a dataclass, assigns a rekuest state
-    name, converts the class into an evented state object through ``statify``,
-    and registers the resulting schema in the selected :class:`AppRegistry`.
-    The injected ``__init__`` wrapper wires state changes into the publishing
-    machinery used by the agent runtime.
+    The class is made a dataclass if it is not one, its schema is inspected
+    against the app's structures, and the app registry records it under the
+    given name with its rules. The class itself is returned unchanged: it is
+    the *app* that knows it as a state, so one class can be a state of any
+    number of apps. An instance becomes evented when an agent adopts it (see
+    :func:`~rekuest.state.observable.evented`).
 
     Args:
         *function: Class to decorate when used as ``@state`` without
@@ -138,9 +99,10 @@ def state(
         name: Explicit exported state name. Defaults to the class name.
         required_locks: Locks that must be held while mutating this state.
         publish_interval: Debounce interval for published state updates.
-        registry: App registry to populate. Defaults to the global registry.
+        registry: App registry to populate. Required: without one this raises
+            ``NoRegistryError``, since state goes through an app (``@app.state``).
         structure_reg: Structure registry used while inspecting the state
-            schema.
+            schema. Defaults to the app registry's.
 
     Returns:
         The decorated class, or a decorator configured with the provided
@@ -149,18 +111,22 @@ def state(
     Raises:
         ValueError: If more than one class is passed at once.
 
+    Reached through ``AppRegistry.state``; call it directly only with
+    ``registry=``.
+
     Examples:
         Register a state class that is observable by the runtime::
 
-            @state(name="camera_state", required_locks=["camera"])
+            @app.state(name="camera_state", required_locks=["camera"])
             class CameraState:
                 connected: bool = False
                 exposure_ms: float = 10.0
     """
-    from rekuest.app import get_default_app_registry
-
-    registry = registry or get_default_app_registry()
-    structure_registry = structure_reg or get_default_structure_registry()
+    if registry is None:
+        raise NoRegistryError.for_decorator(
+            "State goes", "state", "class MyState: ...", "registry"
+        )
+    structure_registry = structure_reg or registry.structure_registry
 
     if len(function) == 1:
         cls = function[0]
@@ -169,7 +135,7 @@ def state(
             required_locks=required_locks,
             publish_interval=publish_interval,
             registry=registry,
-            structure_reg=structure_reg,
+            structure_reg=structure_registry,
         )(cls)
 
     if len(function) == 0:
@@ -181,17 +147,14 @@ def state(
             except TypeError:
                 cls = dataclass(cls)
 
-            setattr(cls, "__rekuest_state__", cls.__name__ if name is None else name)
-
-            # Apply Statify Logic
-            cls, state_schema = statify(
+            interface = cls.__name__ if name is None else name
+            registry.register_state(
                 cls,
+                inspect_state(cls, interface, structure_registry),
+                structure_registry,
                 required_locks=required_locks,
-                structure_registry=structure_registry,
                 publish_interval=publish_interval,
             )
-
-            registry.register_state(cls, state_schema, structure_registry)
             return cls
 
         return wrapper

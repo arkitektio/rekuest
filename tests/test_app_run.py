@@ -1,13 +1,9 @@
 """General Tests for defininin actions"""
 
 import asyncio
-from rekuest.api.schema import (
-    amy_implementation_at,
-)
 import pytest
 from rekuest.structures.registry import StructureRegistry
 from .conftest import CONNECT_TIMEOUT, DeployedRekuest
-from rekuest.remote import acall
 
 
 @pytest.mark.integration
@@ -39,9 +35,9 @@ async def test_run_and_call_app(
     await async_deployed_app.rekuest.aconnect(timeout=CONNECT_TIMEOUT)
     task = asyncio.create_task(async_deployed_app.rekuest.aloop())
 
-    impl = await amy_implementation_at("most_basic_function")
+    impl = await async_deployed_app.rekuest.amy_implementation_at("most_basic_function")
 
-    answer = await acall(impl, hello="hello")
+    answer = await async_deployed_app.rekuest.acall(impl, hello="hello")
     assert answer == "hello world", "The answer should be 'hello'"
 
     task.cancel()

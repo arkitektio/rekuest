@@ -37,7 +37,7 @@ behalf. That makes it a good fit for scientific and automation workflows where:
 ## How it works
 
 ```
-  @register function  ──inspect──▶  Action (self-documenting schema)
+  @app.register function  ──inspect──▶  Action (self-documenting schema)
         │                                  │
         │ hosted by an Agent               │ discovered + reserved by callers
         ▼                                  ▼
@@ -80,10 +80,12 @@ pip install arkitekt
 Register a typed function — its signature and docstring become the schema:
 
 ```python
-from arkitekt import register, easy
+from rekuest import AppRegistry
+
+app = AppRegistry()   # in arkitekt: `app = App("my.app")`, and `@app.action`
 
 
-@register
+@app.register
 def add_greeting(x: int, name: str) -> str:
     """Add a greeting.
 
@@ -182,7 +184,7 @@ Now you can use `Image` directly in type hints — rekuest automatically `ashrin
 the receiving side:
 
 ```python
-@register
+@app.register
 def brightest_pixel(image: Image) -> int:
     return image.max()
 ```
@@ -201,12 +203,12 @@ class Session:  # no get_identifier / ashrink / aexpand -> memory structure
         self.handle = handle
 
 
-@register
+@app.register
 def open_session(path: str) -> Session:
     return Session(open(path))
 
 
-@register
+@app.register
 def read_session(session: Session) -> str:
     return session.handle.read()
 ```
@@ -219,20 +221,19 @@ re-serialization. See `tests/test_app_memory_structure.py` for end-to-end exampl
 
 Actions are stateless by default — each call is independent. When an agent needs to
 remember something *across* calls (a connection, a counter, a loaded model), declare an
-**observable state** with `@state` on a dataclass:
+**observable state** with `@app.state` on a dataclass:
 
 ```python
 from dataclasses import dataclass
-from rekuest import state, startup
 
 
-@state
+@app.state
 @dataclass
 class CounterState:
     count: int = 0
 
 
-@startup
+@app.startup
 def initialize() -> CounterState:
     # Startup hooks return the initial state instances for the agent.
     return CounterState(count=0)
@@ -242,28 +243,24 @@ Any action can then read and mutate that state simply by **type-hinting a parame
 with the state class — rekuest injects the live instance:
 
 ```python
-@register
+@app.register
 def increment(counter: CounterState) -> int:
     counter.count += 1   # mutation is published to the platform automatically
     return counter.count
 ```
 
 State is shared by all of an agent's actors and is *observable*: changes are published
-live (at `publish_interval`), so dashboards and other apps can watch it in real time. Use
-`@state(local_only=True)` to keep a state on the agent without exposing it to the platform.
+live (at `publish_interval`), so dashboards and other apps can watch it in real time.
 
 ## Shutdown
 
-Whatever a startup hook opens, a `@shutdown` hook closes. Shutdown hooks run when the
+Whatever a startup hook opens, a `@app.shutdown` hook closes. Shutdown hooks run when the
 agent tears down — on a clean exit as well as after an error or a cancellation — in the
 reverse of the order they were registered. Like actions, they take the live state and
 context objects by **type-hinting a parameter**, and they return nothing:
 
 ```python
-from rekuest import shutdown
-
-
-@shutdown
+@app.shutdown
 async def finalize(counter: CounterState) -> None:
     await save_to_disk(counter.count)
 ```
@@ -283,20 +280,17 @@ background tasks.
 ## Dependencies
 
 An action can call out to functionality provided by **another** agent. You describe what
-you need with a **dependency protocol** — `@declare` (a.k.a. `agent_protocol`) inspects the
-class so that its public methods become *action demands* and its `@declare_state`
-attributes become *state demands*:
+you need with a **dependency protocol** — `@app.declare` inspects the class so that its
+public methods become *action demands* and its public annotated attributes become
+*state demands* (each annotated with a class whose annotations are the state's
+fields), with their ports built against that app's structures then and there:
 
 ```python
-from rekuest import declare, declare_state
-
-
-@declare_state
 class CameraState:
     connected: bool
 
 
-@declare(app="lab")
+@app.declare(app="lab")
 class Camera:
     state: CameraState
 
@@ -305,19 +299,22 @@ class Camera:
 ```
 
 Consume the dependency by type-hinting a parameter with the protocol class. rekuest
-resolves a matching remote agent and injects a proxy you can call — `.call(...)`
-(sync) or `.acall(...)` (async). Calls are routed through your agent and tracked as
-children of the current assignment:
+resolves a matching remote agent and injects a proxy made for the task the action
+runs in. `camera.snap(...)` calls as the protocol declared the method (awaitable
+if it is `async`); `.call(...)` and `.acall(...)` are the explicit forms. Every call
+goes over your agent's socket as a child of that task -- the same task a
+`task: Task` parameter receives -- and a name the protocol does not declare raises
+`AttributeError`:
 
 ```python
-@register
+@app.register
 def capture(camera: Camera) -> bytes:
     # Calls the remote agent's `snap` action and returns its result.
     return camera.snap(exposure_ms=10.0)
 ```
 
 The platform load balances across matching agents and will heal the reservation if one
-disconnects. Use `auto_resolvable=True`, `min=`, and `max=` on `@declare` to control how
+disconnects. Use `auto_resolvable=True`, `min=`, and `max=` on `@app.declare` to control how
 many matching agents may be bound automatically.
 
 ## Port validators and effects
@@ -330,10 +327,10 @@ automatically:
 
 ```python
 from typing import Annotated
-from rekuest import register, withEffect, withValidator
+from rekuest import withEffect, withValidator
 from rekuest.api.schema import EffectKind
 
-@register
+@app.register
 def crop(
     start: Annotated[int, withValidator("value >= 0", error_message="Must not be negative")],
     stop: Annotated[int, withValidator("value > start", error_message="Stop must exceed start")],
@@ -349,22 +346,22 @@ the value of port `other`. Operators desugar onto the **base catalog** (`gt`, `l
 `if`, `len_between`, ...), a versioned vocabulary every UI implements and the server checks
 every definition against; `annotated_types` markers (`Gt`, `Le`, `Len`) become such
 validators too. UIs may register extension catalogs with more operations; name them with
-`@register(catalogs=["..."])` (several may be combined; `base@1` is always applied) to use them (`clamp(value=value, min=0, max=10) == value`, keyword arguments because the client cannot name positionals of extension operations). Operations neither
+`@app.register(catalogs=["..."])` (several may be combined; `base@1` is always applied) to use them (`clamp(value=value, min=0, max=10) == value`, keyword arguments because the client cannot name positionals of extension operations). Operations neither
 catalog provides do not block registration: the server stores a warning on the
 implementation (`diagnostics`). Inside a call `value` always means the port's own value, so
 a sibling port named `value` cannot be referenced from another port's call.
 
-## Bloks — dashboards from JSX
+## Bloks — dashboards from BSX
 
 A **blok** is a declarative UI panel an app contributes to the platform — a small
 dashboard built from a component tree, wired straight to your actions and state. You
-write it as a JSX/XML string; `jsx(...)` parses it into a component tree (with helpful
+write it as a BSX/XML string; `bsx(...)` parses it into a component tree (with helpful
 line/column errors when it can't):
 
 ```python
-from rekuest import jsx
+from rekuest import bsx
 
-panel = jsx(
+panel = bsx(
     """
     <Page>
       <Label text="Camera" />

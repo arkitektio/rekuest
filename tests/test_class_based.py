@@ -5,18 +5,24 @@ from dataclasses import dataclass
 
 from rekuest.agents.hooks.startup import ThreadedStartupHook
 from rekuest.agents.hooks.background import WrappedThreadedBackgroundTask
-from rekuest.rekuest import RekuestNext
+from rekuest.agents.base import RekuestAgent
+from rekuest.rekuest import Rekuest
 from rekuest.state.decorator import state
+from rekuest.app import AppRegistry
+
+# Hooks and states belong to a registry, as they would to an app.
+_REGISTRY = AppRegistry()
+_HOOKS = _REGISTRY.hooks_registry
 
 
-def test_actify_class_based_function(mock_rekuest: RekuestNext) -> None:
+def test_actify_class_based_function(mock_rekuest: Rekuest, mock_agent: RekuestAgent) -> None:
     """Test if the function is correctly buildable into an actor definition."""
 
     class ClassBase:
-        def __init__(self, rekuest: RekuestNext) -> None:
+        def __init__(self, rekuest: Rekuest) -> None:
             """Initialize the class."""
             self.rekuest = mock_rekuest
-            self.rekuest.register(self.basic_function)
+            mock_agent.app_registry.register(self.basic_function)
 
         def basic_function(self, x: int) -> int:
             """A basic function that returns the input multiplied by 2."""
@@ -25,17 +31,17 @@ def test_actify_class_based_function(mock_rekuest: RekuestNext) -> None:
     class_instance = ClassBase(mock_rekuest)
 
     assert class_instance.basic_function(5) == 10
-    app_registry = mock_rekuest.agent.app_registry
+    app_registry = mock_agent.app_registry
     assert "basic_function" in app_registry.implementations
     implementation = app_registry.implementations["basic_function"]
 
     assert len(implementation.definition.args) == 1
 
 
-def test_actify_class_based_startup(mock_rekuest: RekuestNext) -> None:
+def test_actify_class_based_startup(mock_rekuest: Rekuest, mock_agent: RekuestAgent) -> None:
     """Test if the function is correctly buildable into an actor definition."""
 
-    @state
+    @state(registry=mock_agent.app_registry)
     @dataclass
     class DefaultState:
         """A default state for the class."""
@@ -43,10 +49,10 @@ def test_actify_class_based_startup(mock_rekuest: RekuestNext) -> None:
         instance_id: str = ""
 
     class ClassBase:
-        def __init__(self, rekuest: RekuestNext) -> None:
+        def __init__(self, rekuest: Rekuest) -> None:
             """Initialize the class."""
             self.rekuest = mock_rekuest
-            self.rekuest.register_startup(self.basic_startup)
+            mock_agent.app_registry.startup(self.basic_startup)
 
         def basic_startup(self) -> DefaultState:
             """A basic function that returns the input multiplied by 2."""
@@ -54,15 +60,15 @@ def test_actify_class_based_startup(mock_rekuest: RekuestNext) -> None:
 
     _ = ClassBase(mock_rekuest)
 
-    app_registry = mock_rekuest.agent.app_registry
+    app_registry = mock_agent.app_registry
     default = app_registry.hooks_registry.startup_hooks.get("basic_startup")
     assert isinstance(default, ThreadedStartupHook)
 
 
-def test_actify_class_based_background(mock_rekuest: RekuestNext) -> None:
+def test_actify_class_based_background(mock_rekuest: Rekuest, mock_agent: RekuestAgent) -> None:
     """Test if the function is correctly buildable into an actor definition."""
 
-    @state
+    @state(registry=mock_agent.app_registry)
     @dataclass
     class DefaultState:
         """A default state for the class."""
@@ -70,10 +76,10 @@ def test_actify_class_based_background(mock_rekuest: RekuestNext) -> None:
         instance_id: str = ""
 
     class ClassBase:
-        def __init__(self, rekuest: RekuestNext) -> None:
+        def __init__(self, rekuest: Rekuest) -> None:
             """Initialize the class."""
             self.rekuest = mock_rekuest
-            self.rekuest.register_background(self.basic_background)
+            mock_agent.app_registry.background(self.basic_background)
 
         def basic_background(self, state: DefaultState) -> None:
             """A basic function that returns the input multiplied by 2."""
@@ -83,7 +89,7 @@ def test_actify_class_based_background(mock_rekuest: RekuestNext) -> None:
 
     ClassBase(mock_rekuest)
 
-    app_registry = mock_rekuest.agent.app_registry
+    app_registry = mock_agent.app_registry
     default = app_registry.hooks_registry.background_worker.get("basic_background")
     assert default is not None
     assert isinstance(default, WrappedThreadedBackgroundTask)

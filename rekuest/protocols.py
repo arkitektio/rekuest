@@ -1,7 +1,8 @@
+from __future__ import annotations
+
 from typing import Any, Protocol, runtime_checkable
 from collections.abc import Awaitable
 
-from rekuest.state.observable import StateConfig
 
 
 @runtime_checkable
@@ -26,14 +27,12 @@ class AnyFunction(Protocol):
 
 @runtime_checkable
 class AnyState(Protocol):
-    """A function that takes a passport and a transport and returns an actor.
-    This method will create the actor and return it.
+    """An instance of a class an app registered as a state.
+
+    Being a state is a declaration on an app, not a property of the class, so
+    there is nothing structural to check here: any instance qualifies. (Kept
+    runtime-checkable because pydantic validates fields typed with it.)
     """
-
-    __rekuest_state__: str
-    __rekuest_state_config__: StateConfig
-
-    pass
 
 
 AnyContext = Any

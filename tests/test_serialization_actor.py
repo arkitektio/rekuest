@@ -85,8 +85,8 @@ async def test_expand_structure(
     args = await expand_inputs(
         functional_definition,
         {
-            "rep": {"__identifier": "mock/serializable", "object": "3"},
-            "name": {"__identifier": "mock/serializable", "object": "3"},
+            "rep": {"__identifier": "@mock/serializable", "object": "3"},
+            "name": {"__identifier": "@mock/serializable", "object": "3"},
         },
         structure_registry=simple_registry,
         shelver=mock_shelver,
@@ -129,8 +129,8 @@ async def test_expand_nested_structure(
     args = await expand_inputs(
         functional_definition,
         {
-            "rep": [{"__identifier": "mock/serializable", "object": "3"}],
-            "name": {"lala": {"__identifier": "mock/serializable", "object": "3"}},
+            "rep": [{"__identifier": "@mock/serializable", "object": "3"}],
+            "name": {"lala": {"__identifier": "@mock/serializable", "object": "3"}},
         },
         structure_registry=simple_registry,
         shelver=mock_shelver,
@@ -204,7 +204,7 @@ async def test_shrink_union_tagged(
         "First arm (SerializableObject) should be used"
     )
     assert args["return0"]["__value"] == {
-        "__identifier": "mock/serializable",
+        "__identifier": "@mock/serializable",
         "object": 3,
     }
 
@@ -224,7 +224,7 @@ async def test_expand_union_uses_index(
         {
             "rep": {
                 "__use": 0,
-                "__value": {"__identifier": "mock/serializable", "object": "3"},
+                "__value": {"__identifier": "@mock/serializable", "object": "3"},
             }
         },
         structure_registry=simple_registry,
@@ -237,7 +237,7 @@ async def test_expand_union_uses_index(
         {
             "rep": {
                 "__use": 1,
-                "__value": {"__identifier": "mock/secondserializable", "object": "abc"},
+                "__value": {"__identifier": "@mock/secondserializable", "object": "abc"},
             }
         },
         structure_registry=simple_registry,

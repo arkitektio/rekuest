@@ -22,29 +22,31 @@ So rekuest splits the decision in two:
 The default is to keep running, so nothing that works today changes.
 
 ```python
-from rekuest import register, CancelOnDisconnect
+from rekuest import AppRegistry, CancelOnDisconnect
+
+app = AppRegistry()
 
 
-@register
+@app.register
 def train_model(epochs: int) -> Model:
     """Rides out a disconnect. This is the default."""
     ...
 
 
-@register(policy=CancelOnDisconnect())
+@app.register(policy=CancelOnDisconnect())
 def move_stage(direction: str) -> None:
     """Stops the moment control is lost."""
     ...
 
 
-@register(policy=CancelOnDisconnect(grace=2.0))
+@app.register(policy=CancelOnDisconnect(grace=2.0))
 def scan_tile(x: int, y: int) -> Image:
     """Tolerates a two-second blip, then stops."""
     ...
 ```
 
 One `policy` argument rather than a pair of flags, so future dimensions can be
-added without growing `register`'s already long signature.
+added without growing `app.register`'s already long signature.
 
 When the link goes down, the agent starts a per-action countdown. If it comes back
 inside the grace period, nothing happens. If it does not, the work is cancelled and
@@ -66,7 +68,7 @@ not stop.
 from koil import check_cancelled
 
 
-@register(policy=CancelOnDisconnect())
+@app.register(policy=CancelOnDisconnect())
 def move_stage(direction: str) -> None:
     while motor.moving():
         check_cancelled()   # required — without this the loop never stops

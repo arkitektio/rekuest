@@ -29,7 +29,15 @@ class BlokVisitor(Protocol):
     ``scope`` maps a local name declared by an enclosing ``foreach`` to whatever
     :meth:`declare_foreach_local` returned for it. ``context`` is a human-readable
     location (``"prop 'text' of <Button> (Card/Button[0])"``) for error messages.
+
+    :meth:`visit_component` fires once per node, before its own props, so a visitor
+    sees a component before anything it carries.
     """
+
+    def visit_component(
+        self, node: ComponentNodeInput, scope: dict[str, Any], context: str
+    ) -> None:  # pragma: no cover - protocol
+        ...
 
     def visit_path(
         self, path: str, scope: dict[str, Any], context: str
@@ -106,8 +114,10 @@ def walk_component(
     visitor: BlokVisitor,
     scope: dict[str, Any] | None = None,
 ) -> None:
-    """Walk ``node`` and its subtree, invoking ``visitor`` for every reference."""
+    """Walk ``node`` and its subtree, invoking ``visitor`` for the node and every reference."""
     current_scope = dict(scope or {})
+
+    visitor.visit_component(node, current_scope, node_context(node))
 
     binding = _declare_foreach(node, visitor, current_scope)
     if binding is not None:

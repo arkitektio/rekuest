@@ -1,5 +1,6 @@
 """The vendored base catalog manifest and its loader."""
 
+import os
 import subprocess
 import sys
 from importlib import resources
@@ -15,7 +16,9 @@ from rekuest.catalogs import (
     load_base_catalog,
 )
 
-SERVER_MANIFEST = Path("/home/jhnnsrs/Code/deployments/next/mounts/rekuest/rekuest_core/catalogs/base_v1.json")
+DEFAULT_SERVER_TREE = Path("/home/jhnnsrs/Code/deployments/next/mounts/rekuest")
+SERVER_TREE = Path(os.environ.get("REKUEST_SERVER_TREE", DEFAULT_SERVER_TREE))
+SERVER_MANIFEST = SERVER_TREE / "rekuest_core" / "catalogs" / "base_v1.json"
 
 
 def test_base_manifest_loads_via_importlib_resources() -> None:

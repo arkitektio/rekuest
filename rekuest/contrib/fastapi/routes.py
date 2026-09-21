@@ -33,8 +33,6 @@ from rekuest.contrib.fastapi.route_groups import (
     build_task_router,
 )
 from rekuest.contrib.fastapi.auth import ExpandUserFromRequest
-from rekuest.contrib.sql_lite.retriever import SQLLiteRetriever
-from rekuest.contrib.sql_lite.sink import SQLLiteSink
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +61,13 @@ def create_lifespan(
 ) -> Callable[[FastAPI], contextlib.AbstractAsyncContextManager[None]]:
     """Create a FastAPI lifespan manager for a configured agent.
 
+    When the app starts, the agent takes a snapshot of its registry -- validated,
+    copied and frozen -- and serves that, exactly as ``run(app)`` does: what a
+    server offers is what was declared when it started, and a port naming a
+    class the app cannot resolve fails here rather than mid-assignment. The
+    declaration registry handed to ``configure_fastapi`` is left as it was, so
+    it can be declared into up to the moment the app starts, and served again.
+
     Args:
         agent: The agent to enter and provide for the lifetime of the app.
         app_context: Optional context passed to ``agent.aprovide``.
@@ -72,6 +77,11 @@ def create_lifespan(
 
     @contextlib.asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        agent.app_registry = agent.app_registry.snapshot()
+        # Refused here, out of the lifespan, so a server started without the app
+        # context its app declares does not start at all (the provide task's own
+        # failure would only be logged).
+        agent.app_registry.require_app_context(app_context, whose="This served app")
         if on_startup is not None:
             on_startup(app)
         app.state.agent = agent
@@ -220,10 +230,27 @@ def configure_fastapi(
     locks_path: str = "/locks",
     db_file: str = "agent_data.db",
     app_context: Any | None = None,
+    bound_app: Any | None = None,
+    lifespan: bool = True,
 ) -> FastApiAgent:
     """Configure a FastAPI app with a refactored set of agent route groups.
 
+    With ``lifespan`` (the default) the agent serves a snapshot of
+    ``app_registry`` taken when the app starts (see :func:`create_lifespan`), so
+    ``app_registry`` itself is never frozen and may be declared into until then,
+    and the agent is provided for the lifetime of the app.
+
+    With ``lifespan=False`` nothing is installed on the app: ``app_registry`` is
+    served as handed in (a runtime hands in its snapshot), every route is added
+    now, and whoever called this enters and provides the agent -- what
+    ``arkitekt.serve`` does, so the agent is the runtime's like any other.
+
     Args:
+        bound_app: The running app the agent belongs to (a runtime), which
+            supplies the clients actions ask for by annotation. ``None`` for an
+            agent serving a registry that uses no services.
+        lifespan: Whether to install the lifespan that snapshots, enters and
+            provides the agent.
         expand_user_from_request: Unified authentication hook. It is handed a
             Starlette `Request` for HTTP routes and a `WebSocketSubscriptionInit`
             for the websocket handshake, so one callable covers both transports.
@@ -233,8 +260,14 @@ def configure_fastapi(
             `expand_user_from_request`. Still honoured when the newer hook is
             absent, in which case the websocket stays unauthenticated as before.
     """
+    # Imported here: the sqlite retriever reads the protocol under this
+    # package, so a module-level import would be circular.
+    from rekuest.contrib.sql_lite.retriever import SQLLiteRetriever
+    from rekuest.contrib.sql_lite.sink import SQLLiteSink
+
     agent: FastApiAgent = FastApiAgent(  # type: ignore
         app_registry=app_registry,
+        bound_app=bound_app,
         retriever=SQLLiteRetriever(db_path=db_file),
         sink=SQLLiteSink(db_path=db_file),
     )
@@ -270,10 +303,14 @@ def configure_fastapi(
             add_schema_routes(fastapi_app, agent)
         configure_openapi(fastapi_app)
 
-    lifespan = create_lifespan(
+    if not lifespan:
+        app.state.agent = agent
+        _register_deferred_routes(app)
+        return agent
+
+    app.router.lifespan_context = create_lifespan(
         agent, app_context=app_context, on_startup=_register_deferred_routes
     )
-    app.router.lifespan_context = lifespan
     return agent
 
 

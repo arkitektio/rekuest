@@ -29,7 +29,7 @@ from rekuest.agents.caller import AgentPostman
 from rekuest.api.schema import TaskEventChange, TaskEventKind
 from rekuest.postmans.errors import RootOnlyAssignError
 from rekuest.postmans.graphql import GraphQLPostman
-from rekuest.rath import RekuestNextRath
+from rekuest.rath import RekuestRath
 from rekuest.remote import aiterate_raw
 
 from rath.links.testing.direct_succeeding_link import DirectSucceedingLink
@@ -75,7 +75,7 @@ class RecordingGraphQLPostman(GraphQLPostman):
 
 
 def _graphql_postman() -> RecordingGraphQLPostman:
-    return RecordingGraphQLPostman(rath=RekuestNextRath(link=DirectSucceedingLink()))
+    return RecordingGraphQLPostman(rath=RekuestRath(link=DirectSucceedingLink()))
 
 
 @pytest.mark.asyncio

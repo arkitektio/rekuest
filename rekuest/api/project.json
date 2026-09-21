@@ -135,49 +135,17 @@
                     "type": "turms.plugins.operations.OperationsPlugin"
                 },
                 {
-                    "type": "turms.plugins.funcs.FuncsPlugin",
+                    "type": "turms.plugins.client.ClientPlugin",
+                    "client_class": "RekuestApi",
+                    "reserved_from": [
+                        "rekuest.rekuest.Rekuest"
+                    ],
                     "coercible_scalars": {
                         "SearchQuery": "rekuest.scalars.SearchQueryCoercible",
                         "ID": "rath.scalars.IDCoercible"
                     },
                     "expand_input_types": [
                         "input"
-                    ],
-                    "global_kwargs": [
-                        {
-                            "type": "rekuest.rath.RekuestNextRath",
-                            "key": "rath",
-                            "description": "The arkitekt rath client"
-                        }
-                    ],
-                    "definitions": [
-                        {
-                            "type": "subscription",
-                            "is_async": true,
-                            "use": "rekuest.funcs.asubscribe"
-                        },
-                        {
-                            "type": "query",
-                            "is_async": true,
-                            "use": "rekuest.funcs.aexecute"
-                        },
-                        {
-                            "type": "mutation",
-                            "is_async": true,
-                            "use": "rekuest.funcs.aexecute"
-                        },
-                        {
-                            "type": "subscription",
-                            "use": "rekuest.funcs.subscribe"
-                        },
-                        {
-                            "type": "query",
-                            "use": "rekuest.funcs.execute"
-                        },
-                        {
-                            "type": "mutation",
-                            "use": "rekuest.funcs.execute"
-                        }
                     ]
                 }
             ],

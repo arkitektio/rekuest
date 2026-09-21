@@ -89,7 +89,7 @@ def test_define_structure(simple_registry: StructureRegistry) -> None:
     assert functional_definition.name == "Plain Structure Function", (
         "Name should be inferred from the function name, not the docstring title"
     )
-    assert functional_definition.args[0].identifier == "mock/serializable"
+    assert functional_definition.args[0].identifier == "@mock/serializable"
 
 
 @pytest.mark.define
@@ -194,7 +194,7 @@ def test_define_nested_structure_function(simple_registry: StructureRegistry) ->
         "Child of List is not of type IntArgPort"
     )
     assert (
-        functional_definition.args[0].children[0].identifier == "mock/serializable"
+        functional_definition.args[0].children[0].identifier == "@mock/serializable"
     ), "Child of List is not of type IntArgPort"
     assert functional_definition.args[0].children[0].kind == PortKind.STRUCTURE, (
         "Child of Dict is not of type StringArgPort"
@@ -205,7 +205,7 @@ def test_define_nested_structure_function(simple_registry: StructureRegistry) ->
     assert functional_definition.returns[1].children[0].kind == PortKind.STRUCTURE
     assert (
         functional_definition.returns[1].children[0].identifier
-        == "mock/secondserializable"
+        == "@mock/secondserializable"
     )
 
 

@@ -1,4 +1,4 @@
-from typing import Protocol
+from typing import Any, Protocol
 from rekuest.api.schema import (
     AgentDependencyInput,
     OptimisticInput,
@@ -8,7 +8,9 @@ from rekuest.api.schema import (
 class ToDependencyProtocol(Protocol):
     """A type that can be coerced into a DependencyInput."""
 
-    def to_dependency_input(self) -> AgentDependencyInput: ...
+    def to_dependency_input(
+        self, key: str, structure_registry: Any
+    ) -> AgentDependencyInput: ...
 
 
 DependencyCoercible = AgentDependencyInput | ToDependencyProtocol

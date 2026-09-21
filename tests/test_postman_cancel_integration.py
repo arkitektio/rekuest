@@ -1,6 +1,6 @@
 """Integration smoke test for postman cancel-confirmation against the real backend.
 
-Stands up a fresh ``RekuestNext`` (via :func:`build_fresh_rekuest`) on the shared
+Stands up a fresh ``Rekuest`` (via :func:`build_fresh_rekuest`) on the shared
 deployment, registers a long-running action, starts a call, then cancels it. Because
 the GraphQL postman now awaits the backend's CANCELLED confirmation before re-raising,
 by the time the ``CancelledError`` surfaces the server-side task must already be in the
@@ -13,15 +13,16 @@ import uuid
 import pytest
 from dokker import Deployment
 
-from rekuest.api.schema import TaskEventKind, amy_implementation_at, arequests
-from rekuest.remote import acall
+from rekuest.api.schema import (
+    TaskEventKind,
+)
 
 from .conftest import CONNECT_TIMEOUT, build_fresh_rekuest
 
 
-async def _find_task(reference: str):
+async def _find_task(client, reference: str):  # noqa: ANN001
     """Return the task with ``reference`` from the backend, or ``None``."""
-    for task in await arequests():
+    for task in await client.arequests():
         if task.reference == reference:
             return task
     return None
@@ -45,10 +46,10 @@ async def test_cancel_awaits_backend_cancelled(deployment: Deployment) -> None:
         await app.aconnect(timeout=CONNECT_TIMEOUT)
         loop_task = asyncio.create_task(app.aloop())
 
-        impl = await amy_implementation_at("sleeper")
+        impl = await app.amy_implementation_at("sleeper")
 
         reference = f"cancel-smoke-{uuid.uuid4().hex[:8]}"
-        call_task = asyncio.create_task(acall(impl, seconds=30, reference=reference))
+        call_task = asyncio.create_task(app.acall(impl, seconds=30, reference=reference))
 
         # Wait until the backend has registered the task and recorded an event for it.
         #
@@ -58,7 +59,7 @@ async def test_cancel_awaits_backend_cancelled(deployment: Deployment) -> None:
         # moving, so we gate on that — it says the task exists on the backend, which is
         # all the cancel below needs.
         async def _started() -> bool:
-            task = await _find_task(reference)
+            task = await _find_task(app, reference)
             return task is not None and len(task.events) > 0
 
         deadline = asyncio.get_event_loop().time() + 10.0
@@ -72,7 +73,7 @@ async def test_cancel_awaits_backend_cancelled(deployment: Deployment) -> None:
         with pytest.raises(asyncio.CancelledError):
             await call_task
 
-        task = await _find_task(reference)
+        task = await _find_task(app, reference)
         assert task is not None, "task disappeared from the backend"
         assert task.latest_event_kind == TaskEventKind.CANCELLED, (
             f"expected CANCELLED, got {task.latest_event_kind}"

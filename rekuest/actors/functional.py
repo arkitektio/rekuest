@@ -8,6 +8,7 @@ from rekuest.actors.base import SerializingActor
 from rekuest.messages import Assign
 from rekuest.structures.serialization.actor import expand_inputs, shrink_outputs
 from rekuest.actors.helper import AssignmentHelper
+from rekuest.task import Task
 from rekuest.structures.errors import SerializationError
 from rekuest import messages
 from rekuest.actors.debug import capture_to_list
@@ -61,6 +62,9 @@ class FunctionalActor(SerializingActor):
         )
 
         async with self.sync_context(assignment.task, assignment.interface):
+            # Expansion goes through the clients this actor's structure registry
+            # was bound to. The body gets one Task per assignment, and its
+            # dependency proxies and client views are made for that same object.
             try:
                 input_kwargs = await expand_inputs(
                     self.definition,
@@ -81,13 +85,17 @@ class FunctionalActor(SerializingActor):
                 )
                 return
 
-            context_kwargs, state_kwargs, dependency_kwargs = await self.aget_locals()
+            context_kwargs, state_kwargs = await self.aget_locals(assignment)
+            task = Task(AssignmentHelper(assignment=assignment, actor=self))
+            dependency_kwargs = await self.aget_dependency_locals(task)
+            injected_kwargs = await self.aget_injected_locals(task)
 
             params: dict[str, Any] = {
                 **input_kwargs,
                 **context_kwargs,
                 **state_kwargs,
                 **dependency_kwargs,
+                **injected_kwargs,
             }
 
             logs: list[str] = []
@@ -104,35 +112,34 @@ class FunctionalActor(SerializingActor):
 
             try:
                 async with capture_to_list(logs, self.agent, assignment):
-                    async with AssignmentHelper(assignment=assignment, actor=self):
-                        async for returns in self.aiterate_results(**params):
-                            try:
-                                returns = await shrink_outputs(
-                                    self.definition,
-                                    returns,
-                                    structure_registry=self.structure_registry,
-                                    shelver=self.agent,
-                                    skip_shrinking=not self.shrink_outputs,
-                                )
-                            except SerializationError as ex:
-                                logger.critical(
-                                    f"Output serialization error in {impl_id}",
-                                    exc_info=True,
-                                )
-                                await self.asend(
-                                    message=messages.Failed(
-                                        task=assignment.task,
-                                        error=str(ex),
-                                    )
-                                )
-                                return
-
+                    async for returns in self.aiterate_results(**params):
+                        try:
+                            returns = await shrink_outputs(
+                                self.definition,
+                                returns,
+                                structure_registry=self.structure_registry,
+                                shelver=self.agent,
+                                skip_shrinking=not self.shrink_outputs,
+                            )
+                        except SerializationError as ex:
+                            logger.critical(
+                                f"Output serialization error in {impl_id}",
+                                exc_info=True,
+                            )
                             await self.asend(
-                                message=messages.Yield(
+                                message=messages.Failed(
                                     task=assignment.task,
-                                    returns=returns,
+                                    error=str(ex),
                                 )
                             )
+                            return
+
+                        await self.asend(
+                            message=messages.Yield(
+                                task=assignment.task,
+                                returns=returns,
+                            )
+                        )
 
                 await aflush_captured_logs()
 

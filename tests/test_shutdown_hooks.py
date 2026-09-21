@@ -11,15 +11,21 @@ from collections.abc import Generator
 
 import pytest
 
-from rekuest import context, state
+from rekuest.app import AppRegistry
+from rekuest.state.decorator import state
 from rekuest.agents.hooks.shutdown import (
     ThreadedShutdownHook,
     WrappedShutdownHook,
 )
-from rekuest.rekuest import RekuestNext
+from rekuest.agents.base import RekuestAgent
 
 
-@context
+# These contexts and states belong to a registry, as they would to an app.
+# There is no process-wide one to fall into.
+_REGISTRY = AppRegistry()
+
+
+@_REGISTRY.context
 class Connection:
     """A context holding something a shutdown hook has to close."""
 
@@ -27,7 +33,7 @@ class Connection:
         self.closed = False
 
 
-@state
+@state(registry=_REGISTRY)
 class Counter:
     """A state a shutdown hook may want to read one last time."""
 
@@ -35,33 +41,33 @@ class Counter:
 
 
 @pytest.fixture(autouse=True)
-def _isolated_hooks(mock_rekuest: RekuestNext) -> Generator[None, None, None]:
+def _isolated_hooks(mock_agent: RekuestAgent) -> Generator[None, None, None]:
     """The agent defaults to the global app registry, which other test modules also
     decorate into. Start (and leave) each test with an empty hooks registry."""
-    registry = mock_rekuest.agent.app_registry.hooks_registry
+    registry = mock_agent.app_registry.hooks_registry
     registry.reset()
     yield
     registry.reset()
 
 
-def test_register_shutdown_lands_in_the_registry(mock_rekuest: RekuestNext) -> None:
+def test_register_shutdown_lands_in_the_registry(mock_agent: RekuestAgent) -> None:
     def close_it() -> None:
         pass
 
     async def aclose_it() -> None:
         pass
 
-    mock_rekuest.register_shutdown(close_it)
-    mock_rekuest.register_shutdown(aclose_it)
+    mock_agent.app_registry.shutdown(close_it)
+    mock_agent.app_registry.shutdown(aclose_it)
 
-    hooks = mock_rekuest.agent.app_registry.hooks_registry.shutdown_hooks
+    hooks = mock_agent.app_registry.hooks_registry.shutdown_hooks
     assert isinstance(hooks["close_it"], ThreadedShutdownHook)
     assert isinstance(hooks["aclose_it"], WrappedShutdownHook)
 
 
-def test_app_registry_shutdown_decorator(mock_rekuest: RekuestNext) -> None:
+def test_app_registry_shutdown_decorator(mock_agent: RekuestAgent) -> None:
     """The registry-bound decorator registers on that registry, under a given name."""
-    registry = mock_rekuest.agent.app_registry
+    registry = mock_agent.app_registry
 
     @registry.shutdown
     async def close_it() -> None:
@@ -78,7 +84,7 @@ def test_app_registry_shutdown_decorator(mock_rekuest: RekuestNext) -> None:
 
 @pytest.mark.asyncio
 async def test_shutdown_hooks_run_with_states_and_contexts(
-    mock_rekuest: RekuestNext,
+    mock_agent: RekuestAgent,
 ) -> None:
     """The live state and context objects are injected by annotation."""
     seen: list[object] = []
@@ -87,12 +93,14 @@ async def test_shutdown_hooks_run_with_states_and_contexts(
         connection.closed = True
         seen.append(counter)
 
-    mock_rekuest.register_shutdown(close_connection)
+    # The state belongs to the module's registry; this agent's app takes it in.
+    mock_agent.app_registry.merge(_REGISTRY)
+    mock_agent.app_registry.shutdown(close_connection)
 
-    agent = mock_rekuest.agent
+    agent = mock_agent
     connection, counter = Connection(), Counter()
-    agent.contexts[Connection.__rekuest_context__] = connection
-    agent.states[Counter.__rekuest_state__] = counter
+    agent.contexts[_REGISTRY.structure_registry.context_for(Connection).name] = connection
+    agent.states["Counter"] = counter
 
     agent.collect_from_registry()
     agent._ran_startup_hooks = True
@@ -104,7 +112,7 @@ async def test_shutdown_hooks_run_with_states_and_contexts(
 
 @pytest.mark.asyncio
 async def test_threaded_shutdown_hook_runs_with_states_and_contexts(
-    mock_rekuest: RekuestNext,
+    mock_agent: RekuestAgent,
 ) -> None:
     """A sync hook runs in a thread, and gets the same injection as an async one."""
     seen: list[object] = []
@@ -113,12 +121,14 @@ async def test_threaded_shutdown_hook_runs_with_states_and_contexts(
         connection.closed = True
         seen.append(counter)
 
-    mock_rekuest.register_shutdown(close_connection)
+    # The state belongs to the module's registry; this agent's app takes it in.
+    mock_agent.app_registry.merge(_REGISTRY)
+    mock_agent.app_registry.shutdown(close_connection)
 
-    agent = mock_rekuest.agent
+    agent = mock_agent
     connection, counter = Connection(), Counter()
-    agent.contexts[Connection.__rekuest_context__] = connection
-    agent.states[Counter.__rekuest_state__] = counter
+    agent.contexts[_REGISTRY.structure_registry.context_for(Connection).name] = connection
+    agent.states["Counter"] = counter
 
     agent.collect_from_registry()
     agent._ran_startup_hooks = True
@@ -130,7 +140,7 @@ async def test_threaded_shutdown_hook_runs_with_states_and_contexts(
 
 @pytest.mark.asyncio
 async def test_shutdown_hooks_run_in_reverse_registration_order(
-    mock_rekuest: RekuestNext,
+    mock_agent: RekuestAgent,
 ) -> None:
     """Teardown unwinds in the reverse of the order things were set up."""
     calls: list[str] = []
@@ -141,10 +151,10 @@ async def test_shutdown_hooks_run_in_reverse_registration_order(
     async def second() -> None:
         calls.append("second")
 
-    mock_rekuest.register_shutdown(first)
-    mock_rekuest.register_shutdown(second)
+    mock_agent.app_registry.shutdown(first)
+    mock_agent.app_registry.shutdown(second)
 
-    agent = mock_rekuest.agent
+    agent = mock_agent
     agent.collect_from_registry()
     agent._ran_startup_hooks = True
     await agent.arun_shutdown_hooks()
@@ -154,7 +164,7 @@ async def test_shutdown_hooks_run_in_reverse_registration_order(
 
 @pytest.mark.asyncio
 async def test_failing_shutdown_hook_does_not_stop_the_others(
-    mock_rekuest: RekuestNext,
+    mock_agent: RekuestAgent,
 ) -> None:
     """A hook that raises is logged; teardown carries on."""
     calls: list[str] = []
@@ -165,10 +175,10 @@ async def test_failing_shutdown_hook_does_not_stop_the_others(
     async def exploding() -> None:
         raise RuntimeError("nope")
 
-    mock_rekuest.register_shutdown(survivor)
-    mock_rekuest.register_shutdown(exploding)  # runs first (reverse order)
+    mock_agent.app_registry.shutdown(survivor)
+    mock_agent.app_registry.shutdown(exploding)  # runs first (reverse order)
 
-    agent = mock_rekuest.agent
+    agent = mock_agent
     agent.collect_from_registry()
     agent._ran_startup_hooks = True
 
@@ -179,16 +189,16 @@ async def test_failing_shutdown_hook_does_not_stop_the_others(
 
 @pytest.mark.asyncio
 async def test_shutdown_hooks_only_run_for_a_started_agent_and_only_once(
-    mock_rekuest: RekuestNext,
+    mock_agent: RekuestAgent,
 ) -> None:
     calls: list[str] = []
 
     async def close_it() -> None:
         calls.append("closed")
 
-    mock_rekuest.register_shutdown(close_it)
+    mock_agent.app_registry.shutdown(close_it)
 
-    agent = mock_rekuest.agent
+    agent = mock_agent
     agent.collect_from_registry()
 
     # Never started: teardown owes it nothing.

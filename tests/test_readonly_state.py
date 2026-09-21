@@ -13,14 +13,18 @@ import pytest
 from rekuest.agents.base import BaseAgent
 from rekuest.app import AppRegistry
 from rekuest.state.decorator import state
-from rekuest.state.observable import make_evented
-from rekuest.state.publish import direct_publishing
+from rekuest.state.observable import adopt, evented
 from rekuest.state.readonly import ReadOnlyStateError, read_only_view
 
 from .memory_transport import MemoryAgentTransport
 
 
-@state
+# These states belong to a registry, as they would to an app. There is no
+# process-wide one to fall into.
+_REGISTRY = AppRegistry()
+
+
+@state(registry=_REGISTRY)
 @dataclass
 class Board:
     """A state with a scalar and both container kinds."""
@@ -31,8 +35,12 @@ class Board:
 
 
 def _evented_board() -> Board:
-    """A Board wired up the way the agent holds one at runtime."""
-    return make_evented(Board(), getattr(Board, "__rekuest_state_config__"))
+    """A Board wired up the way the agent holds one at runtime.
+
+    Registering the class changes nothing on it; the agent makes each adopted
+    instance evented with the app's declaration, so this does the same.
+    """
+    return evented(Board(), _REGISTRY.structure_registry.state_for(Board))
 
 
 class _RecordingPublisher:
@@ -84,11 +92,11 @@ def test_refusing_a_write_publishes_nothing() -> None:
     view = read_only_view(board, "Board")
     publisher = _RecordingPublisher()
 
-    with direct_publishing(publisher):
-        with pytest.raises(ReadOnlyStateError):
-            view.count = 3
-        with pytest.raises(ReadOnlyStateError):
-            view.items.append(1)
+    adopt(board, publisher)
+    with pytest.raises(ReadOnlyStateError):
+        view.count = 3
+    with pytest.raises(ReadOnlyStateError):
+        view.items.append(1)
 
     assert publisher.patches == [], "a refused write must not publish a patch"
     assert board.count == 0 and list(board.items) == [], "the state must be untouched"
@@ -99,8 +107,8 @@ def test_the_writeable_handle_still_publishes() -> None:
     board = _evented_board()
     publisher = _RecordingPublisher()
 
-    with direct_publishing(publisher):
-        board.count = 3
+    adopt(board, publisher)
+    board.count = 3
 
     assert publisher.patches == ["Board"]
 
@@ -144,6 +152,7 @@ async def test_readonly_annotation_reaches_an_actor_as_a_refusing_view() -> None
     agent = BaseAgent(
         name="ro-actor", transport=MemoryAgentTransport(), app_registry=AppRegistry()
     )
+    agent.app_registry.merge(_REGISTRY)  # Board is a state of this app too
     transport = agent.transport
     board = _evented_board()
     agent.states["Board"] = board
@@ -231,8 +240,8 @@ def test_slice_assignment_emits_replayable_patches(initial, target_slice, new_va
     expected = list(initial)
     expected[target_slice] = new_values
 
-    with direct_publishing(recorder):
-        board.items[target_slice] = new_values
+    adopt(board, recorder)
+    board.items[target_slice] = new_values
 
     assert list(board.items) == expected
     assert _replay(recorder.patches, initial) == expected

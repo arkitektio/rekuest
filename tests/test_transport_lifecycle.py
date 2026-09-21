@@ -771,3 +771,63 @@ async def test_a_failed_send_does_not_wedge_the_flush(
 
         await transport.adisconnect()
         await _stop(consumer)
+
+
+@pytest.mark.asyncio
+async def test_a_malformed_frame_does_not_take_the_agent_down(socket: FakeSocket) -> None:
+    """``json.JSONDecodeError`` is a ValueError, not a pydantic error.
+
+    The handler only caught ``pydantic.ValidationError``, so one garbled frame escaped it,
+    ended the receive loop as a definite connection failure and tore the whole agent down —
+    orphaning everything it was running. Its own log line said "dropped, never fatal".
+    """
+    transport = WebsocketAgentTransport(
+        endpoint_url="ws://localhost:8000/agi", token_loader=_token
+    )
+
+    async with transport as transport:
+        await transport.aconnect()
+        received: list[messages.ToAgentMessage] = []
+
+        async def consume() -> None:
+            async for message in transport.areceive():
+                received.append(message)
+
+        consumer = asyncio.create_task(consume())
+        socket._incoming.put_nowait("{this is not json")
+        socket.feed(messages.Init(agent="agent-1"))
+        await asyncio.sleep(0.05)
+
+        assert len(received) == 1, "the frame after the garbled one must still arrive"
+        assert not consumer.done(), "a bad frame must not end the receive stream"
+
+        consumer.cancel()
+        try:
+            await consumer
+        except asyncio.CancelledError:
+            pass
+
+
+@pytest.mark.asyncio
+async def test_an_unreadable_assign_is_answered_not_dropped(socket: FakeSocket) -> None:
+    """A frame that fails the schema was logged and dropped without a word.
+
+    For an ``Assign`` that means the backend dispatched a task this agent will never mention
+    again. If the frame still tells us *which* task, say so: a Critical ends it.
+    """
+    transport = WebsocketAgentTransport(
+        endpoint_url="ws://localhost:8000/agi", token_loader=_token
+    )
+
+    async with transport as transport:
+        await transport.aconnect()
+        # An Assign from a newer/older backend: right type and task id, wrong shape.
+        socket._incoming.put_nowait(
+            json.dumps({"type": "ASSIGN", "task": "task-unreadable", "args": "not-a-dict"})
+        )
+        await asyncio.sleep(0.1)
+
+        sent = [json.loads(frame) for frame in socket.sent]
+        criticals = [f for f in sent if f.get("type") == "CRITICAL"]
+        assert criticals, f"the unreadable Assign must be refused, got {sent}"
+        assert criticals[0]["task"] == "task-unreadable"

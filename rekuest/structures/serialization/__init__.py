@@ -1,1 +1,1 @@
-"""General serialzion logic for Rekuest Next"""
+"""General serialzion logic for Rekuest"""

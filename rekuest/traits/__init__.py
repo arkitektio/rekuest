@@ -1,1 +1,1 @@
-"""General traits for Rekuest Next"""
+"""General traits for Rekuest"""

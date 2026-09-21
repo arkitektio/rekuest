@@ -2,14 +2,12 @@
 
 from typing import Any, Self
 from pydantic import BaseModel, ConfigDict
-from rekuest.api.schema import LogLevel
+from enum import Enum
+
+from rekuest.messages import LogLevel
 from koil import unkoil
 from rekuest import messages
-from rekuest.actors.vars import (
-    current_task_helper,
-)
 from rekuest.actors.types import Actor, AssignmentHook
-from rekuest.postmans.vars import current_postman
 
 
 class AssignmentHelper(BaseModel):
@@ -21,8 +19,11 @@ class AssignmentHelper(BaseModel):
     assignment: messages.Assign
     actor: Actor
     model_config = ConfigDict(arbitrary_types_allowed=True)
-    _token = None
-    _postman_token = None
+
+    @property
+    def agent(self) -> Any:  # noqa: ANN401 - ActorContext
+        """The agent running the actor this assignment belongs to."""
+        return self.actor.agent
 
     async def alog(
         self: Self, level: LogLevel | messages.LogLevelLiteral, message: str
@@ -36,7 +37,7 @@ class AssignmentHelper(BaseModel):
         await self.actor.asend(
             message=messages.Log(
                 task=self.assignment.task,
-                level=level.value if isinstance(level, LogLevel) else level,
+                level=level.value if isinstance(level, Enum) else level,
                 message=message,
             )
         )
@@ -135,58 +136,3 @@ class AssignmentHelper(BaseModel):
         when the implementation opted out of provenance (needs_token=False).
         """
         return self.assignment.token
-
-    def __enter__(self) -> Self:
-        """Set the current task helper to this instance.
-        This is used to send logs and progress messages to the actor.
-
-        Within this context all get_task_helper() calls will return this instance.
-        """
-
-        self._token = current_task_helper.set(self)
-        # Route actor-internal acall/acall_dependency over the agent socket (instead of the
-        # GraphQL postman) for the duration of this task body. Standalone callers outside an
-        # actor never enter here, so they keep the app's GraphQL postman.
-        self._postman_token = current_postman.set(self.actor.agent.caller_postman)
-        return self
-
-    def __exit__(
-        self,
-        exc_type: type | None,
-        exc_val: Exception | None,
-        exc_tb: type | None,
-    ) -> None:
-        """Exit the context manager
-
-        Args:
-            exc_type (Optional[type]): The type of the exception
-            exc_val (Optional[Exception]): The exception value
-            exc_tb (Optional[type]): The traceback
-        """
-        if self._postman_token:
-            current_postman.reset(self._postman_token)
-        if self._token:
-            current_task_helper.reset(self._token)
-
-    async def __aenter__(self) -> Self:
-        """Set the current task helper to this instance.
-        This is used to send logs and progress messages to the actor.
-        Within this context all get_task_helper() calls will return this instance.
-        """
-
-        return self.__enter__()
-
-    async def __aexit__(
-        self,
-        exc_type: type | None,
-        exc_val: Exception | None,
-        exc_tb: type | None,
-    ) -> None:
-        """Exit the async context manager
-
-        Args:
-            exc_type (Optional[type]): The type of the exception
-            exc_val (Optional[Exception]): The exception value
-            exc_tb (Optional[type]): The traceback
-        """
-        return self.__exit__(exc_type, exc_val, exc_tb)

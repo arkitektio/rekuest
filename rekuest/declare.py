@@ -1,15 +1,26 @@
-"""Register a function or actor with the definition registry."""
+"""Declared protocols: what an app demands of *other* apps.
+
+A protocol class describes a remote agent by its public methods (action
+demands) and its public annotated attributes (state demands, each annotated
+with a class whose annotations are the state's fields). It is declared on an
+app -- ``@app.declare(app="lab")`` -- and its ports are built then and there,
+against that app's structure registry. Nothing is written on the
+class: the app's :class:`~rekuest.structures.registry.StructureRegistry` keeps
+the :class:`DeclaredAgentProtocol` under the class, so one class can be declared
+on any number of apps, each building its own ports.
+"""
 
 from typing import (
     Any,
+    ClassVar,
     Generic,
     ParamSpec,
     TypeVar,
-    overload,
+    get_origin,
     get_type_hints,
 )
-from collections.abc import Callable
 from rekuest.api.schema import (
+    DefinitionInput,
     ReturnPortInput,
     StateDependencyInput,
 )
@@ -20,15 +31,18 @@ from rekuest.definition.dependencies import (
 from rekuest.definition.demands import (
     ActionDemandOverride,
     StateDemandOverride,
+    demand,
+    demand_state,
     get_action_demand_override,
     get_state_demand_override,
     unwrap_annotated,
 )
 from rekuest.definition.define import prepare_definition
+from rekuest.definition.errors import DefinitionError
+from rekuest.structures.registry import StructureRegistry
 from rekuest.definition.define import convert_object_to_returnport
 from rekuest.definition.utils import interface_name
 from rekuest.protocols import AnyFunction
-from rekuest.structures.default import get_default_structure_registry
 from rekuest.api.schema import (
     ActionDependencyInput,
     AgentDependencyInput,
@@ -42,35 +56,44 @@ R = TypeVar("R")
 
 
 class DeclaredAgentAction(Generic[P, R]):
-    """A wrapped function that calls the actor's implementation."""
+    """One public method of a declared protocol: an action demanded of the remote agent."""
 
     def __init__(
         self,
         func: AnyFunction,
         agent_interface: str,
         key: str,
+        structure_registry: StructureRegistry,
         app: str | None = None,
     ) -> None:
-        """Initialize the wrapped function."""
+        """Build the demand, its definition included.
+
+        Args:
+            func: The protocol method.
+            agent_interface: The interface of the protocol it belongs to.
+            key: The method's name on the protocol.
+            structure_registry: The declaring app's structures, which the
+                definition's ports are built against.
+            app: The remote app the demand is directed at, if any.
+        """
         self.func = func
         self.agent_interface = agent_interface
         self.key = key
         self.app = app
         self.override: ActionDemandOverride | None = get_action_demand_override(func)
-        self.definition = prepare_definition(
-            func,
-            omitfirst=1,  # Omit the first parameter, which is usually `self` in agent protocols
-            structure_registry=get_default_structure_registry(),
-        )
         self.is_async = inspect.iscoroutinefunction(func)
         self.interface = func.__name__
+        self.definition: DefinitionInput = prepare_definition(
+            func,
+            omitfirst=1,  # the protocol's `self`
+            structure_registry=structure_registry,
+        )
 
     def to_dependency_input(self) -> ActionDependencyInput:
-        """Convert the wrapped function to a DependencyInput.
+        """The demand as the server takes it.
 
-        By default the demanded action inherits its ``app`` from the protocol's
-        core app and its ``key`` from the method name. A :func:`demand` override
-        on the method redirects it to another action instead.
+        By default it inherits its ``app`` from the protocol and its ``key`` from
+        the method name; a :func:`demand` override on the method redirects it.
         """
         override = self.override
         return build_action_dependency_input(
@@ -94,17 +117,28 @@ class DeclaredAgentAction(Generic[P, R]):
 
 
 class DeclaredAgentState:
-    """A wrapped function that calls the actor's implementation."""
+    """One annotated attribute of a declared protocol: a state demanded of the remote agent."""
 
     def __init__(
         self,
         stateclass: type,
         agent_interface: str,
         key: str,
+        structure_registry: StructureRegistry,
         app: str | None = None,
         override: "StateDemandOverride | None" = None,
     ) -> None:
-        """Initialize the wrapped function."""
+        """Build the demand, its definition included.
+
+        Args:
+            stateclass: The state's shape: a class whose annotations are its fields.
+            agent_interface: The interface of the protocol it belongs to.
+            key: The attribute's name on the protocol.
+            structure_registry: The declaring app's structures, which the
+                definition's ports are built against.
+            app: The remote app the demand is directed at, if any.
+            override: A :func:`demand_state` marker found on the annotation.
+        """
         self.func = stateclass
         self.agent_interface = agent_interface
         self.key = key
@@ -113,14 +147,15 @@ class DeclaredAgentState:
         self.override: StateDemandOverride | None = (
             override if override is not None else get_state_demand_override(stateclass)
         )
-        self.definition = inspect_declared_state(stateclass)
+        self.definition: StateDefinitionInput = inspect_declared_state(
+            stateclass, structure_registry
+        )
 
     def to_dependency_input(self) -> StateDependencyInput:
-        """Convert the wrapped function to a DependencyInput.
+        """The demand as the server takes it.
 
-        By default the demanded state inherits its ``app`` from the protocol's
-        core app and its ``key`` from the attribute name. A :func:`demand_state`
-        marker on the annotation redirects it to another state instead.
+        By default it inherits its ``app`` from the protocol and its ``key`` from
+        the attribute name; a :func:`demand_state` marker redirects it.
         """
         override = self.override
         return build_state_dependency_input(
@@ -145,42 +180,9 @@ Agent = TypeVar("Agent")
 T = TypeVar("T")
 
 
-def declare_state(cls: type[T]) -> type[T]:
-    """Mark a class as a declared state dependency.
-
-    Declared states are lightweight protocol-style classes used by
-    :func:`declare` to describe remote state dependencies. The decorator
-    sets marker attributes on the class and preserves the class unchanged.
-
-    Args:
-        cls: Class describing the exposed state fields through type annotations.
-
-    Returns:
-        The same class, annotated with rekuest state metadata.
-
-    Examples:
-        Declare a state shape for a protocol dependency::
-
-            @declare_state
-            class CameraState:
-                connected: bool
-                exposure_ms: float
-    """
-    state_cls = cls[0] if isinstance(cls, tuple) else cls
-    setattr(state_cls, "__is_state__", True)
-    if getattr(state_cls, "__rekuest_state__", None) is None:
-        setattr(state_cls, "__rekuest_state__", state_cls.__name__)
-    return state_cls
-
-
-def state_dep_like(cls: type[Any]) -> bool:
-    if isinstance(cls, type) and getattr(cls, "__is_state__", None):
-        return True
-    return False
-
-
-def inspect_declared_state(stateclass: type[Any]) -> StateDefinitionInput:
-    structure_registry = get_default_structure_registry()
+def inspect_declared_state(
+    stateclass: type[Any], structure_registry: StructureRegistry
+) -> StateDefinitionInput:
     type_hints = get_type_hints(stateclass, include_extras=True)
     ports: list[ReturnPortInput] = []
 
@@ -196,16 +198,23 @@ def inspect_declared_state(stateclass: type[Any]) -> StateDefinitionInput:
 
     return StateDefinitionInput(
         ports=tuple(ports),
-        name=getattr(stateclass, "__rekuest_state__", stateclass.__name__),
+        name=stateclass.__name__,
     )
 
 
 class DeclaredAgentProtocol(Generic[Agent]):
-    """A wrapped function that calls the actor's implementation."""
+    """A protocol class as one app declared it: its demands, ports built.
+
+    Made by :meth:`AppRegistry.declare <rekuest.app.AppRegistry.declare>` and kept
+    by the app's structure registry under the class. An action parameter
+    annotated with the class is handed a proxy that calls the remote agent; a
+    blok names it under a key in ``dependencies``.
+    """
 
     def __init__(
         self,
         func: type[Agent],
+        structure_registry: StructureRegistry,
         app: str | None = None,
         min: int | None = None,
         max: int | None = None,
@@ -214,7 +223,20 @@ class DeclaredAgentProtocol(Generic[Agent]):
         description: str | None = None,
         allow_inactive: bool = True,
     ) -> None:
-        """Initialize the wrapped function."""
+        """Inspect the class and build every demand against ``structure_registry``.
+
+        Args:
+            func: The protocol class.
+            structure_registry: The declaring app's structures.
+            app: The remote app the protocol is directed at, if any.
+            min: Minimum viable number of matching agents.
+            max: Maximum viable number of matching agents.
+            version: The protocol's version.
+            auto_resolvable: Whether any matching agent may be assigned
+                automatically.
+            description: What the protocol is for. Defaults to the class docstring.
+            allow_inactive: Whether an inactive agent may satisfy it.
+        """
         self.func = func
         self.app = app
         self.description = description or func.__doc__
@@ -229,31 +251,44 @@ class DeclaredAgentProtocol(Generic[Agent]):
 
         type_hints = get_type_hints(func, include_extras=True)
 
+        # Every public annotated attribute is a state demand: nothing marks a
+        # state shape, so the annotation has to be a class of its own.
         for dependency_key, annotation in type_hints.items():
-            if dependency_key.startswith("_"):
+            if dependency_key.startswith("_") or get_origin(annotation) is ClassVar:
                 continue
 
             state_cls = unwrap_annotated(annotation)
-            if state_dep_like(state_cls):
-                state = DeclaredAgentState(
-                    state_cls,
-                    self.interface,
-                    key=dependency_key,
-                    app=self.app,
-                    override=get_state_demand_override(annotation),
+            if not (inspect.isclass(state_cls) and state_cls.__module__ != "builtins"):
+                raise DefinitionError(
+                    f"{func.__qualname__}.{dependency_key} is annotated "
+                    f"{annotation!r}, which is not a state shape. A protocol's public "
+                    "annotated attributes are the states it demands of the remote "
+                    "agent: annotate one with a class whose annotations are the "
+                    "state's fields, prefix it with `_` to keep it private, or make "
+                    "it a method."
                 )
-                self.states[dependency_key] = state
+            self.states[dependency_key] = DeclaredAgentState(
+                state_cls,
+                self.interface,
+                key=dependency_key,
+                structure_registry=structure_registry,
+                app=self.app,
+                override=get_state_demand_override(annotation),
+            )
 
         for dependeny_key, method in inspect.getmembers(func):
             if not dependeny_key.startswith("_") and callable(method):
                 action: DeclaredAgentAction[Any, Any] = DeclaredAgentAction(
-                    method, self.interface, key=dependeny_key, app=self.app
+                    method,
+                    self.interface,
+                    key=dependeny_key,
+                    structure_registry=structure_registry,
+                    app=self.app,
                 )
                 self.actions[dependeny_key] = action
 
-    # Add some kwargs because we might overwrite them when looking at the params of the function annotations
     def to_dependency_input(self, key: str) -> AgentDependencyInput:
-        """Convert the wrapped function to a DependencyInput."""
+        """This protocol as a dependency under ``key``, as the server takes it."""
         return AgentDependencyInput(
             key=key,
             app=self.app,
@@ -272,88 +307,12 @@ class DeclaredAgentProtocol(Generic[Agent]):
         )
 
 
-T = TypeVar("T", bound=object)
-
-
-def declare(
-    app: str | None = None,
-    auto_resolvable: bool = False,
-    min: int | None = None,
-    max: int | None = None,
-    version: str | None = None,
-) -> Callable[[type[T]], type[T]]:
-    """Declare a protocol that describes a remote agent dependency.
-
-    The decorated class is inspected in two passes:
-
-    - public methods become action demands
-    - annotated attributes marked with :func:`declare_state` become state demands
-
-    The resulting metadata is stored on the class as
-    ``__rekuest__dependency__`` together with a ``to_dependency`` helper so the
-    protocol can be serialized into an :class:`AgentDependencyInput` later.
-
-    Args:
-        app: Optional application namespace for dependency resolution.
-        auto_resolvable: Whether any matching available agent may be assigned
-            automatically.
-        min: Minimum viable number of matching agents.
-        max: Maximum viable number of matching agents.
-        version: Optional protocol version string.
-
-    Returns:
-        A class decorator that attaches the inspected dependency metadata.
-
-    Examples:
-        Declare a protocol with action and state requirements::
-
-            @declare_state
-            class CameraState:
-                connected: bool
-
-            @declare(app="lab")
-            class CameraProtocol:
-                state: CameraState
-
-                async def snap(self, exposure_ms: float) -> bytes:
-                    ...
-    """
-
-    def real_decorator(
-        func: type[T],
-    ) -> type[T]:  # type: ignore[valid-type]
-        the_class = func
-        protocol = DeclaredAgentProtocol(
-            func=the_class,
-            app=app,
-            auto_resolvable=auto_resolvable,
-            min=min,
-            max=max,
-            version=version,
-        )
-        setattr(the_class, "__rekuest__dependency__", protocol)
-        setattr(the_class, "to_dependency", protocol.to_dependency_input)
-        return the_class
-
-    return real_decorator
-
-
-@overload
-def state_protocol(cls: type[T], /) -> type[T]: ...
-
-
-@overload
-def state_protocol() -> Callable[[type[T]], type[T]]: ...
-
-
-def state_protocol(*cls: type[T]) -> type[T] | Callable[[type[T]], type[T]]:
-    """Declare a state protocol; usable bare or with parentheses.
-
-    Alias of :func:`declare_state`. The class is returned unmodified apart from
-    the rekuest state markers.
-    """
-    if len(cls) == 1:
-        return declare_state(cls[0])
-    if len(cls) == 0:
-        return declare_state
-    raise ValueError("You can only declare one state protocol at a time.")
+__all__ = [
+    "ActionDemandOverride",
+    "DeclaredAgentAction",
+    "DeclaredAgentProtocol",
+    "DeclaredAgentState",
+    "StateDemandOverride",
+    "demand",
+    "demand_state",
+]

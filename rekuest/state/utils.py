@@ -4,6 +4,7 @@ from rekuest.actors.types import (
     AnyFunction,
     PreparedAppContextReturns,
     PreparedAppContextVariables,
+    PreparedInjectedVariables,
     PreparedStateReturns,
     PreparedStateVariables,
 )
@@ -20,8 +21,13 @@ from rekuest.state.predicate import (
     get_read_only_state_type,
     is_state,
 )
-from typing import get_type_hints
+from rekuest.agents.types import unwrap_injectable
+from rekuest.task import is_task
+from typing import TYPE_CHECKING, Any, get_type_hints
 import inspect
+
+if TYPE_CHECKING:
+    from rekuest.structures.registry import StructureRegistry
 
 
 def is_empty_type(cls: type) -> bool:
@@ -56,16 +62,20 @@ def get_return_length(signature: inspect.Signature) -> int:
 
 
 def prepare_state_variables(
-    function: AnyFunction,
+    function: AnyFunction, structure_registry: "StructureRegistry | None" = None
 ) -> tuple[PreparedStateVariables, PreparedStateReturns]:
-    """Prepare the state variables for the function.
+    """Find the parameters and returns of ``function`` that are states of the app.
+
+    A parameter is a state when its annotation is a class registered as one on
+    ``structure_registry`` (``ReadOnly[...]`` for a read-only view); without a
+    registry no parameter is.
 
     Args:
-        function (Callable): The function to prepare the state variables for.
+        function: The function to inspect.
+        structure_registry: The app's structures, which know its states.
 
     Returns:
-        Tuple[PreparedStateVariables, PreparedStateReturns]: The state variables and state returns for the function.
-
+        The state variables (with the locks each requires) and the state returns.
     """
     sig = inspect.signature(function)
     parameters = sig.parameters
@@ -82,24 +92,28 @@ def prepare_state_variables(
 
     for key, value in parameters.items():
         annotation = hints.get(key, value.annotation)
-        if is_state(annotation):
-            write_state_variables[key] = get_state_name(annotation)
-            required_state_locks[key] = get_state_locks(annotation)
-        elif is_read_only_state(annotation):
+        if is_state(annotation, structure_registry):
+            assert structure_registry is not None
+            write_state_variables[key] = get_state_name(annotation, structure_registry)
+            required_state_locks[key] = get_state_locks(annotation, structure_registry)
+        elif is_read_only_state(annotation, structure_registry):
+            assert structure_registry is not None
             # ReadOnly[SomeState] is an Annotated wrapper, so the state itself has to be
             # unwrapped before its name and locks can be read off it.
             real_state = get_read_only_state_type(annotation)
-            read_only_variables[key] = get_state_name(real_state)
-            required_state_locks[key] = get_state_locks(real_state)
+            read_only_variables[key] = get_state_name(real_state, structure_registry)
+            required_state_locks[key] = get_state_locks(real_state, structure_registry)
 
     returns = hints.get("return", sig.return_annotation)
     if is_tuple(returns):
         for index, cls in enumerate(get_non_null_variants(returns)):
-            if is_state(cls):
-                state_returns[index] = get_state_name(cls)
+            if is_state(cls, structure_registry):
+                assert structure_registry is not None
+                state_returns[index] = get_state_name(cls, structure_registry)
     else:
-        if is_state(returns):
-            state_returns[0] = get_state_name(returns)
+        if is_state(returns, structure_registry):
+            assert structure_registry is not None
+            state_returns[0] = get_state_name(returns, structure_registry)
 
     return PreparedStateVariables(
         write_state_variables=write_state_variables,
@@ -109,16 +123,19 @@ def prepare_state_variables(
 
 
 def prepare_appcontext(
-    function: AnyFunction,
+    function: AnyFunction, structure_registry: "StructureRegistry | None" = None
 ) -> tuple[PreparedAppContextVariables, PreparedAppContextReturns]:
-    """Prepare the state variables for the function.
+    """The parameters and returns of ``function`` that are the app context.
+
+    A parameter is one when its annotation is a class the app declared with
+    ``@app.app_context`` on ``structure_registry``; without a registry none is.
 
     Args:
-        function (Callable): The function to prepare the state variables for.
+        function: The function to inspect.
+        structure_registry: The app's structures, which hold the declaration.
 
     Returns:
-        Tuple[PreparedStateVariables, PreparedStateReturns]: The state variables and state returns for the function.
-
+        The app-context parameters and returns, each with its class.
     """
     sig = inspect.signature(function)
     parameters = sig.parameters
@@ -128,24 +145,63 @@ def prepare_appcontext(
     except Exception:
         hints = {}
 
-    write_app_context_variables: dict[str, str] = {}
+    write_app_context_variables: dict[str, type[Any]] = {}
     for key, value in parameters.items():
         annotation = hints.get(key, value.annotation)
-        if is_app_context(annotation):
-            write_app_context_variables[key] = annotation.__rekuest_app_context__
+        if is_app_context(annotation, structure_registry):
+            write_app_context_variables[key] = annotation
 
     returns = hints.get("return", sig.return_annotation)
 
-    app_context_returns: dict[int, str] = {}
+    app_context_returns: dict[int, type[Any]] = {}
 
     if is_tuple(returns):
         for index, cls in enumerate(get_non_null_variants(returns)):
-            if is_app_context(cls):
-                app_context_returns[index] = cls.__rekuest_app_context__
+            if is_app_context(cls, structure_registry):
+                app_context_returns[index] = cls
     else:
-        if is_app_context(returns):
-            app_context_returns[0] = returns.__rekuest_app_context__
+        if is_app_context(returns, structure_registry):
+            app_context_returns[0] = returns
 
     return PreparedAppContextVariables(
         app_context_variables=write_app_context_variables,
     ), PreparedAppContextReturns(app_context_returns=app_context_returns)
+
+
+def prepare_injected_variables(
+    function: AnyFunction, structure_registry: "StructureRegistry | None" = None
+) -> PreparedInjectedVariables:
+    """Find the parameters of a function that ask for a client (``mikro: Mikro``),
+    for the task it runs for, or for the app context the run was started with.
+
+    A parameter asks for a client when its annotation is what a service registered
+    on ``structure_registry`` returns, and for the app context when it is the class
+    the app declared as such; without a registry neither is. Hooks read the app
+    context through :func:`prepare_appcontext`; this is the action's side of it.
+    """
+    sig = inspect.signature(function)
+
+    try:
+        hints = get_type_hints(function, include_extras=True)
+    except Exception:
+        hints = {}
+
+    annotations = {
+        key: hints.get(key, value.annotation) for key, value in sig.parameters.items()
+    }
+
+    return PreparedInjectedVariables(
+        service_client_variables={
+            key: unwrap_injectable(annotation)
+            for key, annotation in annotations.items()
+            if structure_registry is not None and structure_registry.is_client(annotation)
+        },
+        task_variables=[
+            key for key, annotation in annotations.items() if is_task(annotation)
+        ],
+        app_context_variables={
+            key: annotation
+            for key, annotation in annotations.items()
+            if is_app_context(annotation, structure_registry)
+        },
+    )

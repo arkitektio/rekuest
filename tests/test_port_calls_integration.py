@@ -22,16 +22,11 @@ from rekuest.api.schema import (
     ImplementationInput,
     UtilCallInput,
     ValidatorInput,
-    abase_catalog,
-    aimplement_agent,
-    amy_implementation_at,
-    aregister_ui_catalog,
 )
 from rekuest.blok.parser import parse_util_call
 from rekuest.definition.define import prepare_definition
 from rekuest.definition.errors import DefinitionError
 from rekuest.definition.define import prepare_definition
-from rekuest.remote import acall
 from rekuest.widgets import withEffect, withValidator
 
 from .conftest import CONNECT_TIMEOUT, build_fresh_rekuest
@@ -120,7 +115,7 @@ async def test_port_calls_round_trip(deployment: Deployment) -> None:
     app.register(offset)
 
     async def body(app):  # noqa: ANN001, ANN202
-        impl = await amy_implementation_at("crop", rath=app.rath)
+        impl = await app.amy_implementation_at("crop")
         start, stop, note = impl.action.args
 
         (validator,) = start.validators
@@ -166,11 +161,11 @@ async def test_port_calls_round_trip(deployment: Deployment) -> None:
         # keyed that way -- in ``offset``'s validator ``value`` is n's own value.
         # The server rejects such an implementation; we reject it while defining
         # so it fails locally instead of at registration.
-        impl = await amy_implementation_at("offset", rath=app.rath)
+        impl = await app.amy_implementation_at("offset")
         base_port, n_port = impl.action.args
         assert base_port.key == "base"
         assert n_port.validators[0].dependencies == ()
-        assert await acall(impl, postman=app.postman, structure_registry=app.structure_registry, base=2, n=3) == 5
+        assert await app.acall(impl, base=2, n=3) == 5
 
         with pytest.raises(DefinitionError, match="reserved key"):
             prepare_definition(
@@ -179,8 +174,8 @@ async def test_port_calls_round_trip(deployment: Deployment) -> None:
             )
 
         # the function itself is unaffected
-        impl = await amy_implementation_at("crop", rath=app.rath)
-        assert await acall(impl, postman=app.postman, structure_registry=app.structure_registry, start=2, stop=5) == 3
+        impl = await app.amy_implementation_at("crop")
+        assert await app.acall(impl, start=2, stop=5) == 3
 
     await _run(app, body)
 
@@ -258,11 +253,10 @@ async def test_server_enforces_call_rules_independently(
 
     async def body(app):  # noqa: ANN001, ANN202
         definition = _bypass_definition(app.structure_registry, validator)
-        coro = aimplement_agent(
+        coro = app.aimplement_agent(
             name=app.agent.name,
             implementations=[ImplementationInput(definition=definition, interface="bypass")],
             hash="bypass",
-            rath=app.rath,
         )
         if message is None:
             await coro
@@ -280,20 +274,19 @@ async def test_catalog_validation_at_registration(deployment: Deployment) -> Non
     app = build_fresh_rekuest(deployment, token="atest_token")
 
     async def body(app):  # noqa: ANN001, ANN202
-        base = await abase_catalog(rath=app.rath)
+        base = await app.abase_catalog()
         assert base.name == "base" and base.version == 1
         assert [a.key for a in next(op for op in base.operations if op.name == "gt").arguments] == ["a", "b"]
 
         with pytest.raises(Exception, match="cannot redefine base operations"):
-            await aregister_ui_catalog(
+            await app.aregister_ui_catalog(
                 name="port-call-tests",
                 components=[],
                 widget_defaults=[],
                 operations=[CatalogOperationInput(name="gt", returns=CatalogValueKind.BOOL, arguments=[])],
-                rath=app.rath,
             )
 
-        catalog = await aregister_ui_catalog(
+        catalog = await app.aregister_ui_catalog(
             name="port-call-tests",
             components=[],
                 widget_defaults=[],
@@ -308,7 +301,6 @@ async def test_catalog_validation_at_registration(deployment: Deployment) -> Non
                     ],
                 )
             ],
-            rath=app.rath,
         )
         assert catalog.is_registered
         assert [op.name for op in catalog.operations] == ["clamp"]
@@ -357,7 +349,7 @@ async def test_catalog_validation_at_registration(deployment: Deployment) -> Non
         return n
 
     async def registered_ok(app, interface):  # noqa: ANN001, ANN202
-        impl = await amy_implementation_at(interface, rath=app.rath)
+        impl = await app.amy_implementation_at(interface)
         assert impl.diagnostics == ()
         if interface == "arithmetic":
             (validator,) = impl.action.args[1].validators
@@ -375,7 +367,7 @@ async def test_catalog_validation_at_registration(deployment: Deployment) -> Non
 
     await _run(
         build_fresh_rekuest(deployment, token="atest_token"),
-        lambda app: aregister_ui_catalog(
+        lambda app: app.aregister_ui_catalog(
             name="port-call-tests-2",
             components=[],
                 widget_defaults=[],
@@ -386,7 +378,6 @@ async def test_catalog_validation_at_registration(deployment: Deployment) -> Non
                     arguments=[CatalogArgumentInput(key="a", kind=CatalogValueKind.ANY), CatalogArgumentInput(key="b", kind=CatalogValueKind.ANY)],
                 )
             ],
-            rath=app.rath,
         ),
     )
 
@@ -413,7 +404,7 @@ async def test_catalog_validation_at_registration(deployment: Deployment) -> Non
         warned.register(unknown, catalogs=catalog_names)
 
         async def check(app, expected=codes):  # noqa: ANN001, ANN202
-            impl = await amy_implementation_at("unknown", rath=app.rath)
+            impl = await app.amy_implementation_at("unknown")
             assert [d.code for d in impl.diagnostics] == expected
             assert "'fizz'" in impl.diagnostics[0].message
 

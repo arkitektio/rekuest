@@ -62,3 +62,9 @@ class StructureDefinitionError(StructureRegistryError):
     """Raised when a structure was never defined in the registry"""
 
     pass
+
+
+class StructureClientError(StructureRegistryError):
+    """A structure expanded by a client has no client to expand with."""
+
+    pass

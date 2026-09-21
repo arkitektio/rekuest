@@ -10,6 +10,7 @@ from typing import (
     Literal,
 )
 from collections.abc import Awaitable
+from rekuest.agents.types import BoundApp
 from rekuest import messages
 from rekuest.actors.policy import KEEP, DisconnectPolicy
 from rekuest.agents.context import PreparedContextReturns, PreparedContextVariables
@@ -32,7 +33,7 @@ from rekuest.definition.define import (
     ReturnWidgetMap,
 )
 from collections.abc import Sequence, Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 if TYPE_CHECKING:
@@ -72,12 +73,38 @@ class PreparedStateVariables:
 
 @dataclass
 class PreparedAppContextVariables:
-    app_context_variables: dict[str, str]
+    app_context_variables: dict[str, type[Any]]
+    """The app-context class each parameter asks for, by parameter name."""
 
     @property
     def count(self) -> int:
         """Get the amount of state variables."""
         return len(self.app_context_variables)
+
+
+@dataclass
+class PreparedInjectedVariables:
+    """The parameters of a function that are injected rather than ports.
+
+    ``service_client_variables`` map a parameter to the client class it receives
+    from the app the agent is bound to (``mikro: Mikro``); ``task_variables``
+    receive the :class:`rekuest.task.Task` being run; ``app_context_variables``
+    receive the app context the run started the agent with, keyed by the class
+    the app declared.
+    """
+
+    service_client_variables: dict[str, type] = field(default_factory=dict)
+    task_variables: list[str] = field(default_factory=list)
+    app_context_variables: dict[str, type] = field(default_factory=dict)
+
+    @property
+    def count(self) -> int:
+        """Get the amount of injected variables."""
+        return (
+            len(self.service_client_variables)
+            + len(self.task_variables)
+            + len(self.app_context_variables)
+        )
 
 
 @dataclass
@@ -97,7 +124,8 @@ class PreparedStateReturns:
 
 @dataclass
 class PreparedAppContextReturns:
-    app_context_returns: dict[int, str]
+    app_context_returns: dict[int, type[Any]]
+    """The app-context class each return position publishes, by index."""
 
     @property
     def count(self) -> int:
@@ -115,6 +143,26 @@ class ImplementationDetails:
     locks: list[str] | None = None
     tracks: list["TrackInput"] | None = None
     manipulates: list[str] | None = None
+    injected_variables: PreparedInjectedVariables = field(
+        default_factory=PreparedInjectedVariables
+    )
+
+    def actor_kwargs(self) -> dict[str, Any]:
+        """Everything derived from the function that its actor is built with.
+
+        Every actifier passes this whole, so a new kind of injected parameter
+        reaches every actor: hand-listing the fields is how the Qt builder and
+        fluss's flow actifier each silently dropped the injected variables.
+        """
+        return {
+            "state_variables": self.state_variables,
+            "state_returns": self.state_returns,
+            "context_variables": self.context_variables,
+            "context_returns": self.context_returns,
+            "dependency_variables": self.dependency_variables,
+            "injected_variables": self.injected_variables,
+            "locks": self.locks,
+        }
 
 
 @runtime_checkable
@@ -181,7 +229,7 @@ class ActorContext(Shelver, LockHost, Capturable, Protocol):
 
     @property
     def caller_postman(self) -> Postman:
-        """The agent-as-caller postman, bound as ``current_postman`` while an actor runs.
+        """The agent-as-caller postman: a per-task ``Rekuest`` view calls through it.
 
         Declared as a property, not an attribute: implementations build it lazily, and a
         mutable protocol attribute is invariant, so a read-only property would not satisfy it.
@@ -197,12 +245,20 @@ class ActorContext(Shelver, LockHost, Capturable, Protocol):
         read-only is declarative, not enforced."""
         ...
 
-    async def aget_write_proxy(self, key: str) -> AnyState:  # noqa: ANN401
-        """Get a state an actor writes to."""
+    async def aget_write_proxy(self, key: str, mutation: Any = None) -> AnyState:  # noqa: ANN401
+        """Get a state an actor writes to, as a view for ``mutation`` (a task's)."""
         ...
 
     async def aget_context(self, context: str) -> Any:  # noqa: ANN401
         """Get a context value registered with ``@context``."""
+        ...
+
+    async def aget_bound_app(self) -> BoundApp | None:
+        """Get the app this agent is bound to, or ``None`` when it runs on its own.
+
+        It answers ``get(cls)`` with the app's clients, which an actor injects
+        into parameters annotated with a client class.
+        """
         ...
 
     def publish_patch(self, interface: str, patch: Patch) -> None:
@@ -214,7 +270,7 @@ class ActorContext(Shelver, LockHost, Capturable, Protocol):
 class AgentLifecycle(Protocol):
     """Driving the agent itself — what the composition root uses, not what actors use.
 
-    Called only from :class:`~rekuest.rekuest.RekuestNext` and the FastAPI routes.
+    Called only from :class:`~rekuest.rekuest.Rekuest` and the FastAPI routes.
     """
 
     force: bool | None

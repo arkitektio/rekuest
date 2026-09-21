@@ -5,7 +5,6 @@ import pytest
 
 from rekuest.api.schema import ArgPortInput, PortKind
 from rekuest.definition.define import prepare_definition
-from rekuest.structures.model import model
 from rekuest.structures.registry import StructureRegistry
 from rekuest.structures.serialization.postman import ashrink_args
 from rekuest.structures.serialization.predication import predicate_port
@@ -25,9 +24,8 @@ def test_list_port_predicates_lists_not_dicts() -> None:
     assert predicate_port(port, ["a"], registry) is False
 
 
-@model
 class Point:
-    """A registered model."""
+    """A model, declared on the registry each test builds."""
 
     x: int
     y: int
@@ -47,6 +45,7 @@ def list_or_str(item: list[int] | str) -> int:
 async def test_union_shrink_selects_model_branch() -> None:
     """A model item passed to a ``Model | int`` union picks the model branch."""
     registry = StructureRegistry()
+    registry.model(Point)
     definition = prepare_definition(point_or_int, structure_registry=registry)
 
     shrunk = await ashrink_args(
@@ -63,6 +62,7 @@ async def test_union_shrink_selects_model_branch() -> None:
 async def test_union_shrink_selects_list_branch() -> None:
     """A list item passed to a ``List[int] | str`` union picks the list branch."""
     registry = StructureRegistry()
+    registry.model(Point)
     definition = prepare_definition(list_or_str, structure_registry=registry)
 
     shrunk = await ashrink_args(definition, ([1, 2],), {}, structure_registry=registry)

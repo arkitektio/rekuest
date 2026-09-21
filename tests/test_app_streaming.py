@@ -1,6 +1,6 @@
 """Integration tests for streaming (generator) actions.
 
-Each test stands up its own ``RekuestNext`` with a fresh ``AppRegistry``
+Each test stands up its own ``Rekuest`` with a fresh ``AppRegistry``
 (via :func:`build_fresh_rekuest`) against the shared deployment, registers a
 generator function, runs the agent, and consumes the yields with ``aiterate``.
 This exercises the per-yield shrink → YieldEvent pipeline of the generator
@@ -14,8 +14,6 @@ from collections.abc import AsyncGenerator, Generator
 import pytest
 from dokker import Deployment
 
-from rekuest.api.schema import amy_implementation_at
-from rekuest.remote import aiterate
 
 from .conftest import CONNECT_TIMEOUT, build_fresh_rekuest
 
@@ -37,9 +35,9 @@ async def test_iterate_sync_generator_action(deployment: Deployment) -> None:
         await app.aconnect(timeout=CONNECT_TIMEOUT)
         task = asyncio.create_task(app.aloop())
 
-        impl = await amy_implementation_at("count_up")
+        impl = await app.amy_implementation_at("count_up")
 
-        received = [value async for value in aiterate(impl, until=3)]
+        received = [value async for value in app.aiterate(impl, until=3)]
         assert received == [0, 1, 2], f"Expected streamed [0, 1, 2], got {received}"
 
         task.cancel()
@@ -67,9 +65,9 @@ async def test_iterate_async_generator_action(deployment: Deployment) -> None:
         await app.aconnect(timeout=CONNECT_TIMEOUT)
         task = asyncio.create_task(app.aloop())
 
-        impl = await amy_implementation_at("spell_out")
+        impl = await app.amy_implementation_at("spell_out")
 
-        received = [value async for value in aiterate(impl, word="abc")]
+        received = [value async for value in app.aiterate(impl, word="abc")]
         assert received == ["a", "b", "c"], f"Expected ['a', 'b', 'c'], got {received}"
 
         task.cancel()

@@ -18,18 +18,18 @@ from rekuest.traits.calls import resolve_base_arguments
 
 
 class BlokParser:
-    """Parses XML/JSX string representations enforcing strict namespace paths and collections."""
+    """Parses XML/BSX string representations enforcing strict namespace paths and collections."""
 
     @classmethod
-    def parse(cls, jsx_string: str) -> ComponentNodeInput:
+    def parse(cls, bsx_string: str) -> ComponentNodeInput:
         try:
-            root_element = ET.fromstring(jsx_string)
+            root_element = ET.fromstring(bsx_string)
         except ET.ParseError as e:
-            raise ValueError(cls._format_xml_parse_error(jsx_string, e)) from e
+            raise ValueError(cls._format_xml_parse_error(bsx_string, e)) from e
         return cls._parse_element(root_element, root_element.tag)
 
     @staticmethod
-    def _format_xml_parse_error(jsx_string: str, error: ET.ParseError) -> str:
+    def _format_xml_parse_error(bsx_string: str, error: ET.ParseError) -> str:
         reason = str(error)
         line: int | None = None
         column: int | None = None
@@ -38,7 +38,7 @@ class BlokParser:
             line, column = error.position
 
         if line is None or column is None:
-            return f"Failed to parse JSX/XML: {reason}"
+            return f"Failed to parse BSX/XML: {reason}"
 
         if ": line " in reason:
             reason = reason.split(": line ", 1)[0]
@@ -50,8 +50,8 @@ class BlokParser:
                 "Check for a missing closing tag before this point"
             )
 
-        source_lines = jsx_string.splitlines()
-        if jsx_string.endswith(("\n", "\r")):
+        source_lines = bsx_string.splitlines()
+        if bsx_string.endswith(("\n", "\r")):
             source_lines.append("")
 
         snippet = ""
@@ -80,7 +80,7 @@ class BlokParser:
             snippet = "\n" + "\n".join(context_lines)
 
         return (
-            f"Failed to parse JSX/XML at line {line}, column {column + 1}: {headline_reason}"
+            f"Failed to parse BSX/XML at line {line}, column {column + 1}: {headline_reason}"
             f"{snippet}"
         )
 
@@ -657,8 +657,8 @@ def coerce_util_call(call: "str | UtilCallInput") -> UtilCallInput:
 
 
 
-def jsx(string: str) -> ComponentNodeInput:
-    """Parse a JSX/XML blok string into a component tree.
+def bsx(string: str) -> ComponentNodeInput:
+    """Parse a BSX/XML blok string into a component tree.
 
     The helper delegates to :class:`BlokParser` and raises a formatted
     :class:`ValueError` when XML parsing fails. Error messages include line and
@@ -669,7 +669,7 @@ def jsx(string: str) -> ComponentNodeInput:
     an identical tree.
 
     Args:
-        string: JSX-like XML source describing a blok component tree.
+        string: BSX-like XML source describing a blok component tree.
 
     Returns:
         Parsed component tree as a :class:`ComponentNodeInput`.
@@ -680,7 +680,7 @@ def jsx(string: str) -> ComponentNodeInput:
     Examples:
         Parse a minimal blok layout::
 
-            component = jsx('<Page><Label text="Ready" /></Page>')
+            component = bsx('<Page><Label text="Ready" /></Page>')
     """
     return BlokParser.parse(string)
 

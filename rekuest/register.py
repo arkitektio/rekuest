@@ -15,14 +15,13 @@ from collections.abc import Callable
 
 if TYPE_CHECKING:
     from rekuest.app import AppRegistry
+from rekuest.errors import NoRegistryError
 from rekuest.coercible_types import (
     OptimisticCoercible,
 )
-from rekuest.remote import acall, call
 from rekuest.actors.actify import reactify
 from rekuest.actors.policy import KEEP, DisconnectPolicy
 from rekuest.actors.types import Actifier, ActorBuilder, RegisterConfig
-from rekuest.actors.vars import get_current_task_helper
 from rekuest.definition.define import (
     dependency_to_dependency_input,
 )
@@ -30,7 +29,6 @@ from rekuest.definition.utils import interface_name
 from rekuest.definition.dependencies import build_action_dependency_input
 from rekuest.definition.hash import hash_definition
 from rekuest.protocols import AnyFunction
-from rekuest.structures.default import get_default_structure_registry
 from rekuest.structures.registry import StructureRegistry
 from rekuest.api.schema import (
     AssignWidgetInput,
@@ -38,15 +36,14 @@ from rekuest.api.schema import (
     ActionDependencyInput,
     TrackInput,
     PortGroupInput,
-    amy_implementation_at,
     EffectInput,
     ImplementationInput,
     ValidatorInput,
     AgentDependencyInput,
     OptimisticInput,
     TestTargetInput,
-    my_implementation_at,
 )
+import functools
 import logging
 
 
@@ -58,44 +55,37 @@ R = TypeVar("R")
 
 
 class WrappedFunction(Generic[P, R]):
-    """A wrapped function that calls the actor's implementation."""
+    """A registered function: still the plain function, plus what it registered as.
+
+    Calling it remotely goes through a client, which knows the app it runs in:
+    ``rekuest.call(fn, ...)`` finds its implementation there.
+    """
 
     def __init__(
         self, func: Callable[P, R], interface: str, definition: DefinitionInput
     ) -> None:
         """Initialize the wrapped function."""
+        functools.update_wrapper(self, func)  # name, doc, signature: still the function
         self.func = func
         self.interface = interface
         self.definition = definition
         self.hash = hash_definition(definition)
 
-    def call(self, *args: P.args, **kwargs: P.kwargs) -> R:
-        """ "Call the actor's implementation."""
-        helper = get_current_task_helper()
-        implementation = my_implementation_at(self.interface)
-
-        return call(
-            implementation,
-            *args,
-            parent=helper.assignment,
-            **cast("dict[str, Any]", kwargs),
-        )
-
-    async def acall(self, *args: P.args, **kwargs: P.kwargs) -> R:
-        """ "Asynchronously call the actor's implementation."""
-        helper = get_current_task_helper()
-        implementation = await amy_implementation_at(self.interface)
-
-        return await acall(
-            implementation,
-            *args,
-            parent=helper.assignment,
-            **cast("dict[str, Any]", kwargs),
-        )
-
     def __call__(self, *args: P.args, **kwargs: P.kwargs) -> R:
         """Call the actor's implementation."""
         return self.func(*args, **kwargs)
+
+    def __reduce__(self) -> str:
+        """Pickle by name, like the function it replaced at module level.
+
+        The decorated name now holds this wrapper, so pickling the inner function
+        by reference would find the wrapper there and refuse.
+
+        Returns:
+            The qualified name pickle looks the wrapper up under.
+        """
+        qualname: str = getattr(self.func, "__qualname__")
+        return qualname
 
     def to_dependency_input(self) -> ActionDependencyInput:
         """Convert the wrapped function to a DependencyInput."""
@@ -145,7 +135,9 @@ def register_func(
         key,
         dependency,
     ) in implementation_details.dependency_variables.dependency_variables.items():
-        dependencies.append(dependency_to_dependency_input(key, dependency))
+        dependencies.append(
+            dependency_to_dependency_input(key, dependency, structure_registry)
+        )
 
     optimistics: list[OptimisticInput] = [
         optimistic
@@ -283,10 +275,15 @@ def register(  # type: ignore[valid-type]
     Returns:
         The wrapped function, or a decorator producing it.
     """
-    from rekuest.app import get_default_app_registry
-
-    implementation_registry = implementation_registry or get_default_app_registry()
-    structure_registry = structure_registry or get_default_structure_registry()
+    if implementation_registry is None:
+        raise NoRegistryError.for_decorator(
+            "Registration goes",
+            "action",
+            "def my_function(...): ...",
+            "implementation_registry",
+        )
+    if structure_registry is None:
+        structure_registry = implementation_registry.structure_registry
 
     config = RegisterConfig(
         name=name,
@@ -320,11 +317,6 @@ def register(  # type: ignore[valid-type]
             config,
             actifier=actifier,
         )
-
-        target = getattr(function_or_actor, "__func__", function_or_actor)
-        setattr(target, "__definition__", definition)
-        setattr(target, "__definition_hash__", hash_definition(definition))
-        setattr(target, "__interface__", iface)
 
         return WrappedFunction(function_or_actor, iface, definition)
 

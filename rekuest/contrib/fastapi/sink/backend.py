@@ -5,16 +5,12 @@ that owns sessions. This is that difference expressed as a backend rather than a
 ``BaseAgent`` overrides.
 """
 
-from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from rekuest.contrib.fastapi.sink.protocol import StateSink
 from rekuest.protocols import AnyState
 from rekuest.scalars import Identifier
-
-if TYPE_CHECKING:
-    from rekuest.app import AppRegistry
 
 
 class SinkAgentBackend(BaseModel):
@@ -34,19 +30,6 @@ class SinkAgentBackend(BaseModel):
     @property
     def registered_agent_id(self) -> str | None:
         """The in-process agent is not assigned an id by anyone."""
-        return None
-
-    async def aensure_registered(
-        self,
-        app_registry: "AppRegistry",
-        name: str | None,
-        definition_hash: str,
-    ) -> None:
-        """Nothing to register: the definitions never leave this process.
-
-        The session created below carries them instead, so they are recorded here.
-        """
-        self.implementations = list(app_registry.implementations.values())
         return None
 
     async def acreate_session(self) -> str:

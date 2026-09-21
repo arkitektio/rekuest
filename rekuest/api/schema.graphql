@@ -308,6 +308,10 @@ input ActionFilter {
   OR: ActionFilter
   NOT: ActionFilter
   DISTINCT: Boolean
+
+  """
+  Search by name: a case-insensitive substring, or semantic similarity of the query to the action's name and description. Substring matches rank first, then by similarity; an explicit `ordering` replaces that ranking.
+  """
   search: String
   ids: [ID!]
   demands: [PortDemandInput!]
@@ -385,7 +389,7 @@ type Agent {
   """The client (app instance) this agent runs as."""
   client: Client!
 
-  """User associated with the agent."""
+  """The user this agent belongs to."""
   user: User!
 
   """The organization this agent belongs to."""
@@ -1368,9 +1372,6 @@ input ChoiceReturnWidgetInput @unionElementOf(union: "ReturnWidgetInput", discri
 type Client {
   """Unique ID of the client."""
   id: ID!
-
-  """Name of the client."""
-  name: String!
 
   """OAuth2 client ID."""
   clientId: String!
@@ -3429,7 +3430,7 @@ type Provides {
 
 input ProvidesInput {
   """
-  The key of the provision: the path into the object the constraint reads
+  The key of the provision: the descriptor name the constraint reads, matched verbatim as one flat key of the candidate object (any non-empty string, e.g. 'axes' or '@mikro/n_space_axes')
   """
   key: String!
 
@@ -3770,7 +3771,7 @@ type Requires {
 
 input RequiresInput {
   """
-  The key of the requirement: the path into the object the constraint reads
+  The key of the requirement: the descriptor name the constraint reads, matched verbatim as one flat key of the candidate object (any non-empty string, e.g. 'axes' or '@mikro/n_space_axes')
   """
   key: String!
 
@@ -4708,6 +4709,11 @@ type Task {
   """Last update timestamp."""
   updatedAt: DateTime!
 
+  """
+  Monotonic per-task version, bumped by every write. Pairs with the change feeds: discard a TaskChange whose revision is not greater than the one you hold.
+  """
+  revision: Int!
+
   """Timestamp when the task was finished."""
   finishedAt: DateTime
 
@@ -4763,6 +4769,11 @@ type TaskChange {
   createdAt: DateTime!
   updatedAt: DateTime!
   finishedAt: DateTime
+
+  """
+  Monotonic per-task version. Changes are produced by several backends and may arrive out of order: apply one only if its revision is greater than the last you applied.
+  """
+  revision: Int!
 }
 
 type TaskChangeEvent {

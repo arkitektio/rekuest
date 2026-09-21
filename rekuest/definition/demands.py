@@ -13,7 +13,6 @@ from typing import Annotated, Any, TypeVar, get_args, get_origin
 from collections.abc import Callable
 
 ACTION_DEMAND_ATTR = "__rekuest_action_demand__"
-STATE_DEMAND_ATTR = "__rekuest_state_demand__"
 
 
 @dataclass(frozen=True)
@@ -85,7 +84,7 @@ def demand(
     Examples:
         Redirect a single method to another app's action::
 
-            @declare(app="myapp")
+            @app.declare(app="myapp")
             class Deps:
                 # inherits app="myapp", key="acquire"
                 async def acquire(self, exposure: float) -> bytes: ...
@@ -148,11 +147,10 @@ def demand_state(
     """Override the state an agent-dependency protocol attribute demands.
 
     States are declared as annotated attributes rather than methods, so — unlike
-    :func:`demand` — this returns a marker to place inside :data:`typing.Annotated`
-    (it can also be attached to a state class, taking effect wherever that class
-    is used). It redirects a state demand to another state — a different ``app``
-    + ``key`` — instead of inheriting them from the protocol's core app and the
-    attribute name.
+    :func:`demand` — this returns a marker to place inside :data:`typing.Annotated`.
+    It redirects a state demand to another state — a different ``app`` + ``key``
+    — instead of inheriting them from the protocol's core app and the attribute
+    name.
 
     Args:
         app: The app that provides the demanded state. Overrides the app the
@@ -173,7 +171,7 @@ def demand_state(
     Examples:
         Redirect a state attribute to another app's state::
 
-            @declare(app="myapp")
+            @app.declare(app="myapp")
             class Deps:
                 # inherits app="myapp", key="camera"
                 camera: CameraState
@@ -201,13 +199,9 @@ def unwrap_annotated(annotation: Any) -> Any:
 
 
 def get_state_demand_override(annotation: Any) -> StateDemandOverride | None:
-    """Return the :class:`StateDemandOverride` for a state annotation, if any.
-
-    Looks first at ``Annotated[...]`` metadata on the attribute, then falls back
-    to a marker attached to the (unwrapped) state class itself.
-    """
+    """The :class:`StateDemandOverride` in a state attribute's ``Annotated[...]`` metadata, if any."""
     if get_origin(annotation) is Annotated:
         for meta in get_args(annotation)[1:]:
             if isinstance(meta, StateDemandOverride):
                 return meta
-    return getattr(unwrap_annotated(annotation), STATE_DEMAND_ATTR, None)
+    return None

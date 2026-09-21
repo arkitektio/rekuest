@@ -9,7 +9,6 @@ from rekuest.api.schema import (
     DescriptorOperator,
 )
 from rekuest.definition.define import prepare_definition
-from rekuest.structures.model import model
 from rekuest.structures.registry import StructureRegistry
 
 TiffName = Annotated[
@@ -18,12 +17,17 @@ TiffName = Annotated[
 Wide = Annotated[int, Provides(key="x", operator=DescriptorOperator.GTE, value="1")]
 
 
-@model
 class Box:
-    """A registered model."""
+    """A model, declared on the registry each test builds."""
 
     width: int
     height: int
+
+
+def registry_with_box() -> StructureRegistry:
+    registry = StructureRegistry()
+    registry.model(Box)
+    return registry
 
 
 def optional_requires(name: TiffName | None = None) -> Wide | None:
@@ -52,7 +56,7 @@ def test_optional_ports_keep_requires_and_provides() -> None:
 
 def test_model_arg_port_keeps_requires() -> None:
     definition = prepare_definition(
-        model_requires, structure_registry=StructureRegistry()
+        model_requires, structure_registry=registry_with_box()
     )
     (arg,) = definition.args
     assert arg.kind == PortKind.MODEL

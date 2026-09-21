@@ -27,12 +27,14 @@ from rekuest.api.schema import (
 from rekuest.constants import UNSET
 from rekuest.scalars import Identifier
 from rekuest.structures.errors import (
+    StructureRegistryError,
     ExpandingError,
     ShrinkingError,
     StructureExpandingError,
 )
 from rekuest.structures.quantities import expand_quantity, shrink_quantity
 from rekuest.structures.registry import StructureRegistry
+from rekuest.structures.serialization.batching import ExpandBatcher
 from rekuest.structures.serialization.context import (
     KindTable,
     SerializationContext,
@@ -79,6 +81,8 @@ async def _expand(
         shelver=ctx.require_shelver(),
         path=ctx.path,
         depth=ctx.depth,
+        # Nested ports expand in the same batches as the argument they are part of.
+        batcher=ctx.batcher,
     )
 
 
@@ -95,10 +99,10 @@ async def _expand_dict(
         )
     if not isinstance(value, dict):
         raise _expand_error(port, value, ctx, "We only accept dicts for dict ports")
-    return {
-        key: await _expand(child, item, ctx.child(port.key, key))
-        for key, item in value.items()
-    }
+    expanded = await asyncio.gather(
+        *[_expand(child, item, ctx.child(port.key, key)) for key, item in value.items()]
+    )
+    return dict(zip(value.keys(), expanded))
 
 
 async def _expand_union(
@@ -227,27 +231,16 @@ async def _expand_enum(
         raise _expand_error(
             port, value, ctx, f"Enum {port.identifier} not found in registry"
         ) from None
-
-    if isinstance(value, str):
-        if value in fenum.cls.__members__:
-            return fenum.cls[value]
-        # Python 3.13+: partial() values are treated as descriptors so they
-        # never appear in __members__. Fall back to a direct attribute lookup.
-        attr = getattr(fenum.cls, value, None)
-        if attr is not None:
-            return attr
-        raise _expand_error(
-            port, value, ctx, f"Enum {port.identifier} does not have {value} as member"
-        )
-    if isinstance(value, int):
-        if value not in fenum.cls.__members__.values():
+    if isinstance(value, (str, int)):
+        try:
+            return fenum.expand(value)
+        except KeyError:
             raise _expand_error(
                 port,
                 value,
                 ctx,
                 f"Enum {port.identifier} does not have {value} as member",
-            )
-        return fenum.cls(value)
+            ) from None
     raise _expand_error(
         port,
         value,
@@ -303,9 +296,20 @@ async def _expand_structure(
         raise _expand_error(
             port, value, ctx, "We only accept structures with identifiers"
         )
-    fstruc = ctx.registry.get_fullfilled_structure(port.identifier)
     try:
-        return await fstruc.aexpand(ID.validate(object))
+        # Inside the try: a registry that refuses this identifier (unknown, or
+        # another service's) says why, and that belongs in the port's path like
+        # any other expansion failure.
+        fstruc = ctx.registry.get_fullfilled_structure(port.identifier)
+    except (KeyError, StructureRegistryError) as e:
+        raise _expand_error(
+            port,
+            value,
+            ctx,
+            f"No structure {port.identifier} in this app's registry. {e}",
+        ) from e
+    try:
+        return await ctx.load(fstruc, ID.validate(object))
     except Exception as e:
         raise _expand_error(
             port,
@@ -361,6 +365,7 @@ async def aexpand_arg(
     *,
     path: Sequence[str] | None = None,
     depth: int = 0,
+    batcher: ExpandBatcher | None = None,
 ) -> Any:  # noqa: ANN401
     """Expand an incoming wire value through ``port``.
 
@@ -370,7 +375,7 @@ async def aexpand_arg(
     Raises:
         ExpandingError: If the value does not fit the port.
     """
-    ctx = SerializationContext.build(structure_registry, shelver, path, depth)
+    ctx = SerializationContext.build(structure_registry, shelver, path, depth, batcher)
 
     # Only arg ports carry a default.
     port_default = getattr(port, "default", None)
@@ -421,12 +426,18 @@ async def expand_inputs(
 ) -> dict[str, Any]:
     """Expand an incoming ``args`` dict against ``definition.args``.
 
+    The expanders resolve their client from whichever app is current; an
+    assignment runs pinned to its agent's app.
+
     Raises:
         ExpandingError: If any argument fails to expand.
     """
     if skip_expanding:
         return {port.key: args.get(port.key, None) for port in definition.args}
 
+    # One batcher for the whole call: two arguments of the same structure are
+    # one request, like two elements of a list.
+    batcher = ExpandBatcher()
     try:
         expanded_args = await asyncio.gather(
             *[
@@ -437,6 +448,7 @@ async def expand_inputs(
                     shelver=shelver,
                     path=[port.key],
                     depth=1,
+                    batcher=batcher,
                 )
                 for port in definition.args
             ]
@@ -649,7 +661,7 @@ async def _shrink_structure(
         )
     fstruc = ctx.registry.get_fullfilled_structure(port.identifier)
     try:
-        shrunk = await fstruc.ashrink(value)
+        shrunk = await fstruc.shrink(value)
     except Exception as e:
         raise _shrink_error(
             port,
@@ -808,7 +820,12 @@ async def shrink_outputs(
     shrunk = await asyncio.gather(
         *[
             ashrink_return(
-                port, val, structure_registry, shelver=shelver, path=[port.key], depth=0
+                port,
+                val,
+                structure_registry,
+                shelver=shelver,
+                path=[port.key],
+                depth=0,
             )
             for port, val in zip(definition.returns, returns)
         ]

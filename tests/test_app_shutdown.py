@@ -1,6 +1,6 @@
 """Integration tests for the ``shutdown`` hooks of a real, running app.
 
-Each test stands up its own ``RekuestNext`` (fresh ``AppRegistry`` via
+Each test stands up its own ``Rekuest`` (fresh ``AppRegistry`` via
 :func:`build_fresh_rekuest`) against the shared deployment, boots it with a
 ``startup`` hook that produces a state, and asserts that the ``shutdown`` hook
 runs on teardown — with the live state injected — on both the clean-exit and the
@@ -134,7 +134,7 @@ async def test_state_mutated_in_a_shutdown_hook_reaches_the_backend(
         if session["agent"]["id"] == agent_id
         for patch in session["patches"]
     ]
-    assert (Counter.__rekuest_state__, "replace", "/count", 7) in patches, (
+    assert ("Counter", "replace", "/count", 7) in patches, (
         "The backend should have persisted the patch the shutdown hook wrote, "
         f"got {patches}"
     )

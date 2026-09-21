@@ -15,26 +15,20 @@ from typing import (
 from collections.abc import AsyncGenerator, Generator
 
 from rekuest.api.schema import DefinitionInput
+
 from koil import unkoil, unkoil_gen
 from rath.scalars import ID
-from rekuest.actors.context import useAssign
-from rekuest.actors.vars import (
-    NotWithinATaskError,
-)
 from rekuest.api.schema import (
     TaskEventKind,
     HookInput,
     Action,
-    afind as afind_node,
     Implementation,
 )
 from rekuest.messages import Assign, JSONSerializable
 from rekuest.postmans.types import Postman
-from rekuest.postmans.vars import get_current_postman
 from rekuest.structures.registry import (
     StructureRegistry,
 )
-from rekuest.structures.default import get_default_structure_registry
 from rekuest.structures.serialization.actor import (
     aexpand_actor_returns,
     ashrink_actor_args,
@@ -43,60 +37,7 @@ from rekuest.structures.serialization.postman import aexpand_returns, ashrink_ar
 from rekuest.errors import CriticalCallError, ErrorCallError
 
 
-__all__ = [
-    "find",
-    "afind",
-]
-
-
-async def afind(
-    action_implementation_res: ID | Action | Implementation,
-) -> Action:
-    """Find and return the task generator"""
-    if isinstance(action_implementation_res, Action):
-        return action_implementation_res
-
-    if isinstance(action_implementation_res, (ID, str)):
-        if isinstance(action_implementation_res, str):
-            if "." in action_implementation_res:
-                # If the ID is a string with dots, we assume it's an app . action identifier, and we need to find the action by its identifier
-                raise ValueError(
-                    "Finding by string identifier is not supported yet. Please use the ID type for now."
-                )
-
-        action_implementation_res = await afind_node(action_implementation_res)
-        return action_implementation_res
-
-    raise ValueError(
-        "action_implementation_res must be an ID, Action, Implementation, DeclaredFunction or DeclaredProtocol"
-    )
-
-
-def find(
-    action_implementation_res: ID | Action | Implementation,
-) -> Action:
-    """Resolve an action reference into a concrete action model.
-
-    This synchronous helper delegates to :func:`afind` through ``unkoil``. If an
-    :class:`Action` is passed, it is returned unchanged. If an id-like value is
-    passed, the helper fetches the matching action through the GraphQL layer.
-
-    Args:
-        action_implementation_res: Action object or action id to resolve.
-
-    Returns:
-        The resolved action model.
-
-    Raises:
-        ValueError: If the reference type is unsupported.
-
-    Examples:
-        Resolve an action id before calling it::
-
-            action = find(action_id)
-            result = call(action, value=1)
-    """
-    return unkoil(afind, action_implementation_res)
+__all__: list[str] = []
 
 
 def ensure_return_as_tuple(value: Any) -> tuple[Any]:  # noqa: ANN401
@@ -120,26 +61,33 @@ def _resolve_target(
 
 
 def _resolve_postman(postman: Postman | None) -> Postman:
-    """Resolve the postman to use, falling back to the current context."""
-    postman = postman or get_current_postman()
-    if not postman:
-        raise ValueError("Postman is not set")
+    """The postman to call through. There is no current one to fall back to."""
+    if postman is None:
+        raise ValueError(
+            "No postman to call through. Call through a Rekuest client "
+            "(rekuest.call(...)), which supplies its own."
+        )
     return postman
+
+
+def _resolve_structure_registry(
+    structure_registry: StructureRegistry | None,
+) -> StructureRegistry:
+    """The registry to (de)serialize with. There is no current one to fall back to."""
+    if structure_registry is None:
+        raise ValueError(
+            "No structure registry to (de)serialize with. Call through a Rekuest "
+            "client (rekuest.call(...)), which supplies its own."
+        )
+    return structure_registry
 
 
 def _resolve_parent(parent: Assign | None) -> ID | None:
     """The parent task id to attach this call to, as the socket wants it.
 
-    When no ``parent`` is given and the call happens inside another task, the current
-    task becomes the parent. Only the agent socket can carry one — which is exactly the
-    postman bound while an actor body runs, so the two line up on their own.
+    Only what the caller passed: a per-task ``Rekuest`` view passes its task.
     """
-    if parent is None:
-        try:
-            parent = useAssign()
-        except NotWithinATaskError:
-            return None
-    return ID.validate(parent.task)
+    return ID.validate(parent.task) if parent is not None else None
 
 
 @dataclass(frozen=True)
@@ -230,6 +178,20 @@ async def _astream_raw(  # noqa: PLR0913 - the call description, mirrored from t
 
         if i.kind == TaskEventKind.CRITICAL:
             raise CriticalCallError(i.message)
+
+        # CANCELLED and INTERRUPTED are terminal too. Somebody else (a user in the UI,
+        # an interrupt cascading down a tree) can end a task this call is waiting on;
+        # without these arms the stream simply never ended and the caller hung forever.
+        # The agent-side postman surfaces them the same way (``agents.caller._adapt``).
+        #
+        # DISCONNECTED is deliberately NOT terminal: the task's fate is unknown and its
+        # agent may still come back and report the real outcome. The backend bounds that
+        # wait itself (``disconnected_expiry`` → CRITICAL), so this cannot hang forever.
+        if i.kind in (TaskEventKind.CANCELLED, TaskEventKind.INTERRUPTED):
+            raise CriticalCallError(
+                i.message
+                or f"The task was {i.kind.value.lower()} before it completed."
+            )
 
 
 async def aiterate_raw(
@@ -417,9 +379,8 @@ async def acall(
         log: Whether the remote execution should persist logs.
         capture: Whether outputs should be captured remotely.
         structure_registry: Structure registry used for shrinking and expanding
-            structured values. Defaults to the current default registry.
+            structured values.
         postman: Postman override. Defaults to the current postman context.
-        **kwargs: Keyword Python arguments matching the action definition.
 
     Returns:
         The expanded return value, or a tuple of values for multi-return
@@ -436,7 +397,7 @@ async def acall(
             result = await acall(action, image=my_image, threshold=0.5)
     """
     action, implementation = _resolve_target(action_implementation_res)
-    structure_registry = structure_registry or get_default_structure_registry()
+    structure_registry = _resolve_structure_registry(structure_registry)
 
     shrinked_args = await ashrink_args(
         action, args, kwargs, structure_registry=structure_registry
@@ -460,7 +421,9 @@ async def acall(
     )
 
     returns = await aexpand_returns(
-        action, raw_returns, structure_registry=structure_registry
+        action,
+        raw_returns,
+        structure_registry=structure_registry,
     )
     if len(returns) == 1:
         return returns[0]
@@ -506,7 +469,6 @@ async def aiterate(
         structure_registry: Structure registry used for shrinking and expanding
             structured values.
         postman: Postman override. Defaults to the current postman context.
-        **kwargs: Keyword Python arguments matching the action definition.
 
     Yields:
         Expanded yielded values from the remote task.
@@ -523,7 +485,7 @@ async def aiterate(
                 print(chunk)
     """
     action, implementation = _resolve_target(action_implementation_res)
-    structure_registry = structure_registry or get_default_structure_registry()
+    structure_registry = _resolve_structure_registry(structure_registry)
 
     shrinked_args = await ashrink_args(
         action, args, kwargs, structure_registry=structure_registry
@@ -546,7 +508,9 @@ async def aiterate(
         ),
     ):
         returns = await aexpand_returns(
-            action, raw_returns, structure_registry=structure_registry
+            action,
+            raw_returns,
+            structure_registry=structure_registry,
         )
         if len(returns) == 1:
             yield returns[0]
@@ -570,7 +534,7 @@ async def acall_dependency(
     **kwargs: Any,  # noqa: ANN401
 ) -> Any:  # noqa: ANN401
     """Call a method on a dependency and return expanded Python values."""
-    structure_registry = structure_registry or get_default_structure_registry()
+    structure_registry = _resolve_structure_registry(structure_registry)
 
     shrinked_args = await ashrink_actor_args(
         definition, args, kwargs, structure_registry=structure_registry
@@ -589,7 +553,9 @@ async def acall_dependency(
         postman=postman,
     )
 
-    returns = await aexpand_actor_returns(definition, raw_returns, structure_registry)
+    returns = await aexpand_actor_returns(
+        definition, raw_returns, structure_registry
+    )
     if len(returns) == 1:
         return returns[0]
     return returns

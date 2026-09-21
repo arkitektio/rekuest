@@ -31,16 +31,12 @@ Example:
 
 """
 
-import contextvars
 from types import TracebackType
-from typing import Optional
 
+from fakts import Alias
 from koil.composition import KoiledModel
 
 
-current_rekuest_datalayer: contextvars.ContextVar[Optional["DataLayer"]] = (
-    contextvars.ContextVar("current_rekuest_datalayer", default=None)
-)
 
 
 class DataLayer(KoiledModel):
@@ -63,11 +59,28 @@ class DataLayer(KoiledModel):
     port: int | None = None
     protocol: str = "https"
 
+
+    @classmethod
+    def from_alias(cls, alias: "Alias") -> "DataLayer":
+        """Point a datalayer at a resolved address.
+
+        Args:
+            alias: Where the store is, resolved when the run connected.
+
+        Returns:
+            The datalayer, ready to use.
+        """
+        return cls(
+            endpoint_url=alias.to_http_path(),
+            host=alias.host,
+            port=alias.port,
+            protocol="https" if alias.ssl else "http",
+        )
+
     async def get_endpoint_url(self):
         return self.endpoint_url
 
     async def __aenter__(self):
-        current_rekuest_datalayer.set(self)
         return self
 
     async def __aexit__(
@@ -76,4 +89,4 @@ class DataLayer(KoiledModel):
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
     ) -> None:
-        current_rekuest_datalayer.set(None)
+        return None

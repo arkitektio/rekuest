@@ -6,8 +6,8 @@ going out through the GraphQL postman. ``AgentPostman`` is the object that makes
 it satisfies the :class:`~rekuest.postmans.types.Postman` protocol (``aassign`` →
 ``AsyncGenerator`` of task events), so every existing call path in
 :mod:`rekuest.remote` (``acall`` / ``aiterate`` / ``acall_dependency``) routes through
-it unchanged once it is bound as ``current_postman`` while an actor body runs (see
-:meth:`rekuest.actors.helper.AssignmentHelper.__enter__`).
+it unchanged: a per-task ``Rekuest`` view (``Rekuest.for_task``) and the dependency
+proxies pass it as ``postman=``.
 
 The translation is:
 

@@ -28,32 +28,20 @@ projects:
           - type: turms.plugins.inputs.InputsPlugin
           - type: turms.plugins.fragments.FragmentsPlugin
           - type: turms.plugins.operations.OperationsPlugin
-          - type: turms.plugins.funcs.FuncsPlugin
+          - type: turms.plugins.client.ClientPlugin
+            # Every operation is a method of RekuestApi, which Rekuest (and the
+            # internal RekuestGraphQL) mix in. Each method hands its operation to
+            # execute/aexecute/subscribe/asubscribe of self, which those two
+            # clients implement over their rath.
+            client_class: RekuestApi
+            # Everything Rekuest defines itself (fields, call helpers, register...).
+            reserved_from:
+              - rekuest.rekuest.Rekuest
             coercible_scalars:
               SearchQuery: rekuest.scalars.SearchQueryCoercible
               ID: rath.scalars.IDCoercible
             expand_input_types:
               - input
-            global_kwargs:
-              - type: rekuest.rath.RekuestNextRath
-                key: rath
-                description: The arkitekt rath client
-            definitions:
-              - type: subscription
-                is_async: true
-                use: rekuest.funcs.asubscribe
-              - type: query
-                is_async: true
-                use: rekuest.funcs.aexecute
-              - type: mutation
-                is_async: true
-                use: rekuest.funcs.aexecute
-              - type: subscription
-                use: rekuest.funcs.subscribe
-              - type: query
-                use: rekuest.funcs.execute
-              - type: mutation
-                use: rekuest.funcs.execute
         processors:
           - type: turms.processors.disclaimer.DisclaimerProcessor
         scalar_definitions:

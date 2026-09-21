@@ -7,7 +7,9 @@ from typing import (
     Protocol,
     runtime_checkable,
 )
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
+
+from rekuest.errors import RegistryFrozenError
 
 if TYPE_CHECKING:
     from rekuest.state.publish import StateHolder
@@ -95,31 +97,53 @@ class HooksRegistry(BaseModel):
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
+    _frozen: bool = PrivateAttr(default=False)
+
+    def freeze(self) -> None:
+        """Refuse further registration. Done when the app that owns this is entered."""
+        self._frozen = True
+
+    def _refuse_if_frozen(self, what: str) -> None:
+        if self._frozen:
+            raise RegistryFrozenError(
+                f"Cannot register {what} on an app that is already entered. Register "
+                "before `app.run()` / `async with app:` -- what an app offers is fixed "
+                "when it connects."
+            )
+
     def register_background(self, name: str, task: BackgroundTask) -> None:
         """Register a background task in the registry."""
+        self._refuse_if_frozen("a background worker")
         self.background_worker[name] = task
 
     def register_startup(self, name: str, hook: StartupHook) -> None:
         """Register a startup hook in the registry."""
+        self._refuse_if_frozen("a startup hook")
         self.startup_hooks[name] = hook
 
     def register_shutdown(self, name: str, hook: ShutdownHook) -> None:
         """Register a shutdown hook in the registry."""
+        self._refuse_if_frozen("a shutdown hook")
         self.shutdown_hooks[name] = hook
 
+    def __setattr__(self, name: str, value: object) -> None:
+        """Refuse replacing a registry field wholesale once frozen.
+
+        The `register_*` guards only cover writes *into* the dicts; without this,
+        `registry.startup_hooks = {}` would walk straight past the freeze. Private
+        names pass through, or `freeze()` could not set `_frozen` itself.
+        """
+        if not name.startswith("_"):
+            self._refuse_if_frozen(f"'{name}'")
+        super().__setattr__(name, value)
+
     def reset(self) -> None:
-        """Reset the registry"""
+        """Reset the registry.
+
+        Refused once frozen, like every other write here.
+        """
+        self._refuse_if_frozen("anything (resetting)")
         self.background_worker = {}
         self.startup_hooks = {}
         self.shutdown_hooks = {}
 
-
-def get_default_hook_registry() -> HooksRegistry:
-    """Return the default hook registry (the app registry's).
-
-    Returns:
-        HooksRegistry: The hooks registry of the global app registry.
-    """
-    from rekuest.app import get_default_app_registry
-
-    return get_default_app_registry().hooks_registry

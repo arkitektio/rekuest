@@ -19,7 +19,7 @@ from collections.abc import AsyncIterator
 from pydantic import BaseModel, ConfigDict, Field
 
 from rekuest.agents.policy import ConnectionPolicy
-from rekuest.messages import FromAgentMessage, ToAgentMessage
+from rekuest.messages import AgentDeclaration, FromAgentMessage, ToAgentMessage
 
 
 class HandshakeParams(BaseModel):
@@ -31,6 +31,11 @@ class HandshakeParams(BaseModel):
     reflects current agent state rather than whatever was true at build time.
     """
 
+    declaration: AgentDeclaration | None = Field(default=None)
+    """What the agent offers, sent with every ``Register``: registering is implementing.
+
+    ``None`` registers an agent that declares nothing (the backend only makes sure it
+    exists). Asked per attempt like the rest, so a reconnect carries the current hash."""
     force: bool | None = Field(default=None)
     """Kick any connection already registered for this agent and take over.
 

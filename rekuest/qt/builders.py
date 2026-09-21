@@ -5,6 +5,7 @@ This allow the async patterns of actors to extend to the Qt world.
 """
 
 import inspect
+from functools import partial
 from typing import (
     Any,
     get_args,
@@ -45,7 +46,6 @@ class QtInLoopBuilder(QtCore.QObject):
         assign: Callable = None,
         *args,  # noqa: ANN002
         parent: QtWidgets.QWidget | None = None,
-        structure_registry: StructureRegistry | None = None,
         definition: DefinitionInput = None,
         **actor_kwargs: dict,
     ) -> None:
@@ -54,7 +54,6 @@ class QtInLoopBuilder(QtCore.QObject):
         self.wrapped_function = assign
         self.coro = qt_to_async(self.qt_assign)
         self.provisions = {}
-        self.structure_registry = structure_registry
         self.actor_kwargs = actor_kwargs
         self.definition = definition
 
@@ -67,12 +66,16 @@ class QtInLoopBuilder(QtCore.QObject):
 
         return await self.coro.acall(**kwargs)
 
-    def build(self, agent: Agent) -> "FunctionalActor":
-        """Builds the actor."""
+    def build(self, agent: Agent, structure_registry: StructureRegistry) -> "FunctionalActor":
+        """Build the actor against ``structure_registry``.
+
+        The registry is not held here: the actifier returns a ``partial`` over this
+        method carrying it, so a run's snapshot can re-point it at its own copy.
+        """
         try:
             ac = FunctionalActor(
                 agent=agent,
-                structure_registry=self.structure_registry,
+                structure_registry=structure_registry,
                 assign=self.on_assign,
                 iterator=FUNC,
                 definition=self.definition,
@@ -98,7 +101,6 @@ class QtFutureBuilder(QtCore.QObject):
         assign: Callable = None,
         *args,  # noqa: ANN002
         parent: QtWidgets.QWidget | None = None,
-        structure_registry: StructureRegistry | None = None,
         definition: DefinitionInput = None,
         **actor_kwargs: dict,
     ) -> None:
@@ -106,7 +108,6 @@ class QtFutureBuilder(QtCore.QObject):
         super().__init__(*args, parent=parent)
         self.coro = qt_to_async(lambda *args, **kwargs: assign(*args, **kwargs))
         self.provisions = {}
-        self.structure_registry = structure_registry
         self.actor_kwargs = actor_kwargs
         self.definition = definition
 
@@ -115,12 +116,16 @@ class QtFutureBuilder(QtCore.QObject):
         x = await self.coro.acall(*args, **kwargs)
         return x
 
-    def build(self, agent: Agent) -> "FunctionalActor":
-        """Builds the actor."""
+    def build(self, agent: Agent, structure_registry: StructureRegistry) -> "FunctionalActor":
+        """Build the actor against ``structure_registry``.
+
+        The registry is not held here: the actifier returns a ``partial`` over this
+        method carrying it, so a run's snapshot can re-point it at its own copy.
+        """
         try:
             ac = FunctionalActor(
                 agent=agent,
-                structure_registry=self.structure_registry,
+                structure_registry=structure_registry,
                 assign=self.on_assign,
                 iterator=FUNC,
                 definition=self.definition,
@@ -156,7 +161,6 @@ class QtGeneratorBuilder(QtCore.QObject):
             lambda *args, **kwargs: assign(*args, **kwargs)
         )
         self.provisions = {}
-        self.structure_registry = structure_registry
         self.actor_kwargs = actor_kwargs
         self.definition = definition
 
@@ -165,12 +169,16 @@ class QtGeneratorBuilder(QtCore.QObject):
         async for i in self.generator.acall(*args, **kwargs):
             yield i
 
-    def build(self, agent: Agent) -> "FunctionalActor":
-        """Builds the actor."""
+    def build(self, agent: Agent, structure_registry: StructureRegistry) -> "FunctionalActor":
+        """Build the actor against ``structure_registry``.
+
+        The registry is not held here: the actifier returns a ``partial`` over this
+        method carrying it, so a run's snapshot can re-point it at its own copy.
+        """
         try:
             ac = FunctionalActor(
                 agent=agent,
-                structure_registry=self.structure_registry,
+                structure_registry=structure_registry,
                 assign=self.on_assign,
                 iterator=GEN,
                 definition=self.definition,
@@ -196,7 +204,7 @@ def qtinloopactifier(
     """
     config = config or RegisterConfig()
 
-    implementation_details = derive_implementation_details(function, config)
+    implementation_details = derive_implementation_details(function, config, structure_registry)
     definition = prepare_definition_from_config(
         function, structure_registry, config, implementation_details
     )
@@ -204,23 +212,21 @@ def qtinloopactifier(
     actor_attributes: dict[str, Any] = {
         "expand_inputs": not config.bypass_expand,
         "shrink_outputs": not config.bypass_shrink,
-        "state_variables": implementation_details.state_variables,
-        "state_returns": implementation_details.state_returns,
-        "context_variables": implementation_details.context_variables,
-        "context_returns": implementation_details.context_returns,
-        "dependency_variables": implementation_details.dependency_variables,
-        "locks": implementation_details.locks,
+        **implementation_details.actor_kwargs(),
     }
 
     in_loop_instance = QtInLoopBuilder(
         parent=parent,
         assign=function,
-        structure_registry=structure_registry,
         definition=definition,
         **actor_attributes,
     )
 
-    return definition, implementation_details, in_loop_instance.build
+    return (
+        definition,
+        implementation_details,
+        partial(in_loop_instance.build, structure_registry=structure_registry),
+    )
 
 
 def qtwithfutureactifier(
@@ -258,7 +264,7 @@ def qtwithfutureactifier(
             "If you are using a QtFuture as the first parameter, you need to provide the return type of the future as a type hint. E.g `QtFuture[int]`"
         )
 
-    implementation_details = derive_implementation_details(function, config)
+    implementation_details = derive_implementation_details(function, config, structure_registry)
     definition = prepare_definition_from_config(
         function,
         structure_registry,
@@ -271,11 +277,14 @@ def qtwithfutureactifier(
     in_loop_instance = QtFutureBuilder(
         parent=parent,
         assign=function,
-        structure_registry=structure_registry,
         definition=definition,
     )
 
-    return definition, implementation_details, in_loop_instance.build
+    return (
+        definition,
+        implementation_details,
+        partial(in_loop_instance.build, structure_registry=structure_registry),
+    )
 
 
 def qtwithgeneratoractifier(
@@ -313,7 +322,7 @@ def qtwithgeneratoractifier(
             "If you are using a QtGenerator as the first parameter, you need to provide the return type of the generator as a type hint. E.g `QtGenerator[int]`"
         )
 
-    implementation_details = derive_implementation_details(function, config)
+    implementation_details = derive_implementation_details(function, config, structure_registry)
     definition = prepare_definition_from_config(
         function,
         structure_registry,
@@ -326,8 +335,11 @@ def qtwithgeneratoractifier(
     in_loop_instance = QtGeneratorBuilder(
         parent=parent,
         assign=function,
-        structure_registry=structure_registry,
         definition=definition,
     )
 
-    return definition, implementation_details, in_loop_instance.build
+    return (
+        definition,
+        implementation_details,
+        partial(in_loop_instance.build, structure_registry=structure_registry),
+    )

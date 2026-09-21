@@ -25,9 +25,7 @@ from dokker import Deployment
 from rekuest.annotations import Provides, Requires
 from rekuest.api.schema import (
     DescriptorOperator,
-    amy_implementation_at,
 )
-from rekuest.remote import acall
 
 from .conftest import CONNECT_TIMEOUT, build_fresh_rekuest
 
@@ -113,8 +111,8 @@ async def test_server_respects_requires_and_provides(deployment: Deployment) -> 
             assert ret["provides"] == [{"key": "x", "operator": "GTE", "value": 1}]
 
             # And the function still runs end-to-end with a conforming input.
-            impl = await amy_implementation_at("capture_image", rath=app.rath)
-            answer = await acall(
+            impl = await app.amy_implementation_at("capture_image")
+            answer = await app.acall(
                 impl,
                 postman=app.postman,
                 structure_registry=app.structure_registry,

@@ -19,6 +19,12 @@ from rekuest.blok.walk import (
     action_key_for,
     walk_component,
 )
+from rekuest.catalogs import (
+    CatalogView,
+    Diagnostic,
+    check_call,
+    check_component,
+)
 from rekuest.definition.match import build_port_matches
 
 
@@ -80,8 +86,28 @@ class DependencyIndex:
 class _ValidationVisitor(BlokVisitor):
     """Resolves every reference in a blok against its declared dependencies."""
 
-    def __init__(self, index: DependencyIndex) -> None:
+    def __init__(self, index: DependencyIndex, catalog: "CatalogView | None" = None) -> None:
         self.index = index
+        self.catalog = catalog
+        self.diagnostics: list[Diagnostic] = []
+
+    def visit_component(
+        self, node: ComponentNodeInput, scope: dict[str, PortMatchInput | None], context: str
+    ) -> None:
+        """Check the node against the catalog in force, if any is known."""
+        if self.catalog is None:
+            return None
+        check_component(
+            node.component,
+            [prop.key for prop in node.props or ()],
+            bool(node.children),
+            {
+                prop.key: prop.agent_call is not None or prop.util_call is not None
+                for prop in node.props or ()
+            },
+            self.catalog,
+            context,
+        )
 
     def visit_path(
         self, path: str, scope: dict[str, PortMatchInput | None], context: str
@@ -112,7 +138,21 @@ class _ValidationVisitor(BlokVisitor):
     def visit_util_call(
         self, call: UtilCallInput, scope: dict[str, PortMatchInput | None], context: str
     ) -> None:
-        # Util operations are resolved by the renderer's catalog, not here.
+        """Resolve the operation against the catalog in force, if any is known.
+
+        Nested util calls inside arguments arrive here on their own, because
+        :func:`walk_component` recurses through the argument tree.
+        """
+        if self.catalog is None:
+            return None
+        finding = check_call(
+            call.operation,
+            [argument.key for argument in call.arguments or () if argument.key is not None],
+            self.catalog,
+            context,
+        )
+        if finding is not None:
+            self.diagnostics.append(finding)
         return None
 
     def declare_foreach_local(
@@ -194,17 +234,110 @@ class _ValidationVisitor(BlokVisitor):
 
 
 def validate_blok(
-    component: ComponentNodeInput, dependencies: list[AgentDependencyInput]
-) -> bool:
+    component: ComponentNodeInput,
+    dependencies: list[AgentDependencyInput],
+    catalog: "CatalogView | None" = None,
+) -> list[Diagnostic]:
     """Validate every reference in ``component`` resolves against ``dependencies``.
 
+    With a ``catalog``, the tree's components, props and util operations are checked
+    against it too. Without one, only references are checked -- component names are
+    unknowable, exactly as on the server before a UI app registers any.
+
+    Args:
+        component: The component tree to validate.
+        dependencies: What references in the tree may resolve against.
+        catalog: The catalog view in force, or ``None`` to skip every catalog rule.
+
+    Returns:
+        The non-fatal findings, e.g. util calls naming an operation the catalog does
+        not provide. Empty when nothing was found or no catalog was given.
+
     Raises:
-        ValueError: If any reference cannot be resolved. The message names the
-            component and its structural id.
+        ValueError: If any reference cannot be resolved, or any catalog rule is broken.
+            The message names the component and its structural id.
     """
-    visitor = _ValidationVisitor(DependencyIndex.from_dependencies(dependencies))
+    visitor = _ValidationVisitor(DependencyIndex.from_dependencies(dependencies), catalog)
     walk_component(component, visitor)
-    return True
+    return visitor.diagnostics
+
+
+class _CatalogVisitor(BlokVisitor):
+    """Checks a tree against a catalog alone, ignoring every reference.
+
+    References need the blok's fully inferred dependencies, which only exist once
+    :func:`~rekuest.blok.registry.build_declared_bloks` has run. Catalog rules need
+    none, so they can fire the moment a blok is declared.
+    """
+
+    def __init__(self, catalog: CatalogView) -> None:
+        self.catalog = catalog
+        self.diagnostics: list[Diagnostic] = []
+
+    def visit_component(
+        self, node: ComponentNodeInput, scope: dict[str, PortMatchInput | None], context: str
+    ) -> None:
+        check_component(
+            node.component,
+            [prop.key for prop in node.props or ()],
+            bool(node.children),
+            {
+                prop.key: prop.agent_call is not None or prop.util_call is not None
+                for prop in node.props or ()
+            },
+            self.catalog,
+            context,
+        )
+
+    def visit_util_call(
+        self, call: UtilCallInput, scope: dict[str, PortMatchInput | None], context: str
+    ) -> None:
+        finding = check_call(
+            call.operation,
+            [argument.key for argument in call.arguments or () if argument.key is not None],
+            self.catalog,
+            context,
+        )
+        if finding is not None:
+            self.diagnostics.append(finding)
+
+    def visit_path(
+        self, path: str, scope: dict[str, PortMatchInput | None], context: str
+    ) -> None:
+        return None
+
+    def visit_agent_call(
+        self, call: AgentProbeInput, scope: dict[str, PortMatchInput | None], context: str
+    ) -> None:
+        return None
+
+    def declare_foreach_local(
+        self,
+        name: str,
+        items_path: str,
+        scope: dict[str, PortMatchInput | None],
+        context: str,
+    ) -> PortMatchInput | None:
+        return None
+
+
+def validate_blok_catalog(
+    component: ComponentNodeInput, catalog: CatalogView
+) -> list[Diagnostic]:
+    """Check ``component``'s components, props and util operations against ``catalog``.
+
+    References are not checked -- they need dependencies this stage does not have.
+
+    Returns:
+        The non-fatal findings, e.g. operations the catalog does not provide.
+
+    Raises:
+        ValueError: If a catalog rule is broken. The message names the component
+            and its structural id.
+    """
+    visitor = _CatalogVisitor(catalog)
+    walk_component(component, visitor)
+    return visitor.diagnostics
 
 
 def _resolve_dependency_state_path(

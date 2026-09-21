@@ -13,17 +13,17 @@ import pytest
 
 from rekuest.agents.lock import LockGroup, TaskLock
 from rekuest.api.schema import LockDefinitionInput, LockImplementationInput
-from rekuest.rekuest import RekuestNext
+from rekuest.agents.base import RekuestAgent
 
 
-def test_collect_from_registry_builds_task_locks(mock_rekuest: RekuestNext) -> None:
+def test_collect_from_registry_builds_task_locks(mock_agent: RekuestAgent) -> None:
     def snap(x: int) -> int:
         """Take a picture."""
         return x
 
-    mock_rekuest.register(snap, locks=["camera"])
+    mock_agent.app_registry.register(snap, locks=["camera"])
 
-    agent = mock_rekuest.agent
+    agent = mock_agent
     agent.collect_from_registry()
 
     assert "camera" in agent.locks
@@ -33,7 +33,7 @@ def test_collect_from_registry_builds_task_locks(mock_rekuest: RekuestNext) -> N
 
 @pytest.mark.asyncio
 async def test_overlapping_lock_groups_do_not_deadlock(
-    mock_rekuest: RekuestNext,
+    mock_agent: RekuestAgent,
 ) -> None:
     """Opposite declaration orders must still acquire in one global order."""
 
@@ -45,10 +45,10 @@ async def test_overlapping_lock_groups_do_not_deadlock(
         """Use b then a."""
         return x
 
-    mock_rekuest.register(use_ab, locks=["a", "b"])
-    mock_rekuest.register(use_ba, locks=["b", "a"])
+    mock_agent.app_registry.register(use_ab, locks=["a", "b"])
+    mock_agent.app_registry.register(use_ba, locks=["b", "a"])
 
-    agent = mock_rekuest.agent
+    agent = mock_agent
     agent.collect_from_registry()
 
     async def hammer(keys: tuple[str, ...], task: str) -> None:
@@ -93,9 +93,9 @@ async def test_failed_lock_notification_releases_the_local_lock() -> None:
     assert task_lock.locking_task is None
 
 
-def _spawn_actor(mock_rekuest: RekuestNext, interface: str):
-    builder = mock_rekuest.agent.app_registry.get_builder_for_interface(interface)
-    return builder(agent=mock_rekuest.agent)
+def _spawn_actor(mock_agent: RekuestAgent, interface: str):
+    builder = mock_agent.app_registry.get_builder_for_interface(interface)
+    return builder(agent=mock_agent)
 
 
 async def _enter_twice(actor, events: list[str]) -> None:
@@ -110,17 +110,17 @@ async def _enter_twice(actor, events: list[str]) -> None:
 
 @pytest.mark.asyncio
 async def test_parallel_actor_interleaves_assignments(
-    mock_rekuest: RekuestNext,
+    mock_agent: RekuestAgent,
 ) -> None:
     async def free(x: int) -> int:
         """No shared resources."""
         return x
 
-    mock_rekuest.register(free, concurrency="parallel")
-    mock_rekuest.agent.collect_from_registry()
+    mock_agent.app_registry.register(free, concurrency="parallel")
+    mock_agent.collect_from_registry()
 
     events: list[str] = []
-    await _enter_twice(_spawn_actor(mock_rekuest, "free"), events)
+    await _enter_twice(_spawn_actor(mock_agent, "free"), events)
 
     # Both assignments are inside the context before either leaves.
     assert events[:2] == ["in-1", "in-2"]
@@ -128,24 +128,24 @@ async def test_parallel_actor_interleaves_assignments(
 
 @pytest.mark.asyncio
 async def test_actor_serializes_assignments_by_default(
-    mock_rekuest: RekuestNext,
+    mock_agent: RekuestAgent,
 ) -> None:
     async def one_at_a_time(x: int) -> int:
         """Must not run concurrently with itself."""
         return x
 
-    mock_rekuest.register(one_at_a_time)
-    mock_rekuest.agent.collect_from_registry()
+    mock_agent.app_registry.register(one_at_a_time)
+    mock_agent.collect_from_registry()
 
     events: list[str] = []
-    await _enter_twice(_spawn_actor(mock_rekuest, "one_at_a_time"), events)
+    await _enter_twice(_spawn_actor(mock_agent, "one_at_a_time"), events)
 
     assert events == ["in-1", "out-1", "in-2", "out-2"]
 
 
 @pytest.mark.asyncio
 async def test_shared_lock_key_serializes_across_actors(
-    mock_rekuest: RekuestNext,
+    mock_agent: RekuestAgent,
 ) -> None:
     async def left(x: int) -> int:
         """Uses the camera."""
@@ -155,12 +155,12 @@ async def test_shared_lock_key_serializes_across_actors(
         """Also uses the camera."""
         return x
 
-    mock_rekuest.register(left, locks=["camera"])
-    mock_rekuest.register(right, locks=["camera"])
-    mock_rekuest.agent.collect_from_registry()
+    mock_agent.app_registry.register(left, locks=["camera"])
+    mock_agent.app_registry.register(right, locks=["camera"])
+    mock_agent.collect_from_registry()
 
-    left_actor = _spawn_actor(mock_rekuest, "left")
-    right_actor = _spawn_actor(mock_rekuest, "right")
+    left_actor = _spawn_actor(mock_agent, "left")
+    right_actor = _spawn_actor(mock_agent, "right")
 
     events: list[str] = []
 

@@ -10,7 +10,7 @@ from uuid import uuid4
 import pytest
 from rekuest.app import AppRegistry
 from rekuest.structures.registry import StructureRegistry
-from rekuest.rekuest import RekuestNext, RekuestNextRath
+from rekuest.rekuest import Rekuest, RekuestRath
 from rath.links.testing.direct_succeeding_link import DirectSucceedingLink
 from rekuest.agents.base import RekuestAgent
 from rekuest.postmans.graphql import GraphQLPostman
@@ -96,9 +96,20 @@ class MockShelver:
 
 @pytest.fixture()
 def simple_registry() -> StructureRegistry:
-    """Fixture for a simple registry"""
-    registry = StructureRegistry()
+    """A registry preloaded with the structures the test functions use.
 
+    Nothing registers itself any more, so the structures a signature names have
+    to be in here before a definition can be built against it.
+    """
+    from .funcs import Karl, LocalizedStructure
+    from .structures import test_registry
+
+    registry = test_registry()
+    # Lives in funcs.py beside the function that returns it, and is the one thing
+    # here that is kept on the shelve rather than fetched by id.
+    registry.register_as_memory_structure(LocalizedStructure)
+    # The one model the test functions name; a model is declared on an app.
+    registry.model(Karl)
     return registry
 
 
@@ -109,36 +120,31 @@ def mock_shelver() -> MockShelver:
 
 
 @pytest.fixture()
-def mock_rekuest() -> RekuestNext:
-    """Fixture for a mock rekuest"""
-    # This fixture can be used to mock the rekuest functionality if needed
+def mock_agent() -> RekuestAgent:
+    """An agent with a transport that never connects and a registry of its own."""
 
     async def token_loader() -> str:
         """Mock token loader function."""
         return "mock_token"
 
-    rath = RekuestNextRath(link=DirectSucceedingLink())
-
-    agent = RekuestAgent(
+    return RekuestAgent(
         transport=WebsocketAgentTransport(
             endpoint_url="ws://localhost:8000/graphql",
             token_loader=token_loader,
         ),
-        rath=rath,
         name="Test",
     )
 
-    rath = RekuestNextRath(link=DirectSucceedingLink())
 
-    x = RekuestNext(
+@pytest.fixture()
+def mock_rekuest(mock_agent: RekuestAgent) -> Rekuest:
+    """A client of the same registry as ``mock_agent``, knowing nothing of the agent."""
+    rath = RekuestRath(link=DirectSucceedingLink())
+    return Rekuest(
         rath=rath,
-        agent=agent,
-        postman=GraphQLPostman(
-            rath=rath,
-        ),
+        postman=GraphQLPostman(rath=rath),
+        structure_registry=mock_agent.app_registry.structure_registry,
     )
-
-    return x
 
 
 project_path = os.path.join(os.path.dirname(__file__), "integration")
@@ -185,12 +191,12 @@ def integration_ports() -> Generator[dict[str, int], None, None]:
 
     Both stack fixtures depend on this, so neither can come up on a stale port.
     """
-    rekuest_port, minio_port = _reserve_free_ports(2)
-    env = {"REKUEST_HOST_PORT": str(rekuest_port), "MINIO_HOST_PORT": str(minio_port)}
+    rekuest_port, rustfs_port = _reserve_free_ports(2)
+    env = {"REKUEST_HOST_PORT": str(rekuest_port), "RUSTFS_HOST_PORT": str(rustfs_port)}
     previous = {key: os.environ.get(key) for key in env}
     os.environ.update(env)
     try:
-        yield {"rekuest": rekuest_port, "minio": minio_port}
+        yield {"rekuest": rekuest_port, "rustfs": rustfs_port}
     finally:
         for key, value in previous.items():
             if value is None:
@@ -242,12 +248,12 @@ def make_token_loader(token: str = "test") -> Callable[[], Awaitable[str]]:
 
 @dataclass
 class DeployedRekuest:
-    """Dataclass to hold the deployed MikroNext application and its components."""
+    """Dataclass to hold the deployed Mikro application and its components."""
 
     deployment: Deployment
     rekuest_watcher: LogWatcher
-    minio_watcher: LogWatcher
-    rekuest: RekuestNext
+    rustfs_watcher: LogWatcher
+    rekuest: "FreshApp"
 
 
 def most_basic_function(hello: str) -> str:
@@ -266,15 +272,15 @@ def most_basic_function(hello: str) -> str:
 
 @pytest.fixture(scope="session")
 def deployed_app(integration_ports: dict[str, int]) -> Generator[DeployedRekuest, None, None]:
-    """Fixture to deploy the MikroNext application with Docker Compose.
+    """Fixture to deploy the Mikro application with Docker Compose.
 
-    This fixture sets up the MikroNext application using Docker Compose,
-    configures health checks, and provides a deployed instance of MikroNext
-    for testing purposes. It also includes watchers for the Mikro and MinIO
+    This fixture sets up the Mikro application using Docker Compose,
+    configures health checks, and provides a deployed instance of Mikro
+    for testing purposes. It also includes watchers for the Mikro and RustFS
     services to monitor their logs, when performing requests against the application.
 
     Yields:
-        DeployedMikro: An instance containing the deployment, watchers, and MikroNext instance
+        DeployedMikro: An instance containing the deployment, watchers, and Mikro instance
 
     """
     setup = testing(compose_files)
@@ -288,7 +294,7 @@ def deployed_app(integration_ports: dict[str, int]) -> Generator[DeployedRekuest
     )
 
     watcher = setup.create_watcher("rekuest")
-    minio_watcher = setup.create_watcher("minio")
+    rustfs_watcher = setup.create_watcher("rustfs")
 
     with setup:
         setup.down()
@@ -298,7 +304,7 @@ def deployed_app(integration_ports: dict[str, int]) -> Generator[DeployedRekuest
         mikro_http_url = f"http://localhost:{setup.spec.find_service('rekuest').get_port_for_internal(80).published}/graphql"
         mikro_ws_url = f"ws://localhost:{setup.spec.find_service('rekuest').get_port_for_internal(80).published}/graphql"
 
-        rath = RekuestNextRath(
+        rath = RekuestRath(
             link=compose(
                 ComposedAuthLink(
                     token_loader=token_loader, token_refresher=token_loader
@@ -316,20 +322,20 @@ def deployed_app(integration_ports: dict[str, int]) -> Generator[DeployedRekuest
                 endpoint_url=f"ws://localhost:{setup.spec.find_service('rekuest').get_port_for_internal(80).published}/agi",
                 token_loader=token_loader,
             ),
-            rath=rath,
             name="Test",
         )
 
-        rekuest = RekuestNext(
-            rath=rath,
-            agent=agent,
-            postman=GraphQLPostman(
+        rekuest = FreshApp(
+            client=Rekuest(
                 rath=rath,
+                postman=GraphQLPostman(rath=rath),
+                structure_registry=agent.app_registry.structure_registry,
             ),
+            agent=agent,
         )
         setup.up()
 
-        rekuest.register(most_basic_function)
+        rekuest.registry.register(most_basic_function)
 
         setup.check_health()
 
@@ -337,7 +343,7 @@ def deployed_app(integration_ports: dict[str, int]) -> Generator[DeployedRekuest
             deployed = DeployedRekuest(
                 deployment=setup,
                 rekuest_watcher=watcher,
-                minio_watcher=minio_watcher,
+                rustfs_watcher=rustfs_watcher,
                 rekuest=rekuest,
             )
 
@@ -356,17 +362,51 @@ delayed, the stale sweep displaces it after 30s at the latest. 45s covers both.
 """
 
 
-class _FreshRekuestNext(RekuestNext):
-    """``RekuestNext`` whose ``aconnect`` tolerates the previous test's registration.
+@dataclass
+class FreshApp:
+    """A client and the agent serving its registry, as a run would hold them.
 
-    The integration server keys the agent registration on the *token* and only
-    releases it asynchronously after the socket closes. Every test builds a fresh
-    client for the same handful of tokens, so a test may connect while the
-    previous test's registration is still draining and get
-    ``"Another connection is already registered for this agent"``. Retrying the
-    connect (each failed attempt tears the agent down cleanly) within the same
-    ``timeout`` budget turns that race into a short wait instead of a flake.
+    What the integration tests drive: register on ``registry``, ``aconnect`` and
+    ``aloop`` the agent, call the API through ``client``. Attributes the app does
+    not have are the client's, so a test reads ``app.acall`` and ``app.postman``
+    off it directly.
+
+    ``aconnect`` tolerates the previous test's registration: the server keys the
+    agent registration on the *token* and only releases it asynchronously after
+    the socket closes, so a fresh app may connect while the previous test's
+    registration is still draining and get ``"Another connection is already
+    registered for this agent"``. Retrying within the drain budget turns that
+    race into a short wait instead of a flake.
     """
+
+    client: Rekuest
+    agent: RekuestAgent
+
+    @property
+    def registry(self) -> AppRegistry:
+        return self.agent.app_registry
+
+    def __getattr__(self, name: str) -> Any:  # noqa: ANN401
+        return getattr(self.client, name)
+
+    async def __aenter__(self) -> "FreshApp":
+        await self.client.__aenter__()
+        await self.agent.__aenter__()
+        return self
+
+    async def __aexit__(self, *exc: Any) -> None:
+        await self.agent.__aexit__(*exc)
+        await self.client.__aexit__(*exc)
+
+    def __enter__(self) -> "FreshApp":
+        from koil import unkoil
+
+        return unkoil(self.__aenter__)
+
+    def __exit__(self, *exc: Any) -> None:
+        from koil import unkoil
+
+        unkoil(self.__aexit__, *exc)
 
     async def aconnect(
         self,
@@ -379,13 +419,15 @@ class _FreshRekuestNext(RekuestNext):
 
         from rekuest.agents.errors import AgentException
 
+        if force is not None:
+            self.agent.force = force
         started = _time.monotonic()
         deadline = started + REGISTRATION_DRAIN_TIMEOUT
         attempt = 0
         while True:
             attempt += 1
             try:
-                await super().aconnect(context, force=force, timeout=timeout)
+                await self.agent.aconnect(context, timeout=timeout)
                 if attempt > 1:
                     logger.info(
                         "Agent %s registered after %d attempts (%.1fs): the previous "
@@ -400,9 +442,12 @@ class _FreshRekuestNext(RekuestNext):
                     raise
                 await asyncio.sleep(0.5)
 
+    async def aloop(self) -> None:
+        await self.agent.aloop()
 
-def build_fresh_rekuest(setup: Deployment, token: str = "test") -> RekuestNext:
-    """Build a brand-new ``RekuestNext`` against an already-running deployment.
+
+def build_fresh_rekuest(setup: Deployment, token: str = "test") -> FreshApp:
+    """Build a brand-new ``Rekuest`` against an already-running deployment.
 
     Every call gets its own empty :class:`AppRegistry`, so registrations made by
     one test are completely invisible to the next. This is the per-test
@@ -420,7 +465,7 @@ def build_fresh_rekuest(setup: Deployment, token: str = "test") -> RekuestNext:
             its instance based on this authentication. Defaults to ``"test"``.
 
     Returns:
-        A fresh, not-yet-entered ``RekuestNext`` client.
+        A fresh, not-yet-entered app: its client and the agent serving its registry.
     """
     loader = make_token_loader(token)
     port = setup.spec.find_service("rekuest").get_port_for_internal(80).published
@@ -428,7 +473,7 @@ def build_fresh_rekuest(setup: Deployment, token: str = "test") -> RekuestNext:
     ws_url = f"ws://localhost:{port}/graphql"
     agi_url = f"ws://localhost:{port}/agi"
 
-    rath = RekuestNextRath(
+    rath = RekuestRath(
         link=compose(
             ComposedAuthLink(token_loader=loader, token_refresher=loader),
             SplitLink(
@@ -444,15 +489,17 @@ def build_fresh_rekuest(setup: Deployment, token: str = "test") -> RekuestNext:
             endpoint_url=agi_url,
             token_loader=loader,
         ),
-        rath=rath,
         name=f"Test-{token}-{uuid4().hex[:8]}",
         app_registry=AppRegistry(),
     )
 
-    return _FreshRekuestNext(
-        rath=rath,
+    return FreshApp(
+        client=Rekuest(
+            rath=rath,
+            postman=GraphQLPostman(rath=rath),
+            structure_registry=agent.app_registry.structure_registry,
+        ),
         agent=agent,
-        postman=GraphQLPostman(rath=rath),
     )
 
 
@@ -460,7 +507,7 @@ def build_fresh_rekuest(setup: Deployment, token: str = "test") -> RekuestNext:
 async def deployment(integration_ports: dict[str, int]) -> AsyncGenerator[Deployment, None]:
     """Bring the rekuest stack up once per session and yield the dokker setup.
 
-    Tests build their own fresh ``RekuestNext`` (fresh ``AppRegistry``, unique
+    Tests build their own fresh ``Rekuest`` (fresh ``AppRegistry``, unique
     instance id) against this running stack via :func:`build_fresh_rekuest`, so
     no registry state ever leaks between tests.
     """
@@ -497,16 +544,16 @@ async def async_deployed_app(
     :func:`build_fresh_rekuest`, so it too gets its own ``AppRegistry``.
     """
     watcher = deployment.create_watcher("rekuest")
-    minio_watcher = deployment.create_watcher("minio")
+    rustfs_watcher = deployment.create_watcher("rustfs")
 
     rekuest = build_fresh_rekuest(deployment)
-    rekuest.register(most_basic_function)
+    rekuest.registry.register(most_basic_function)
 
     async with rekuest as rekuest:
         deployed = DeployedRekuest(
             deployment=deployment,
             rekuest_watcher=watcher,
-            minio_watcher=minio_watcher,
+            rustfs_watcher=rustfs_watcher,
             rekuest=rekuest,
         )
 

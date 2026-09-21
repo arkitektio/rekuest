@@ -2,6 +2,7 @@
 
 import inspect
 from typing import (
+    TYPE_CHECKING,
     Any,
     TypeVar,
     cast,
@@ -10,19 +11,22 @@ from typing import (
 from collections.abc import Callable
 import asyncio
 
+from rekuest.agents.types import BoundApp
 from koil.bridge import run_threaded
+from rekuest.errors import NoRegistryError
 from rekuest.state.publish import StateHolder
 from rekuest.agents.hooks.registry import (
     HooksRegistry,
-    get_default_hook_registry,
 )
 from rekuest.agents.hooks.variables import WithVariables
+
+if TYPE_CHECKING:
+    from rekuest.structures.registry import StructureRegistry
 from rekuest.protocols import (
     BackgroundFunction,
     ThreadedBackgroundFunction,
     AsyncBackgroundFunction,
 )
-from rekuest.state.publish import direct_publishing
 
 
 class BackgroundWithVariables(WithVariables):
@@ -32,12 +36,14 @@ class BackgroundWithVariables(WithVariables):
 class WrappedBackgroundTask(BackgroundWithVariables):
     """Background task that runs in the event loop"""
 
-    def __init__(self, func: AsyncBackgroundFunction) -> None:
+    def __init__(
+        self, func: AsyncBackgroundFunction, structure_registry: "StructureRegistry | None" = None
+    ) -> None:
         """Initialize the background task
         Args:
             func (Callable): The function to run in the background async
         """
-        super().__init__(func)
+        super().__init__(func, structure_registry)
 
     async def arun(
         self,
@@ -45,26 +51,27 @@ class WrappedBackgroundTask(BackgroundWithVariables):
         contexts: dict[str, Any],
         states: dict[str, Any],
         app_context: Any = None,  # noqa: ANN401
+        bound_app: BoundApp | None = None,
     ) -> None:
         """Run the background task in the event loop"""
-        kwargs = self.get_kwargs(contexts, states, app_context)
-        with direct_publishing(agent):
-            return await self.func(**kwargs)
+        kwargs = self.get_kwargs(contexts, states, app_context, bound_app=bound_app)
+        return await self.func(**kwargs)
 
 
 class WrappedThreadedBackgroundTask(BackgroundWithVariables):
     """Background task that runs in a thread pool"""
 
-    def __init__(self, func: ThreadedBackgroundFunction) -> None:
+    def __init__(
+        self, func: ThreadedBackgroundFunction, structure_registry: "StructureRegistry | None" = None
+    ) -> None:
         """Initialize the background task
         Args:
             func (Callable): The function to run in the background
         """
-        super().__init__(func)
+        super().__init__(func, structure_registry)
 
     def run_with_publishing(self, agent: StateHolder, **kwargs: Any) -> None:
-        with direct_publishing(agent):
-            return self.func(**kwargs)
+        return self.func(**kwargs)
 
     async def arun(
         self,
@@ -72,9 +79,10 @@ class WrappedThreadedBackgroundTask(BackgroundWithVariables):
         contexts: dict[str, Any],
         states: dict[str, Any],
         app_context: Any = None,  # noqa: ANN401
+        bound_app: BoundApp | None = None,
     ) -> None:
         """Run the background task in a thread pool"""
-        kwargs = self.get_kwargs(contexts, states, app_context)
+        kwargs = self.get_kwargs(contexts, states, app_context, bound_app=bound_app)
         return await run_threaded(
             self.run_with_publishing,
             agent,
@@ -91,7 +99,10 @@ def background(*args: TBackground) -> TBackground: ...
 
 @overload
 def background(
-    *, name: str | None = None, registry: HooksRegistry | None = None
+    *,
+    name: str | None = None,
+    registry: HooksRegistry | None = None,
+    structure_registry: "StructureRegistry | None" = None,
 ) -> Callable[[TBackground], TBackground]: ...
 
 
@@ -100,6 +111,7 @@ def background(
     *args: TBackground,
     name: str | None = None,
     registry: HooksRegistry | None = None,
+    structure_registry: "StructureRegistry | None" = None,
 ) -> TBackground | Callable[[TBackground], TBackground]: ...
 
 
@@ -107,6 +119,7 @@ def background(  # noqa: ANN201
     *args: TBackground,
     name: str | None = None,
     registry: HooksRegistry | None = None,
+    structure_registry: "StructureRegistry | None" = None,
 ) -> TBackground | Callable[[TBackground], TBackground]:
     """Register a background task on the selected hook registry.
 
@@ -116,15 +129,15 @@ def background(  # noqa: ANN201
 
     Async background tasks run in the event loop. Synchronous ones are wrapped
     in ``WrappedThreadedBackgroundTask`` and executed through ``run_threaded``.
-    Both variants run inside ``direct_publishing`` so state mutations are
-    propagated immediately.
+    State changes they make publish to the agent that adopted the state, as
+    changes made outside a task.
 
     Args:
         *args: Background function to register when used as ``@background``
             without parentheses.
         name: Explicit registry key. Defaults to the function name.
-        registry: Hook registry to populate. Defaults to the global hook
-            registry.
+        registry: Hook registry to populate. Required: without one this raises
+            ``NoRegistryError``, since hooks go through an app (``@app.background``).
 
     Returns:
         The original function, or a decorator configured with the provided
@@ -133,10 +146,13 @@ def background(  # noqa: ANN201
     Raises:
         ValueError: If more than one function is passed at once.
 
+    Reached through ``AppRegistry.background``; call it directly only with
+    ``registry=``.
+
     Examples:
         Register a long-running async background loop::
 
-            @background
+            @app.background
             async def heartbeat(state: MyState) -> None:
                 while True:
                     state.counter += 1
@@ -147,23 +163,26 @@ def background(  # noqa: ANN201
         raise ValueError("You can only register one function at a time.")
     if len(args) == 1:
         function = args[0]
-        registry = registry or get_default_hook_registry()
+        if registry is None:
+            raise NoRegistryError.for_decorator(
+                "Hooks go", "background", "async def my_hook(): ...", "registry"
+            )
         name = name or function.__name__
         if asyncio.iscoroutinefunction(function):
             a = cast(AsyncBackgroundFunction, function)
-            registry.register_background(name, WrappedBackgroundTask(a))
+            registry.register_background(name, WrappedBackgroundTask(a, structure_registry))
         else:
             assert inspect.isfunction(function) or inspect.ismethod(function), (
                 "Function must be a async function or a sync function"
             )
             t = cast(ThreadedBackgroundFunction, function)
-            registry.register_background(name, WrappedThreadedBackgroundTask(t))
+            registry.register_background(name, WrappedThreadedBackgroundTask(t, structure_registry))
 
         return cast(TBackground, function)
 
     else:
 
         def decorator(function: TBackground) -> TBackground:
-            return cast(TBackground, background(function, name=name, registry=registry))
+            return cast(TBackground, background(function, name=name, registry=registry, structure_registry=structure_registry))
 
         return decorator

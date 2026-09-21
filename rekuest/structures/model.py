@@ -1,17 +1,19 @@
-"""This module contains the model decorator that can
-be used to mark a class as a model."""
+"""Models: dataclasses that travel by value, field by field.
+
+A model is declared on an app (``@app.model``), which makes the class a
+dataclass if it is not one and registers it on that app's structures under an
+identifier. Nothing is written on the class. :func:`model_field` is the field
+helper that carries a description, a label and validators to the port.
+"""
 
 import inspect
 import re
 from dataclasses import dataclass, field
 from typing import Any, TypeVar, get_type_hints
-import inflection
 from fieldz import fields, Field  # type: ignore
 from pydantic import BaseModel
 
 from rekuest.api.schema import ValidatorInput
-
-from typing import dataclass_transform
 
 T = TypeVar("T", bound=type[Any])
 
@@ -52,31 +54,23 @@ def model_field(
     )  # type: ignore
 
 
-@dataclass_transform(field_specifiers=(model_field,))
-def model(cls: T) -> T:
-    """Mark a class as a rekuest model and dataclass if needed.
+def ensure_model_dataclass(cls: T) -> T:
+    """Make ``cls`` a dataclass if it is not one, for use as a model.
 
-    The decorator ensures the class is dataclass-compatible, registers its
-    exported model name through ``__rekuest_model__``, and augments dataclass
-    construction failures with source-aware error messages that point at the
-    offending class line when possible.
+    Called by :meth:`~rekuest.structures.registry.StructureRegistry.model` when
+    an app declares the class. Dataclass construction failures are augmented
+    with source-aware error messages that point at the offending class line
+    when possible.
 
     Args:
-        cls: Class to convert and mark as a rekuest model.
+        cls: The class an app declares as a model.
 
     Returns:
-        The dataclass-compatible model class.
+        The same class, a dataclass.
 
     Raises:
         TypeError: If dataclass conversion fails. The raised error includes file
             and line context when source code is available.
-
-    Examples:
-        Register a lightweight structured model::
-
-            @model
-            class AcquisitionConfig:
-                threshold: float = model_field(default=0.5)
     """
 
     try:
@@ -85,7 +79,7 @@ def model(cls: T) -> T:
     except TypeError:
         try:
             # If not, attempt to transform it into a dataclass
-            return model(dataclass(cls))  # type: ignore
+            return ensure_model_dataclass(dataclass(cls))  # type: ignore
         except Exception as e:
             # --- Enhanced Error Reporting ---
             try:
@@ -127,16 +121,7 @@ def model(cls: T) -> T:
 
             raise TypeError(error_msg) from None
 
-    # Register the model name
-    setattr(cls, "__rekuest_model__", inflection.underscore(cls.__name__))
-
     return cls
-
-
-def is_model(cls: type[Any]) -> bool:
-    """Check if a class is a model."""
-
-    return getattr(cls, "__rekuest_model__", False)
 
 
 class InspectedModel(BaseModel):
@@ -184,10 +169,10 @@ def inspect_args_for_model(cls: type[Any]) -> list[InspectedArg]:
     return args
 
 
-def inspect_model_class(cls: type[Any]) -> InspectedModel:
-    """Retrieve the fullfilled model for a class."""
+def inspect_model_class(cls: type[Any], identifier: str) -> InspectedModel:
+    """The model class ``cls`` as a port is built from it: its fields, under ``identifier``."""
     return InspectedModel(
-        identifier=cls.__rekuest_model__,
+        identifier=identifier,
         description=cls.__doc__,
         args=inspect_args_for_model(cls),
     )

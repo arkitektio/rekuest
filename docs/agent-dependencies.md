@@ -11,16 +11,17 @@ satisfies it — either automatically (`auto_resolvable`) or by asking the user 
 pick one when your implementation is set up.
 
 ```python
-from rekuest import declare, declare_state
+from rekuest.app import AppRegistry
+
+app = AppRegistry()   # in arkitekt: `app = App(...)`
 
 
-@declare_state
 class CameraState:
     connected: bool
     exposure_ms: float
 
 
-@declare(app="mymicroscope")
+@app.declare(app="mymicroscope")
 class CameraDeps:
     """A camera agent this app needs to drive."""
 
@@ -31,13 +32,36 @@ class CameraDeps:
         ...
 ```
 
-Two passes turn this class into a dependency:
+The protocol is declared *on an app*, and its demands' ports are built right
+then against that app's structures -- nothing is written on the class, so one
+class can be declared on any number of apps. Two passes turn it into a dependency:
 
 - **public methods → action demands.** Each method's signature (via
   `prepare_definition`) becomes the arg/return *port matches* the resolved action
   must satisfy.
-- **`@declare_state` attributes → state demands.** Each annotated attribute's
-  fields become the *port matches* the resolved agent's state must satisfy.
+- **public annotated attributes → state demands.** Each attribute is annotated
+  with a class whose annotations are the state's fields; those fields become the
+  *port matches* the resolved agent's state must satisfy. Prefix an attribute
+  with `_` to keep it out.
+
+## Calling a dependency
+
+Type-hint a parameter with the protocol class and the actor hands the function a
+proxy made for the task it runs in:
+
+```python
+@app.register
+def capture(camera: CameraDeps, task: Task) -> bytes:
+    task.progress(10, "acquiring")
+    return camera.acquire(exposure_ms=10.0)   # a child of this task
+```
+
+`camera.acquire(...)` calls as the protocol declared the method: awaitable when it
+is `async`, blocking otherwise (`.acall(...)` / `.call(...)` are the explicit
+forms). The call leaves over your agent's socket, parented to the task the
+proxy was made for -- the very object a `task: Task` parameter receives -- and is
+(de)serialized with your app's structures. A name the protocol does not declare
+raises `AttributeError`; a state demand is not readable through the proxy.
 
 ## App + key: how a demand is identified
 
@@ -53,8 +77,8 @@ By default these are **inherited from the protocol**:
 
 | Demand | default `app`         | default `key`               |
 | ------ | --------------------- | --------------------------- |
-| action | the `@declare` app    | the **method name**         |
-| state  | the `@declare` app    | the **attribute name**      |
+| action | the `@app.declare` app | the **method name**         |
+| state  | the `@app.declare` app | the **attribute name**      |
 
 So in the example above `acquire` demands the action `mymicroscope.acquire`, and
 `state` demands the state `mymicroscope.state`.
@@ -87,7 +111,7 @@ resolved agent doesn't have to satisfy it at all. Pass `optional=True` to `@dema
 or `demand_state`:
 
 ```python
-@declare(app="mymicroscope")
+@app.declare(app="mymicroscope")
 class Deps:
     async def acquire(self, exposure_ms: float) -> bytes: ...
 
@@ -114,10 +138,10 @@ a camera protocol but delegates image opening to `imagej`'s `open_image` action.
 Decorate the method to override its demand target:
 
 ```python
-from rekuest import declare, demand
+from rekuest.declare import demand
 
 
-@declare(app="mymicroscope")
+@app.declare(app="mymicroscope")
 class Deps:
     # inherits app="mymicroscope", key="acquire"
     async def acquire(self, exposure_ms: float) -> bytes:
@@ -154,15 +178,14 @@ Instead, place a `demand_state(...)` marker inside `typing.Annotated`:
 ```python
 from typing import Annotated
 
-from rekuest import declare, declare_state, demand_state
+from rekuest.declare import demand_state
 
 
-@declare_state
 class ViewerState:
     open: bool
 
 
-@declare(app="mymicroscope")
+@app.declare(app="mymicroscope")
 class Deps:
     # inherits app="mymicroscope", key="camera"
     camera: CameraState
@@ -248,10 +271,9 @@ for matching actions and agents.
 
 | Symbol                                | Import                        |
 | ------------------------------------- | ----------------------------- |
-| `declare(app=..., ...)`               | `from rekuest import declare` |
-| `declare_state`                       | `from rekuest import declare_state` |
-| `demand(*, app=..., key=..., ...)`    | `from rekuest import demand` |
-| `demand_state(*, app=..., key=..., ...)` | `from rekuest import demand_state` |
+| `app.declare(app=..., ...)`           | a method of `AppRegistry` (arkitekt: `App.declare`) |
+| `demand(*, app=..., key=..., ...)`    | `from rekuest.declare import demand` |
+| `demand_state(*, app=..., key=..., ...)` | `from rekuest.declare import demand_state` |
 
 The override dataclasses (`ActionDemandOverride`, `StateDemandOverride`) and the
 low-level builders (`build_action_dependency_input`,

@@ -166,7 +166,7 @@ async def _structure(
         return value
     fstruc = ctx.registry.get_fullfilled_structure(port.identifier)
     try:
-        shrunk = await fstruc.ashrink(value)
+        shrunk = await fstruc.shrink(value)
     except Exception:
         raise StructureShrinkingError(
             f"Error shrinking {repr(value)} with Structure {port.identifier}"

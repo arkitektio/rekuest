@@ -775,8 +775,13 @@ class FastApiAgent(BaseAgent):
         """Start the agent and initialize the sink and retriever."""
         await self.sink.ainitialize()
         await self.retriever.ainitialize()
+        # Before anything is recorded: a doomed start is refused here, with the sink
+        # initialised so the teardown that follows has something to close.
+        self.app_registry.require_app_context(app_context, whose="This app")
         if isinstance(self.backend, SinkAgentBackend):
-            # The session records the agent's states, which exist only once started.
+            # The session records what the agent implements and its states (the latter
+            # exist only once started).
+            self.backend.implementations = list(self.app_registry.implementations.values())
             self.backend.states = list(self.states.values())
         # The baseline snapshot reaches the sink through apublish_session_init below,
         # which super().astart() triggers once states are initialized. (This used to dump
@@ -786,6 +791,8 @@ class FastApiAgent(BaseAgent):
     async def atear_down(self) -> None:
         """Tear down the agent and clean up the sink and retriever."""
         await super().atear_down()
-        await self._await_persistence_caught_up()
+        if self._ran_startup_hooks:
+            # An agent that never started persisted nothing to catch up on.
+            await self._await_persistence_caught_up()
         await self.sink.ateardown()
         await self.retriever.ateardown()
