@@ -3,7 +3,7 @@
 from enum import Enum
 import pytest
 from rekuest.definition.define import prepare_definition
-from rekuest.api.schema import (
+from rekuest.protocol.schema import (
     ActionArgumentInput,
     AgentProbeInput,
     ChoiceInput,

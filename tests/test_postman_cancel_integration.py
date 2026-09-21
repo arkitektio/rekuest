@@ -13,9 +13,7 @@ import uuid
 import pytest
 from dokker import Deployment
 
-from rekuest.api.schema import (
-    TaskEventKind,
-)
+from rekuest.protocol.schema import TaskEventKind
 
 from .conftest import CONNECT_TIMEOUT, build_fresh_rekuest
 

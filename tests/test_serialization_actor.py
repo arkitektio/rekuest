@@ -16,7 +16,7 @@ from .funcs import (
 )
 from .structures import SecondObject, SecondSerializableObject, SerializableObject
 from rekuest.structures.errors import ShrinkingError, ExpandingError
-from rekuest.api.schema import (
+from rekuest.protocol.schema import (
     ActionKind,
     DefinitionInput,
     ArgPortInput,

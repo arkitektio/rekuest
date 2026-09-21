@@ -5,14 +5,13 @@ from typing import Any
 from collections.abc import AsyncGenerator, Sequence
 from rath.scalars import ID
 from rekuest.client.graphql import RekuestGraphQL
-from rekuest.api.schema import (
+from rekuest.protocol.schema import (
     HookInput,
     ResolvedDependencyInput,
-    TaskChange,
-    TaskEventChange,
     TaskEventKind,
     AssignInput,
 )
+from rekuest.api.schema import TaskChange, TaskEventChange
 from rekuest.scalars import ActionHash
 import asyncio
 import uuid

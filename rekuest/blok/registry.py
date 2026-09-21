@@ -6,7 +6,7 @@ from typing import (
 )
 from collections.abc import Iterable, Sequence
 
-from rekuest.api.schema import (
+from rekuest.protocol.schema import (
     ActionDependencyInput,
     AgentProbeInput,
     AgentDependencyInput,

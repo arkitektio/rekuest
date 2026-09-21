@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from collections.abc import Iterable
 
-from rekuest.api.schema import (
+from rekuest.protocol.schema import (
     AgentDependencyInput,
     AgentProbeInput,
     ComponentNodeInput,

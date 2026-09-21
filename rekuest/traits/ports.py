@@ -9,7 +9,7 @@ from rekuest.traits.calls import check_pure_call
 from rekuest.messages import JSONSerializable
 
 if TYPE_CHECKING:
-    from rekuest.api.schema import (
+    from rekuest.protocol.schema import (
         ArgPortInput,
         DefinitionInput,
         EffectInput,
@@ -50,7 +50,7 @@ class PortTrait(BaseModel):
     @model_validator(mode="after")  # type: ignore[override]
     def validate_portkind_nested(self: "PortInput") -> "PortInput":
         """Validate the function of the validator"""
-        from rekuest.api.schema import PortKind
+        from rekuest.protocol.schema import PortKind
 
         if self.kind == PortKind.STRUCTURE:
             if self.identifier is None:
@@ -217,7 +217,7 @@ class DefinitionInputTrait(BaseModel):
         ``value`` always names the port's own value, so a sibling port called ``value``
         is shadowed there (but is otherwise an ordinary port).
         """
-        from rekuest.api.schema import AssignWidgetKind
+        from rekuest.protocol.schema import AssignWidgetKind
 
         roots = [*(self.args or ()), *(self.returns or ())]
 

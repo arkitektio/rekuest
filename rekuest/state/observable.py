@@ -6,7 +6,7 @@ import contextlib
 import threading
 from collections.abc import Iterator
 
-from rekuest.api.schema import ReturnPortInput, StateDefinitionInput
+from rekuest.protocol.schema import ReturnPortInput, StateDefinitionInput
 from rekuest.state.publish import Patch, StateHolder
 from rekuest.structures.types import StateDeclaration
 

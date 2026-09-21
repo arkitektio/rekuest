@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING
 from rekuest.catalogs import base_operation
 
 if TYPE_CHECKING:
-    from rekuest.api.schema import ActionArgumentInput, UtilCallInput
+    from rekuest.protocol.schema import ActionArgumentInput, UtilCallInput
 
 OWN_VALUE = "value"
 """The reserved ``value_path`` root that refers to the port's own value."""

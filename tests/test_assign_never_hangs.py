@@ -16,7 +16,8 @@ import pytest
 
 from rekuest import messages
 from rekuest.agents.base import BaseAgent
-from rekuest.api.schema import TaskEventChange, TaskEventKind
+from rekuest.protocol.schema import TaskEventKind
+from rekuest.api.schema import TaskEventChange
 from rekuest.app import AppRegistry
 from rekuest.errors import CriticalCallError
 from rekuest.register import register

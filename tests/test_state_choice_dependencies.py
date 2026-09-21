@@ -9,7 +9,7 @@ reference (``dependency=None``) points at the function's own state and is always
 import pytest
 from pydantic import ValidationError
 
-from rekuest.api.schema import (
+from rekuest.protocol.schema import (
     AgentDependencyInput,
     ImplementationInput,
     PortKind,

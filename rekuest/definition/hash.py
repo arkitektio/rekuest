@@ -3,7 +3,7 @@
 import hashlib
 import json
 
-from rekuest.api.schema import DefinitionInput
+from rekuest.protocol.schema import DefinitionInput
 
 
 def hash_definition(definition: DefinitionInput) -> str:

@@ -3,7 +3,7 @@
 
 import pytest
 
-from rekuest.api.schema import ArgPortInput, PortKind
+from rekuest.protocol.schema import ArgPortInput, PortKind
 from rekuest.definition.define import prepare_definition
 from rekuest.structures.registry import StructureRegistry
 from rekuest.structures.serialization.postman import ashrink_args

@@ -1,5 +1,5 @@
 from typing import Annotated, TypeVar, TypeAlias
-from rekuest.protocols import AnyState
+from rekuest.protocol.types import AnyState
 
 # 1. Define a TypeVar to represent the generic inner type
 T = TypeVar("T", bound=AnyState)

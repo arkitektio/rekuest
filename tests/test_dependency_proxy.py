@@ -15,7 +15,7 @@ from rekuest.actors.dependency import AgentDependencyProxy
 from rekuest.actors.helper import AssignmentHelper
 from rekuest.agents.base import BaseAgent
 from rekuest.agents.caller import CallerTaskEvent
-from rekuest.api.schema import TaskEventKind
+from rekuest.protocol.schema import TaskEventKind
 from rekuest.task import Task
 
 from .agent_helpers import run_assignment

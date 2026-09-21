@@ -11,7 +11,7 @@ from pydantic import ValidationError
 import pytest
 
 from rekuest.widgets import SearchWidget
-from rekuest.api.schema import ArgPortInput, PortKind
+from rekuest.protocol.schema import ArgPortInput, PortKind
 from rekuest.definition.define import prepare_definition
 from rekuest.structures.registry import StructureRegistry
 

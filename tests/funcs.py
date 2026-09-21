@@ -4,7 +4,7 @@ import asyncio
 from collections.abc import Generator
 from .structures import SecondObject, SecondSerializableObject, SerializableObject
 from annotated_types import Le, Predicate, Gt, Len
-from rekuest.api.schema import CustomAssignWidgetInput
+from rekuest.protocol.schema import CustomAssignWidgetInput
 
 
 from typing import Annotated

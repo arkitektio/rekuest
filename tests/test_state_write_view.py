@@ -10,7 +10,7 @@ import threading
 
 import pytest
 
-from rekuest.api.schema import StateDefinitionInput
+from rekuest.protocol.schema import StateDefinitionInput
 from rekuest.state.observable import Mutation, StateConfig, adopt, make_evented
 from rekuest.state.write import write_view
 

@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-from rekuest.api.schema import DiagnosticLevel
+from rekuest.protocol.schema import DiagnosticLevel
 from rekuest.catalogs import (
     RULES,
     UNKNOWN_CATALOG,

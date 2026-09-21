@@ -10,7 +10,7 @@ from dataclasses import dataclass
 import pytest
 from pydantic import ValidationError
 
-from rekuest.api.schema import (
+from rekuest.protocol.schema import (
     AgentDependencyInput,
     ImplementAgentInput,
     ImplementationInput,

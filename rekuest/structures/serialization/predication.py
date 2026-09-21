@@ -6,7 +6,7 @@ Used to pick the matching branch of a ``UNION`` port before shrinking.
 import datetime as dt
 from typing import Any
 
-from rekuest.api.schema import PortKind
+from rekuest.protocol.schema import PortKind
 from rekuest.structures.quantities import matches_dimension
 from rekuest.structures.registry import StructureRegistry
 from rekuest.structures.serialization.protocols import SerializablePort

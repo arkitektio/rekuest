@@ -16,7 +16,7 @@ from rekuest.actors.types import ActorBuilder
 from rekuest.agents.hooks.registry import HooksRegistry
 from rekuest.provider import Provider, declare_provider
 from rekuest.service import Service, declare_service
-from rekuest.api.schema import (
+from rekuest.protocol.schema import (
     AgentDependencyInput,
     AssignWidgetInput,
     ReturnWidgetInput,
@@ -38,7 +38,7 @@ from rekuest.catalogs import (
     check_extension_does_not_shadow_base,
     resolve_catalogs,
 )
-from rekuest.protocols import AnyState
+from rekuest.protocol.types import AnyState
 from rekuest.errors import AppContextError, RegistryFrozenError
 from rekuest.structures.registry import StructureRegistry
 from rekuest.structures.types import ExpanderT, ManyExpander, Shrinker
@@ -327,7 +327,7 @@ class AppRegistry(BaseModel):
         actually be built with. A hand-registered structure's service is guessed
         from its identifier, and ``@myapp/image`` names no service at all.
         """
-        from rekuest.api.schema import PortKind
+        from rekuest.protocol.schema import PortKind
         from rekuest.structures.errors import StructureRegistryError
 
         needed: dict[str, set[str]] = {}
@@ -860,7 +860,7 @@ class AppRegistry(BaseModel):
         Raises:
             StructureRegistryError: Listing every problem it found.
         """
-        from rekuest.api.schema import PortKind
+        from rekuest.protocol.schema import PortKind
         from rekuest.structures.errors import StructureRegistryError
 
         registry = self.structure_registry

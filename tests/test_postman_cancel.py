@@ -26,7 +26,8 @@ from rekuest import messages
 
 from .memory_transport import MemoryAgentTransport
 from rekuest.agents.caller import AgentPostman
-from rekuest.api.schema import TaskEventChange, TaskEventKind
+from rekuest.protocol.schema import TaskEventKind
+from rekuest.api.schema import TaskEventChange
 from rekuest.postmans.errors import RootOnlyAssignError
 from rekuest.client.postman import GraphQLPostman
 from rekuest.client.rath import RekuestRath

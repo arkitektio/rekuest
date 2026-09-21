@@ -31,7 +31,7 @@ Deadlock invariants
 import asyncio
 import logging
 from types import TracebackType
-from rekuest.api.schema import LockImplementationInput
+from rekuest.protocol.schema import LockImplementationInput
 from typing import TYPE_CHECKING, Self
 
 if TYPE_CHECKING:

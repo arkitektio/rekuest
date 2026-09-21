@@ -13,7 +13,7 @@ from typing import Annotated
 import pytest
 from dokker import Deployment
 
-from rekuest.api.schema import (
+from rekuest.protocol.schema import (
     ActionArgumentInput,
     CatalogArgumentInput,
     CatalogOperationInput,

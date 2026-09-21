@@ -5,7 +5,7 @@ import keyword
 import tokenize
 import xml.etree.ElementTree as ET
 
-from rekuest.api.schema import (
+from rekuest.protocol.schema import (
     ActionArgumentInput,
     AgentProbeInput,
     ComponentNodeInput,

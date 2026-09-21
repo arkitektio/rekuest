@@ -1,7 +1,7 @@
 """The base client for rekuest"""
 
 from typing import TypeVar
-from rekuest.protocols import AnyFunction
+from rekuest.protocol.types import AnyFunction
 from rekuest.client.rath import RekuestRath
 from rekuest.api.schema import RekuestApi
 from rekuest.postmans.types import Postman

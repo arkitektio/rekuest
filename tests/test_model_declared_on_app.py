@@ -11,7 +11,7 @@ from dataclasses import dataclass
 
 import pytest
 
-from rekuest.api.schema import PortKind
+from rekuest.protocol.schema import PortKind
 from rekuest.app import AppRegistry
 from rekuest.definition.define import prepare_definition
 from rekuest.definition.errors import DefinitionError

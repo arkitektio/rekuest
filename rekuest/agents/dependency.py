@@ -11,7 +11,7 @@ from rekuest.definition.define import (
     is_dependency_type,
     is_tuple,
 )
-from rekuest.protocols import AnyFunction
+from rekuest.protocol.types import AnyFunction
 
 if TYPE_CHECKING:
     from rekuest.structures.registry import StructureRegistry

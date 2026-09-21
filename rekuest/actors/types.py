@@ -16,11 +16,11 @@ from rekuest.actors.policy import KEEP, DisconnectPolicy
 from rekuest.agents.context import PreparedContextReturns, PreparedContextVariables
 from rekuest.coercible_types import OptimisticCoercible
 from rekuest.postmans.types import Postman
-from rekuest.protocols import AnyFunction, AnyState
+from rekuest.protocol.types import AnyFunction, AnyState
 from rekuest.scalars import Identifier
 from rekuest.state.publish import Patch
 from rekuest.structures.registry import StructureRegistry
-from rekuest.api.schema import (
+from rekuest.protocol.schema import (
     PortGroupInput,
     TestTargetInput,
     TrackInput,

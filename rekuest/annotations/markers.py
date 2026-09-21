@@ -17,7 +17,7 @@ from the top-level :mod:`rekuest` package::
 
 from typing import TypeVar
 
-from rekuest.api.schema import ProvidesInput, RequiresInput
+from rekuest.protocol.schema import ProvidesInput, RequiresInput
 from rekuest.structures.types import JSONSerializable
 
 T = TypeVar("T")

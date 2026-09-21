@@ -11,11 +11,7 @@ from rekuest.contrib.fastapi.auth import (
     ExpandUserFromRequest,
 )
 from rekuest.messages import Cancel, Pause, Resume
-from rekuest.api.schema import (
-    CancelInput,
-    PauseInput,
-    ResumeInput,
-)
+from rekuest.protocol.schema import CancelInput, PauseInput, ResumeInput
 from rekuest.contrib.fastapi.agent import FastApiAgent
 
 

@@ -6,7 +6,7 @@ from datetime import datetime, UTC
 
 from rekuest import messages
 from rekuest.contrib.sql_lite.schema import ensure_sqlite_schema
-from rekuest.protocols import AnyState
+from rekuest.protocol.types import AnyState
 
 
 # 2. Helpers

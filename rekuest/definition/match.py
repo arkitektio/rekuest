@@ -1,4 +1,4 @@
-from rekuest.api.schema import ArgPortInput, PortMatchInput, ReturnPortInput
+from rekuest.protocol.schema import ArgPortInput, PortMatchInput, ReturnPortInput
 
 
 def build_port_match(

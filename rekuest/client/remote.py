@@ -15,7 +15,8 @@ from collections.abc import AsyncGenerator, Generator
 
 from koil import unkoil, unkoil_gen
 
-from rekuest.api.schema import Action, HookInput, Implementation
+from rekuest.protocol.schema import HookInput
+from rekuest.api.schema import Action, Implementation
 from rekuest.calls import (
     CallOptions,
     _astream_raw,

@@ -2,7 +2,7 @@ from typing import Any, Protocol, runtime_checkable
 
 from attr import dataclass
 
-from rekuest.api.schema import ReturnPortInput
+from rekuest.protocol.schema import ReturnPortInput
 
 @dataclass
 class Patch:

@@ -1,6 +1,6 @@
 from collections.abc import Sequence
 
-from rekuest.api.schema import (
+from rekuest.protocol.schema import (
     ActionDemandInput,
     ActionDependencyInput,
     DefinitionInput,

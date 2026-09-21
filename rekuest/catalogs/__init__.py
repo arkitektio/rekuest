@@ -17,7 +17,7 @@ This module also holds the validation rules themselves, mirroring the server's
 models so that they stay usable from anywhere -- see the import rule below.
 
 .. warning::
-   This module must import **nothing** from ``rekuest``. ``rekuest.api.schema`` imports
+   This module must import **nothing** from ``rekuest``. ``rekuest.protocol.schema`` imports
    ``rekuest.traits.ports`` while it is still executing, and that reaches this loader, so any
    ``rekuest`` import here is a cycle. ``tests/test_base_catalog.py`` enforces it as a
    source-level substring check, which is why even a sibling ``rekuest.catalogs.x`` import is

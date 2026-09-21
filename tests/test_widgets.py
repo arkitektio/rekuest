@@ -60,7 +60,7 @@ def test_custom_widgets_render_catalog_components() -> None:
     """Custom widgets name a catalog component and carry pure props; members enforce their fields."""
     from pydantic import ValidationError
 
-    from rekuest.api.schema import (
+    from rekuest.protocol.schema import (
         ActionArgumentInput,
         ChoiceInput,
         ChoiceReturnWidgetInput,
@@ -112,7 +112,7 @@ def test_choice_widgets_carry_choices_off_the_wire() -> None:
 
 def test_state_choice_needs_exactly_one_pointer() -> None:
     """A state choice widget is either a static pointer or a computed one."""
-    from rekuest.api.schema import (
+    from rekuest.protocol.schema import (
         ActionArgumentInput,
         StateChoiceAssignWidgetInput,
         UtilCallInput,

@@ -16,7 +16,7 @@ from typing import Annotated  # noqa: E402
 
 from kanne import ElectricPotential, Duration, Capacitance  # noqa: E402
 
-from rekuest.api.schema import ArgPortInput, PortKind  # noqa: E402
+from rekuest.protocol.schema import ArgPortInput, PortKind
 from rekuest.definition.define import (  # noqa: E402
     prepare_definition,
     convert_object_to_argport,

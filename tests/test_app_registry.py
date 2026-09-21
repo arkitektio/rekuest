@@ -10,7 +10,8 @@ from enum import Enum
 
 import pytest
 
-from rekuest.api.schema import Implementation, PortKind
+from rekuest.protocol.schema import PortKind
+from rekuest.api.schema import Implementation
 from rekuest.app import AppRegistry
 from rekuest.arkitekt import rekuest_service
 from rekuest.definition.errors import DefinitionError

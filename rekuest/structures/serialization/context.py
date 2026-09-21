@@ -6,7 +6,7 @@ from collections.abc import Awaitable, Callable, Sequence
 
 from rath.scalars import ID
 from rekuest.actors.types import Shelver
-from rekuest.api.schema import PortKind
+from rekuest.protocol.schema import PortKind
 from rekuest.structures.registry import StructureRegistry
 from rekuest.structures.serialization.batching import ExpandBatcher
 from rekuest.structures.serialization.protocols import SerializablePort

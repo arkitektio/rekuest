@@ -4,10 +4,10 @@
     "extensions": {
         "turms": {
             "domain": null,
-            "out_dir": "rekuest/api",
+            "out_dir": "rekuest/protocol",
             "dump_configuration": true,
             "configuration_name": "project.json",
-            "dump_schema": true,
+            "dump_schema": false,
             "schema_name": "schema.graphql",
             "generated_name": "schema.py",
             "documents": "graphql/**/**.graphql",
@@ -73,20 +73,46 @@
             "skip_forwards": false,
             "min_python_version": "3.10",
             "type_annotation_style": "auto",
-            "external_modules": [
-                {
-                    "module": "rekuest.protocol.schema",
-                    "kinds": [
-                        "enum",
-                        "input"
-                    ],
-                    "names": {},
-                    "from_project": "rekuest_protocol"
-                }
-            ],
+            "external_modules": [],
             "additional_bases": {
-                "Action": [
-                    "rekuest.traits.action.Callable"
+                "AnnotationInput": [
+                    "rekuest.traits.ports.AnnotationInputTrait"
+                ],
+                "ArgPortInput": [
+                    "rekuest.traits.ports.PortTrait"
+                ],
+                "ReturnPortInput": [
+                    "rekuest.traits.ports.PortTrait"
+                ],
+                "SearchAssignWidgetInput": [
+                    "rekuest.traits.ports.SearchWidgetInputTrait"
+                ],
+                "SliderAssignWidgetInput": [
+                    "rekuest.traits.ports.SliderWidgetInputTrait"
+                ],
+                "StateChoiceAssignWidgetInput": [
+                    "rekuest.traits.ports.StateChoiceWidgetInputTrait"
+                ],
+                "CreateBlokInput": [
+                    "rekuest.traits.blok.CreateBlokInputTrait"
+                ],
+                "ImplementationInput": [
+                    "rekuest.traits.implementation.ImplementationInputTrait"
+                ],
+                "BlokImplementationInput": [
+                    "rekuest.traits.blok.BlokImplementationInputTrait"
+                ],
+                "ImplementAgentInput": [
+                    "rekuest.traits.agent.ImplementAgentInputTrait"
+                ],
+                "ValidatorInput": [
+                    "rekuest.traits.ports.ValidatorInputTrait"
+                ],
+                "EffectInput": [
+                    "rekuest.traits.ports.EffectInputTrait"
+                ],
+                "DefinitionInput": [
+                    "rekuest.traits.ports.DefinitionInputTrait"
                 ]
             },
             "additional_config": {},
@@ -95,24 +121,10 @@
             "parsers": [],
             "plugins": [
                 {
-                    "type": "turms.plugins.fragments.FragmentsPlugin"
+                    "type": "turms.plugins.enums.EnumsPlugin"
                 },
                 {
-                    "type": "turms.plugins.operations.OperationsPlugin"
-                },
-                {
-                    "type": "turms.plugins.client.ClientPlugin",
-                    "client_class": "RekuestApi",
-                    "reserved_from": [
-                        "rekuest.client.client.Rekuest"
-                    ],
-                    "coercible_scalars": {
-                        "SearchQuery": "rekuest.scalars.SearchQueryCoercible",
-                        "ID": "rath.scalars.IDCoercible"
-                    },
-                    "expand_input_types": [
-                        "input"
-                    ]
+                    "type": "turms.plugins.inputs.InputsPlugin"
                 }
             ],
             "processors": [

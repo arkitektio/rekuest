@@ -1,7 +1,7 @@
 """FastAPI route orchestration for rekuest agents."""
 
 from __future__ import annotations
-from rekuest.api.schema import StateImplementationInput
+from rekuest.protocol.schema import StateImplementationInput
 
 import asyncio
 import contextlib

@@ -10,10 +10,7 @@ from collections.abc import AsyncGenerator, Sequence
 
 from rath.scalars import ID
 
-from rekuest.api.schema import (
-    HookInput,
-    TaskEventKind,
-)
+from rekuest.protocol.schema import HookInput, TaskEventKind
 
 
 @runtime_checkable

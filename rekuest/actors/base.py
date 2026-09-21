@@ -30,7 +30,7 @@ from rekuest import messages
 from rekuest.definition.define import (
     DefinitionInput,
 )
-from rekuest.protocols import AnyContext, AnyState
+from rekuest.protocol.types import AnyContext, AnyState
 from rekuest.state.observable import Mutation
 from rekuest.state.utils import PreparedStateReturns, PreparedStateVariables
 from rekuest.structures.registry import StructureRegistry

@@ -10,7 +10,7 @@ supply a visitor.
 
 from typing import Any, Protocol
 
-from rekuest.api.schema import (
+from rekuest.protocol.schema import (
     ActionArgumentInput,
     AgentProbeInput,
     ComponentNodeInput,

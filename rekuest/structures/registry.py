@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from rekuest.api.schema import (
+from rekuest.protocol.schema import (
     AssignWidgetInput,
     ChoiceInput,
     EffectInput,

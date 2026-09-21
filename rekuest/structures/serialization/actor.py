@@ -18,7 +18,7 @@ from collections.abc import Sequence
 from rath.scalars import ID
 
 from rekuest.actors.types import Shelver
-from rekuest.api.schema import (
+from rekuest.protocol.schema import (
     ArgPortInput,
     DefinitionInput,
     PortKind,

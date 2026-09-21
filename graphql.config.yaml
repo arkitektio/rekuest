@@ -1,16 +1,17 @@
 projects:
-  rekuest:
+  # The wire vocabulary: every enum and input in the schema, woven with the
+  # hand-written traits. An app speaks only this; importing rekuest loads it
+  # and stops there.
+  rekuest_protocol:
     schema: http://jhnnsrs-lab/rekuest/schema
     documents: graphql/**/**.graphql
     extensions:
       turms:
-        out_dir: rekuest/api
+        out_dir: rekuest/protocol
+        dump_schema: false
         always_resolve_interfaces: true
         exclude_typenames: true
         dump_configuration: true
-        dump_schema: true
-        freeze:
-          enabled: true
         options:
           enabled: true
           populate_by_name: true
@@ -19,6 +20,8 @@ projects:
           extra: forbid
           types:
             - input
+        freeze:
+          enabled: true
         stylers:
           - type: turms.stylers.default.DefaultStyler
           - type: turms.stylers.appender.AppenderStyler
@@ -26,6 +29,84 @@ projects:
         plugins:
           - type: turms.plugins.enums.EnumsPlugin
           - type: turms.plugins.inputs.InputsPlugin
+        processors:
+          - type: turms.processors.disclaimer.DisclaimerProcessor
+        scalar_definitions:
+          uuid: str
+          Callback: str
+          Any: typing.Any
+          AnyInput: typing.Any
+          JSONSerializable: rekuest.scalars.JSONSerializable
+          UISchema: rekuest.scalars.UISchema
+          AnyDefault: typing.Any
+          Args: rekuest.scalars.Args
+          ValueMap: rekuest.scalars.ValueMap
+          MediaLike: rekuest.scalars.MediaLike
+          ID: rath.scalars.ID
+          ActionHash: rekuest.scalars.ActionHash
+          Arg: typing.Any
+          Identifier: rekuest.scalars.Identifier
+          SearchQuery: rekuest.scalars.SearchQuery
+        additional_bases:
+          AnnotationInput:
+            - rekuest.traits.ports.AnnotationInputTrait
+          ArgPortInput:
+            - rekuest.traits.ports.PortTrait
+          ReturnPortInput:
+            - rekuest.traits.ports.PortTrait
+          SearchAssignWidgetInput:
+            - rekuest.traits.ports.SearchWidgetInputTrait
+          SliderAssignWidgetInput:
+            - rekuest.traits.ports.SliderWidgetInputTrait
+          StateChoiceAssignWidgetInput:
+            - rekuest.traits.ports.StateChoiceWidgetInputTrait
+          CreateBlokInput:
+            - rekuest.traits.blok.CreateBlokInputTrait
+          ImplementationInput:
+            - rekuest.traits.implementation.ImplementationInputTrait
+          BlokImplementationInput:
+            - rekuest.traits.blok.BlokImplementationInputTrait
+          ImplementAgentInput:
+            - rekuest.traits.agent.ImplementAgentInputTrait
+          ValidatorInput:
+            - rekuest.traits.ports.ValidatorInputTrait
+          EffectInput:
+            - rekuest.traits.ports.EffectInputTrait
+          DefinitionInput:
+            - rekuest.traits.ports.DefinitionInputTrait
+  # The client surface: fragments, operations and the RekuestApi mixin, over
+  # the vocabulary above. Only rekuest/client/ and rekuest/arkitekt.py may
+  # name it -- tests/test_layering.py enforces that.
+  rekuest:
+    schema: http://jhnnsrs-lab/rekuest/schema
+    documents: graphql/**/**.graphql
+    extensions:
+      turms:
+        out_dir: rekuest/api
+        dump_schema: true
+        external_modules:
+          - module: rekuest.protocol.schema
+            kinds: [enum, input]
+            from_project: rekuest_protocol
+        always_resolve_interfaces: true
+        exclude_typenames: true
+        dump_configuration: true
+        options:
+          enabled: true
+          populate_by_name: true
+          alias_mode: split
+          use_enum_values: true
+          extra: forbid
+          types:
+            - input
+        freeze:
+          enabled: true
+        stylers:
+          - type: turms.stylers.default.DefaultStyler
+          - type: turms.stylers.appender.AppenderStyler
+            append_fragment: ""
+        plugins:
+        plugins:
           - type: turms.plugins.fragments.FragmentsPlugin
           - type: turms.plugins.operations.OperationsPlugin
           - type: turms.plugins.client.ClientPlugin
@@ -63,29 +144,3 @@ projects:
         additional_bases:
           Action:
             - rekuest.traits.action.Callable
-          AnnotationInput:
-            - rekuest.traits.ports.AnnotationInputTrait
-          ArgPortInput:
-            - rekuest.traits.ports.PortTrait
-          ReturnPortInput:
-            - rekuest.traits.ports.PortTrait
-          SearchAssignWidgetInput:
-            - rekuest.traits.ports.SearchWidgetInputTrait
-          SliderAssignWidgetInput:
-            - rekuest.traits.ports.SliderWidgetInputTrait
-          StateChoiceAssignWidgetInput:
-            - rekuest.traits.ports.StateChoiceWidgetInputTrait
-          CreateBlokInput:
-            - rekuest.traits.blok.CreateBlokInputTrait
-          ImplementationInput:
-            - rekuest.traits.implementation.ImplementationInputTrait
-          BlokImplementationInput:
-            - rekuest.traits.blok.BlokImplementationInputTrait
-          ImplementAgentInput:
-            - rekuest.traits.agent.ImplementAgentInputTrait
-          ValidatorInput:
-            - rekuest.traits.ports.ValidatorInputTrait
-          EffectInput:
-            - rekuest.traits.ports.EffectInputTrait
-          DefinitionInput:
-            - rekuest.traits.ports.DefinitionInputTrait

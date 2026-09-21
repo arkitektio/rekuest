@@ -83,10 +83,8 @@ class UploadLink(ParsingLink):
     async def aget_media_upload_credentials(
         self, file: MediaLike, datalayer: DataLayer
     ) -> "MediaUploadGrant":
-        from rekuest.api.schema import (
-            RequestMediaUploadInput,
-            RequestMediaUploadMutation,
-        )
+        from rekuest.protocol.schema import RequestMediaUploadInput
+        from rekuest.api.schema import RequestMediaUploadMutation
 
         if not self.next:
             raise ValueError("No next link found. Please set the next link.")

@@ -19,7 +19,7 @@ from collections.abc import AsyncGenerator
 from koil import unkoil
 from rath.scalars import ID
 
-from rekuest.api.schema import DefinitionInput, HookInput, TaskEventKind
+from rekuest.protocol.schema import DefinitionInput, HookInput, TaskEventKind
 from rekuest.errors import CriticalCallError, ErrorCallError
 from rekuest.messages import Assign, JSONSerializable
 from rekuest.postmans.types import Postman

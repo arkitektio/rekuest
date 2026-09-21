@@ -21,7 +21,7 @@ from rekuest.agents.hooks.variables import WithVariables
 
 if TYPE_CHECKING:
     from rekuest.structures.registry import StructureRegistry
-from rekuest.protocols import (
+from rekuest.protocol.types import (
     AnyFunction,
     AsyncStartupFunction,
     ContextLessStartupFunction,

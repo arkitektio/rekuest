@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Any, cast
 from pydantic import BaseModel, model_validator
 
 if TYPE_CHECKING:
-    from rekuest.api.schema import CreateBlokInput, BlokImplementationInput
+    from rekuest.protocol.schema import CreateBlokInput, BlokImplementationInput
 
 
 def _validate_demo_state_against_dependencies(

@@ -12,7 +12,7 @@ from typing import Any
 
 import pytest
 
-from rekuest.api.schema import TaskEventKind
+from rekuest.protocol.schema import TaskEventKind
 
 
 class RecordingPostman:

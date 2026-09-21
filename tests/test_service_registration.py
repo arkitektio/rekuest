@@ -11,7 +11,7 @@ from typing import Annotated, Optional
 import pytest
 from fakts import Alias, Require
 
-from rekuest.api.schema import PortKind
+from rekuest.protocol.schema import PortKind
 from rekuest.app import AppRegistry
 from rekuest.definition.errors import DefinitionError
 from rekuest.errors import RegistryFrozenError

@@ -4,7 +4,7 @@ from collections.abc import Iterable, Iterator
 from pydantic import BaseModel, model_validator
 
 if TYPE_CHECKING:
-    from rekuest.api.schema import (
+    from rekuest.protocol.schema import (
         ArgPortInput,
         AssignWidgetInput,
         ImplementAgentInput,

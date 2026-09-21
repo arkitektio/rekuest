@@ -3,7 +3,7 @@
 from typing import Annotated
 
 from rekuest.annotations import Provides, Requires
-from rekuest.api.schema import (
+from rekuest.protocol.schema import (
     StringAssignWidgetInput,
     PortKind,
     DescriptorOperator,

@@ -11,7 +11,7 @@ from typing import Annotated
 import pytest
 from annotated_types import Gt, Le, Len
 
-from rekuest.api.schema import (
+from rekuest.protocol.schema import (
     ActionArgumentInput,
     AgentProbeInput,
     EffectInput,
@@ -614,7 +614,7 @@ def test_definition_checks_return_ports_children_and_port_groups(
     simple_registry: StructureRegistry,
 ) -> None:
     """Dependencies are checked wherever an effect can sit, not only on top-level args."""
-    from rekuest.api.schema import PortGroupInput
+    from rekuest.protocol.schema import PortGroupInput
 
     @simple_registry.model
     class Inner:

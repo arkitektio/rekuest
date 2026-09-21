@@ -7,7 +7,7 @@ from collections.abc import Callable, Sequence
 from rekuest.structures.model import inspect_model_class
 from .utils import is_local_var
 from rekuest.annotations import extract_annotations, PortAnnotations
-from rekuest.api.schema import (
+from rekuest.protocol.schema import (
     AgentDependencyInput,
     ArgPortInput,
     ProvidesInput,

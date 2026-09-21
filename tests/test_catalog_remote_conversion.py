@@ -1,12 +1,12 @@
 """Turning what the server returns into the catalogs the rules run against. No network."""
 
+from rekuest.protocol.schema import CatalogValueKind
 from rekuest.api.schema import (
     BaseCatalogQueryBaseCatalog,
     CatalogArgument,
     CatalogComponent,
     CatalogOperation,
     CatalogProp,
-    CatalogValueKind,
     UICatalog,
 )
 from rekuest.catalogs import BASE_CATALOG_DRIFT, load_base_catalog

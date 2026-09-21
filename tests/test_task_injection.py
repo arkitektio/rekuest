@@ -11,7 +11,7 @@ from typing import Any, Optional
 import pytest
 
 from rekuest import messages
-from rekuest.api.schema import PortKind
+from rekuest.protocol.schema import PortKind
 from rekuest.definition.define import prepare_definition
 from rekuest.structures.registry import StructureRegistry
 from rekuest.api.schema import Action

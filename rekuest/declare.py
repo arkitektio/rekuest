@@ -19,7 +19,7 @@ from typing import (
     get_origin,
     get_type_hints,
 )
-from rekuest.api.schema import (
+from rekuest.protocol.schema import (
     DefinitionInput,
     ReturnPortInput,
     StateDependencyInput,
@@ -42,8 +42,8 @@ from rekuest.definition.errors import DefinitionError
 from rekuest.structures.registry import StructureRegistry
 from rekuest.definition.define import convert_object_to_returnport
 from rekuest.definition.utils import interface_name
-from rekuest.protocols import AnyFunction
-from rekuest.api.schema import (
+from rekuest.protocol.types import AnyFunction
+from rekuest.protocol.schema import (
     ActionDependencyInput,
     AgentDependencyInput,
     StateDefinitionInput,

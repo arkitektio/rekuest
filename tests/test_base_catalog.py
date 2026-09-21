@@ -38,8 +38,8 @@ def test_base_manifest_loads_via_importlib_resources() -> None:
 
 def test_loader_does_not_import_the_generated_schema() -> None:
     """``traits`` imports the loader while the generated module is still importing, so the
-    loader itself must not depend on ``rekuest.api`` (the package ``__init__`` does, which
-    is why this is a source-level check rather than a ``sys.modules`` one)."""
+    loader itself must not depend on ``rekuest.protocol`` (the package ``__init__`` does,
+    which is why this is a source-level check rather than a ``sys.modules`` one)."""
     import rekuest.catalogs as catalogs
 
     imports = [line for line in Path(catalogs.__file__).read_text().splitlines() if line.startswith(("import ", "from "))]

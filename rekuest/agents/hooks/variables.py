@@ -13,7 +13,7 @@ from typing import Any
 from rekuest.agents.types import BoundApp, resolve_service_clients
 from rekuest.agents.context import prepare_context_variables
 from rekuest.agents.errors import StateRequirementsNotMet
-from rekuest.protocols import AnyFunction
+from rekuest.protocol.types import AnyFunction
 from rekuest.state.utils import (
     prepare_appcontext,
     prepare_injected_variables,

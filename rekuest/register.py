@@ -28,9 +28,9 @@ from rekuest.definition.define import (
 from rekuest.definition.utils import interface_name
 from rekuest.definition.dependencies import build_action_dependency_input
 from rekuest.definition.hash import hash_definition
-from rekuest.protocols import AnyFunction
+from rekuest.protocol.types import AnyFunction
 from rekuest.structures.registry import StructureRegistry
-from rekuest.api.schema import (
+from rekuest.protocol.schema import (
     AssignWidgetInput,
     DefinitionInput,
     ActionDependencyInput,

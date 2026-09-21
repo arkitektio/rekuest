@@ -13,7 +13,7 @@ from typing import Any, TypeVar, get_type_hints
 from fieldz import fields, Field  # type: ignore
 from pydantic import BaseModel
 
-from rekuest.api.schema import ValidatorInput
+from rekuest.protocol.schema import ValidatorInput
 
 T = TypeVar("T", bound=type[Any])
 

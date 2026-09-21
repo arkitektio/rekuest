@@ -23,9 +23,7 @@ import pytest
 from dokker import Deployment
 
 from rekuest.annotations import Provides, Requires
-from rekuest.api.schema import (
-    DescriptorOperator,
-)
+from rekuest.protocol.schema import DescriptorOperator
 
 from .conftest import CONNECT_TIMEOUT, build_fresh_rekuest
 

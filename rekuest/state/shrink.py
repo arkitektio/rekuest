@@ -2,9 +2,9 @@
 
 from typing import Any
 from rekuest.actors.types import Shelver
-from rekuest.api.schema import StateDefinitionInput
+from rekuest.protocol.schema import StateDefinitionInput
 from rekuest.messages import JSONSerializable
-from rekuest.protocols import AnyState
+from rekuest.protocol.types import AnyState
 from rekuest.structures.registry import StructureRegistry
 from rekuest.structures.serialization.actor import ashrink_return
 

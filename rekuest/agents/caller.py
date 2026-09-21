@@ -35,7 +35,7 @@ from collections.abc import AsyncGenerator, Sequence
 from rath.scalars import ID
 
 from rekuest import messages
-from rekuest.api.schema import HookInput, TaskEventKind
+from rekuest.protocol.schema import HookInput, TaskEventKind
 from rekuest.agents.transport.types import MessageSink
 from rekuest.postmans.errors import AssignException
 from rekuest.scalars import ActionHash

@@ -1,7 +1,7 @@
 from typing import Protocol, runtime_checkable
 
 from rekuest import messages
-from rekuest.protocols import AnyState
+from rekuest.protocol.types import AnyState
 
 
 @runtime_checkable

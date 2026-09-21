@@ -12,7 +12,7 @@ It mirrors the server's ``facade.catalog_validation`` -- ``iter_definition_calls
 from collections.abc import Iterator, Sequence
 from typing import Any
 
-from rekuest.api.schema import (
+from rekuest.protocol.schema import (
     AssignWidgetInput,
     DefinitionInput,
     OptimisticInput,

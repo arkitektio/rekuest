@@ -14,7 +14,7 @@ import pytest
 from rekuest import messages
 from rekuest.agents.base import BaseAgent
 from rekuest.agents.errors import StateRequirementsNotMet
-from rekuest.api.schema import PortKind
+from rekuest.protocol.schema import PortKind
 from rekuest.app import AppRegistry
 from rekuest.definition.define import prepare_definition
 from rekuest.structures.registry import StructureRegistry

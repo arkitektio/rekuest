@@ -1,8 +1,5 @@
 from typing import Any, Protocol
-from rekuest.api.schema import (
-    AgentDependencyInput,
-    OptimisticInput,
-)
+from rekuest.protocol.schema import AgentDependencyInput, OptimisticInput
 
 
 class ToDependencyProtocol(Protocol):

@@ -13,7 +13,7 @@ from rekuest import messages
 
 from .memory_transport import MemoryAgentTransport
 from rekuest.agents.caller import AgentPostman, CallerTaskEvent
-from rekuest.api.schema import TaskEventKind
+from rekuest.protocol.schema import TaskEventKind
 from rekuest.postmans.errors import AssignException
 from rekuest.calls import _astream_raw
 from rekuest.errors import ErrorCallError

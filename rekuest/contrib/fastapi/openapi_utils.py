@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from fastapi import APIRouter
 from fastapi.openapi.utils import get_openapi
 
-from rekuest.api.schema import ArgPortInput, PortKind, ReturnPortInput
+from rekuest.protocol.schema import ArgPortInput, PortKind, ReturnPortInput
 
 
 CUSTOM_SCHEMAS_STATE_KEY = "rekuest_custom_schemas"

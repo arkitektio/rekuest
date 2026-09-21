@@ -54,10 +54,8 @@ from rekuest.agents.backend import (
     LocalAgentBackend,
     SocketAgentBackend,
 )
-from rekuest.api.schema import (
-    StateDefinitionInput,
-)
-from rekuest.protocols import AnyState
+from rekuest.protocol.schema import StateDefinitionInput
+from rekuest.protocol.types import AnyState
 from rekuest.scalars import Identifier
 from rekuest.state.observable import Mutation, adopt, evented
 from rekuest.state.write import write_view

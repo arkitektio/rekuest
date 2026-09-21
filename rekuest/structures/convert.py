@@ -18,7 +18,7 @@ from typing import (
 )
 from collections.abc import Callable
 
-from rekuest.api.schema import (
+from rekuest.protocol.schema import (
     ChoiceAssignWidgetInput,
     ChoiceReturnWidgetInput,
     ChoiceInput,

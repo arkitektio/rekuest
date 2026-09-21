@@ -26,7 +26,7 @@ class Callable(KoiledModel):
             AsyncIterator[Any]: The result of the action.
         """
         from rekuest.client.remote import iterate
-        from rekuest.api.schema import ActionKind
+        from rekuest.protocol.schema import ActionKind
 
         assert self.get_action_kind() == ActionKind.GENERATOR, (
             "Action kind must be GENERATOR to use iterate."
@@ -41,7 +41,7 @@ class Callable(KoiledModel):
             Any: The result of the action.
         """
         from rekuest.client.remote import call
-        from rekuest.api.schema import ActionKind
+        from rekuest.protocol.schema import ActionKind
 
         if self.get_action_kind() == ActionKind.GENERATOR:
             logger.warning(
@@ -59,7 +59,7 @@ class Callable(KoiledModel):
             AsyncIterator[Any]: The result of the action.
         """
         from rekuest.client.remote import aiterate
-        from rekuest.api.schema import ActionKind
+        from rekuest.protocol.schema import ActionKind
 
         assert self.get_action_kind() == ActionKind.GENERATOR, (
             "Action kind must be GENERATOR to use aiterate."
@@ -74,7 +74,7 @@ class Callable(KoiledModel):
             Any: The result of the action.
         """
         from rekuest.client.remote import acall
-        from rekuest.api.schema import ActionKind
+        from rekuest.protocol.schema import ActionKind
 
         assert self.get_action_kind() == ActionKind.FUNCTION, (
             "Action kind must be FUNCTION to use acall."
@@ -85,7 +85,7 @@ class Callable(KoiledModel):
     def __call__(self, *args: typing.Any, **kwargs: typing.Any):
         """Call the action with the given arguments."""
 
-        from rekuest.api.schema import ActionKind
+        from rekuest.protocol.schema import ActionKind
 
         if self.get_action_kind() == ActionKind.GENERATOR:
             return self.iterate(*args, **kwargs)

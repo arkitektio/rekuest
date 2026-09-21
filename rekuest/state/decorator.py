@@ -10,7 +10,7 @@ from typing import (
 )
 from collections.abc import Callable
 from rekuest.errors import NoRegistryError
-from rekuest.api.schema import (
+from rekuest.protocol.schema import (
     ReturnPortInput,
     StateImplementationInput,
     StateDefinitionInput,

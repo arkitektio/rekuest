@@ -14,7 +14,7 @@ from typing import Any
 from collections.abc import Callable
 
 from rekuest.annotations.markers import Default, Description, Units
-from rekuest.api.schema import (
+from rekuest.protocol.schema import (
     ActionArgumentInput,
     AssignWidgetInput,
     EffectInput,

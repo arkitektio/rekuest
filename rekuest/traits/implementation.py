@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING
 from pydantic import BaseModel, model_validator
 
 if TYPE_CHECKING:
-    from rekuest.api.schema import (
+    from rekuest.protocol.schema import (
         AgentDependencyInput,
         ArgPortInput,
         ImplementationInput,

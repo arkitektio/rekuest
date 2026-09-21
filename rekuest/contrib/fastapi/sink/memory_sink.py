@@ -2,7 +2,7 @@ import uuid
 from dataclasses import dataclass, field
 
 from rekuest import messages
-from rekuest.protocols import AnyState
+from rekuest.protocol.types import AnyState
 
 
 @dataclass

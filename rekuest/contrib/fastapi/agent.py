@@ -21,7 +21,7 @@ from fastapi import WebSocket, WebSocketDisconnect
 from pydantic import ConfigDict, Field, PrivateAttr
 
 from rekuest import messages
-from rekuest.api.schema import AssignInput, StateImplementationInput
+from rekuest.protocol.schema import AssignInput, StateImplementationInput
 from rekuest.agents.base import BaseAgent
 from rekuest.agents.dataclasses import RevisedState
 from rekuest.agents.transport.base import AgentTransport

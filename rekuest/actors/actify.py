@@ -25,9 +25,7 @@ from rekuest.actors.types import (
 from rekuest.agents.context import (
     prepare_context_variables,
 )
-from rekuest.api.schema import (
-    DefinitionInput,
-)
+from rekuest.protocol.schema import DefinitionInput
 from rekuest.definition.define import (
     prepare_definition,
 )

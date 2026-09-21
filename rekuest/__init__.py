@@ -30,10 +30,12 @@ overrides for a declared protocol come from ``rekuest.declare`` (``demand``,
 ``demand_state``). Calling other actions goes through the ``Rekuest`` client
 an action is handed (``rekuest: Rekuest`` -> ``rekuest.call(...)``).
 
-Importing this package loads the declaration surface only. The rekuest service
-and its agent provider live in :mod:`rekuest.arkitekt` (``rekuest_service``,
-``rekuest_provider``), which is what brings in the socket runtime and the
-GraphQL client; ``arkitekt`` re-exports everything here, so an app author
+Importing this package loads the declaration surface and the wire vocabulary
+(:mod:`rekuest.protocol.schema`) -- and nothing else. The fragments, the
+operations and the ``Rekuest`` client are :mod:`rekuest.api` and
+:mod:`rekuest.client`, reached only through :mod:`rekuest.arkitekt`
+(``rekuest_service``, ``rekuest_provider``), which is also what brings in the
+socket runtime. ``arkitekt`` re-exports everything here, so an app author
 imports ``arkitekt`` alone.
 """
 

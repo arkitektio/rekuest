@@ -1,7 +1,7 @@
 from fastapi import APIRouter, FastAPI
 from fastapi.testclient import TestClient
 
-from rekuest.api.schema import (
+from rekuest.protocol.schema import (
     ImplementationInput,
     PortKind,
     ReturnPortInput,

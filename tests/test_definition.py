@@ -1,7 +1,7 @@
 """General Tests for defininin actions"""
 
 
-from rekuest.api.schema import DefinitionInput, PortKind
+from rekuest.protocol.schema import DefinitionInput, PortKind
 import pytest
 from rekuest.definition.define import prepare_definition
 from rekuest.structures.registry import StructureRegistry

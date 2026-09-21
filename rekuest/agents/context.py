@@ -11,7 +11,7 @@ import inspect
 from dataclasses import dataclass
 
 from rekuest.definition.define import get_non_null_variants, is_tuple
-from rekuest.protocols import AnyFunction
+from rekuest.protocol.types import AnyFunction
 
 if TYPE_CHECKING:
     from rekuest.structures.registry import StructureRegistry

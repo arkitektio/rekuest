@@ -27,7 +27,7 @@ from rekuest.actors.types import (
     ImplementationDetails,
     RegisterConfig,
 )
-from rekuest.protocols import AnyFunction
+from rekuest.protocol.types import AnyFunction
 from rekuest.structures.registry import StructureRegistry
 
 

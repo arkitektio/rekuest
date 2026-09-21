@@ -4,7 +4,7 @@ from typing import get_args
 
 from pydantic import Field
 
-from rekuest.api.schema import (
+from rekuest.protocol.schema import (
     AssignWidgetInput,
     ChoiceAssignWidgetInput,
     ChoiceInput,
