@@ -105,17 +105,37 @@ REMOVED_STAMPS = (
 )
 
 
-def test_no_module_uses_context_variables() -> None:
-    """Two apps in one process share nothing ambient: what a call needs, it is handed."""
-    offenders = [
-        str(path.relative_to(PACKAGE))
-        for path in sorted(PACKAGE.rglob("*.py"))
-        if any(
-            name == "contextvars" or name.startswith("contextvars.")
-            for name in _module_scope_imports(ast.parse(path.read_text()))
-        )
-    ]
-    assert not offenders, f"context variables are back in: {offenders}"
+def test_rekuest_defines_no_context_variable_of_its_own() -> None:
+    """There is exactly one ambient thing, and rekuest does not own it.
+
+    The task an action runs for is ambient -- `rath.task.current_task`, which the
+    actor sets around the body so the clients it was handed can attribute their
+    requests. rekuest *reads* that one. It defines none: a second ambient thing is
+    how two apps in one process start sharing state again, and the import check
+    this replaced could not see the difference (it only looked for
+    `import contextvars`, which reading rath's does not need).
+    """
+    offenders: dict[str, list[str]] = {}
+    for path in sorted(PACKAGE.rglob("*.py")):
+        defined = [
+            node.lineno
+            for node in ast.walk(ast.parse(path.read_text()))
+            if isinstance(node, ast.Call)
+            and (
+                (isinstance(node.func, ast.Name) and node.func.id == "ContextVar")
+                or (
+                    isinstance(node.func, ast.Attribute)
+                    and node.func.attr == "ContextVar"
+                )
+            )
+        ]
+        if defined:
+            offenders[str(path.relative_to(PACKAGE))] = defined
+
+    assert not offenders, (
+        f"rekuest defines context variables: {offenders}. The one ambient value is "
+        "rath's current task; anything else a call needs, it is handed."
+    )
 
 
 def test_no_module_stamps_app_state_on_user_objects() -> None:

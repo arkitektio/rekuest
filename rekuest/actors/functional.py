@@ -12,6 +12,7 @@ from rekuest.task import Task
 from rekuest.structures.errors import SerializationError
 from rekuest import messages
 from rekuest.actors.debug import capture_to_list
+from rath.task import task_scope
 
 logger = logging.getLogger(__name__)
 
@@ -111,35 +112,41 @@ class FunctionalActor(SerializingActor):
                     )
 
             try:
-                async with capture_to_list(logs, self.agent, assignment):
-                    async for returns in self.aiterate_results(**params):
-                        try:
-                            returns = await shrink_outputs(
-                                self.definition,
-                                returns,
-                                structure_registry=self.structure_registry,
-                                shelver=self.agent,
-                                skip_shrinking=not self.shrink_outputs,
-                            )
-                        except SerializationError as ex:
-                            logger.critical(
-                                f"Output serialization error in {impl_id}",
-                                exc_info=True,
-                            )
+                # Everything the body does belongs to this task: the clients it
+                # was handed read the task from here rather than being handed a
+                # per-task copy of themselves. `task_scope` unwinds on every
+                # exit, including the `return`s below and any exception, so a
+                # task never outlives the assignment it belongs to.
+                with task_scope(task):
+                    async with capture_to_list(logs, self.agent, assignment):
+                        async for returns in self.aiterate_results(**params):
+                            try:
+                                returns = await shrink_outputs(
+                                    self.definition,
+                                    returns,
+                                    structure_registry=self.structure_registry,
+                                    shelver=self.agent,
+                                    skip_shrinking=not self.shrink_outputs,
+                                )
+                            except SerializationError as ex:
+                                logger.critical(
+                                    f"Output serialization error in {impl_id}",
+                                    exc_info=True,
+                                )
+                                await self.asend(
+                                    message=messages.Failed(
+                                        task=assignment.task,
+                                        error=str(ex),
+                                    )
+                                )
+                                return
+
                             await self.asend(
-                                message=messages.Failed(
+                                message=messages.Yield(
                                     task=assignment.task,
-                                    error=str(ex),
+                                    returns=returns,
                                 )
                             )
-                            return
-
-                        await self.asend(
-                            message=messages.Yield(
-                                task=assignment.task,
-                                returns=returns,
-                            )
-                        )
 
                 await aflush_captured_logs()
 
