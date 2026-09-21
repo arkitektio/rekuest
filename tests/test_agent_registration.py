@@ -46,13 +46,23 @@ async def _until(predicate, timeout: float = 2.0) -> None:
         await asyncio.sleep(0)
 
 
-def _agent(transport: MemoryAgentTransport) -> RekuestAgent:
-    return RekuestAgent(transport=transport, app_registry=AppRegistry(), name="reg-test")
+def _agent(
+    transport: MemoryAgentTransport, registry: AppRegistry | None = None
+) -> RekuestAgent:
+    return RekuestAgent(
+        transport=transport,
+        app_registry=registry if registry is not None else AppRegistry(),
+        name="reg-test",
+    )
 
 
-async def _connected(transport: RecordingTransport, **init) -> RekuestAgent:
+async def _connected(
+    transport: RecordingTransport,
+    registry: AppRegistry | None = None,
+    **init,
+) -> RekuestAgent:
     """An agent through ``aconnect``: the backend acknowledged what ``Register`` declared."""
-    agent = _agent(transport)
+    agent = _agent(transport, registry)
     connecting = asyncio.create_task(agent.aconnect(timeout=2.0))
     await _until(lambda: transport.handshakes)
     transport.feed(messages.Init(agent="agent-1", hash=transport.handshakes[0].declaration.hash, **init))
@@ -76,6 +86,38 @@ async def test_register_carries_the_declaration_and_init_registers_the_agent() -
     assert agent.registered_agent_id == "agent-1"
     (session_init,) = transport.of_type(messages.SessionInit)
     assert session_init.session_id == agent.current_session
+    await agent.atear_down()
+
+
+@pytest.mark.asyncio
+async def test_the_declaration_is_spelled_the_way_the_socket_models_are() -> None:
+    """snake_case, not the generated models' GraphQL aliases.
+
+    The socket is not GraphQL. The backend validates ``Register`` against its own
+    pydantic models (``rekuest_core.inputs.models``), which are spelled in
+    snake_case and forbid extras -- so a dump carrying ``portGroups`` is refused
+    field by field, and the agent never registers. Only a live backend catches
+    that, which is why the spelling is pinned here.
+    """
+    registry = AppRegistry()
+
+    @registry.register
+    def crop(x: int) -> int:
+        """Takes a number."""
+        return x
+
+    transport = RecordingTransport()
+    agent = await _connected(transport, registry=registry)
+
+    (handshake,) = transport.handshakes
+    assert handshake.declaration is not None
+    (implementation,) = handshake.declaration.implementations
+    definition = implementation["definition"]
+
+    aliased = [key for key in definition if key != key.lower()]
+    assert not aliased, f"{aliased} are GraphQL aliases; the socket wants snake_case"
+    assert "port_groups" in definition or "portGroups" not in definition
+
     await agent.atear_down()
 
 

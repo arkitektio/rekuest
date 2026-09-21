@@ -366,10 +366,11 @@ delayed, the stale sweep displaces it after 30s at the latest. 45s covers both.
 class FreshApp:
     """A client and the agent serving its registry, as a run would hold them.
 
-    What the integration tests drive: register on ``registry``, ``aconnect`` and
+    What the integration tests drive: declare on ``registry``, ``aconnect`` and
     ``aloop`` the agent, call the API through ``client``. Attributes the app does
-    not have are the client's, so a test reads ``app.acall`` and ``app.postman``
-    off it directly.
+    not have are looked up on the client first and then the registry, so a test
+    reads ``app.acall`` off the client and ``app.register`` off the registry
+    without saying which is which -- as a run's own surface does.
 
     ``aconnect`` tolerates the previous test's registration: the server keys the
     agent registration on the *token* and only releases it asynchronously after
@@ -387,7 +388,13 @@ class FreshApp:
         return self.agent.app_registry
 
     def __getattr__(self, name: str) -> Any:  # noqa: ANN401
-        return getattr(self.client, name)
+        try:
+            return getattr(self.client, name)
+        except AttributeError:
+            # The declaration surface lives on the registry, not the client:
+            # `Rekuest.register` and friends were deleted when declaring became
+            # app-scoped. Falling through keeps the tests reading like an app.
+            return getattr(self.agent.app_registry, name)
 
     async def __aenter__(self) -> "FreshApp":
         await self.client.__aenter__()

@@ -1464,9 +1464,14 @@ class BaseAgent(KoiledModel):
         reconciliation when it already holds that hash).
         """
         agent_input = self.app_registry.to_implement_agent_input(name=self.name)
+        # ``by_alias=False``: the aliases on the generated input models are the
+        # *GraphQL* wire spelling (``portGroups``), and this is not GraphQL. The
+        # socket's own models -- the backend's ``rekuest_core.inputs.models`` --
+        # are spelled in snake_case and forbid extras, so an aliased dump is
+        # refused field by field at registration.
         declaration = messages.AgentDeclaration(
             hash=await self.aget_hash(),
-            **agent_input.model_dump(mode="json", by_alias=True, exclude_unset=True),
+            **agent_input.model_dump(mode="json", by_alias=False, exclude_unset=True),
         )
         return HandshakeParams(
             force=self.force,

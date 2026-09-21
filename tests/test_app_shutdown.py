@@ -38,8 +38,8 @@ async def test_shutdown_hook_runs_on_clean_exit(deployment: Deployment) -> None:
         """Release whatever the app acquired."""
         torn_down.append(counter.count)
 
-    app.register_startup(boot)
-    app.register_shutdown(teardown)
+    app.startup(boot)
+    app.shutdown(teardown)
 
     async with app as app:
         await app.aconnect(timeout=CONNECT_TIMEOUT)
@@ -100,8 +100,8 @@ async def test_state_mutated_in_a_shutdown_hook_reaches_the_backend(
         """Record a final value on the way out."""
         counter.count = 7
 
-    app.register_startup(boot)
-    app.register_shutdown(teardown)
+    app.startup(boot)
+    app.shutdown(teardown)
 
     async with app as app:
         await app.aconnect(timeout=CONNECT_TIMEOUT)
@@ -174,9 +174,9 @@ async def test_shutdown_hook_runs_once_when_the_loop_is_cancelled(
         """Release whatever the app acquired."""
         calls.append("teardown")
 
-    app.register_startup(boot)
-    app.register_shutdown(teardown)
-    app.register_shutdown(exploding)
+    app.startup(boot)
+    app.shutdown(teardown)
+    app.shutdown(exploding)
 
     async with app as app:
         await app.aconnect(timeout=CONNECT_TIMEOUT)
