@@ -447,6 +447,7 @@ class AgentFilter(BaseModel):
 class AgentInput(BaseModel):
     """No documentation"""
     name: str | None = Field(default=None, description='The name of the agent. This is used to identify the agent in the system.')
+    description: str | None = Field(default=None, description='What this agent is, in a sentence. Omitting it leaves whatever the agent already has: a name is what identifies it, a description is what tells two of them apart.')
     kind: AgentKind | None = Field(default=None, description='The transport kind of the agent: WEBSOCKET (default) or WEBHOOK (a HookAgent the backend POSTs to).')
     hook_url: str | None = Field(validation_alias=AliasChoices('hook_url', 'hookUrl'), serialization_alias='hookUrl', default=None, description='For a WEBHOOK agent: the URL the backend POSTs messages (Assign, Cancel, Caller* events) to.')
     hook_url_secret: str | None = Field(validation_alias=AliasChoices('hook_url_secret', 'hookUrlSecret'), serialization_alias='hookUrlSecret', default=None, description='For a WEBHOOK agent: the shared secret used to HMAC-sign messages in both directions (outbound delivery and POST intake).')
@@ -471,7 +472,7 @@ class ArgPortInput(PortTrait, BaseModel):
     label: str | None = Field(default=None, description='The label of the port. This is the text that is displayed in the UI')
     kind: PortKind = Field(description='The kind of the port. This is the type of the port. Can be either int, string, structure, list, bool, dict, float, date, union or model')
     description: str | None = Field(default=None, description='The description of the port. This is the text that is displayed in the UI when the user hovers over the port')
-    identifier: str | None = Field(default=None, description='The identifier of a structure port. This is used to uniquely identify a specific type of structure.')
+    identifier: str | None = Field(default=None, description="The identifier of the port's type, of the form @package/key. Required for STRUCTURE, MEMORY_STRUCTURE and INTERFACE, where it is the only identity a value has; optional for MODEL and ENUM, where it names the class or enum the port was built from so that agents can map a value back to it.")
     nullable: Annotated[bool | None, GraphQLDefault('False')] = Field(default=None, description='Whether the port is nullable or not. If the port is nullable, it can be set to null. If the port is not nullable, it cannot be set to null')
     'Whether the port is nullable or not. If the port is nullable, it can be set to null. If the port is not nullable, it cannot be set to null\nDefault: False'
     effects: tuple['EffectInput', ...] | None = Field(default=None, description='The effects of the port')
@@ -757,6 +758,7 @@ class HookInput(BaseModel):
 class ImplementAgentInput(ImplementAgentInputTrait, BaseModel):
     """Implement an agent with the given implementations, states and locks. This will create the agent if it doesn't exist and update it if it does exist."""
     name: str | None = Field(default=None, description='The name of the agent. This is used to identify the agent in the system.')
+    description: str | None = Field(default=None, description='What this agent is, in a sentence. Omitting it leaves whatever the agent already has, unlike `name`, which falls back to the client id.')
     states: tuple['StateImplementationInput', ...] | None = Field(default=None, description='The states of the agent. This is used to specify the initial states of the agent')
     implementations: tuple['ImplementationInput', ...] | None = Field(default=None, description='The implementations of the agent. This is used to specify the initial implementations of the agent')
     locks: tuple['LockImplementationInput', ...] | None = Field(default=None, description='The locks of the agent. This is used to specify which resources the agent needs to run')
@@ -996,7 +998,7 @@ class ReturnPortInput(PortTrait, BaseModel):
     label: str | None = Field(default=None, description='The label of the port. This is the text that is displayed in the UI')
     kind: PortKind = Field(description='The kind of the port. This is the type of the port. Can be either int, string, structure, list, bool, dict, float, date, union or model')
     description: str | None = Field(default=None, description='The description of the port. This is the text that is displayed in the UI when the user hovers over the port')
-    identifier: str | None = Field(default=None, description='The identifier of a structure port. This is used to uniquely identify a specific type of structure.')
+    identifier: str | None = Field(default=None, description="The identifier of the port's type, of the form @package/key. Required for STRUCTURE, MEMORY_STRUCTURE and INTERFACE, where it is the only identity a value has; optional for MODEL and ENUM, where it names the class or enum the port was built from so that agents can map a value back to it.")
     nullable: Annotated[bool | None, GraphQLDefault('False')] = Field(default=None, description='Whether the port is nullable or not. If the port is nullable, it can be set to null. If the port is not nullable, it cannot be set to null')
     'Whether the port is nullable or not. If the port is nullable, it can be set to null. If the port is not nullable, it cannot be set to null\nDefault: False'
     effects: tuple[EffectInput, ...] | None = Field(default=None, description='The effects of the port')

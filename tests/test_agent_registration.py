@@ -226,3 +226,65 @@ async def test_a_base_agent_declares_too_but_keeps_its_local_backend() -> None:
         await connecting
     assert agent.registered_agent_id is None
     await agent.atear_down()
+
+
+@pytest.mark.asyncio
+async def test_register_carries_the_agents_description() -> None:
+    """A described agent says so in ``Register``; an undescribed one stays silent.
+
+    The two halves matter for different reasons. The description has to reach the
+    backend for it to be shown beside the name, and an agent that declares none
+    has to leave the field *unset* rather than send an explicit null -- the
+    server's contract is that omitting it keeps whatever the agent already has,
+    so a null would be the one way to wipe a description the UI had.
+    """
+    transport = RecordingTransport()
+    agent = RekuestAgent(
+        transport=transport,
+        app_registry=AppRegistry(),
+        name="reg-test",
+        description="What this agent is, in a sentence.",
+    )
+    connecting = asyncio.create_task(agent.aconnect(timeout=2.0))
+    await _until(lambda: transport.handshakes)
+    transport.feed(
+        messages.Init(agent="agent-1", hash=transport.handshakes[0].declaration.hash)
+    )
+    await connecting
+
+    (handshake,) = transport.handshakes
+    declaration = handshake.declaration
+    assert declaration is not None
+    assert declaration.description == "What this agent is, in a sentence."
+    await agent.atear_down()
+
+    # The undescribed agent: the key is absent, not null.
+    plain = RecordingTransport()
+    await _connected(plain)
+    (plain_handshake,) = plain.handshakes
+    declared = plain_handshake.declaration
+    assert declared is not None
+    assert declared.description is None
+    assert "description" not in declared.model_dump(exclude_unset=True)
+
+
+def test_a_description_changes_the_definition_hash() -> None:
+    """Otherwise the backend would skip reconciling and never pick a new one up.
+
+    The backend stores whatever hash ``Register`` carries and skips the whole
+    reconciliation when the next one matches. So a description that did not move
+    the hash would be silently dropped on every agent that had already
+    registered -- while an agent that declares none must keep the hash it had
+    before descriptions existed, or every such agent re-reconciles once for
+    nothing.
+    """
+    registry = AppRegistry()
+
+    def canonical(**kwargs: object) -> str:
+        return registry.to_implement_agent_input(name="a:1", **kwargs).model_dump_json(
+            by_alias=True, exclude_none=True
+        )
+
+    assert canonical() == canonical(description=None)
+    assert canonical(description="One thing.") != canonical()
+    assert canonical(description="One thing.") != canonical(description="Another thing.")

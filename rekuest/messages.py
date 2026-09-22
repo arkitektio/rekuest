@@ -569,6 +569,9 @@ class AgentDeclaration(BaseModel):
     """
 
     name: str | None = None
+    description: str | None = None
+    """What the agent is, in a sentence. Omitting it leaves whatever the agent already
+    has -- unlike ``name``, which the backend falls back to the client id for."""
     hash: str | None = None
     implementations: list[dict[str, Any]] | None = None
     states: list[dict[str, Any]] | None = None

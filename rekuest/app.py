@@ -639,15 +639,29 @@ class AppRegistry(BaseModel):
     def to_implement_agent_input(
         self,
         name: str | None = None,
+        description: str | None = None,
     ) -> ImplementAgentInput:
         """Assemble (and validate) the full agent input from this registry.
 
         Constructing the :class:`ImplementAgentInput` triggers its model
         validation, so this is the single validated retrieval point for
         everything the agent registers.
+
+        Args:
+            name: What identifies the agent. The backend falls back to the
+                client id when it is omitted.
+            description: What the agent is, in a sentence. Omitting it leaves
+                whatever the agent already has, rather than clearing it.
         """
         return ImplementAgentInput(
             name=name,
+            # Passed only when there is one, so that an app declaring no
+            # description leaves the field *unset* rather than sending an
+            # explicit null: the declaration is dumped with ``exclude_unset``,
+            # so this is what keeps such an agent's wire bytes (and its
+            # definition hash) exactly what they were before descriptions
+            # existed.
+            **({"description": description} if description is not None else {}),
             implementations=tuple(self.get_implementations()),
             states=tuple(self.states.values()),
             locks=tuple(self.get_locks()),

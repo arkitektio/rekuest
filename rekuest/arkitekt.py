@@ -118,6 +118,9 @@ def rekuest_agent(
             token_loader=fakts.aget_token,
         ),
         name=f"{fakts.manifest.identifier}:{fakts.manifest.version}",
+        # What the app said it is, carried onto the agent: the name identifies
+        # it, the description tells two of them apart.
+        description=fakts.manifest.description,
         app_registry=registry,
     )
 

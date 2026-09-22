@@ -113,6 +113,14 @@ class BaseAgent(KoiledModel):
         default=None,
         description="The name of the agent. This is used to identify the agent in the system.",
     )
+    description: str | None = Field(
+        default=None,
+        description=(
+            "What this agent is, in a sentence, shown beside its name in the UI. "
+            "Omitting it leaves whatever the agent already has -- unlike the name, "
+            "which the backend falls back to the client id for."
+        ),
+    )
 
     # TODO: KV Store
     shelve: dict[str, Any] = Field(default_factory=dict)  # kv_store -> Seperate
@@ -1068,7 +1076,9 @@ class BaseAgent(KoiledModel):
         what makes that comparison meaningful. Keys are sorted so that
         dictionary ordering cannot change the digest.
         """
-        agent_input = self.app_registry.to_implement_agent_input(name=self.name)
+        agent_input = self.app_registry.to_implement_agent_input(
+            name=self.name, description=self.description
+        )
         canonical = json.dumps(
             json.loads(agent_input.model_dump_json(by_alias=True, exclude_none=True)),
             sort_keys=True,
@@ -1463,7 +1473,9 @@ class BaseAgent(KoiledModel):
         what this agent offers and its definition hash (the backend skips the
         reconciliation when it already holds that hash).
         """
-        agent_input = self.app_registry.to_implement_agent_input(name=self.name)
+        agent_input = self.app_registry.to_implement_agent_input(
+            name=self.name, description=self.description
+        )
         # ``by_alias=False``: the aliases on the generated input models are the
         # *GraphQL* wire spelling (``portGroups``), and this is not GraphQL. The
         # socket's own models -- the backend's ``rekuest_core.inputs.models`` --

@@ -2155,13 +2155,14 @@ class RekuestApi:
 
 Each method hands its operation to ``execute``, ``aexecute``, ``subscribe``, ``asubscribe`` of ``self``, which the class this one is mixed into (or a base of it) provides."""
 
-    async def aensure_agent(self, name: str | None | UnsetType=UNSET, kind: AgentKind | None | UnsetType=UNSET, hook_url: str | None | UnsetType=UNSET, hook_url_secret: str | None | UnsetType=UNSET) -> Agent:
+    async def aensure_agent(self, name: str | None | UnsetType=UNSET, description: str | None | UnsetType=UNSET, kind: AgentKind | None | UnsetType=UNSET, hook_url: str | None | UnsetType=UNSET, hook_url_secret: str | None | UnsetType=UNSET) -> Agent:
         """EnsureAgent 
 
 Ensure agent record exists or is up to date.
 
 Args:
     name: The name of the agent. This is used to identify the agent in the system.
+    description: What this agent is, in a sentence. Omitting it leaves whatever the agent already has: a name is what identifies it, a description is what tells two of them apart.
     kind: The transport kind of the agent: WEBSOCKET (default) or WEBHOOK (a HookAgent the backend POSTs to).
     hook_url: For a WEBHOOK agent: the URL the backend POSTs messages (Assign, Cancel, Caller* events) to.
     hook_url_secret: For a WEBHOOK agent: the shared secret used to HMAC-sign messages in both directions (outbound delivery and POST intake).
@@ -2173,6 +2174,8 @@ Returns:
         _input: dict[str, builtins.object] = {}
         if name is not UNSET:
             _input['name'] = name
+        if description is not UNSET:
+            _input['description'] = description
         if kind is not UNSET:
             _input['kind'] = kind
         if hook_url is not UNSET:
@@ -2182,13 +2185,14 @@ Returns:
         variables['input'] = _input
         return (await self.aexecute(EnsureAgentMutation, variables)).ensure_agent
 
-    def ensure_agent(self, name: str | None | UnsetType=UNSET, kind: AgentKind | None | UnsetType=UNSET, hook_url: str | None | UnsetType=UNSET, hook_url_secret: str | None | UnsetType=UNSET) -> Agent:
+    def ensure_agent(self, name: str | None | UnsetType=UNSET, description: str | None | UnsetType=UNSET, kind: AgentKind | None | UnsetType=UNSET, hook_url: str | None | UnsetType=UNSET, hook_url_secret: str | None | UnsetType=UNSET) -> Agent:
         """EnsureAgent 
 
 Ensure agent record exists or is up to date.
 
 Args:
     name: The name of the agent. This is used to identify the agent in the system.
+    description: What this agent is, in a sentence. Omitting it leaves whatever the agent already has: a name is what identifies it, a description is what tells two of them apart.
     kind: The transport kind of the agent: WEBSOCKET (default) or WEBHOOK (a HookAgent the backend POSTs to).
     hook_url: For a WEBHOOK agent: the URL the backend POSTs messages (Assign, Cancel, Caller* events) to.
     hook_url_secret: For a WEBHOOK agent: the shared secret used to HMAC-sign messages in both directions (outbound delivery and POST intake).
@@ -2200,6 +2204,8 @@ Returns:
         _input: dict[str, builtins.object] = {}
         if name is not UNSET:
             _input['name'] = name
+        if description is not UNSET:
+            _input['description'] = description
         if kind is not UNSET:
             _input['kind'] = kind
         if hook_url is not UNSET:
@@ -2209,13 +2215,14 @@ Returns:
         variables['input'] = _input
         return self.execute(EnsureAgentMutation, variables).ensure_agent
 
-    async def aimplement_agent(self, name: str | None | UnsetType=UNSET, states: Iterable[StateImplementationInput] | None | UnsetType=UNSET, implementations: Iterable[ImplementationInput] | None | UnsetType=UNSET, locks: Iterable[LockImplementationInput] | None | UnsetType=UNSET, bloks: Iterable[BlokImplementationInput] | None | UnsetType=UNSET, hash: str | None | UnsetType=UNSET) -> Agent:
+    async def aimplement_agent(self, name: str | None | UnsetType=UNSET, description: str | None | UnsetType=UNSET, states: Iterable[StateImplementationInput] | None | UnsetType=UNSET, implementations: Iterable[ImplementationInput] | None | UnsetType=UNSET, locks: Iterable[LockImplementationInput] | None | UnsetType=UNSET, bloks: Iterable[BlokImplementationInput] | None | UnsetType=UNSET, hash: str | None | UnsetType=UNSET) -> Agent:
         """ImplementAgent 
 
 Implement an agent with given states and implementations. This is used to set up an agent with its initial configuration and capabilities.
 
 Args:
     name: The name of the agent. This is used to identify the agent in the system.
+    description: What this agent is, in a sentence. Omitting it leaves whatever the agent already has, unlike `name`, which falls back to the client id.
     states: The states of the agent. This is used to specify the initial states of the agent
     implementations: The implementations of the agent. This is used to specify the initial implementations of the agent
     locks: The locks of the agent. This is used to specify which resources the agent needs to run
@@ -2229,6 +2236,8 @@ Returns:
         _input: dict[str, builtins.object] = {}
         if name is not UNSET:
             _input['name'] = name
+        if description is not UNSET:
+            _input['description'] = description
         if states is not UNSET:
             _input['states'] = states
         if implementations is not UNSET:
@@ -2242,13 +2251,14 @@ Returns:
         variables['input'] = _input
         return (await self.aexecute(ImplementAgentMutation, variables)).implement_agent
 
-    def implement_agent(self, name: str | None | UnsetType=UNSET, states: Iterable[StateImplementationInput] | None | UnsetType=UNSET, implementations: Iterable[ImplementationInput] | None | UnsetType=UNSET, locks: Iterable[LockImplementationInput] | None | UnsetType=UNSET, bloks: Iterable[BlokImplementationInput] | None | UnsetType=UNSET, hash: str | None | UnsetType=UNSET) -> Agent:
+    def implement_agent(self, name: str | None | UnsetType=UNSET, description: str | None | UnsetType=UNSET, states: Iterable[StateImplementationInput] | None | UnsetType=UNSET, implementations: Iterable[ImplementationInput] | None | UnsetType=UNSET, locks: Iterable[LockImplementationInput] | None | UnsetType=UNSET, bloks: Iterable[BlokImplementationInput] | None | UnsetType=UNSET, hash: str | None | UnsetType=UNSET) -> Agent:
         """ImplementAgent 
 
 Implement an agent with given states and implementations. This is used to set up an agent with its initial configuration and capabilities.
 
 Args:
     name: The name of the agent. This is used to identify the agent in the system.
+    description: What this agent is, in a sentence. Omitting it leaves whatever the agent already has, unlike `name`, which falls back to the client id.
     states: The states of the agent. This is used to specify the initial states of the agent
     implementations: The implementations of the agent. This is used to specify the initial implementations of the agent
     locks: The locks of the agent. This is used to specify which resources the agent needs to run
@@ -2262,6 +2272,8 @@ Returns:
         _input: dict[str, builtins.object] = {}
         if name is not UNSET:
             _input['name'] = name
+        if description is not UNSET:
+            _input['description'] = description
         if states is not UNSET:
             _input['states'] = states
         if implementations is not UNSET:
