@@ -64,7 +64,7 @@ def CancelOnDisconnect(grace: float = 0.0) -> DisconnectPolicy:  # noqa: N802
 
     Named like a constructor because that is how it reads at a registration site::
 
-        @register(policy=CancelOnDisconnect(grace=2.0))
+        @app.register(policy=CancelOnDisconnect(grace=2.0))
         def move_stage(direction: str) -> None: ...
 
     Args:

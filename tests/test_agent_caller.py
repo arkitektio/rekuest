@@ -80,8 +80,6 @@ async def test_actor_internal_dependency_call_uses_agent(
         )
         answer = await workflow_app.acall(
             impl,
-            postman=workflow_app.postman,
-            structure_registry=workflow_app.structure_registry,
         )
 
         assert answer == "stitched-printer", f"Unexpected workflow result: {answer!r}"

@@ -20,9 +20,7 @@ from rekuest.protocol.schema import TaskEventKind
 from rekuest.api.schema import TaskEventChange
 from rekuest.app import AppRegistry
 from rekuest.errors import CriticalCallError
-from rekuest.register import register
 from rekuest.calls import _astream_raw
-from rekuest.state.decorator import state
 
 from .memory_transport import MemoryAgentTransport
 
@@ -32,7 +30,7 @@ from .memory_transport import MemoryAgentTransport
 _REGISTRY = AppRegistry()
 
 
-@state(registry=_REGISTRY)
+@_REGISTRY.state
 @dataclass
 class Stage:
     """A state some function depends on — and that the agent under test never initializes."""
@@ -87,10 +85,8 @@ def _assign(task: str, interface: str, **args: object) -> messages.Assign:
 
 
 def _register(agent: BaseAgent, function) -> None:
-    register(
+    agent.app_registry.register(
         function,
-        implementation_registry=agent.app_registry,
-        structure_registry=agent.app_registry.structure_registry,
     )
     agent.collect_from_registry()
 

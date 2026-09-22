@@ -19,31 +19,19 @@ class ErrorCallError(RekuestError):
     pass
 
 
-class NoRegistryError(RekuestError):
-    """Raised when something asks to be registered but names no registry.
+class RootOnlyCallError(RekuestError):
+    """Raised when a call is made through the client while a task is running.
 
-    Registration goes through an app: there is no process-wide registry to fall
-    back to, on purpose -- it made what an app ran depend on what the process had
-    imported.
+    A call through a :class:`~rekuest.client.client.Rekuest` is a *root*: it goes over the
+    client's own postman with no parent. Inside a running task a call is that task's
+    child, over the agent's socket and parented to its assignment -- which only the task
+    knows -- so the client refuses rather than quietly making a sibling of the task it
+    should have been a child of.
+
+    The client-side counterpart of
+    :class:`~rekuest.postmans.errors.RootOnlyAssignError`, which is the transport
+    refusing the same mistake from the other end.
     """
-
-    @classmethod
-    def for_decorator(
-        cls, what: str, decorator: str, example: str, parameter: str
-    ) -> "NoRegistryError":
-        """The error for a decorator used with no registry, showing the app-based form.
-
-        Args:
-            what: What was being registered, as the subject of "goes through an app".
-            decorator: The app method to use instead (``"register"``, ``"state"``, ...).
-            example: The decorated definition the example shows.
-            parameter: The keyword that registers into a registry directly.
-        """
-        return cls(
-            f"There is no registry to register into. {what} through an app:\n\n"
-            f'    app = App(identifier="my-app")\n\n    @app.{decorator}\n    {example}\n\n'
-            f"Pass `{parameter}=` to register into a registry directly."
-        )
 
 
 class AppContextError(RekuestError):

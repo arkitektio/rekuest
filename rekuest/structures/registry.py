@@ -42,7 +42,11 @@ from rekuest.structures.convert import (
     is_literal,
     make_enum_converter,
 )
-from rekuest.structures.model import model_field
+import inflection
+from functools import partial
+from rekuest.agents.errors import StateRequirementsNotMet
+from rekuest.agents.types import resolve_service_clients, unwrap_injectable
+from rekuest.structures.model import ensure_model_dataclass, model_field
 from rekuest.structures.utils import build_instance_predicate
 
 from .errors import (
@@ -87,8 +91,19 @@ _PORT_KIND_FOR: dict[type, PortKind] = {
 }
 
 
-def _qualified(cls: type[Any]) -> str:
-    return f"{getattr(cls, '__module__', '?')}.{getattr(cls, '__qualname__', cls)}"
+def _display_name(obj: object) -> str:
+    """How a registered type is named in an error message.
+
+    Read defensively rather than as ``obj.__qualname__``: what a caller registers need not be a
+    class. A ``Literal[...]`` form and a union are both accepted here and neither carries one.
+    """
+    qualname = getattr(obj, "__qualname__", None)
+    return qualname if isinstance(qualname, str) else repr(obj)
+
+
+def _qualified(cls: object) -> str:
+    module = getattr(cls, "__module__", None)
+    return f"{module if isinstance(module, str) else '?'}.{_display_name(cls)}"
 
 
 def _travelling_class(
@@ -99,7 +114,7 @@ def _travelling_class(
     Raises:
         StructureDefinitionError: If neither is a class, or the two disagree.
     """
-    name = getattr(expand, "__qualname__", repr(expand))
+    name = _display_name(expand)
     try:
         returned = get_type_hints(expand).get("return")
     except (NameError, TypeError) as e:
@@ -832,7 +847,7 @@ class StructureRegistry(BaseModel):
         try:
             return self.protocols[cls]
         except (KeyError, TypeError):
-            shown = getattr(cls, "__qualname__", repr(cls))
+            shown = _display_name(cls)
             raise KeyError(
                 f"{shown} is not a protocol this app declared. Declare it with "
                 f"`@app.declare(...)` before naming it."
@@ -861,7 +876,7 @@ class StructureRegistry(BaseModel):
         try:
             return self.states[cls]
         except (KeyError, TypeError):
-            shown = getattr(cls, "__qualname__", repr(cls))
+            shown = _display_name(cls)
             raise KeyError(
                 f"{shown} is not a state this app registered. Register it with "
                 "`@app.state` before naming it."
@@ -885,8 +900,6 @@ class StructureRegistry(BaseModel):
         Returns:
             The declaration recorded.
         """
-        import inflection
-
         declaration = ContextDeclaration(
             name=inflection.underscore(name or cls.__name__),
             locks=tuple(locks or ()),
@@ -956,10 +969,6 @@ class StructureRegistry(BaseModel):
             ValueError: If more than one class is passed at once.
             TypeError: If the class cannot be made a dataclass.
         """
-        import inflection
-
-        from rekuest.structures.model import ensure_model_dataclass
-
         if len(cls) > 1:
             raise ValueError("You can only declare one model at a time.")
 
@@ -1051,7 +1060,7 @@ class StructureRegistry(BaseModel):
         try:
             return self.contexts[cls]
         except (KeyError, TypeError):
-            shown = getattr(cls, "__qualname__", repr(cls))
+            shown = _display_name(cls)
             raise KeyError(
                 f"{shown} is not a context this app declared. Declare it with "
                 "`@app.context` before naming it."
@@ -1133,8 +1142,6 @@ class StructureRegistry(BaseModel):
         Returns:
             Whether a run hands such a parameter a client.
         """
-        from rekuest.agents.types import unwrap_injectable
-
         cls = unwrap_injectable(annotation)
         if not isinstance(cls, type):
             return False
@@ -1238,11 +1245,6 @@ class StructureRegistry(BaseModel):
         Returns ``None`` when there is nothing to do, so a structure that asks for
         no client and cannot batch costs one dict lookup and no copy.
         """
-        from functools import partial
-
-        from rekuest.agents.errors import StateRequirementsNotMet
-        from rekuest.agents.types import resolve_service_clients
-
         wanted = structure.injects
         if not wanted:
             return None
@@ -1291,8 +1293,6 @@ class StructureRegistry(BaseModel):
         which owns the structure, so neither is used and it falls back to one
         request per id.
         """
-        from functools import partial
-
         capable = []
         for client in clients.values():
             batch = getattr(client, "aexpand_many", None)

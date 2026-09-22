@@ -115,20 +115,20 @@ async def _expand_union(
             ctx,
             "Can't expand value to union port. We only accept unions with children. Please report this to the developers.",
         )
-    index, reason = union_index(value)
-    if index is None:
+    tagged, reason = union_index(value)
+    if tagged is None:
         raise _expand_error(
             port, value, ctx, f"Can't expand value to union port. {reason}"
         )
-    if not 0 <= index < len(port.children):
+    if not 0 <= tagged.index < len(port.children):
         raise _expand_error(
             port,
             value,
             ctx,
-            f"Union '__use' index {index} is out of range for {len(port.children)} children.",
+            f"Union '__use' index {tagged.index} is out of range for {len(port.children)} children.",
         )
     return await _expand(
-        port.children[index], value["__value"], ctx.child(f"{port.key}[{index}]")
+        port.children[tagged.index], tagged.value, ctx.child(f"{port.key}[{tagged.index}]")
     )
 
 

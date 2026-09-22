@@ -9,7 +9,6 @@ from dataclasses import dataclass
 from rekuest.app import AppRegistry
 from rekuest.actors.actify import derive_implementation_details
 from rekuest.actors.types import RegisterConfig
-from rekuest.state.decorator import state
 
 
 # These states belong to a registry, as they would to an app. There is no
@@ -17,13 +16,13 @@ from rekuest.state.decorator import state
 _REGISTRY = AppRegistry()
 
 
-@state(registry=_REGISTRY, required_locks=["zeta", "alpha", "mu"])
+@_REGISTRY.state(required_locks=["zeta", "alpha", "mu"])
 @dataclass
 class First:
     value: int = 0
 
 
-@state(registry=_REGISTRY, required_locks=["beta", "alpha"])
+@_REGISTRY.state(required_locks=["beta", "alpha"])
 @dataclass
 class Second:
     value: int = 0

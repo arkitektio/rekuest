@@ -1,18 +1,21 @@
 """What a call names as its target reaches the postman as an id.
 
 The translation happens once, at the boundary between the two halves of the call
-surface: ``rekuest.client.remote`` holds the fetched ``Action``/``Implementation`` and
+surface: ``rekuest.invoke`` holds the fetched ``Action``/``Implementation`` and
 reads ``.id`` off it, ``rekuest.calls`` only ever sees the id. Every other test
 that drives these helpers leaves the target unset, so both sides of that
 boundary were unguarded.
 """
 
 from collections.abc import AsyncGenerator, Sequence
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
 
+from rekuest import messages
 from rekuest.protocol.schema import TaskEventKind
+from rekuest.task import Task
 
 
 class RecordingPostman:
@@ -89,21 +92,45 @@ async def test_a_call_with_no_target_sends_neither_id() -> None:
 
 
 # --------------------------------------------------------------------------- #
-# The client half: a fetched model is reduced to its id, and only here
+# The client half: a fetched model is reduced to its id, and only at the surface
 # --------------------------------------------------------------------------- #
+#
+# The reduction moved. `rekuest.invoke` takes ids -- it is the agnostic half and may not
+# name a fragment -- so whoever holds the model reads `.id` off it: `Rekuest.acall_raw`
+# and `Task.acall_raw`. These test it where it now happens, on the Task surface, because
+# that one needs no GraphQL client to stand up.
 
 
 async def _iterate(postman: RecordingPostman, **kwargs: Any) -> list[Any]:  # noqa: ANN401
-    from rekuest.client.remote import aiterate_raw
+    from rekuest.invoke import _aiterate_raw as aiterate_raw
 
     return [item async for item in aiterate_raw(postman=postman, **kwargs)]
+
+
+class _Helper:
+    """The least of an AssignmentHelper that a Task's call path reads."""
+
+    def __init__(self, postman: RecordingPostman) -> None:
+        self.agent = SimpleNamespace(caller_postman=postman)
+        # Only `.task` is read from it, on its way to `_resolve_parent`.
+        self.assignment = messages.Assign.model_construct(task="task-1")
+        self.structure_registry = object()
+        self.task = "task-1"
+
+
+def _task(postman: RecordingPostman) -> Task:
+    return Task(_Helper(postman))  # type: ignore[arg-type]
 
 
 @pytest.mark.asyncio
 async def test_a_fetched_action_is_reduced_to_its_id() -> None:
     postman = RecordingPostman()
 
-    assert await _iterate(postman, action=_Target("action-1")) == [("ok",)]
+    result = [
+        item
+        async for item in _task(postman).aiterate_raw(action=_Target("action-1"))
+    ]
+    assert result == [("ok",)]
 
     (call,) = postman.calls
     assert (call["action"], call["implementation"]) == ("action-1", None)
@@ -113,7 +140,19 @@ async def test_a_fetched_action_is_reduced_to_its_id() -> None:
 async def test_a_fetched_implementation_is_reduced_to_its_id() -> None:
     postman = RecordingPostman()
 
-    await _iterate(postman, implementation=_Target("impl-1"))
+    async for _ in _task(postman).aiterate_raw(implementation=_Target("impl-1")):
+        pass
 
     (call,) = postman.calls
     assert (call["action"], call["implementation"]) == (None, "impl-1")
+
+
+@pytest.mark.asyncio
+async def test_the_raw_engine_itself_only_ever_sees_ids() -> None:
+    """The other side of the same boundary: no model reaches `rekuest.invoke`."""
+    postman = RecordingPostman()
+
+    await _iterate(postman, action_id="action-1", implementation_id=None)
+
+    (call,) = postman.calls
+    assert (call["action"], call["implementation"]) == ("action-1", None)

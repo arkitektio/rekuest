@@ -10,7 +10,7 @@ from rekuest.protocol.schema import PortKind
 from rekuest.structures.registry import StructureRegistry
 from rekuest.structures.serialization.batching import ExpandBatcher
 from rekuest.structures.serialization.protocols import SerializablePort
-from rekuest.structures.types import FullFilledStructure
+from rekuest.structures.types import FullFilledStructure, JSONSerializable
 
 
 @dataclass(frozen=True)
@@ -76,10 +76,26 @@ def single_child(port: SerializablePort) -> SerializablePort | None:
     return port.children[0]
 
 
-def union_index(value: Any) -> tuple[int | None, str | None]:  # noqa: ANN401
+@dataclass(frozen=True)
+class TaggedUnion:
+    """A validated ``{"__use": i, "__value": ...}`` pair.
+
+    A dataclass rather than a NamedTuple: a tuple already has an ``index`` method, and a field of
+    that name would shadow it.
+    """
+
+    #: Which of the port's children the value belongs to.
+    index: int
+    #: The value itself, already unwrapped from its tag.
+    value: "JSONSerializable"
+
+
+def union_index(value: "JSONSerializable") -> tuple[TaggedUnion | None, str | None]:
     """Parse a tagged ``{"__use": i, "__value": ...}`` union value.
 
-    Returns ``(index, None)`` on success, ``(None, reason)`` otherwise.
+    Returns ``(tagged, None)`` on success, ``(None, reason)`` otherwise. The inner value comes
+    back with the index because every caller wants both, and reading ``value["__value"]`` at the
+    call site would mean re-asserting the dict check this function already performed.
     """
     if not isinstance(value, dict) or "__use" not in value or "__value" not in value:
         return None, (
@@ -93,4 +109,4 @@ def union_index(value: Any) -> tuple[int | None, str | None]:  # noqa: ANN401
             None,
             f"Union '__use' must be an integer index, got {type(index).__name__}",
         )
-    return index, None
+    return TaggedUnion(index, value["__value"]), None

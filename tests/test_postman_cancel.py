@@ -31,7 +31,7 @@ from rekuest.api.schema import TaskEventChange
 from rekuest.postmans.errors import RootOnlyAssignError
 from rekuest.client.postman import GraphQLPostman
 from rekuest.client.rath import RekuestRath
-from rekuest.client.remote import aiterate_raw
+from rekuest.invoke import _aiterate_raw as aiterate_raw
 
 from rath.links.testing.direct_succeeding_link import DirectSucceedingLink
 

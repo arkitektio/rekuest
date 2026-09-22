@@ -13,7 +13,6 @@ import asyncio
 
 from rekuest.agents.types import BoundApp
 from koil.bridge import run_threaded
-from rekuest.errors import NoRegistryError
 from rekuest.state.publish import StateHolder
 from rekuest.agents.hooks.registry import (
     HooksRegistry,
@@ -94,31 +93,34 @@ TBackground = TypeVar("TBackground", bound=BackgroundFunction)
 
 
 @overload
-def background(*args: TBackground) -> TBackground: ...
+def declare_background(
+    func: TBackground,
+    /,
+    *,
+    name: str | None = None,
+    registry: HooksRegistry,
+    structure_registry: "StructureRegistry | None" = None,
+) -> TBackground: ...
 
 
 @overload
-def background(
+def declare_background(
+    func: None = None,
+    /,
     *,
     name: str | None = None,
-    registry: HooksRegistry | None = None,
+    registry: HooksRegistry,
     structure_registry: "StructureRegistry | None" = None,
 ) -> Callable[[TBackground], TBackground]: ...
 
 
-@overload
-def background(
-    *args: TBackground,
+# --- Implementation ---
+def declare_background(
+    func: TBackground | None = None,
+    /,
+    *,
     name: str | None = None,
-    registry: HooksRegistry | None = None,
-    structure_registry: "StructureRegistry | None" = None,
-) -> TBackground | Callable[[TBackground], TBackground]: ...
-
-
-def background(  # noqa: ANN201
-    *args: TBackground,
-    name: str | None = None,
-    registry: HooksRegistry | None = None,
+    registry: HooksRegistry,
     structure_registry: "StructureRegistry | None" = None,
 ) -> TBackground | Callable[[TBackground], TBackground]:
     """Register a background task on the selected hook registry.
@@ -136,8 +138,7 @@ def background(  # noqa: ANN201
         *args: Background function to register when used as ``@background``
             without parentheses.
         name: Explicit registry key. Defaults to the function name.
-        registry: Hook registry to populate. Required: without one this raises
-            ``NoRegistryError``, since hooks go through an app (``@app.background``).
+        registry: The hook registry the task is recorded in.
 
     Returns:
         The original function, or a decorator configured with the provided
@@ -159,30 +160,18 @@ def background(  # noqa: ANN201
                     await asyncio.sleep(1)
     """
 
-    if len(args) > 1:
-        raise ValueError("You can only register one function at a time.")
-    if len(args) == 1:
-        function = args[0]
-        if registry is None:
-            raise NoRegistryError.for_decorator(
-                "Hooks go", "background", "async def my_hook(): ...", "registry"
-            )
-        name = name or function.__name__
+    def decorator(function: TBackground) -> TBackground:
+        key = name or function.__name__
         if asyncio.iscoroutinefunction(function):
             a = cast(AsyncBackgroundFunction, function)
-            registry.register_background(name, WrappedBackgroundTask(a, structure_registry))
+            registry.register_background(key, WrappedBackgroundTask(a, structure_registry))
         else:
             assert inspect.isfunction(function) or inspect.ismethod(function), (
                 "Function must be a async function or a sync function"
             )
             t = cast(ThreadedBackgroundFunction, function)
-            registry.register_background(name, WrappedThreadedBackgroundTask(t, structure_registry))
+            registry.register_background(key, WrappedThreadedBackgroundTask(t, structure_registry))
 
         return cast(TBackground, function)
 
-    else:
-
-        def decorator(function: TBackground) -> TBackground:
-            return cast(TBackground, background(function, name=name, registry=registry, structure_registry=structure_registry))
-
-        return decorator
+    return decorator(func) if func is not None else decorator

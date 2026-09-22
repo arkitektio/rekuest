@@ -22,14 +22,21 @@ context, when you do that (see :mod:`rath.task`).
 import logging
 from typing import TYPE_CHECKING, Any
 
-from koil import unkoil
+from koil import unkoil, unkoil_gen
 
 from rekuest.messages import LogLevel
 
 if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator, Generator
+
     from rekuest.actors.helper import AssignmentHelper
     from rekuest.actors.types import AssignmentHook
+    from rekuest.invoke import CallTarget, ImplementationTarget
     from rekuest.messages import Assign
+    from rekuest.postmans.types import Postman
+    from rekuest.protocol.schema import HookInput
+    from rekuest.structures.registry import StructureRegistry
+    from rekuest.structures.types import JSONSerializable
 
 logger = logging.getLogger("rekuest.task")
 
@@ -115,6 +122,175 @@ class Task:
         """Pause here if the task was asked to."""
         unkoil(self.apausepoint)
 
+    # -- calling ---------------------------------------------------------- #
+
+    def _caller(self) -> "tuple[Postman, StructureRegistry, Assign]":
+        """The socket, the registry and the parent for a call made as this task's child.
+
+        Read off the assignment rather than looked up: the postman is the agent's
+        caller socket, the parent is this task's own assignment, and the registry is the
+        one the actor was built with. Mirrors
+        :meth:`rekuest.actors.dependency.AgentMethodProxy._call_kwargs`, whose docstring
+        puts it best -- nothing is looked up from context.
+
+        Raises:
+            ValueError: If no agent runs this task (a :meth:`local` one): a child call
+                needs a socket to leave over and an assignment to hang off.
+        """
+        agent = self._helper.agent
+        assignment = self._helper.assignment
+        if agent is None or assignment is None:
+            raise ValueError(
+                f"Task {self.id!r} runs for no assignment (a Task.local()?), so a call "
+                "made through it would have nothing to be a child of. Call through a "
+                "Rekuest client instead -- rekuest.call(action, ...) -- which makes a root."
+            )
+        return agent.caller_postman, self._helper.structure_registry, assignment
+
+    async def acall(
+        self,
+        target: "CallTarget | ImplementationTarget",
+        *args: Any,  # noqa: ANN401 -- the action's own arguments
+        reference: str | None = None,
+        hooks: "list[HookInput] | None" = None,
+        capture: bool = False,
+        escalate_to_interrupt: bool = False,
+        cancel_timeout: float | None = None,
+        **kwargs: Any,  # noqa: ANN401 -- ditto, by keyword
+    ) -> Any:  # noqa: ANN401 -- whatever the action returns
+        """Call an action as a child of this task.
+
+        ``target`` is an already-fetched ``Action`` or ``Implementation``. A task knows
+        no client, so it cannot look one up by id or by registered function: take a
+        ``rekuest: Rekuest`` parameter, ``await rekuest.aresolve(target)``, and pass the
+        result here.
+        """
+        from rekuest.invoke import _acall
+
+        postman, structure_registry, parent = self._caller()
+        return await _acall(
+            target,
+            *args,
+            postman=postman,
+            structure_registry=structure_registry,
+            parent=parent,
+            reference=reference,
+            hooks=hooks,
+            capture=capture,
+            escalate_to_interrupt=escalate_to_interrupt,
+            cancel_timeout=cancel_timeout,
+            **kwargs,
+        )
+
+    def call(
+        self,
+        target: "CallTarget | ImplementationTarget",
+        *args: Any,  # noqa: ANN401 -- the action's own arguments
+        **kwargs: Any,  # noqa: ANN401 -- ditto, by keyword
+    ) -> Any:  # noqa: ANN401 -- whatever the action returns
+        """Call an action as a child of this task, blocking for its result."""
+        self._caller()  # refuse a local task here, not inside koil's loop machinery
+        return unkoil(self.acall, target, *args, **kwargs)
+
+    async def aiterate(
+        self,
+        target: "CallTarget | ImplementationTarget",
+        *args: Any,  # noqa: ANN401 -- the action's own arguments
+        reference: str | None = None,
+        hooks: "list[HookInput] | None" = None,
+        capture: bool = False,
+        escalate_to_interrupt: bool = False,
+        cancel_timeout: float | None = None,
+        **kwargs: Any,  # noqa: ANN401 -- ditto, by keyword
+    ) -> "AsyncGenerator[Any, None]":
+        """Stream a generator action's yields as a child of this task."""
+        from rekuest.invoke import _aiterate
+
+        postman, structure_registry, parent = self._caller()
+        async for value in _aiterate(
+            target,
+            *args,
+            postman=postman,
+            structure_registry=structure_registry,
+            parent=parent,
+            reference=reference,
+            hooks=hooks,
+            capture=capture,
+            escalate_to_interrupt=escalate_to_interrupt,
+            cancel_timeout=cancel_timeout,
+            **kwargs,
+        ):
+            yield value
+
+    def iterate(
+        self,
+        target: "CallTarget | ImplementationTarget",
+        *args: Any,  # noqa: ANN401 -- the action's own arguments
+        **kwargs: Any,  # noqa: ANN401 -- ditto, by keyword
+    ) -> "Generator[Any, None, None]":
+        """Stream a generator action's yields, blocking between them."""
+        self._caller()  # refuse a local task here, not inside koil's loop machinery
+        return unkoil_gen(self.aiterate, target, *args, **kwargs)
+
+    async def acall_raw(
+        self,
+        kwargs: "dict[str, JSONSerializable] | None" = None,
+        *,
+        action: "CallTarget | None" = None,
+        implementation: "ImplementationTarget | None" = None,
+        reference: str | None = None,
+        hooks: "list[HookInput] | None" = None,
+        capture: bool = False,
+        escalate_to_interrupt: bool = False,
+        cancel_timeout: float | None = None,
+    ) -> Any:  # noqa: ANN401 -- the raw backend payload
+        """Call with already-serialized arguments, as a child of this task."""
+        from rekuest.invoke import _acall_raw
+
+        postman, _, parent = self._caller()
+        return await _acall_raw(
+            postman=postman,
+            kwargs=kwargs,
+            action_id=action.id if action is not None else None,
+            implementation_id=implementation.id if implementation is not None else None,
+            parent=parent,
+            reference=reference,
+            hooks=hooks,
+            capture=capture,
+            escalate_to_interrupt=escalate_to_interrupt,
+            cancel_timeout=cancel_timeout,
+        )
+
+    async def aiterate_raw(
+        self,
+        kwargs: "dict[str, JSONSerializable] | None" = None,
+        *,
+        action: "CallTarget | None" = None,
+        implementation: "ImplementationTarget | None" = None,
+        reference: str | None = None,
+        hooks: "list[HookInput] | None" = None,
+        capture: bool = False,
+        escalate_to_interrupt: bool = False,
+        cancel_timeout: float | None = None,
+    ) -> "AsyncGenerator[Any, None]":
+        """Stream with already-serialized arguments, as a child of this task."""
+        from rekuest.invoke import _aiterate_raw
+
+        postman, _, parent = self._caller()
+        async for value in _aiterate_raw(
+            postman=postman,
+            kwargs=kwargs,
+            action_id=action.id if action is not None else None,
+            implementation_id=implementation.id if implementation is not None else None,
+            parent=parent,
+            reference=reference,
+            hooks=hooks,
+            capture=capture,
+            escalate_to_interrupt=escalate_to_interrupt,
+            cancel_timeout=cancel_timeout,
+        ):
+            yield value
+
     def install_hook(self, hook: "AssignmentHook") -> None:
         """Install an assignment hook for this task."""
         self._helper.install_hook(hook)
@@ -158,6 +334,7 @@ class _LocalHelper:
     assignment = None
     token = None
     agent = None
+    structure_registry = None
 
     def __init__(self, id: str, user: str, org: str) -> None:
         self.task = id

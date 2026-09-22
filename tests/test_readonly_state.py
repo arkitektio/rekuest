@@ -12,7 +12,6 @@ import pytest
 
 from rekuest.agents.base import BaseAgent
 from rekuest.app import AppRegistry
-from rekuest.state.decorator import state
 from rekuest.state.observable import adopt, evented
 from rekuest.state.readonly import ReadOnlyStateError, read_only_view
 
@@ -24,7 +23,7 @@ from .memory_transport import MemoryAgentTransport
 _REGISTRY = AppRegistry()
 
 
-@state(registry=_REGISTRY)
+@_REGISTRY.state
 @dataclass
 class Board:
     """A state with a scalar and both container kinds."""
@@ -146,7 +145,6 @@ async def test_readonly_annotation_reaches_an_actor_as_a_refusing_view() -> None
     read-only -> injected -> writes refused.
     """
     from rekuest import messages
-    from rekuest.register import register
     from rekuest.state.types import ReadOnly
 
     agent = BaseAgent(
@@ -168,10 +166,8 @@ async def test_readonly_annotation_reaches_an_actor_as_a_refusing_view() -> None
             outcome["refused"] = str(e)
         return 1
 
-    register(
+    agent.app_registry.register(
         peek,
-        implementation_registry=agent.app_registry,
-        structure_registry=agent.app_registry.structure_registry,
     )
     agent.collect_from_registry()
 

@@ -112,8 +112,6 @@ async def test_server_respects_requires_and_provides(deployment: Deployment) -> 
             impl = await app.amy_implementation_at("capture_image")
             answer = await app.acall(
                 impl,
-                postman=app.postman,
-                structure_registry=app.structure_registry,
                 file="scan.tiff",
             )
             assert answer == len("scan.tiff")

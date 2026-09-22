@@ -18,6 +18,7 @@ from rekuest.provider import Provider, declare_provider
 from rekuest.service import Service, declare_service
 from rekuest.protocol.schema import (
     AgentDependencyInput,
+    PortKind,
     AssignWidgetInput,
     ReturnWidgetInput,
     BlokImplementationInput,
@@ -39,9 +40,14 @@ from rekuest.catalogs import (
     resolve_catalogs,
 )
 from rekuest.protocol.types import AnyState
+from rekuest.blok.parser import bsx as parse_bsx
+from rekuest.blok.registry import build_declared_bloks
+from rekuest.blok.validate import validate_blok_catalog
+from rekuest.structures.errors import StructureRegistryError
+from functools import partial
 from rekuest.errors import AppContextError, RegistryFrozenError
 from rekuest.structures.registry import StructureRegistry
-from rekuest.structures.types import ExpanderT, ManyExpander, Shrinker
+from rekuest.structures.types import ExpanderT, ManyExpander, Shrinker, StateDeclaration
 
 
 T = TypeVar("T")
@@ -86,7 +92,7 @@ class AppRegistry(BaseModel):
     """The single registry that consolidates all agent registration data.
 
     The AppRegistry stores function implementations, observable states and bloks,
-    and exposes both the storage methods (used by the ``@register``/``@state``
+    and exposes both the storage methods (used by the ``@app.register``/``@app.state``
     decorators and the agent) and the decorator surface itself.
 
     Example:
@@ -327,9 +333,6 @@ class AppRegistry(BaseModel):
         actually be built with. A hand-registered structure's service is guessed
         from its identifier, and ``@myapp/image`` names no service at all.
         """
-        from rekuest.protocol.schema import PortKind
-        from rekuest.structures.errors import StructureRegistryError
-
         needed: dict[str, set[str]] = {}
 
         def visit(interface: str, ports: Any) -> None:  # noqa: ANN401
@@ -465,8 +468,6 @@ class AppRegistry(BaseModel):
             required_locks: Locks an action must hold to change it.
             publish_interval: Seconds between published updates.
         """
-        from rekuest.structures.types import StateDeclaration
-
         self._refuse_if_frozen(f"the state '{state.interface}'")
         self.states[state.interface] = state
         self.state_registry_schemas[state.interface] = registry
@@ -532,9 +533,6 @@ class AppRegistry(BaseModel):
                 resolve, or a declared catalog rejects the tree.
         """
         self._refuse_if_frozen(f"the blok {name!r}")
-        from rekuest.blok.parser import bsx as parse_bsx
-        from rekuest.blok.validate import validate_blok_catalog
-
         if not name:
             raise ValueError("A blok name is required")
         if component is None:
@@ -633,8 +631,6 @@ class AppRegistry(BaseModel):
 
     def get_declared_bloks(self) -> dict[str, BlokImplementationInput]:
         """Generate blok inputs from their declarations against this registry."""
-        from rekuest.blok.registry import build_declared_bloks
-
         return build_declared_bloks(self)
 
     # ------------------------------------------------------------------ #
@@ -781,8 +777,6 @@ class AppRegistry(BaseModel):
             StructureRegistryError: If a port names a structure nothing here holds.
             StructureClientError: If a declared structure's service has no client.
         """
-        from functools import partial
-
         self.validate()
         original = self.structure_registry
         structures = (
@@ -860,9 +854,6 @@ class AppRegistry(BaseModel):
         Raises:
             StructureRegistryError: Listing every problem it found.
         """
-        from rekuest.protocol.schema import PortKind
-        from rekuest.structures.errors import StructureRegistryError
-
         registry = self.structure_registry
         resolvable = {
             PortKind.STRUCTURE: registry.identifier_structure_map,
@@ -936,9 +927,9 @@ class AppRegistry(BaseModel):
         Takes everything the underlying decorator does; they used to drift, and a
         state declaring ``required_locks`` through this method lost them silently.
         """
-        from rekuest.state.decorator import state as state_decorator
+        from rekuest.state.decorator import declare_state
 
-        return state_decorator(
+        return declare_state(
             *args,
             name=name,
             required_locks=required_locks,
@@ -949,83 +940,54 @@ class AppRegistry(BaseModel):
 
     def background(
         self,
-        *args: T,
+        func: T | None = None,
+        /,
+        *,
         name: str | None = None,
     ) -> T | Callable[[T], T]:
         """Register a background task."""
-        from rekuest.agents.hooks.background import (
-            background as background_decorator,
+        from rekuest.agents.hooks.background import declare_background
+
+        return declare_background(  # type: ignore[return-value]
+            func,  # type: ignore[arg-type]
+            name=name,
+            registry=self.hooks_registry,
+            structure_registry=self.structure_registry,
         )
-
-        if args:
-            return background_decorator(
-                *args,
-                name=name,
-                registry=self.hooks_registry,
-                structure_registry=self.structure_registry,
-            )
-
-        def decorator(func: T) -> T:
-            return background_decorator(
-                func,
-                name=name,
-                registry=self.hooks_registry,
-                structure_registry=self.structure_registry,
-            )
-
-        return decorator
 
     def startup(
         self,
-        *args: T,
+        func: T | None = None,
+        /,
+        *,
         name: str | None = None,
     ) -> T | Callable[[T], T]:
         """Register a startup hook."""
-        from rekuest.agents.hooks.startup import startup as startup_decorator
+        from rekuest.agents.hooks.startup import declare_startup
 
-        if args:
-            return startup_decorator(
-                *args,
-                name=name,
-                registry=self.hooks_registry,
-                structure_registry=self.structure_registry,
-            )
-
-        def decorator(func: T) -> T:
-            return startup_decorator(
-                func,
-                name=name,
-                registry=self.hooks_registry,
-                structure_registry=self.structure_registry,
-            )
-
-        return decorator
+        return declare_startup(  # type: ignore[return-value]
+            func,  # type: ignore[arg-type]
+            name=name,
+            registry=self.hooks_registry,
+            structure_registry=self.structure_registry,
+        )
 
     def shutdown(
         self,
-        *args: T,
+        func: T | None = None,
+        /,
+        *,
         name: str | None = None,
     ) -> T | Callable[[T], T]:
         """Register a shutdown hook."""
-        from rekuest.agents.hooks.shutdown import shutdown as shutdown_decorator
+        from rekuest.agents.hooks.shutdown import declare_shutdown
 
-        if args:
-            return shutdown_decorator(
-                *args,
-                name=name,
-                registry=self.hooks_registry,
-                structure_registry=self.structure_registry,
-            )
-
-        def decorator(func: T) -> T:
-            return shutdown_decorator(
-                func,
-                name=name,
-                registry=self.hooks_registry,
-                structure_registry=self.structure_registry,
-            )
-
-        return decorator
+        return declare_shutdown(  # type: ignore[return-value]
+            func,  # type: ignore[arg-type]
+            name=name,
+            registry=self.hooks_registry,
+            structure_registry=self.structure_registry,
+        )
 
     def context(
         self,
@@ -1251,14 +1213,20 @@ class AppRegistry(BaseModel):
 
     def register(
         self,
-        *args: T,
+        func: T | None = None,
+        /,
         **kwargs: Any,
     ) -> T | Callable[[T], T]:
-        """Register a function or class as an implementation."""
-        from rekuest.register import register as register_decorator
+        """Register a function or class as an implementation.
 
-        return register_decorator(
-            *args,
+        Bare (``app.register(fn)``) or configured
+        (``app.register(interface=...)(fn)``); the registry and its structures are
+        supplied here, which is the whole reason this wrapper exists.
+        """
+        from rekuest.register import declare_implementation
+
+        return declare_implementation(  # type: ignore[return-value]
+            func,  # type: ignore[arg-type]
             implementation_registry=self,
             structure_registry=self.structure_registry,
             **kwargs,

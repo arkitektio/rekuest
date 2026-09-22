@@ -153,7 +153,7 @@ class BaseAgent(KoiledModel):
     )
     _app_context: AppContext | None = PrivateAttr(default=None)
     _caller_postman: Optional["AgentPostman"] = PrivateAttr(default=None)
-    """The agent-as-caller postman, lazily built. A per-task ``Rekuest`` view and the
+    """The agent-as-caller postman, lazily built. :class:`~rekuest.task.Task` and the
     dependency proxies call through it, so their calls originate over this socket."""
     _control_plane: Optional["SocketControlPlane"] = PrivateAttr(default=None)
     """Init bookkeeping and the shelve over this socket, lazily built."""
@@ -251,7 +251,7 @@ class BaseAgent(KoiledModel):
     def caller_postman(self) -> "AgentPostman":
         """The agent-as-caller postman (lazily built).
 
-        A per-task ``Rekuest`` view and the dependency proxies call through it, so their
+        :class:`~rekuest.task.Task` and the dependency proxies call through it, so their
         calls originate over this agent's socket instead of through the GraphQL postman.
         """
         if self._caller_postman is None:

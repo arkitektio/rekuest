@@ -6,7 +6,6 @@ from typing import Protocol
 import pytest
 
 from rekuest.app import AppRegistry
-from rekuest.state.decorator import state
 
 
 class RunState:
@@ -43,7 +42,7 @@ def registry() -> AppRegistry:
 def test_demo_state_is_synthesized_for_a_state_with_required_fields(
     registry: AppRegistry,
 ) -> None:
-    @state(registry=registry)
+    @registry.state
     @dataclass
     class ProtocolState:
         available_protocols: list[str]  # required: no default to construct from
@@ -63,7 +62,7 @@ def test_demo_state_is_synthesized_for_a_state_with_required_fields(
 
 
 def test_explicit_demo_state_is_left_alone(registry: AppRegistry) -> None:
-    @state(registry=registry)
+    @registry.state
     @dataclass
     class ProtocolState:
         available_protocols: list[str]

@@ -74,10 +74,14 @@ async def test_reports_through_the_injected_task_in_loop_and_thread() -> None:
 
 
 @pytest.mark.asyncio
-async def test_an_injected_rekuest_client_parents_its_calls_to_the_task(
+async def test_a_call_inside_a_task_goes_through_the_task(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Child calls belong to the rekuest *service*, parented to the running task."""
+    """A child call is the task's, so the task is what makes it.
+
+    It supplies all three things a child needs -- the agent's socket, its own assignment
+    as the parent, and the actor's registry -- and none of them is looked up from context.
+    """
     from rekuest.client.client import Rekuest
 
     app = FakeApp("A")
@@ -95,12 +99,12 @@ async def test_an_injected_rekuest_client_parents_its_calls_to_the_task(
         seen.update(kwargs, target=target, args=args)
         return "child-result"
 
-    monkeypatch.setattr("rekuest.client.remote.acall", fake_acall)
+    monkeypatch.setattr("rekuest.invoke._acall", fake_acall)
 
     async def parent(x: int, rekuest: Rekuest, task: Task) -> str:
-        """Calls a child through the injected client."""
+        """Calls a child through the task it runs for."""
         await task.aprogress(10)
-        return await rekuest.acall(ACTION, x, reference="r")
+        return await task.acall(ACTION, x, reference="r")
 
     agent.app_registry.register(parent)
     agent.collect_from_registry()
@@ -111,6 +115,74 @@ async def test_an_injected_rekuest_client_parents_its_calls_to_the_task(
     assert seen["structure_registry"] is agent.app_registry.structure_registry
     assert (seen["target"], seen["args"], seen["reference"]) == (ACTION, (1,), "r")
     assert "parent" not in Rekuest.model_fields, "the client carries no task state"
+
+
+@pytest.mark.asyncio
+async def test_the_client_refuses_to_make_a_root_call_inside_a_task(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A call through the client is a root, so inside a task it would be the task's
+    sibling rather than its child. It refuses, and points at the task.
+    """
+    from rekuest.client.client import Rekuest
+    from rekuest.errors import RootOnlyCallError
+
+    app = FakeApp("A")
+    agent = build_agent(app)
+    with_client(agent.app_registry, Rekuest, "rekuest")
+    rekuest = Rekuest.model_construct(
+        postman="graphql-postman",
+        structure_registry=agent.app_registry.structure_registry,
+    )
+    app.services["rekuest"] = rekuest
+    seen: dict[str, Any] = {}
+
+    async def parent(rekuest: Rekuest, task: Task) -> str:
+        try:
+            await rekuest.acall(ACTION)
+        except RootOnlyCallError as error:
+            seen["message"] = str(error)
+            return "refused"
+        return "called"
+
+    agent.app_registry.register(parent)
+    agent.collect_from_registry()
+
+    assert await run_assignment(agent, assign("parent")) == {"return0": "refused"}
+    assert "task.acall(action)" in seen["message"]
+    assert "rekuest.aresolve" in seen["message"]
+
+
+@pytest.mark.asyncio
+async def test_a_lookup_inside_a_task_is_not_refused(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Only the six call methods refuse. A lookup made inside a task is correct and
+    common -- ``fluss``'s engine does ``rekuest.acollect(...)`` mid-flow -- so the guard
+    must not have crept into ``aexecute``.
+    """
+    from rekuest.client.client import Rekuest
+
+    app = FakeApp("A")
+    agent = build_agent(app)
+    with_client(agent.app_registry, Rekuest, "rekuest")
+    rekuest = Rekuest.model_construct(
+        postman="graphql-postman",
+        structure_registry=agent.app_registry.structure_registry,
+    )
+    app.services["rekuest"] = rekuest
+    seen: dict[str, Any] = {}
+
+    async def parent(rekuest: Rekuest, task: Task) -> str:
+        # `aresolve` of an already-fetched model needs no transport, and must not refuse.
+        seen["resolved"] = await rekuest.aresolve(ACTION)
+        return "ok"
+
+    agent.app_registry.register(parent)
+    agent.collect_from_registry()
+
+    assert await run_assignment(agent, assign("parent")) == {"return0": "ok"}
+    assert seen["resolved"] is ACTION
 
 
 @pytest.mark.asyncio
@@ -130,11 +202,12 @@ async def test_outside_a_task_the_rekuest_client_calls_over_its_own_postman(
         seen.update(kwargs)
         return "ok"
 
-    monkeypatch.setattr("rekuest.client.remote.acall", fake_acall)
+    monkeypatch.setattr("rekuest.invoke._acall", fake_acall)
     assert await rekuest.acall(ACTION) == "ok"
     assert seen["postman"] == "graphql-postman" and "parent" not in seen
 
-    # A local task runs under no agent, so its calls are roots too.
+    # A local task runs under no agent, so a call under one is still a root -- which is
+    # why the client's refusal tests for an *agent-run* task rather than any ambient task.
     from rath.task import task_scope
 
     seen.clear()

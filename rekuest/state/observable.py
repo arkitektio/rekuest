@@ -1,10 +1,13 @@
 import dataclasses
-from typing import Any, Generic, TypeVar, overload, SupportsIndex
+from typing import TYPE_CHECKING, Any, Generic, TypeVar, cast, overload, SupportsIndex
 from collections.abc import Callable, Iterable
 
 import contextlib
 import threading
 from collections.abc import Iterator
+
+if TYPE_CHECKING:
+    from _typeshed import SupportsKeysAndGetItem, SupportsRichComparison
 
 from rekuest.protocol.schema import ReturnPortInput, StateDefinitionInput
 from rekuest.state.publish import Patch, StateHolder
@@ -173,8 +176,12 @@ def _make_patch(
 
 # --- JSON Patch Compliant EventedDict (RFC 6902) ---
 
-K = TypeVar("K")
+#: Bound to what a JSON Pointer segment can be: every key is handed to `_make_path`, so a
+#: mapping keyed by anything else cannot be described as a patch path in the first place.
+K = TypeVar("K", bound="str | int")
 V = TypeVar("V")
+#: The fallback a caller hands to `pop`, which need not be one of the mapping's own values.
+D = TypeVar("D")
 
 
 def _require_locks(config: StateConfig, path: str) -> None:
@@ -212,7 +219,7 @@ class EventedDict(dict[K, V], Generic[K, V]):
         self._path = path
         self._port = port
 
-    def __setitem__(self, key: Any, value: Any) -> None:
+    def __setitem__(self, key: K, value: V) -> None:
         _require_locks(self._config, self._path)
         full_path = _make_path(self._path, key)
         exists = key in self
@@ -233,7 +240,7 @@ class EventedDict(dict[K, V], Generic[K, V]):
             ),
         )
 
-    def __delitem__(self, key: Any) -> None:
+    def __delitem__(self, key: K) -> None:
         _require_locks(self._config, self._path)
         full_path = _make_path(self._path, key)
         old_value = self[key]
@@ -251,7 +258,14 @@ class EventedDict(dict[K, V], Generic[K, V]):
             ),
         )
 
-    def pop(self, key: Any, *default: Any) -> Any:
+    @overload
+    def pop(self, key: K, /) -> V: ...
+    @overload
+    def pop(self, key: K, default: V, /) -> V: ...
+    @overload
+    def pop(self, key: K, default: D, /) -> V | D: ...
+
+    def pop(self, key: K, /, *default: D) -> V | D:
         """Remove specified key and return the corresponding value.
 
         Emits a 'remove' patch if the key exists.
@@ -278,7 +292,7 @@ class EventedDict(dict[K, V], Generic[K, V]):
         else:
             raise KeyError(key)
 
-    def popitem(self) -> tuple[Any, Any]:
+    def popitem(self) -> tuple[K, V]:
         """Remove and return a (key, value) pair as a 2-tuple.
 
         Emits a 'remove' patch for the removed item.
@@ -319,21 +333,28 @@ class EventedDict(dict[K, V], Generic[K, V]):
             self[key] = default
         return self[key]
 
-    def update(self, other: Any = None, **kwargs: Any) -> None:
+    def update(
+        self,
+        other: "SupportsKeysAndGetItem[K, V] | Iterable[tuple[K, V]] | None" = None,
+        **kwargs: V,
+    ) -> None:
         """Update the dictionary with key/value pairs.
 
         Emits 'add' or 'replace' patches for each key.
         """
         _require_locks(self._config, self._path)
-        if other:
+        if other is not None:
             if hasattr(other, "keys"):
-                for k in other.keys():
-                    self[k] = other[k]
+                mapping = cast("SupportsKeysAndGetItem[K, V]", other)
+                for k in mapping.keys():
+                    self[k] = mapping[k]
             else:
-                for k, v in other:
+                for k, v in cast("Iterable[tuple[K, V]]", other):
                     self[k] = v
-        for k, v in kwargs.items():
-            self[k] = v
+        for name, value in kwargs.items():
+            # Keyword arguments are str by construction, which only satisfies K when K is str --
+            # the same unsoundness typeshed confines to its `dict[str, V]` overload.
+            self[cast("K", name)] = value
 
 
 # --- JSON Patch Compliant EventedList (RFC 6902) ---
@@ -341,7 +362,7 @@ class EventedDict(dict[K, V], Generic[K, V]):
 T = TypeVar("T")
 
 
-class EventedList(list):
+class EventedList(list[T], Generic[T]):
     """A list wrapper that emits JSON Patch operations on modification.
 
     Supports all standard list mutation methods with proper JSON Patch semantics:
@@ -355,7 +376,7 @@ class EventedList(list):
 
     def __init__(
         self,
-        iterable: Iterable,
+        iterable: Iterable[T],
         config: StateConfig,
         path: str,
         port: ReturnPortInput | None,
@@ -379,18 +400,18 @@ class EventedList(list):
                 item._path = _make_path(self._path, i)
 
     @overload
-    def __setitem__(self, index: SupportsIndex, value: Any) -> None: ...
+    def __setitem__(self, index: SupportsIndex, value: T) -> None: ...
     @overload
-    def __setitem__(self, index: slice, value: Iterable[Any]) -> None: ...
+    def __setitem__(self, index: slice, value: Iterable[T]) -> None: ...
 
-    def __setitem__(self, index: SupportsIndex | slice, value: Any) -> None:
+    def __setitem__(self, index: SupportsIndex | slice, value: T | Iterable[T]) -> None:
         _require_locks(self._config, self._path)
         if isinstance(index, slice):
             # Expand slice assignment into the single-index primitives so the
             # emitted patches are valid RFC-6902 operations: remove the old
             # slice (highest index first) then insert the new values in order.
             indices = list(range(*index.indices(len(self))))
-            new_values = list(value)
+            new_values = list(cast("Iterable[T]", value))
             if index.step not in (None, 1):
                 # Extended slices cannot change length: replace slot by slot.
                 if len(indices) != len(new_values):
@@ -413,8 +434,8 @@ class EventedList(list):
             child_port = _resolve_child_port(self._config, self._port, idx)
 
             # Wrap new value
-            value = make_evented(value, self._config, full_path, port=child_port)
-            super().__setitem__(idx, value)
+            item = make_evented(cast("T", value), self._config, full_path, port=child_port)
+            super().__setitem__(idx, item)
             _publish_patch(
                 self._config,
                 _make_patch(
@@ -453,7 +474,7 @@ class EventedList(list):
             # Reindex items after the deleted position
             self._reindex_items(idx)
 
-    def append(self, item: Any) -> None:
+    def append(self, item: T) -> None:
         """Append item to end of list.
 
         Per RFC 6902, uses '/-' to indicate appending to end of array.
@@ -476,7 +497,7 @@ class EventedList(list):
             ),
         )
 
-    def insert(self, index: SupportsIndex, item: Any) -> None:
+    def insert(self, index: SupportsIndex, item: T) -> None:
         """Insert item before index.
 
         Emits an 'add' patch at the specified index.
@@ -502,7 +523,7 @@ class EventedList(list):
         # Reindex items after the inserted position
         self._reindex_items(idx + 1)
 
-    def extend(self, items: Iterable[Any]) -> None:
+    def extend(self, items: Iterable[T]) -> None:
         """Extend list by appending elements from the iterable.
 
         Emits an 'add' patch for each item.
@@ -511,7 +532,7 @@ class EventedList(list):
         for item in items:
             self.append(item)
 
-    def pop(self, index: SupportsIndex = -1) -> Any:  # type: ignore[override]
+    def pop(self, index: SupportsIndex = -1) -> T:  # type: ignore[override]
         """Remove and return item at index (default last).
 
         Emits a 'remove' patch.
@@ -542,7 +563,7 @@ class EventedList(list):
         self._reindex_items(idx)
         return result
 
-    def remove(self, item: Any) -> None:
+    def remove(self, item: T) -> None:
         """Remove first occurrence of item.
 
         Emits a 'remove' patch at the item's index.
@@ -588,20 +609,46 @@ class EventedList(list):
         """
         self._reorder(super().reverse)
 
-    def sort(self, *, key: Any = None, reverse: bool = False) -> None:
+    @overload
+    def sort(
+        self: "EventedList[SupportsRichComparison]",
+        *,
+        key: None = None,
+        reverse: bool = False,
+    ) -> None: ...
+    @overload
+    def sort(
+        self, *, key: "Callable[[T], SupportsRichComparison]", reverse: bool = False
+    ) -> None: ...
+
+    def sort(
+        self,
+        *,
+        key: "Callable[[T], SupportsRichComparison] | None" = None,
+        reverse: bool = False,
+    ) -> None:
         """Sort list in place.
 
         Emits 'replace' patches for each changed position.
         """
-        self._reorder(lambda: super(EventedList, self).sort(key=key, reverse=reverse))
 
-    def __iadd__(self, other: Iterable[Any]) -> "EventedList":
+        def _sort() -> None:
+            # `key=None` and `key=<callable>` are separate overloads on `list.sort`, so the two
+            # cases are spelled out rather than passing an optional through one of them.
+            if key is None:
+                list.sort(cast("list[SupportsRichComparison]", self), reverse=reverse)
+            else:
+                super(EventedList, self).sort(key=key, reverse=reverse)
+
+        self._reorder(_sort)
+
+    def __iadd__(self, other: Iterable[T]) -> "EventedList[T]":
         """Implement += operator."""
         _require_locks(self._config, self._path)
         self.extend(other)
         return self
 
-    def __imul__(self, n: SupportsIndex) -> "EventedList":  # type: ignore[override]
+    def __imul__(self, n: SupportsIndex) -> "EventedList[T]":  # type: ignore[override]
         """Implement *= operator."""
         _require_locks(self._config, self._path)
         count = n.__index__() if hasattr(n, "__index__") else int(n)  # type: ignore

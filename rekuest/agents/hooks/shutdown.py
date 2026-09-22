@@ -14,7 +14,6 @@ import asyncio
 
 from rekuest.agents.types import BoundApp
 from koil.bridge import run_threaded
-from rekuest.errors import NoRegistryError
 from rekuest.state.publish import StateHolder
 from rekuest.agents.hooks.registry import (
     HooksRegistry,
@@ -117,43 +116,34 @@ TShutdown = TypeVar("TShutdown", bound=ShutdownFunction)
 
 
 @overload
-def shutdown(*args: TShutdown) -> TShutdown:
-    """Decorator to register a shutdown hook"""
-
-    ...
-
-
-@overload
-def shutdown(
+def declare_shutdown(
+    func: TShutdown,
+    /,
     *,
     name: str | None = None,
-    registry: HooksRegistry | None = None,
+    registry: HooksRegistry,
     structure_registry: "StructureRegistry | None" = None,
-) -> Callable[[TShutdown], TShutdown]:
-    """Decorator to register a shutdown hook
-
-    Args:
-        name (str): The name of the shutdown hook. If not provided, the function name will be used.
-        registry (HooksRegistry): The registry to register into. Required.
-    """
-    ...
+) -> TShutdown: ...
 
 
 @overload
-def shutdown(
-    *args: TShutdown,
+def declare_shutdown(
+    func: None = None,
+    /,
+    *,
     name: str | None = None,
-    registry: HooksRegistry | None = None,
+    registry: HooksRegistry,
     structure_registry: "StructureRegistry | None" = None,
-) -> TShutdown | Callable[[TShutdown], TShutdown]:
-    """Decorator to register a shutdown hook"""
+) -> Callable[[TShutdown], TShutdown]: ...
 
 
 # --- Implementation ---
-def shutdown(
-    *args: TShutdown,
+def declare_shutdown(
+    func: TShutdown | None = None,
+    /,
+    *,
     name: str | None = None,
-    registry: HooksRegistry | None = None,
+    registry: HooksRegistry,
     structure_registry: "StructureRegistry | None" = None,
 ) -> TShutdown | Callable[[TShutdown], TShutdown]:
     """Register a shutdown hook on the selected hook registry.
@@ -180,8 +170,7 @@ def shutdown(
         *args: Shutdown function to register when used as ``@shutdown`` without
             parentheses.
         name: Explicit registry key. Defaults to the function name.
-        registry: Hook registry to populate. Required: without one this raises
-            ``NoRegistryError``, since hooks go through an app (``@app.shutdown``).
+        registry: The hook registry the hook is recorded in.
 
     Returns:
         The original function, or a decorator configured with the provided
@@ -201,32 +190,19 @@ def shutdown(
                 await my_context.client.aclose()
     """
 
-    if len(args) > 1:
-        raise ValueError("You can only register one function at a time.")
-
-    if len(args) == 1:
-        func = args[0]
-        if registry is None:
-            raise NoRegistryError.for_decorator(
-                "Hooks go", "shutdown", "async def my_hook(): ...", "registry"
-            )
-
-        if asyncio.iscoroutinefunction(func):
-            a = cast(AsyncShutdownFunction, func)
+    def decorator(function: TShutdown) -> TShutdown:
+        if asyncio.iscoroutinefunction(function):
+            a = cast(AsyncShutdownFunction, function)
             registry.register_shutdown(name or a.__name__, WrappedShutdownHook(a, structure_registry))
 
         else:
-            assert inspect.isfunction(func) or inspect.ismethod(func), (
+            assert inspect.isfunction(function) or inspect.ismethod(function), (
                 "Function must be a async function or a sync function"
             )
-            t = cast(ThreadedShutdownFunction, func)
+            t = cast(ThreadedShutdownFunction, function)
 
             registry.register_shutdown(name or t.__name__, ThreadedShutdownHook(t, structure_registry))
 
-        return cast(TShutdown, func)
-    else:
+        return cast(TShutdown, function)
 
-        def decorator(func: TShutdown) -> TShutdown:
-            return cast(TShutdown, shutdown(func, name=name, registry=registry, structure_registry=structure_registry))
-
-        return decorator
+    return decorator(func) if func is not None else decorator

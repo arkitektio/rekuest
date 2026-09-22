@@ -7,7 +7,6 @@ from rekuest.agents.hooks.startup import ThreadedStartupHook
 from rekuest.agents.hooks.background import WrappedThreadedBackgroundTask
 from rekuest.agents.base import RekuestAgent
 from rekuest.client.client import Rekuest
-from rekuest.state.decorator import state
 from rekuest.app import AppRegistry
 
 # Hooks and states belong to a registry, as they would to an app.
@@ -41,7 +40,7 @@ def test_actify_class_based_function(mock_rekuest: Rekuest, mock_agent: RekuestA
 def test_actify_class_based_startup(mock_rekuest: Rekuest, mock_agent: RekuestAgent) -> None:
     """Test if the function is correctly buildable into an actor definition."""
 
-    @state(registry=mock_agent.app_registry)
+    @mock_agent.app_registry.state
     @dataclass
     class DefaultState:
         """A default state for the class."""
@@ -68,7 +67,7 @@ def test_actify_class_based_startup(mock_rekuest: Rekuest, mock_agent: RekuestAg
 def test_actify_class_based_background(mock_rekuest: Rekuest, mock_agent: RekuestAgent) -> None:
     """Test if the function is correctly buildable into an actor definition."""
 
-    @state(registry=mock_agent.app_registry)
+    @mock_agent.app_registry.state
     @dataclass
     class DefaultState:
         """A default state for the class."""

@@ -100,16 +100,15 @@ async def test_workflow_calls_single_dependency(deployment: Deployment) -> None:
         await workflow_app.aconnect(timeout=CONNECT_TIMEOUT)
         workflow_task = asyncio.create_task(workflow_app.aloop())
 
-        # With two apps entered, the ambient rath/postman context is ambiguous,
-        # so address every remote call explicitly to the workflow app.
+        # There is no ambient client, so a call is addressed by the app it is
+        # made on: `workflow_app.acall` uses the workflow app's own postman and
+        # registry. With two apps entered, that is the whole of the addressing.
         impl = await workflow_app.amy_implementation_at(
             "single_workflow",
         )
 
         answer = await workflow_app.acall(
             impl,
-            postman=workflow_app.postman,
-            structure_registry=workflow_app.structure_registry,
         )
         assert answer == "stitched-printer", f"Unexpected workflow result: {answer!r}"
 
@@ -186,16 +185,14 @@ async def test_workflow_calls_two_separate_apps(deployment: Deployment) -> None:
         await workflow_app.aconnect(timeout=CONNECT_TIMEOUT)
         workflow_task = asyncio.create_task(workflow_app.aloop())
 
-        # Address every remote call explicitly to the workflow app, since the
-        # ambient rath/postman context is ambiguous with three apps entered.
+        # Addressed by the app the call is made on -- there is no ambient
+        # client, and `acall` takes its postman and registry from `self`.
         impl = await workflow_app.amy_implementation_at(
             "two_app_workflow",
         )
 
         answer = await workflow_app.acall(
             impl,
-            postman=workflow_app.postman,
-            structure_registry=workflow_app.structure_registry,
         )
         assert answer == "stitched-printer|segmented-ptiner", (
             f"Unexpected workflow result: {answer!r}"
@@ -299,8 +296,6 @@ async def test_workflow_cancel_propagates_to_dependency(
         call_task = asyncio.create_task(
             workflow_app.acall(
                 impl,
-                postman=workflow_app.postman,
-                structure_registry=workflow_app.structure_registry,
             )
         )
 
@@ -412,16 +407,14 @@ async def test_workflow_calls_two_separate_apps_async(deployment: Deployment) ->
         await workflow_app.aconnect(timeout=CONNECT_TIMEOUT)
         workflow_task = asyncio.create_task(workflow_app.aloop())
 
-        # Address every remote call explicitly to the workflow app, since the
-        # ambient rath/postman context is ambiguous with three apps entered.
+        # Addressed by the app the call is made on -- there is no ambient
+        # client, and `acall` takes its postman and registry from `self`.
         impl = await workflow_app.amy_implementation_at(
             "two_app_workflow",
         )
 
         answer = await workflow_app.acall(
             impl,
-            postman=workflow_app.postman,
-            structure_registry=workflow_app.structure_registry,
         )
         assert answer == "stitched-printer|segmented-ptiner", (
             f"Unexpected workflow result: {answer!r}"

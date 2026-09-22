@@ -229,7 +229,7 @@ class ActorContext(Shelver, LockHost, Capturable, Protocol):
 
     @property
     def caller_postman(self) -> Postman:
-        """The agent-as-caller postman: a per-task ``Rekuest`` view calls through it.
+        """The agent-as-caller postman: :class:`~rekuest.task.Task` calls through it.
 
         Declared as a property, not an attribute: implementations build it lazily, and a
         mutable protocol attribute is invariant, so a read-only property would not satisfy it.

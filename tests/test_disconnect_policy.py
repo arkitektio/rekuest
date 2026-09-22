@@ -25,7 +25,6 @@ from rekuest.actors.policy import (
 from rekuest.agents.base import BaseAgent
 from rekuest.agents.policy import Backoff, ConnectionPolicy
 from rekuest.app import AppRegistry
-from rekuest.register import register
 
 from .memory_transport import MemoryAgentTransport
 
@@ -131,11 +130,9 @@ async def test_cancel_policy_stops_work_when_the_link_drops(
             raise
         return x
 
-    register(
+    agent.app_registry.register(
         move_stage,
         policy=CancelOnDisconnect(),
-        implementation_registry=agent.app_registry,
-        structure_registry=agent.app_registry.structure_registry,
     )
     agent.collect_from_registry()
 
@@ -170,10 +167,8 @@ async def test_keep_policy_survives_a_drop(
             raise
         return x
 
-    register(
+    agent.app_registry.register(
         train_model,
-        implementation_registry=agent.app_registry,
-        structure_registry=agent.app_registry.structure_registry,
     )
     agent.collect_from_registry()
 
@@ -218,16 +213,12 @@ async def test_only_the_declaring_action_is_stopped(
             raise
         return x
 
-    register(
+    agent.app_registry.register(
         move_stage,
         policy=CancelOnDisconnect(),
-        implementation_registry=agent.app_registry,
-        structure_registry=agent.app_registry.structure_registry,
     )
-    register(
+    agent.app_registry.register(
         acquire,
-        implementation_registry=agent.app_registry,
-        structure_registry=agent.app_registry.structure_registry,
     )
     agent.collect_from_registry()
 
@@ -262,11 +253,9 @@ async def test_reconnect_within_the_grace_period_spares_the_work(
             raise
         return x
 
-    register(
+    agent.app_registry.register(
         scan_tile,
         policy=CancelOnDisconnect(grace=5.0),
-        implementation_registry=agent.app_registry,
-        structure_registry=agent.app_registry.structure_registry,
     )
     agent.collect_from_registry()
 
@@ -306,11 +295,9 @@ async def test_a_link_that_recovers_as_the_deadline_expires_does_not_kill(
             raise
         return x
 
-    register(
+    agent.app_registry.register(
         move_stage,
         policy=CancelOnDisconnect(grace=0.05),
-        implementation_registry=agent.app_registry,
-        structure_registry=agent.app_registry.structure_registry,
     )
     agent.collect_from_registry()
 
@@ -349,11 +336,9 @@ async def test_the_kill_report_is_retained_and_resent_on_reconnect(
         await asyncio.sleep(60)
         return x
 
-    register(
+    agent.app_registry.register(
         move_stage,
         policy=CancelOnDisconnect(),
-        implementation_registry=agent.app_registry,
-        structure_registry=agent.app_registry.structure_registry,
     )
     agent.collect_from_registry()
 
@@ -393,11 +378,9 @@ async def test_a_policy_kill_does_not_leave_the_task_looking_alive(
         await asyncio.sleep(60)
         return x
 
-    register(
+    agent.app_registry.register(
         move_stage,
         policy=CancelOnDisconnect(),
-        implementation_registry=agent.app_registry,
-        structure_registry=agent.app_registry.structure_registry,
     )
     agent.collect_from_registry()
 
@@ -442,11 +425,9 @@ async def test_a_threaded_action_declaring_cancel_warns_at_registration(
         return x
 
     with pytest.warns(UserWarning, match="check_cancelled"):
-        register(
+        agent.app_registry.register(
             move_stage_sync,
             policy=CancelOnDisconnect(),
-            implementation_registry=agent.app_registry,
-            structure_registry=agent.app_registry.structure_registry,
         )
 
 
@@ -475,11 +456,9 @@ async def test_a_polling_threaded_action_does_stop(
         return x
 
     with pytest.warns(UserWarning):
-        register(
+        agent.app_registry.register(
             move_stage_sync,
             policy=CancelOnDisconnect(),
-            implementation_registry=agent.app_registry,
-            structure_registry=agent.app_registry.structure_registry,
         )
     agent.collect_from_registry()
 

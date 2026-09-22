@@ -25,7 +25,6 @@ from rekuest.app import AppRegistry
 from rekuest.definition.define import prepare_definition
 from rekuest.definition.match import build_port_matches
 from rekuest.register import register_func, RegisterConfig
-from rekuest.state.decorator import state as state_decorator
 from rekuest.structures.registry import StructureRegistry
 from rekuest.widgets import withStateChoices
 
@@ -37,12 +36,7 @@ def _register_camera_state(app: AppRegistry) -> None:
     class CameraState:
         exposure_ms: float = 0.0
 
-    # The ``name=...`` form routes through the branch that threads the registry.
-    state_decorator(
-        name="CameraState",
-        registry=app,
-        structure_reg=app.structure_registry,
-    )(CameraState)
+    app.state(name="CameraState")(CameraState)
 
 
 def _camera_state() -> StateImplementationInput:

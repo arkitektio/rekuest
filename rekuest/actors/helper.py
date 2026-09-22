@@ -1,6 +1,6 @@
 """The AssignmentHelper is a helper class that is used to manage the assignment"""
 
-from typing import Any, Self
+from typing import Any, Protocol, Self, runtime_checkable
 from pydantic import BaseModel, ConfigDict
 from enum import Enum
 
@@ -8,6 +8,16 @@ from rekuest.messages import LogLevel
 from koil import unkoil
 from rekuest import messages
 from rekuest.actors.types import Actor, AssignmentHook
+
+
+@runtime_checkable
+class _Serializes(Protocol):
+    """An actor that carries a structure registry, i.e. one with ports."""
+
+    @property
+    def structure_registry(self) -> Any:  # noqa: ANN401 - StructureRegistry
+        """What this actor's calls (de)serialize with."""
+        ...
 
 
 class AssignmentHelper(BaseModel):
@@ -24,6 +34,22 @@ class AssignmentHelper(BaseModel):
     def agent(self) -> Any:  # noqa: ANN401 - ActorContext
         """The agent running the actor this assignment belongs to."""
         return self.actor.agent
+
+    @property
+    def structure_registry(self) -> Any:  # noqa: ANN401 - StructureRegistry
+        """What a call made as this assignment's child (de)serializes with.
+
+        Read off the concrete actor rather than declared on the ``Actor`` protocol: only
+        a ``SerializingActor`` carries a registry -- an actor with no ports never shrinks
+        anything -- and a mutable protocol attribute would be invariant besides.
+        """
+        actor = self.actor
+        if not isinstance(actor, _Serializes):
+            raise ValueError(
+                f"The actor running {self.assignment.task!r} does not serialize, so it "
+                "has no structure registry for a call to (de)serialize with."
+            )
+        return actor.structure_registry
 
     async def alog(
         self: Self, level: LogLevel | messages.LogLevelLiteral, message: str

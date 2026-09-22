@@ -15,7 +15,7 @@ So rekuest splits the decision in two:
 | Layer | Question | Where |
 | --- | --- | --- |
 | `ConnectionPolicy` | How hard should this **agent** fight to keep its link? | on the agent |
-| `DisconnectPolicy` | What happens to **this action's** work while the link is down? | on `@register` |
+| `DisconnectPolicy` | What happens to **this action's** work while the link is down? | on `@app.register` |
 
 ## Per-action: `DisconnectPolicy`
 

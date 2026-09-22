@@ -2,10 +2,8 @@
 
 from typing import (
     TYPE_CHECKING,
-    Any,
     Generic,
     Literal,
-    Optional,
     ParamSpec,
     TypeVar,
     overload,
@@ -15,7 +13,6 @@ from collections.abc import Callable
 
 if TYPE_CHECKING:
     from rekuest.app import AppRegistry
-from rekuest.errors import NoRegistryError
 from rekuest.coercible_types import (
     OptimisticCoercible,
 )
@@ -164,18 +161,14 @@ def register_func(
     return definition, actor_builder
 
 
-T = TypeVar("T", bound=AnyFunction)
 
 
 @overload
-def register(func: Callable[P, R]) -> WrappedFunction[P, R]:
-    """Register a function or actor directly: ``@register``."""
-    ...
-
-
-@overload
-def register(
+def declare_implementation(
+    func: Callable[P, R],
+    /,
     *,
+    implementation_registry: "AppRegistry",
     name: str | None = None,
     description: str | None = None,
     actifier: Actifier = reactify,
@@ -188,7 +181,37 @@ def register(
     is_test_for: list[TestTargetInput] | None = None,
     validators: dict[str, list[ValidatorInput]] | None = None,
     structure_registry: StructureRegistry | None = None,
-    implementation_registry: Optional["AppRegistry"] = None,
+    optimistics: list[OptimisticCoercible] | None = None,
+    in_process: bool = False,
+    tracks: list[TrackInput] | None = None,
+    locks: list[str] | None = None,
+    concurrency: Literal["parallel", "serial"] = "serial",
+    policy: DisconnectPolicy = KEEP,
+    version: str | None = None,
+    catalogs: list[str] | None = None,
+) -> WrappedFunction[P, R]:
+    """Register a function directly: ``declare_implementation(fn, implementation_registry=...)``."""
+    ...
+
+
+@overload
+def declare_implementation(
+    func: None = None,
+    /,
+    *,
+    implementation_registry: "AppRegistry",
+    name: str | None = None,
+    description: str | None = None,
+    actifier: Actifier = reactify,
+    interface: str | None = None,
+    stateful: bool = False,
+    widgets: dict[str, AssignWidgetInput] | None = None,
+    collections: list[str] | None = None,
+    port_groups: list[PortGroupInput] | None = None,
+    effects: dict[str, list[EffectInput]] | None = None,
+    is_test_for: list[TestTargetInput] | None = None,
+    validators: dict[str, list[ValidatorInput]] | None = None,
+    structure_registry: StructureRegistry | None = None,
     optimistics: list[OptimisticCoercible] | None = None,
     in_process: bool = False,
     tracks: list[TrackInput] | None = None,
@@ -198,12 +221,15 @@ def register(
     version: str | None = None,
     catalogs: list[str] | None = None,
 ) -> Callable[[Callable[P, R]], WrappedFunction[P, R]]:
-    """Register a function or actor with configuration: ``@register(...)``."""
+    """Build a configured decorator: ``declare_implementation(implementation_registry=..., name=...)``."""
     ...
 
 
-def register(  # type: ignore[valid-type]
-    *func: Callable[P, R],
+def declare_implementation(
+    func: Callable[P, R] | None = None,
+    /,
+    *,
+    implementation_registry: "AppRegistry",
     name: str | None = None,
     actifier: Actifier = reactify,
     interface: str | None = None,
@@ -218,7 +244,6 @@ def register(  # type: ignore[valid-type]
     validators: dict[str, list[ValidatorInput]] | None = None,
     structure_registry: StructureRegistry | None = None,
     tracks: list[TrackInput] | None = None,
-    implementation_registry: Optional["AppRegistry"] = None,
     in_process: bool = False,
     locks: list[str] | None = None,
     concurrency: Literal["parallel", "serial"] = "serial",
@@ -228,20 +253,27 @@ def register(  # type: ignore[valid-type]
 ) -> WrappedFunction[P, R] | Callable[[Callable[P, R]], WrappedFunction[P, R]]:
     """Register a function or actor with an app registry.
 
-    Serves as both a bare decorator and a configurable decorator. All keyword
-    arguments are bundled into a single :class:`RegisterConfig` that is threaded
-    through ``register_func`` and the actifier.
+    The implementation behind ``@app.register`` (:meth:`AppRegistry.register`) and
+    arkitekt's ``@app.action``. Registration goes through an app, which owns the registry
+    this writes into -- there is no process-wide one, on purpose, because it made what an
+    app ran depend on what the process had imported. Not part of the package's public
+    surface (see ``rekuest.__all__``); call it through the registry that owns it.
 
-    Use this as:
-        @register
-        def my_function(...): ...
+    All keyword arguments are bundled into a single :class:`RegisterConfig` that is
+    threaded through ``register_func`` and the actifier.
 
-    Or with arguments:
-        @register(interface="custom_interface", widgets={...})
-        def my_function(...): ...
+    Directly, from the registry that owns it::
+
+        app.register(my_function)
+
+    Or configured, returning the decorator it applies::
+
+        app.register(interface="custom_interface", widgets={...})(my_function)
 
     Args:
-        *func: Function to register when used as a bare decorator.
+        func: The function or actor, when registering one directly. Omitted to get a
+            configured decorator back.
+        implementation_registry: The app registry the implementation is recorded in.
         name (Optional[str]): Display name. Defaults to the function name.
         description (Optional[str]): Description. Defaults to the docstring.
         actifier (Actifier): Converts the callable into an actor builder.
@@ -258,10 +290,8 @@ def register(  # type: ignore[valid-type]
             test for, each identified by hash or by (app, key, version).
         validators (Optional[Dict[str, List[ValidatorInput]]]): Input validation
             rules per argument.
-        structure_registry (Optional[StructureRegistry]): Overrides the default
-            structure registry.
-        implementation_registry (Optional[AppRegistry]): Overrides the default
-            app registry.
+        structure_registry (Optional[StructureRegistry]): Structures used to build
+            the ports. Defaults to ``implementation_registry.structure_registry``.
         optimistics (Optional[List[OptimisticCoercible]]): Optimistic outputs.
         in_process (bool): Run the actor in the event loop instead of a thread.
         tracks (Optional[List[TrackInput]]): Tracks the implementation follows.
@@ -275,13 +305,6 @@ def register(  # type: ignore[valid-type]
     Returns:
         The wrapped function, or a decorator producing it.
     """
-    if implementation_registry is None:
-        raise NoRegistryError.for_decorator(
-            "Registration goes",
-            "action",
-            "def my_function(...): ...",
-            "implementation_registry",
-        )
     if structure_registry is None:
         structure_registry = implementation_registry.structure_registry
 
@@ -306,7 +329,7 @@ def register(  # type: ignore[valid-type]
         in_process=in_process,
     )
 
-    def _register(function_or_actor: Callable[P, R]) -> WrappedFunction[P, R]:
+    def offer(function_or_actor: Callable[P, R]) -> WrappedFunction[P, R]:
         any_function = cast(AnyFunction, function_or_actor)
         iface = config.interface or interface_name(any_function)
 
@@ -320,9 +343,4 @@ def register(  # type: ignore[valid-type]
 
         return WrappedFunction(function_or_actor, iface, definition)
 
-    if len(func) > 1:
-        raise ValueError("You can only register one function or actor at a time.")
-    if len(func) == 1:
-        return _register(func[0])
-
-    return cast(Callable[[T], T], _register)  # type: ignore
+    return offer(func) if func is not None else offer

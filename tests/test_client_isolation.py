@@ -33,9 +33,14 @@ def test_client_has_exactly_one_structure_registry() -> None:
     assert client.structure_registry is not build_client(AppRegistry()).structure_registry
 
 
-def test_bare_state_decorator_keeps_the_given_structure_registry() -> None:
-    """The bare form re-resolved the structure registry to the default on recursion."""
-    from rekuest.state.decorator import state
+def test_the_state_decorator_keeps_the_structure_registry_it_was_given() -> None:
+    """A foreign structure registry survives, rather than being re-resolved to the app's.
+
+    Calls ``declare_state`` directly on purpose: this is the one thing
+    ``AppRegistry.state`` cannot express, because it supplies ``structure_reg=self.structure_registry``
+    by design -- an app's structures are the app's. That is exactly what is pinned here.
+    """
+    from rekuest.state.decorator import declare_state
 
     registry = AppRegistry()
     structures = StructureRegistry()
@@ -43,7 +48,7 @@ def test_bare_state_decorator_keeps_the_given_structure_registry() -> None:
     class Bare:
         value: int = 0
 
-    state(Bare, registry=registry, structure_reg=structures)
+    declare_state(Bare, registry=registry, structure_reg=structures)
 
     assert registry.state_registry_schemas["Bare"] is structures
 

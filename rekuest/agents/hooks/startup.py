@@ -11,7 +11,6 @@ from typing import (
 from collections.abc import Callable
 from rekuest.agents.types import BoundApp
 from koil.bridge import run_threaded
-from rekuest.errors import NoRegistryError
 from rekuest.agents.hooks.errors import StartupHookError
 from rekuest.agents.hooks.registry import (
     HooksRegistry,
@@ -155,43 +154,34 @@ TStartup = TypeVar("TStartup", bound=StartupFunction | ContextLessStartupFunctio
 
 
 @overload
-def startup(*args: TStartup) -> TStartup:
-    """Decorator to register a startup hook"""
-
-    ...
-
-
-@overload
-def startup(
+def declare_startup(
+    func: TStartup,
+    /,
     *,
     name: str | None = None,
-    registry: HooksRegistry | None = None,
+    registry: HooksRegistry,
     structure_registry: "StructureRegistry | None" = None,
-) -> Callable[[TStartup], TStartup]:
-    """Decorator to register a startup hook
-
-    Args:
-        name (str): The name of the startup hook. If not provided, the function name will be used.
-        registry (HooksRegistry): The registry to register into. Required.
-    """
-    ...
+) -> TStartup: ...
 
 
 @overload
-def startup(
-    *args: TStartup,
+def declare_startup(
+    func: None = None,
+    /,
+    *,
     name: str | None = None,
-    registry: HooksRegistry | None = None,
+    registry: HooksRegistry,
     structure_registry: "StructureRegistry | None" = None,
-) -> TStartup | Callable[[TStartup], TStartup]:
-    """Decorator to register a startup hook"""
+) -> Callable[[TStartup], TStartup]: ...
 
 
 # --- Implementation ---
-def startup(
-    *args: TStartup,
+def declare_startup(
+    func: TStartup | None = None,
+    /,
+    *,
     name: str | None = None,
-    registry: HooksRegistry | None = None,
+    registry: HooksRegistry,
     structure_registry: "StructureRegistry | None" = None,
 ) -> TStartup | Callable[[TStartup], TStartup]:
     """Register a startup hook on the selected hook registry.
@@ -209,8 +199,7 @@ def startup(
         *args: Startup function to register when used as ``@startup`` without
             parentheses.
         name: Explicit registry key. Defaults to the function name.
-        registry: Hook registry to populate. Required: without one this raises
-            ``NoRegistryError``, since hooks go through an app (``@app.startup``).
+        registry: The hook registry the hook is recorded in.
 
     Returns:
         The original function, or a decorator configured with the provided
@@ -230,32 +219,19 @@ def startup(
                 return MyState(counter=0)
     """
 
-    if len(args) > 1:
-        raise ValueError("You can only register one function at a time.")
-
-    if len(args) == 1:
-        func = args[0]
-        if registry is None:
-            raise NoRegistryError.for_decorator(
-                "Hooks go", "startup", "async def my_hook(): ...", "registry"
-            )
-
-        if inspect.iscoroutinefunction(func):
-            a = cast(AsyncStartupFunction, func)
+    def decorator(function: TStartup) -> TStartup:
+        if inspect.iscoroutinefunction(function):
+            a = cast(AsyncStartupFunction, function)
             registry.register_startup(name or a.__name__, WrappedStartupHook(a, structure_registry))
 
         else:
-            assert inspect.isfunction(func) or inspect.ismethod(func), (
+            assert inspect.isfunction(function) or inspect.ismethod(function), (
                 "Function must be a async function or a sync function"
             )
-            t = cast(ThreadedStartupFunction, func)
+            t = cast(ThreadedStartupFunction, function)
 
             registry.register_startup(name or t.__name__, ThreadedStartupHook(t, structure_registry))
 
-        return cast(TStartup, func)
-    else:
+        return cast(TStartup, function)
 
-        def decorator(func: TStartup) -> TStartup:
-            return cast(TStartup, startup(func, name=name, registry=registry, structure_registry=structure_registry))
-
-        return decorator
+    return decorator(func) if func is not None else decorator

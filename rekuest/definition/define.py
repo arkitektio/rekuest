@@ -39,12 +39,18 @@ from rekuest.structures.quantities import (
     proposed_units_of,
     shrink_quantity,
 )
-from typing import Optional, Any, Literal, cast, get_origin, get_args, Annotated
+from typing import Optional, Any, Literal, TypeAlias, cast, get_origin, get_args, Annotated
 import types
 import typing
 
 
-def is_annotated(obj: Any) -> bool:  # noqa: ANN401
+#: A type annotation as it appears in a signature: a class, a parameterised generic, a union, a
+#: ``Literal[...]`` form or ``None``. Not necessarily a ``type`` -- which is why the predicates
+#: below cannot take ``type[Any]`` -- and only ever inspected with ``get_origin``/``get_args``.
+TypeAnnotation: TypeAlias = object
+
+
+def is_annotated(obj: TypeAnnotation) -> bool:
     """Checks if a hint is an Annotated type
 
     Args:
@@ -57,14 +63,14 @@ def is_annotated(obj: Any) -> bool:  # noqa: ANN401
     return get_origin(obj) is Annotated
 
 
-def is_union_type(cls: Any) -> bool:  # noqa: ANN401
+def is_union_type(cls: TypeAnnotation) -> bool:
     """Check if a class is a union"""
     # We are dealing with a 3.10 Union (PEP 646)
 
     return get_origin(cls) in (Union, typing.Union, types.UnionType, types.UnionType)
 
 
-def is_nullable(cls: Any) -> bool:  # noqa: ANN401
+def is_nullable(cls: TypeAnnotation) -> bool:
     """Check if a class is nullable"""
 
     if is_union_type(cls):
@@ -78,7 +84,7 @@ def is_nullable(cls: Any) -> bool:  # noqa: ANN401
     return False
 
 
-def is_union(cls: Any) -> bool:  # noqa: ANN401
+def is_union(cls: TypeAnnotation) -> bool:
     """Check if a class is a union"""
     if not is_union_type(cls):
         return False
@@ -86,17 +92,17 @@ def is_union(cls: Any) -> bool:  # noqa: ANN401
     return True
 
 
-def is_tuple(cls: Any) -> bool:  # noqa: ANN401
+def is_tuple(cls: TypeAnnotation) -> bool:
     """Check if a class is a tuple"""
     return get_origin(cls) in (tuple, tuple)
 
 
-def is_list(cls: Any) -> bool:  # noqa: ANN401
+def is_list(cls: TypeAnnotation) -> bool:
     """Check if a class is a list"""
     return get_origin(cls) in (list, list)
 
 
-def is_dict(cls: Any) -> bool:  # noqa: ANN401
+def is_dict(cls: TypeAnnotation) -> bool:
     """Check if a class is a dict"""
     return get_origin(cls) in (dict, dict, types.MappingProxyType)
 
@@ -116,21 +122,23 @@ def get_non_null_variants(cls: Any) -> list[Any]:  # noqa: ANN401
     return [arg for arg in get_args(cls) if arg is not type(None)]
 
 
-def is_bool(cls: Any) -> bool:  # noqa: ANN401
+def is_bool(cls: TypeAnnotation) -> bool:
     """Check if a class is a bool"""
     if inspect.isclass(cls):
         return not issubclass(cls, Enum) and issubclass(cls, bool)
     return False
 
 
-def is_float(cls: Any) -> bool:  # noqa: ANN401
+def is_float(cls: TypeAnnotation) -> bool:
     """Check if a class is a float"""
     if inspect.isclass(cls):
         return not issubclass(cls, Enum) and issubclass(cls, float)
     return False
 
 
-def is_dependency_type(cls: Any, structure_registry: "StructureRegistry | None") -> bool:  # noqa: ANN401
+def is_dependency_type(
+    cls: TypeAnnotation, structure_registry: "StructureRegistry | None"
+) -> bool:
     """Whether ``cls`` is a protocol the app declared (``@app.declare``).
 
     Without a registry nothing is: a protocol is a declaration on an app, not a
@@ -149,13 +157,13 @@ def dependency_to_dependency_input(
     return structure_registry.protocol_for(cls).to_dependency_input(key)
 
 
-def is_none_type(cls: Any) -> bool:  # noqa: ANN401
+def is_none_type(cls: TypeAnnotation) -> bool:
     """Check if a class is NoneType"""
 
     return cls is types.NoneType
 
 
-def is_generator_type(cls: Any) -> bool:  # noqa: ANN401
+def is_generator_type(cls: TypeAnnotation) -> bool:
     """Check if a class is a generator type"""
     if get_origin(cls) in (
         types.GeneratorType,
@@ -170,21 +178,21 @@ def is_generator_type(cls: Any) -> bool:  # noqa: ANN401
         return False
 
 
-def is_int(cls: Any) -> bool:  # noqa: ANN401
+def is_int(cls: TypeAnnotation) -> bool:
     """Check if a class is an int"""
     if inspect.isclass(cls):
         return not issubclass(cls, Enum) and issubclass(cls, int)
     return False
 
 
-def is_str(cls: Any) -> bool:  # noqa: ANN401
+def is_str(cls: TypeAnnotation) -> bool:
     """Check if a class is a string"""
     if inspect.isclass(cls):
         return not issubclass(cls, Enum) and issubclass(cls, str)
     return False
 
 
-def is_datetime(cls: Any) -> bool:  # noqa: ANN401
+def is_datetime(cls: TypeAnnotation) -> bool:
     """Check if a class is a datetime"""
     if inspect.isclass(cls):
         return not issubclass(cls, Enum) and (issubclass(cls, dt.datetime))

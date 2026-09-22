@@ -3,13 +3,11 @@
 from dataclasses import dataclass
 from typing import (
     TYPE_CHECKING,
-    Optional,
     TypeVar,
     overload,
     get_type_hints,
 )
 from collections.abc import Callable
-from rekuest.errors import NoRegistryError
 from rekuest.protocol.schema import (
     ReturnPortInput,
     StateImplementationInput,
@@ -62,29 +60,40 @@ def inspect_state(
 
 
 @overload
-def state(*function: type[T]) -> type[T]: ...
+def declare_state(cls: type[T], /, *,
+    name: str | None = None,
+    required_locks: list[str] | None = None,
+    publish_interval: float = 0.1,
+    registry: "AppRegistry",
+    structure_reg: StructureRegistry | None = None,
+) -> type[T]: ...
 
 
 @overload
-def state(
+def declare_state(cls: None = None, /, *,
+    name: str | None = None,
+    required_locks: list[str] | None = None,
+    publish_interval: float = 0.1,
+    registry: "AppRegistry",
+    structure_reg: StructureRegistry | None = None,
+) -> Callable[[type[T]], type[T]]: ...
+
+
+def declare_state(
+    cls: type[T] | None = None,
+    /,
     *,
     name: str | None = None,
     required_locks: list[str] | None = None,
     publish_interval: float = 0.1,
-    registry: Optional["AppRegistry"] = None,
-    structure_reg: StructureRegistry | None = None,
-) -> Callable[[T], T]: ...
-
-
-def state(
-    *function: type[T],
-    name: str | None = None,
-    required_locks: list[str] | None = None,
-    publish_interval: float = 0.1,
-    registry: Optional["AppRegistry"] = None,
+    registry: "AppRegistry",
     structure_reg: StructureRegistry | None = None,
 ) -> type[T] | Callable[[type[T]], type[T]]:
-    """Register a class as an observable state of an app.
+    """Declare a class as an observable state of an app.
+
+    The implementation behind ``@app.state``. Distinct from
+    :class:`~rekuest.declare.DeclaredAgentState`, which is a *dependency on another
+    agent's* state -- this declares one the app owns itself.
 
     The class is made a dataclass if it is not one, its schema is inspected
     against the app's structures, and the app registry records it under the
@@ -99,8 +108,7 @@ def state(
         name: Explicit exported state name. Defaults to the class name.
         required_locks: Locks that must be held while mutating this state.
         publish_interval: Debounce interval for published state updates.
-        registry: App registry to populate. Required: without one this raises
-            ``NoRegistryError``, since state goes through an app (``@app.state``).
+        registry: The app registry the state is recorded in.
         structure_reg: Structure registry used while inspecting the state
             schema. Defaults to the app registry's.
 
@@ -122,41 +130,23 @@ def state(
                 connected: bool = False
                 exposure_ms: float = 10.0
     """
-    if registry is None:
-        raise NoRegistryError.for_decorator(
-            "State goes", "state", "class MyState: ...", "registry"
-        )
     structure_registry = structure_reg or registry.structure_registry
 
-    if len(function) == 1:
-        cls = function[0]
-        return state(
-            name=name or cls.__name__,
+    def wrapper(cls: type[T]) -> type[T]:
+        # Ensure it's a dataclass
+        try:
+            fields(cls)
+        except TypeError:
+            cls = dataclass(cls)
+
+        interface = cls.__name__ if name is None else name
+        registry.register_state(
+            cls,
+            inspect_state(cls, interface, structure_registry),
+            structure_registry,
             required_locks=required_locks,
             publish_interval=publish_interval,
-            registry=registry,
-            structure_reg=structure_registry,
-        )(cls)
+        )
+        return cls
 
-    if len(function) == 0:
-
-        def wrapper(cls: type[T]) -> type[T]:
-            # Ensure it's a dataclass
-            try:
-                fields(cls)
-            except TypeError:
-                cls = dataclass(cls)
-
-            interface = cls.__name__ if name is None else name
-            registry.register_state(
-                cls,
-                inspect_state(cls, interface, structure_registry),
-                structure_registry,
-                required_locks=required_locks,
-                publish_interval=publish_interval,
-            )
-            return cls
-
-        return wrapper
-
-    raise ValueError("You can only register one class at a time.")
+    return wrapper(cls) if cls is not None else wrapper

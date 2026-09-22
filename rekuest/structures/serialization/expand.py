@@ -38,9 +38,9 @@ from rekuest.structures.types import JSONSerializable
 
 async def _expand(
     port: SerializablePort,
-    value: Any,
-    ctx: SerializationContext,  # noqa: ANN401
-) -> Any:  # noqa: ANN401
+    value: JSONSerializable,
+    ctx: SerializationContext,
+) -> Any:  # noqa: ANN401 -- an expanded structure is whatever the caller registered
     """Recursive entry point used by the container handlers."""
     return await aexpand_return(
         port,
@@ -53,7 +53,9 @@ async def _expand(
     )
 
 
-async def _dict(port: SerializablePort, value: Any, ctx: SerializationContext) -> Any:  # noqa: ANN401
+async def _dict(
+    port: SerializablePort, value: JSONSerializable, ctx: SerializationContext
+) -> Any:  # noqa: ANN401 -- an expanded structure is whatever the caller registered
     if not isinstance(value, dict):
         raise PortExpandingError(f"Expected value to be a dict, but got {type(value)}")
     child = single_child(port)
@@ -65,7 +67,9 @@ async def _dict(port: SerializablePort, value: Any, ctx: SerializationContext) -
     return dict(zip(value.keys(), expanded))
 
 
-async def _list(port: SerializablePort, value: Any, ctx: SerializationContext) -> Any:  # noqa: ANN401
+async def _list(
+    port: SerializablePort, value: JSONSerializable, ctx: SerializationContext
+) -> Any:  # noqa: ANN401 -- an expanded structure is whatever the caller registered
     if not isinstance(value, list):
         raise PortExpandingError(f"Expected value to be a list, but got {type(value)}")
     child = single_child(port)
@@ -79,22 +83,26 @@ async def _list(port: SerializablePort, value: Any, ctx: SerializationContext) -
     )
 
 
-async def _union(port: SerializablePort, value: Any, ctx: SerializationContext) -> Any:  # noqa: ANN401
+async def _union(
+    port: SerializablePort, value: JSONSerializable, ctx: SerializationContext
+) -> Any:  # noqa: ANN401 -- an expanded structure is whatever the caller registered
     if not port.children:
         raise PortExpandingError(f"Port {port.identifier} has no children")
-    index, reason = union_index(value)
-    if index is None:
+    tagged, reason = union_index(value)
+    if tagged is None:
         raise PortExpandingError(reason or "Invalid union value")
-    if not 0 <= index < len(port.children):
+    if not 0 <= tagged.index < len(port.children):
         raise PortExpandingError(
-            f"Union '__use' index {index} is out of range for {len(port.children)} children"
+            f"Union '__use' index {tagged.index} is out of range for {len(port.children)} children"
         )
     return await _expand(
-        port.children[index], value["__value"], ctx.child(f"{port.key}[{index}]")
+        port.children[tagged.index], tagged.value, ctx.child(f"{port.key}[{tagged.index}]")
     )
 
 
-async def _int(port: SerializablePort, value: Any, ctx: SerializationContext) -> Any:  # noqa: ANN401
+async def _int(
+    port: SerializablePort, value: JSONSerializable, ctx: SerializationContext
+) -> Any:  # noqa: ANN401 -- an expanded structure is whatever the caller registered
     if not isinstance(value, (int, str)):
         raise PortExpandingError(
             f"Expected value to be an int or str, but got {type(value)}"
@@ -102,7 +110,9 @@ async def _int(port: SerializablePort, value: Any, ctx: SerializationContext) ->
     return int(value)
 
 
-async def _float(port: SerializablePort, value: Any, ctx: SerializationContext) -> Any:  # noqa: ANN401
+async def _float(
+    port: SerializablePort, value: JSONSerializable, ctx: SerializationContext
+) -> Any:  # noqa: ANN401 -- an expanded structure is whatever the caller registered
     if not isinstance(value, (float, str)):
         raise PortExpandingError(
             f"Expected value to be a float or str, but got {type(value)}"
@@ -110,7 +120,9 @@ async def _float(port: SerializablePort, value: Any, ctx: SerializationContext) 
     return float(value)
 
 
-async def _date(port: SerializablePort, value: Any, ctx: SerializationContext) -> Any:  # noqa: ANN401
+async def _date(
+    port: SerializablePort, value: JSONSerializable, ctx: SerializationContext
+) -> Any:  # noqa: ANN401 -- an expanded structure is whatever the caller registered
     if not isinstance(value, str):
         raise PortExpandingError(
             f"Expected value to be a string, but got {type(value)}"
@@ -119,14 +131,14 @@ async def _date(port: SerializablePort, value: Any, ctx: SerializationContext) -
 
 
 async def _memory_structure(
-    port: SerializablePort, value: Any, ctx: SerializationContext
-) -> Any:  # noqa: ANN401
+    port: SerializablePort, value: JSONSerializable, ctx: SerializationContext
+) -> Any:  # noqa: ANN401 -- an expanded structure is whatever the caller registered
     return expand_memory_reference(port, value)
 
 
 async def _structure(
-    port: SerializablePort, value: Any, ctx: SerializationContext
-) -> Any:  # noqa: ANN401
+    port: SerializablePort, value: JSONSerializable, ctx: SerializationContext
+) -> Any:  # noqa: ANN401 -- an expanded structure is whatever the caller registered
     def error(message: str) -> ExpandingError:
         return to_port_error(port, value, message, path=ctx.path, depth=ctx.depth)
 
@@ -169,7 +181,9 @@ async def _structure(
         ) from e
 
 
-async def _model(port: SerializablePort, value: Any, ctx: SerializationContext) -> Any:  # noqa: ANN401
+async def _model(
+    port: SerializablePort, value: JSONSerializable, ctx: SerializationContext
+) -> Any:  # noqa: ANN401 -- an expanded structure is whatever the caller registered
     if not isinstance(value, dict):
         raise PortExpandingError(f"Expected value to be a dict, but got {type(value)}")
     if not port.children:
@@ -194,7 +208,9 @@ async def _model(port: SerializablePort, value: Any, ctx: SerializationContext) 
     return fmodel.cls(**params)
 
 
-async def _enum(port: SerializablePort, value: Any, ctx: SerializationContext) -> Any:  # noqa: ANN401
+async def _enum(
+    port: SerializablePort, value: JSONSerializable, ctx: SerializationContext
+) -> Any:  # noqa: ANN401 -- an expanded structure is whatever the caller registered
     if not port.identifier:
         raise PortExpandingError(f"Port {port.key} is an enum but has no identifier")
     try:
@@ -215,17 +231,21 @@ async def _enum(port: SerializablePort, value: Any, ctx: SerializationContext) -
     )
 
 
-async def _bool(port: SerializablePort, value: Any, ctx: SerializationContext) -> Any:  # noqa: ANN401
+async def _bool(
+    port: SerializablePort, value: JSONSerializable, ctx: SerializationContext
+) -> Any:  # noqa: ANN401 -- an expanded structure is whatever the caller registered
     return bool(value)
 
 
-async def _string(port: SerializablePort, value: Any, ctx: SerializationContext) -> Any:  # noqa: ANN401
+async def _string(
+    port: SerializablePort, value: JSONSerializable, ctx: SerializationContext
+) -> Any:  # noqa: ANN401 -- an expanded structure is whatever the caller registered
     return str(value)
 
 
 async def _quantity(
-    port: SerializablePort, value: Any, ctx: SerializationContext
-) -> Any:  # noqa: ANN401
+    port: SerializablePort, value: JSONSerializable, ctx: SerializationContext
+) -> Any:  # noqa: ANN401 -- an expanded structure is whatever the caller registered
     return expand_quantity(value, port.reference_unit)
 
 

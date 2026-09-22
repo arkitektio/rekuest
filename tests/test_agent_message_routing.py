@@ -90,12 +90,8 @@ async def test_interrupt_reaches_the_actor_and_reports_interrupted(
         await asyncio.sleep(60)
         return x
 
-    from rekuest.register import register
-
-    register(
+    agent.app_registry.register(
         aslow,
-        implementation_registry=agent.app_registry,
-        structure_registry=agent.app_registry.structure_registry,
     )
     agent.collect_from_registry()
 
@@ -262,12 +258,8 @@ async def test_teardown_cancels_in_flight_actor_work(
             raise
         return x
 
-    from rekuest.register import register
-
-    register(
+    agent.app_registry.register(
         blocker,
-        implementation_registry=agent.app_registry,
-        structure_registry=agent.app_registry.structure_registry,
     )
     agent.collect_from_registry()
 
@@ -408,12 +400,8 @@ async def test_a_completed_task_is_not_reported_as_still_running(
         """Finish immediately."""
         return x
 
-    from rekuest.register import register
-
-    register(
+    agent.app_registry.register(
         quick,
-        implementation_registry=agent.app_registry,
-        structure_registry=agent.app_registry.structure_registry,
     )
     agent.collect_from_registry()
 
@@ -465,12 +453,8 @@ async def test_a_liveness_inquiry_does_not_contradict_a_replayed_report(
         """Finish immediately."""
         return x
 
-    from rekuest.register import register
-
-    register(
+    agent.app_registry.register(
         quick,
-        implementation_registry=agent.app_registry,
-        structure_registry=agent.app_registry.structure_registry,
     )
     agent.collect_from_registry()
 

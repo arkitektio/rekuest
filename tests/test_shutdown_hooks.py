@@ -12,7 +12,6 @@ from collections.abc import Generator
 import pytest
 
 from rekuest.app import AppRegistry
-from rekuest.state.decorator import state
 from rekuest.agents.hooks.shutdown import (
     ThreadedShutdownHook,
     WrappedShutdownHook,
@@ -33,7 +32,7 @@ class Connection:
         self.closed = False
 
 
-@state(registry=_REGISTRY)
+@_REGISTRY.state
 class Counter:
     """A state a shutdown hook may want to read one last time."""
 
