@@ -1592,9 +1592,15 @@ class BaseAgent(KoiledModel):
             raise
         except Exception as e:
             logger.error(f"Error in agent loop: {str(e)}")
+            self.running = False
             await self._astop_consume_task(consume_task)
             await self.atear_down()
-            raise e
+            raise
+        else:
+            # The stream ended on its own (the connection closed for good).
+            logger.info("Agent message stream ended")
+            self.running = False
+            await self.atear_down()
 
     async def _astop_consume_task(self, consume_task: "asyncio.Task[None]") -> None:
         """Stop the message-consumer task, bounded by ``cancel_grace_period``.

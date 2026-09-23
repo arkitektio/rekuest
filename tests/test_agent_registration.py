@@ -339,3 +339,33 @@ def test_a_description_changes_the_definition_hash() -> None:
     assert canonical() == canonical(description=None)
     assert canonical(description="One thing.") != canonical()
     assert canonical(description="One thing.") != canonical(description="Another thing.")
+
+
+@pytest.mark.asyncio
+async def test_a_stream_that_ends_tears_the_agent_down() -> None:
+    transport = RecordingTransport()
+    agent = await _connected(transport)
+    agent.shelve["drawer-1"] = object()
+
+    looping = asyncio.create_task(agent.aloop())
+    await _until(lambda: agent.running)
+    transport.close_stream()
+    await asyncio.wait_for(looping, timeout=2.0)
+
+    assert not agent.running
+    assert not transport.connected
+    assert agent.shelve == {}
+
+
+@pytest.mark.asyncio
+async def test_a_failing_stream_stops_the_agent_running() -> None:
+    transport = RecordingTransport()
+    agent = await _connected(transport)
+
+    looping = asyncio.create_task(agent.aloop())
+    await _until(lambda: agent.running)
+    transport.fail(RuntimeError("socket died"))
+    with pytest.raises(RuntimeError):
+        await asyncio.wait_for(looping, timeout=2.0)
+
+    assert not agent.running
