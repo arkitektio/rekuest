@@ -44,6 +44,7 @@ from rekuest.structures.serialization.context import (
 from rekuest.structures.serialization.expand import (
     aexpand_return,
     aexpand_returns,
+    coerce_bool,
 )
 from rekuest.structures.serialization.port_errors import (
     to_port_error,
@@ -322,7 +323,10 @@ async def _expand_structure(
 async def _expand_bool(
     port: SerializablePort, value: Any, ctx: SerializationContext
 ) -> Any:  # noqa: ANN401
-    return bool(value)
+    try:
+        return coerce_bool(value)
+    except ValueError as e:
+        raise _expand_error(port, value, ctx, str(e)) from e
 
 
 async def _expand_string(
@@ -805,17 +809,20 @@ async def shrink_outputs(
     A single (non-tuple) return is treated as one output; a tuple is spread
     over the return ports in order.
     """
+    return_ports = definition.returns or ()
     if returns is None:
-        returns = []
+        # A single (nullable) return port that returned None is one output.
+        returns = [None] if len(return_ports) == 1 else []
     elif not isinstance(returns, tuple):
         returns = [returns]
 
-    assert len(definition.returns) == len(returns), (
-        f"Mismatch in Return Length: expected {len(definition.returns)} got {len(returns)}"
-    )
+    if len(return_ports) != len(returns):
+        raise ShrinkingError(
+            f"Mismatch in Return Length: expected {len(return_ports)} got {len(returns)}"
+        )
 
     if skip_shrinking:
-        return {port.key: val for port, val in zip(definition.returns, returns)}
+        return {port.key: val for port, val in zip(return_ports, returns)}
 
     shrunk = await asyncio.gather(
         *[
@@ -827,10 +834,10 @@ async def shrink_outputs(
                 path=[port.key],
                 depth=0,
             )
-            for port, val in zip(definition.returns, returns)
+            for port, val in zip(return_ports, returns)
         ]
     )
-    return {port.key: val for port, val in zip(definition.returns, shrunk)}
+    return {port.key: val for port, val in zip(return_ports, shrunk)}
 
 
 # --------------------------------------------------------------------------- #
