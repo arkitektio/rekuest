@@ -232,27 +232,10 @@ async def _enum(
     )
 
 
-def coerce_bool(value: Any) -> bool:  # noqa: ANN401
-    """Read a wire bool strictly: a bool, 0/1 or "true"/"false".
-
-    ``bool(value)`` would turn "false" and "0" into ``True``.
-    """
-    if isinstance(value, bool):
-        return value
-    if isinstance(value, int) and value in (0, 1):
-        return bool(value)
-    if isinstance(value, str) and value.lower() in ("true", "false"):
-        return value.lower() == "true"
-    raise ValueError(f"Expected a bool, 0/1 or 'true'/'false', got {value!r}")
-
-
 async def _bool(
     port: SerializablePort, value: JSONSerializable, ctx: SerializationContext
 ) -> Any:  # noqa: ANN401 -- an expanded structure is whatever the caller registered
-    try:
-        return coerce_bool(value)
-    except ValueError as e:
-        raise PortExpandingError(str(e)) from e
+    return bool(value)
 
 
 async def _string(

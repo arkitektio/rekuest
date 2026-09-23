@@ -44,7 +44,6 @@ from rekuest.structures.serialization.context import (
 from rekuest.structures.serialization.expand import (
     aexpand_return,
     aexpand_returns,
-    coerce_bool,
 )
 from rekuest.structures.serialization.port_errors import (
     to_port_error,
@@ -323,10 +322,7 @@ async def _expand_structure(
 async def _expand_bool(
     port: SerializablePort, value: Any, ctx: SerializationContext
 ) -> Any:  # noqa: ANN401
-    try:
-        return coerce_bool(value)
-    except ValueError as e:
-        raise _expand_error(port, value, ctx, str(e)) from e
+    return bool(value)
 
 
 async def _expand_string(

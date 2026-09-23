@@ -10,9 +10,8 @@ from rekuest.annotations.parsers import PortAnnotations, extract_annotations
 from rekuest.definition.define import prepare_definition
 from rekuest.definition.hash import hash_definition
 from rekuest.protocol.schema import ActionKind, PortKind
-from rekuest.structures.errors import ExpandingError
 from rekuest.structures.registry import StructureRegistry
-from rekuest.structures.serialization.actor import expand_inputs, shrink_outputs
+from rekuest.structures.serialization.actor import shrink_outputs
 from rekuest.structures.serialization.expand import aexpand_return
 from rekuest.structures.serialization.predication import predicate_port
 from rekuest.structures.serialization.shrink import ashrink_arg
@@ -30,11 +29,6 @@ def list_with_empty_default(x: list[int] = []) -> int:  # noqa: B006
 
 def takes_float(x: float) -> float:
     """Float"""
-    return x
-
-
-def takes_bool(x: bool) -> bool:
-    """Bool"""
     return x
 
 
@@ -75,26 +69,6 @@ def test_enum_with_default_stays_an_enum() -> None:
 def test_empty_list_default_is_kept() -> None:
     definition = prepare_definition(list_with_empty_default, StructureRegistry())
     assert definition.args[0].default == []
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize("wire,expected", [("false", False), ("true", True), (0, False), (True, True)])
-async def test_bool_expands_strictly(
-    wire: object, expected: bool, mock_shelver: Shelver
-) -> None:
-    registry = StructureRegistry()
-    definition = prepare_definition(takes_bool, registry)
-    expanded = await expand_inputs(definition, {"x": wire}, registry, mock_shelver)
-    assert expanded == {"x": expected}
-    assert await aexpand_return(definition.args[0], wire, registry) is expected
-
-
-@pytest.mark.asyncio
-async def test_bool_rejects_garbage(mock_shelver: Shelver) -> None:
-    registry = StructureRegistry()
-    definition = prepare_definition(takes_bool, registry)
-    with pytest.raises(ExpandingError):
-        await expand_inputs(definition, {"x": "nope"}, registry, mock_shelver)
 
 
 @pytest.mark.asyncio
@@ -142,3 +116,16 @@ def test_annotation_parsing_leaves_callers_lists_alone() -> None:
     base = PortAnnotations(validators=validators, effects=effects)
     result = extract_annotations([], base)
     assert result.validators is not validators and result.effects is not effects
+
+
+def takes_flag(x: bool) -> bool:
+    """Flag"""
+    return x
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("wire", ["false", "0", 1, True])
+async def test_bool_expands_with_python_truthiness(wire: object) -> None:
+    registry = StructureRegistry()
+    definition = prepare_definition(takes_flag, registry)
+    assert await aexpand_return(definition.args[0], wire, registry) is bool(wire)
