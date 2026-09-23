@@ -197,6 +197,57 @@ async def test_collect_drops_the_drawer_and_sends_unshelve() -> None:
 
 
 @pytest.mark.asyncio
+async def test_collect_of_an_unknown_drawer_keeps_the_loop_alive() -> None:
+    transport = RecordingTransport()
+    agent = await _connected(transport)
+    agent.shelve["drawer-1"] = object()
+
+    # A drawer this agent never held (or already dropped) must not kill the loop.
+    transport.feed(messages.Collect(drawers=["unknown"]))
+    transport.feed(messages.Collect(drawers=["drawer-1"]))
+    await _until(lambda: "drawer-1" not in agent.shelve)
+    await agent.atear_down()
+
+
+@pytest.mark.asyncio
+async def test_teardown_empties_the_shelve() -> None:
+    transport = RecordingTransport()
+    agent = await _connected(transport)
+    agent.shelve["drawer-1"] = object()
+
+    await agent.atear_down()
+
+    assert agent.shelve == {}
+
+
+@pytest.mark.asyncio
+async def test_teardown_empties_the_shelve_even_when_it_fails() -> None:
+    transport = RecordingTransport()
+    agent = await _connected(transport)
+    agent.shelve["drawer-1"] = object()
+
+    async def failing_disconnect() -> None:
+        raise RuntimeError("transport broke while disconnecting")
+
+    object.__setattr__(transport, "adisconnect", failing_disconnect)
+
+    with pytest.raises(RuntimeError):
+        await agent.atear_down()
+
+    assert agent.shelve == {}
+
+
+@pytest.mark.asyncio
+async def test_missing_drawer_is_a_clear_error() -> None:
+    transport = RecordingTransport()
+    agent = await _connected(transport)
+
+    with pytest.raises(AgentException, match="drawer-x"):
+        await agent.aget_from_shelve("drawer-x")
+    await agent.atear_down()
+
+
+@pytest.mark.asyncio
 async def test_work_assigned_before_activation_is_held_and_replayed() -> None:
     transport = MemoryAgentTransport()
     agent = _agent(transport)

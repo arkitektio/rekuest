@@ -122,8 +122,9 @@ class BaseAgent(KoiledModel):
         ),
     )
 
-    # TODO: KV Store
-    shelve: dict[str, Any] = Field(default_factory=dict)  # kv_store -> Seperate
+    shelve: dict[str, Any] = Field(default_factory=dict)
+    """Values this agent shelved locally, by drawer. Owned by this agent only and
+    emptied whenever it tears down."""
     transport: AgentTransport
     backend: AgentBackend = Field(
         default_factory=LocalAgentBackend,
@@ -442,7 +443,8 @@ class BaseAgent(KoiledModel):
         The local drop is what matters; a release the backend cannot take is logged, not
         raised, so it never takes the message loop down with it.
         """
-        del self.shelve[key]
+        # An unknown drawer (already dropped, or shelved before a teardown) is a no-op.
+        self.shelve.pop(key, None)
         try:
             await self.backend.acollect(key)
         except Exception:
@@ -578,8 +580,10 @@ class BaseAgent(KoiledModel):
         """Get a value from the shelve. This is used to get values from the
         shelve for the agent and all the actors that are spawned from it.
         """
-        assert key in self.shelve, "Drawer is not in current shelve"
-        return self.shelve[key]
+        try:
+            return self.shelve[key]
+        except KeyError:
+            raise AgentException(f"Drawer {key} is not in this agent's shelve") from None
 
     async def process(self, message: messages.ToAgentMessage) -> None:
         """Route one inbound message to the concern that owns it.
@@ -881,7 +885,16 @@ class BaseAgent(KoiledModel):
     async def atear_down(self) -> None:
         """Tears down the agent. This is used to tear down the agent
         and all the actors that are spawned from it.
+
+        The shelve is emptied however teardown ends: nothing can reference a
+        shelved value once the agent has stopped.
         """
+        try:
+            await self._atear_down()
+        finally:
+            self.shelve.clear()
+
+    async def _atear_down(self) -> None:
         logger.info("Tearing down the agent")
 
         # A failed aconnect leaves the consumer running; aloop stops it itself.
