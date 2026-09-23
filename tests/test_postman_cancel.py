@@ -328,3 +328,29 @@ async def test_graphql_refuses_a_non_root_assign(non_root: dict[str, str]) -> No
     with pytest.raises(RootOnlyAssignError):
         async for _ in pm.aassign(**_call(**non_root)):
             pass
+
+
+@pytest.mark.asyncio
+async def test_a_failed_assign_leaves_no_queue_behind(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The reference's queue is registered before the mutation; a failure must drop it."""
+    from rekuest.client import postman as postman_module
+    from rekuest.postmans.errors import PostmanException
+
+    class FailingGraphQL:
+        def __init__(self, rath: object) -> None:
+            pass
+
+        async def aassign(self, **kwargs: object) -> None:
+            raise RuntimeError("server said no")
+
+    monkeypatch.setattr(postman_module, "RekuestGraphQL", FailingGraphQL)
+    postman = _graphql_postman()
+    postman._lock = asyncio.Lock()
+    postman._watching = True
+    postman._received_something = True
+
+    with pytest.raises(PostmanException):
+        async for _ in postman.aassign(args={}, reference="ref-1", interface="noop"):
+            pass
+
+    assert postman._ass_update_queues == {}

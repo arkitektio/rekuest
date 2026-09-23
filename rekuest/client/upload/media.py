@@ -41,10 +41,10 @@ async def astore_media_file(
             )  # type: ignore
         except botocore.exceptions.ClientError as e:  # type: ignore
             if e.response["Error"]["Code"] == "InvalidAccessKeyId":  # type: ignore
-                return PermissionsError(
+                raise PermissionsError(
                     "Access Key is invalid, trying to get new credentials"
-                )  # type: ignore
+                ) from e
 
-            raise e
+            raise
 
     return credentials.store

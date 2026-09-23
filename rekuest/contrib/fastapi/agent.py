@@ -355,7 +355,7 @@ class FastApiTransport(AgentTransport):
                 handshake from the init payload. Raising `AuthenticationError`
                 closes the socket with code 1008 before any subscription is made.
         """
-        print("WebSocket connection received, waiting for init payload...")
+        logger.debug("WebSocket connection received, waiting for init payload...")
         await websocket.accept()
         try:
             init_data = await websocket.receive_json()

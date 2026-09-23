@@ -14,6 +14,7 @@ def hash_definition(definition: DefinitionInput) -> str:
         if key
         in [
             "name",
+            "kind",
             "description",
             "args",
             "returns",
