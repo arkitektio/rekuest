@@ -675,31 +675,7 @@ async def _shrink_structure(
 async def _shrink_bool(
     port: SerializablePort, value: Any, ctx: SerializationContext
 ) -> JSONSerializable:  # noqa: ANN401
-    if isinstance(value, bool):
-        return value
-    if isinstance(value, str):
-        if value.lower() == "true":
-            return True
-        if value.lower() == "false":
-            return False
-        raise _shrink_error(
-            port,
-            value,
-            ctx,
-            f"Can't shrink string '{value}' to bool. We only accept 'true' or 'false'",
-        )
-    if isinstance(value, int):
-        if value in (0, 1):
-            return bool(value)
-        raise _shrink_error(
-            port, value, ctx, f"Can't shrink int {value} to bool. We only accept 0 or 1"
-        )
-    raise _shrink_error(
-        port,
-        value,
-        ctx,
-        f"Expected bool, str, or int, got {type(value).__name__}: {repr(value)}",
-    )
+    return bool(value)
 
 
 async def _shrink_string(

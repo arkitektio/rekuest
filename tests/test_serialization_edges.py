@@ -129,3 +129,19 @@ async def test_bool_expands_with_python_truthiness(wire: object) -> None:
     registry = StructureRegistry()
     definition = prepare_definition(takes_flag, registry)
     assert await aexpand_return(definition.args[0], wire, registry) is bool(wire)
+
+
+def returns_flag() -> bool:
+    """Flag"""
+    return True
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("value", ["false", "yes", 0, 2, [], {"a": 1}])
+async def test_bool_returns_shrink_with_python_truthiness(
+    value: object, mock_shelver: Shelver
+) -> None:
+    registry = StructureRegistry()
+    definition = prepare_definition(returns_flag, registry)
+    shrunk = await shrink_outputs(definition, value, registry, mock_shelver)
+    assert shrunk == {"return0": bool(value)}
