@@ -203,6 +203,10 @@ class WebsocketAgentTransport(AgentTransport):
         return bool(self._healthy)
 
     _send_queue: Contextual[asyncio.Queue[str]] = None
+    _held: Contextual[str] = None
+    """A frame taken off the send queue whose send failed: it goes out first on the
+    next connection, ahead of everything queued after it, so a drop never reorders
+    what the agent sent. Still counted as unfinished by the queue (``join``)."""
     _in_queue: Contextual[asyncio.Queue[object]] = None
     _connection_task: Contextual[asyncio.Task[None]] = None
     _client: Contextual["websockets.ClientConnection"] = None
@@ -216,6 +220,7 @@ class WebsocketAgentTransport(AgentTransport):
         registry. The network connection is opened by ``aconnect()``.
         """
         self._send_queue = asyncio.Queue()
+        self._held = None
         self._in_queue = asyncio.Queue()
         self._closing = False
         self._client = None
@@ -524,23 +529,25 @@ class WebsocketAgentTransport(AgentTransport):
         in_flight: str | None = None
 
         def requeue() -> None:
-            """Put the held message back, then close out the get that took it.
+            """Hold the message for the next connection, at the head of the line.
 
-            Order matters: putting first keeps the queue's unfinished count above
-            zero throughout, so a concurrent ``aflush`` join() can never observe a
-            transiently drained queue and return early.
+            Putting it back at the tail (as this used to) sent it after everything
+            queued behind it, so a drop reordered the agent's reports. It is not
+            ``task_done`` yet, so the queue's unfinished count stays above zero and a
+            concurrent ``aflush`` join() cannot return before it is really sent.
             """
             nonlocal in_flight
             if in_flight is None:
                 return
-            assert self._send_queue is not None
-            self._send_queue.put_nowait(in_flight)
-            self._send_queue.task_done()
+            self._held = in_flight
             in_flight = None
 
         try:
             while True:
-                in_flight = await self._send_queue.get()
+                if self._held is not None:
+                    in_flight, self._held = self._held, None
+                else:
+                    in_flight = await self._send_queue.get()
                 try:
                     await client.send(in_flight)
                 except Exception:  # noqa: BLE001 — the socket died under us
