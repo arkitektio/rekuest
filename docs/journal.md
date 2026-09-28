@@ -2,7 +2,7 @@
 
 One ordered record of everything an agent reports: task events, lock changes, state patches, snapshots, the session baseline, and (when served) the `ASSIGN` that started each task. The record is persisted, and any position in it can be replayed.
 
-This document is the contract shared by the Rust agent (`rekuest` crate), the Python agent (`rekuest` package, `contrib.fastapi` and `contrib.sql_lite`) and the rekuest server.
+This document is the contract shared by the Rust agent (`rekuest` crate), the Python agents (the journal itself in `arkitekt-runtime`, the distributed agent in `rekuest`, the served agent and its sqlite store in `arkitekt-fastapi`) and the rekuest server.
 
 ## Why
 
