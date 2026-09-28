@@ -11,6 +11,8 @@ from collections.abc import AsyncGenerator
 
 import pytest
 
+from arkitekt_spec.declare.agents.errors import NoCallerError
+
 from arkitekt_runtime.actors.dependency import AgentDependencyProxy
 from arkitekt_runtime.actors.helper import AssignmentHelper
 from arkitekt_runtime.agents.base import BaseAgent
@@ -151,7 +153,7 @@ def test_a_dependency_cannot_be_bound_to_a_task_with_no_assignment() -> None:
     agent, _ = agent_with()
     protocol = agent.app_registry.structure_registry.protocol_for(Lab)
 
-    with pytest.raises(ValueError, match="assignment"):
+    with pytest.raises(NoCallerError, match="assignment"):
         AgentDependencyProxy(
             "lab",
             protocol,

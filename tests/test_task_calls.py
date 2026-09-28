@@ -12,10 +12,12 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+
+from arkitekt_spec.declare.agents.errors import NoCallerError
 from koil.composition.base import KoiledModel
 from rath.origin import ContextBound
 
-from arkitekt_runtime.invoke import CallTarget, ImplementationTarget
+from arkitekt_spec.declare.targets import CallTarget, ImplementationTarget
 from arkitekt_runtime.task import Task
 from rekuest.traits.action import Callable
 
@@ -40,13 +42,13 @@ def test_a_local_task_refuses_to_be_a_parent(method: str) -> None:
     ever moved after that the failure would be koil complaining about a missing loop
     rather than this message.
     """
-    with pytest.raises(ValueError, match="runs for no assignment"):
+    with pytest.raises(NoCallerError, match="is local"):
         getattr(Task.local(), method)(object())
 
 
 def test_the_local_refusal_points_at_the_client() -> None:
     """A parentless call is exactly what the client is for; the message should say so."""
-    with pytest.raises(ValueError, match=r"rekuest\.call\(action"):
+    with pytest.raises(NoCallerError, match=r"rekuest\.call\(action"):
         Task.local().call(object())
 
 

@@ -180,7 +180,7 @@ def test_a_local_task_accepts_reporting_and_attributes_nothing() -> None:
     task.log("hello")
     task.progress(50, "half")
     task.pausepoint()
-    assert task.id == "script" and task.token is None and task.assignment is None
+    assert task.id == "script" and task.token is None
 
 
 def module_level(x: int, task: Task) -> int:

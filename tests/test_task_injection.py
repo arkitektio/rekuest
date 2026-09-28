@@ -231,7 +231,7 @@ async def test_a_task_knows_the_agent_running_it() -> None:
 
     await run_assignment(agent, assign("who"))
     assert seen["agent"] is agent
-    assert Task.local().agent is None
+    assert not hasattr(Task.local(), "agent"), "a local task runs for no agent"
 
 
 def test_actor_kwargs_carry_every_derived_field() -> None:
