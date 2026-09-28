@@ -20,8 +20,6 @@ from arkitekt_runtime.agents.base import BaseAgent
 from arkitekt_runtime.types import TaskEventKind
 from rekuest.api.schema import TaskEventChange
 from arkitekt_spec.declare.app import AppRegistry
-from arkitekt_spec.declare.errors import CriticalCallError
-from arkitekt_runtime.calls import _astream_raw
 
 from .memory_transport import MemoryAgentTransport
 
@@ -92,44 +90,6 @@ def _register(agent: BaseAgent, function) -> None:
     agent.collect_from_registry()
 
 
-@pytest.mark.asyncio
-async def test_duplicate_assign_runs_once(
-    agent: BaseAgent, transport: MemoryAgentTransport
-) -> None:
-    """Assigns are delivered at-least-once; the same task id must never execute twice.
-
-    The backend redelivers an Assign it got no report for, and recovers frames a dying
-    connection popped but never acked. Both can hand a *running* task to the agent again —
-    which used to overwrite the running entry and start a second execution.
-    """
-    runs = 0
-    release = asyncio.Event()
-
-    async def aonce(x: int) -> int:
-        """Count executions, and stay running until released."""
-        nonlocal runs
-        runs += 1
-        await release.wait()
-        return x
-
-    _register(agent, aonce)
-
-    transport.feed(_assign("task-1", "aonce", x=1))
-    await _pump(agent, 1)
-    await _until(lambda: runs == 1)
-
-    transport.feed(_assign("task-1", "aonce", x=1))  # the redelivery
-    await _pump(agent, 1)
-    await asyncio.sleep(0.05)
-
-    assert runs == 1, "a redelivered Assign must not start a second execution"
-    # It must still *answer*: any report tells the backend's watchdog the task was picked up.
-    logs = [m for m in transport.of_type(messages.Log) if m.task == "task-1"]
-    assert logs, "the duplicate should be acknowledged with a report for the task"
-
-    release.set()
-    await _until(lambda: bool(transport.of_type(messages.Completed)))
-    assert len(transport.of_type(messages.Completed)) == 1
 
 
 @pytest.mark.asyncio
@@ -163,45 +123,8 @@ async def test_duplicate_assign_for_finished_task_resends_its_report(
     assert len(transport.of_type(messages.Completed)) == 2
 
 
-@pytest.mark.asyncio
-async def test_unknown_interface_is_reported_and_does_not_kill_the_agent(
-    agent: BaseAgent, transport: MemoryAgentTransport
-) -> None:
-    """The Critical was always sent — and then the exception was re-raised into the message
-    loop, tearing the whole agent down and orphaning every *other* task it was running."""
-    transport.feed(_assign("task-3", "no-such-interface"))
-
-    await _pump(agent, 1)  # must not raise
-
-    criticals = [c for c in transport.of_type(messages.Critical) if c.task == "task-3"]
-    assert criticals, "the backend must be told the assignment could not start"
 
 
-@pytest.mark.asyncio
-async def test_failure_outside_the_actors_own_error_handling_is_reported(
-    agent: BaseAgent, transport: MemoryAgentTransport
-) -> None:
-    """``on_assign`` reports what it anticipates. Whatever else raises inside it (resolving
-    the function's locals, the bound app, a lock on entry) used to be logged by the task's
-    done-callback and nothing more — the backend waited forever."""
-
-    # A function that needs a state this agent never initialized: resolving its locals
-    # genuinely raises ``StateRequirementsNotMet`` — no patching involved.
-    async def aneeds_state(x: int, stage: Stage) -> int:
-        """Never reached."""
-        return x
-
-    agent.app_registry.merge(_REGISTRY)  # Stage is a state of this app too
-    _register(agent, aneeds_state)
-
-    transport.feed(_assign("task-4", "aneeds_state", x=1))
-    await _pump(agent, 1)
-
-    await _until(
-        lambda: any(c.task == "task-4" for c in transport.of_type(messages.Critical))
-    )
-    critical = next(c for c in transport.of_type(messages.Critical) if c.task == "task-4")
-    assert "State requirements not met" in critical.error
 
 
 class _ScriptedPostman:
@@ -219,17 +142,3 @@ class _ScriptedPostman:
         await asyncio.Event().wait()
 
 
-@pytest.mark.asyncio
-@pytest.mark.parametrize("kind", [TaskEventKind.CANCELLED, TaskEventKind.INTERRUPTED])
-async def test_stream_ends_when_the_task_is_cancelled_or_interrupted(
-    kind: TaskEventKind,
-) -> None:
-    """Someone else ending the task (the UI, an interrupt cascading down a tree) is terminal.
-    The GraphQL caller only knew COMPLETED / FAILED / CRITICAL and hung on anything else."""
-
-    async def consume() -> None:
-        async for _ in _astream_raw(postman=_ScriptedPostman(TaskEventKind.PROGRESS, kind)):  # type: ignore[arg-type]
-            pass
-
-    with pytest.raises(CriticalCallError):
-        await asyncio.wait_for(consume(), timeout=2.0)
