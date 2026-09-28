@@ -2,383 +2,115 @@
 
 [![codecov](https://codecov.io/gh/arkitektio/rekuest/graph/badge.svg?token=xzxX2AQPmS)](https://codecov.io/gh/arkitektio/rekuest)
 [![PyPI version](https://badge.fury.io/py/rekuest.svg)](https://pypi.org/project/rekuest/)
-[![Maintenance](https://img.shields.io/badge/Maintained%3F-yes-green.svg)](https://pypi.org/project/rekuest/)
-![Maintainer](https://img.shields.io/badge/maintainer-jhnnsrs-blue)
 [![PyPI pyversions](https://img.shields.io/pypi/pyversions/rekuest.svg)](https://pypi.python.org/pypi/rekuest/)
-[![PyPI status](https://img.shields.io/pypi/status/rekuest.svg)](https://pypi.python.org/pypi/rekuest/)
 
-> **Renamed.** This client was published as `rekuest-next` up to 2.3.1. From 3.0.0 it
-> is published as `rekuest` again, and the import root is `rekuest` (`rekuest_next` is
-> gone). Install `rekuest>=3` and update imports.
+**The distributed runtime for [Arkitekt](https://arkitekt.live) apps.**
 
-**Self-documenting, asynchronous, scalable RPC for untrusted actors** — accessible
-through FastAPI or deployed on the [Arkitekt](https://arkitekt.live) platform.
+An Arkitekt app is a declaration: the actions, states and hooks it offers. The
+declaration itself is [arkitekt-spec](https://github.com/arkitektio/arkitekt-spec)'s,
+and executing it locally is [arkitekt-runtime](https://github.com/arkitektio/arkitekt-runtime)'s.
+rekuest adds what running it *distributed* takes:
 
-Turn an ordinary, typed Python function into a remotely callable *action*: rekuest
-inspects its signature and docstring to build a self-documenting schema, hosts it as
-a provisionable *actor*, and lets other apps discover and call it — with fine-grained,
-per-app access control.
+- an **agent** that registers the declaration with a rekuest server over a websocket,
+  is assigned tasks, and reports their progress, logs and results back;
+- the **caller** through which one app's actions call other apps' actions via the server;
+- **`Rekuest`**, the GraphQL client for the server: find actions and implementations,
+  call them, and watch their tasks.
 
-## Why rekuest?
-
-Most RPC frameworks expose functionality on a *server*. rekuest flips that around:
-functionality lives on the **client**, and any app can *provide* actions on a user's
-behalf. That makes it a good fit for scientific and automation workflows where:
-
-- **Code is the contract.** Type hints and docstrings become the schema — args,
-  returns, widgets, and documentation are derived automatically, no IDL to maintain.
-- **Apps are untrusted.** Every app negotiates access to data and to other apps via
-  OAuth2, so you can safely run third-party or user-contributed code.
-- **Work is distributed.** Many agents can provide the same action; the platform load
-  balances, retries, and fails over calls across them.
-- **Calls compose.** An action can call other actions, so you can build pipelines that
-  span apps and machines.
-
-## How it works
-
-```
-  @app.register function  ──inspect──▶  Action (self-documenting schema)
-        │                                  │
-        │ hosted by an Agent               │ discovered + reserved by callers
-        ▼                                  ▼
-      Actor  ◀───────── assign / call ─────┘
-   (running instance,
-    expands inputs, runs,
-    shrinks outputs)
-```
-
-| Term            | Meaning                                                                                   |
-| --------------- | ----------------------------------------------------------------------------------------- |
-| **Action**      | The documented concept of a function that is available on the platform.                   |
-| **Implementation** | A concrete realization of an Action provided by an App.                                |
-| **App**         | A provider of functionality that negotiates access rights through OAuth2.                  |
-| **Agent**       | A running instance of an App; the host of actors. Agents connect and disconnect.          |
-| **Actor**       | A provisioned, running instance of a function that processes assignments.                 |
-| **Provision**   | A contract obliging an Agent to keep an action available (think *Deployment* in K8s).     |
-| **Reservation** | A contract for a user to call one or more actors; the platform load balances and heals it. |
-
-## Prerequisites
-
-A running rekuest server (most easily obtained through an
-[Arkitekt](https://arkitekt.live) deployment).
+You rarely import rekuest yourself. `run(app)` in [arkitekt](https://github.com/arkitektio/arkitekt)
+uses it, and the names an app is written with (`App`, `Task`, the `Annotated` markers,
+the policies) come from `arkitekt`.
 
 ## Install
 
-rekuest is usually consumed through the Arkitekt platform, which wires up the
-server connection, authentication and lifecycle for you. Installing `arkitekt`
-pulls in `rekuest` as well:
-
 ```bash
-pip install arkitekt
+pip install "arkitekt[rekuest]"   # what an app needs to run(app)
+pip install rekuest               # just the runtime and client
 ```
 
-> Doing image analysis? The Arkitekt platform ships ready-made data structures for
-> imaging (see [mikro](https://github.com/arkitektio/mikro)).
+The optional extras are `units` (physical-quantity ports, via kanne) and `types`
+(`annotated-types` constraints). rekuest requires Python 3.11+.
 
-## Providing an action
+## Offering actions
 
-Register a typed function — its signature and docstring become the schema:
+Declare the app with arkitekt and run it. `run` connects it through rekuest's provider,
+which builds the agent and keeps it offering the app's actions until you stop it:
 
 ```python
-from rekuest import AppRegistry
+from arkitekt import App, Task, run
 
-app = AppRegistry()   # in arkitekt: `app = App("my.app")`, and `@app.action`
+app = App("measure", "0.1.0")
 
 
-@app.register
-def add_greeting(x: int, name: str) -> str:
-    """Add a greeting.
+@app.action
+def double(x: int, task: Task) -> int:
+    """Double
 
-    Takes a number and a name and returns a friendly message.
-
-    Args:
-        x (int): A number to include in the message.
-        name (str): The name to greet.
-
-    Returns:
-        str: The greeting message.
+    Doubles a number.
     """
-    return f"Hello {name}, your number is {x}"
+    task.log(f"doubling {x}")
+    return x * 2
 
 
-with easy("my_app") as app:
-    # Connects, registers the action, and provides it until interrupted.
-    app.run()
+if __name__ == "__main__":
+    run(app)
 ```
 
-Run it during development with:
+An app can also name the provider explicitly: `App(..., providers=[rekuest_provider])`
+with `from rekuest.arkitekt import rekuest_provider`.
 
-```bash
-arkitekt run dev
-```
+## Calling actions
 
-The action is now registered under your app and signed-in user, and can be
-provisioned and called by other apps. By default users may only assign to their own
-apps; this can be relaxed on the rekuest server.
-
-## Calling an action
-
-Calls go through the `Rekuest` client, which an action asks for by annotation.
-`aresolve` takes an id, an `Action` or an `Implementation`; `call`/`acall` invoke it:
+From a script, name the rekuest service and call an action by its id (or pass an
+`Action`/`Implementation` you looked up). The call is a *root* task:
 
 ```python
+from arkitekt import easy
+from rekuest.arkitekt import rekuest_service
+
+with easy("my-script", rekuest_service) as rekuest:
+    result = rekuest.call("<action-id>", x=21)
+```
+
+Inside a running action, a call is a *child* of the task it runs in, so it goes
+through the task. Resolve the target with the client, then call it on the task
+(`rekuest.acall` inside a task raises `RootOnlyCallError`, which says as much):
+
+```python
+from arkitekt import App, Task
+from rekuest.arkitekt import rekuest_service
 from rekuest.client.client import Rekuest
 
+app = App("orchestrate", "0.1.0", services=[rekuest_service])
 
-@app.register
-async def greet_through(action_id: str, rekuest: Rekuest) -> str:
-    """Call another action and return what it said."""
+
+@app.action
+async def double_twice(x: int, action_id: str, task: Task, rekuest: Rekuest) -> int:
+    """Double Twice"""
     action = await rekuest.aresolve(action_id)
-    return await rekuest.acall(action, x=1, name="world")
+    once = await task.acall(action, x=x)
+    return await task.acall(action, x=once)
 ```
 
-When you already know which agent provides an implementation, address it directly:
+Actions, implementations, shortcuts, test cases, test results and task events travel
+between actions by id (`@rekuest/action`, `@rekuest/implementation`, …), so an action
+can take and return them directly.
 
-```python
-impl = await rekuest.amy_implementation_at(instance_id, "add_greeting")
-result = await rekuest.acall(impl, x=1, name="world")
-```
+## Package layout
 
-## Working with complex data structures
+| Module | What it is |
+| --- | --- |
+| `rekuest.arkitekt` | The service (`rekuest_service`), the agent provider (`rekuest_provider`) and the `@rekuest/*` structures |
+| `rekuest.agents` | The agent, its websocket transport, control channel and caller |
+| `rekuest.client` | `Rekuest`, the GraphQL client, and its postman |
+| `rekuest.api.schema` | The generated GraphQL operations and types |
+| `rekuest.protocol` | The wire protocol the agent speaks with the server |
 
-rekuest serializes and documents the standard Python types out of the box:
+## Guides
 
-`str` · `bool` · `int` · `float` · `Enum` · `dict` · `list`
-
-Large or complex objects (e.g. numpy arrays) should **not** be serialized into
-messages. rekuest offers two strategies instead.
-
-### Global structures — reference-by-id
-
-Store the object in central storage and pass only a reference. Make a class a
-*structure* with the `@structure` decorator — give it an identifier and async
-`ashrink`/`aexpand` methods:
-
-```python
-from rekuest import structure
-
-
-@structure(identifier="myapp/image")
-class Image:
-    id: str  # a reference to this object in central storage
-
-    async def ashrink(self) -> str:
-        return self.id
-
-    @classmethod
-    async def aexpand(cls, value: str) -> "Image":
-        return await cls.load_from_server(value)
-```
-
-> The decorator registers the structure eagerly. A class that instead implements a
-> `get_identifier()` classmethod alongside `ashrink`/`aexpand` is still picked up
-> automatically the first time it is used in a type hint.
-
-Now you can use `Image` directly in type hints — rekuest automatically `ashrink`s
-(serializes) it to its reference when sending and `aexpand`s (deserializes) it back on
-the receiving side:
-
-```python
-@app.register
-def brightest_pixel(image: Image) -> int:
-    return image.max()
-```
-
-### Memory structures — keep it on the shelve
-
-Sometimes an object only makes sense within the agent that produced it and never needs
-to leave the machine — a handle to an open file, a live model, an intermediate result.
-Any plain class with no serialization protocol is treated as a **memory structure**:
-instead of being serialized, it is parked on the agent's in-memory *shelve*, and only
-an opaque *drawer reference* travels on the wire.
-
-```python
-class Session:  # no get_identifier / ashrink / aexpand -> memory structure
-    def __init__(self, handle):
-        self.handle = handle
-
-
-@app.register
-def open_session(path: str) -> Session:
-    return Session(open(path))
-
-
-@app.register
-def read_session(session: Session) -> str:
-    return session.handle.read()
-```
-
-Because the object stays on the agent's shelve, piping the reference returned by
-`open_session` into `read_session` resolves the **same live object** — no copy, no
-re-serialization. See `tests/test_app_memory_structure.py` for end-to-end examples.
-
-## State
-
-Actions are stateless by default — each call is independent. When an agent needs to
-remember something *across* calls (a connection, a counter, a loaded model), declare an
-**observable state** with `@app.state` on a dataclass:
-
-```python
-from dataclasses import dataclass
-
-
-@app.state
-@dataclass
-class CounterState:
-    count: int = 0
-
-
-@app.startup
-def initialize() -> CounterState:
-    # Startup hooks return the initial state instances for the agent.
-    return CounterState(count=0)
-```
-
-Any action can then read and mutate that state simply by **type-hinting a parameter**
-with the state class — rekuest injects the live instance:
-
-```python
-@app.register
-def increment(counter: CounterState) -> int:
-    counter.count += 1   # mutation is published to the platform automatically
-    return counter.count
-```
-
-State is shared by all of an agent's actors and is *observable*: changes are published
-live (at `publish_interval`), so dashboards and other apps can watch it in real time.
-
-## Shutdown
-
-Whatever a startup hook opens, a `@app.shutdown` hook closes. Shutdown hooks run when the
-agent tears down — on a clean exit as well as after an error or a cancellation — in the
-reverse of the order they were registered. Like actions, they take the live state and
-context objects by **type-hinting a parameter**, and they return nothing:
-
-```python
-@app.shutdown
-async def finalize(counter: CounterState) -> None:
-    await save_to_disk(counter.count)
-```
-
-A shutdown hook that raises is logged and the remaining hooks still run: teardown never
-fails because of a hook. Each hook is bounded by the agent's `shutdown_hook_timeout`
-(20s by default), so a hook that never returns cannot hang the shutdown.
-
-State a shutdown hook *mutates* is published like any other state change: the agent's
-connection outlives its message loop, so the resulting patch is flushed to the platform
-before the socket closes. A last write on the way out is durable.
-
-Generally, you can also do this with an asyncio.CancelledError handler in your asynchrouns
-background tasks.
-
-
-## Dependencies
-
-An action can call out to functionality provided by **another** agent. You describe what
-you need with a **dependency protocol** — `@app.declare` inspects the class so that its
-public methods become *action demands* and its public annotated attributes become
-*state demands* (each annotated with a class whose annotations are the state's
-fields), with their ports built against that app's structures then and there:
-
-```python
-class CameraState:
-    connected: bool
-
-
-@app.declare(app="lab")
-class Camera:
-    state: CameraState
-
-    async def snap(self, exposure_ms: float) -> bytes:
-        ...   # body is only a signature — it is fulfilled by a remote agent
-```
-
-Consume the dependency by type-hinting a parameter with the protocol class. rekuest
-resolves a matching remote agent and injects a proxy made for the task the action
-runs in. `camera.snap(...)` calls as the protocol declared the method (awaitable
-if it is `async`); `.call(...)` and `.acall(...)` are the explicit forms. Every call
-goes over your agent's socket as a child of that task -- the same task a
-`task: Task` parameter receives -- and a name the protocol does not declare raises
-`AttributeError`:
-
-```python
-@app.register
-def capture(camera: Camera) -> bytes:
-    # Calls the remote agent's `snap` action and returns its result.
-    return camera.snap(exposure_ms=10.0)
-```
-
-The platform load balances across matching agents and will heal the reservation if one
-disconnects. Use `auto_resolvable=True`, `min=`, and `max=` on `@app.declare` to control how
-many matching agents may be bound automatically.
-
-## Port validators and effects
-
-A port can carry validators (is the value acceptable?) and effects (hide the port,
-show a message) that the UI evaluates while the form is being filled in. Both are
-pure calls into the UI's operation catalog, written as a Python expression. `value`
-is the port's own value; any other name is a sibling port, which is subscribed to
-automatically:
-
-```python
-from typing import Annotated
-from rekuest import withEffect, withValidator
-from rekuest.protocol.schema import EffectKind
-
-@app.register
-def crop(
-    start: Annotated[int, withValidator("value >= 0", error_message="Must not be negative")],
-    stop: Annotated[int, withValidator("value > start", error_message="Stop must exceed start")],
-    note: Annotated[str, withEffect(EffectKind.HIDE, "stop > 1000 and start > 0")] = "",
-) -> int:
-    return stop - start
-```
-
-Comparisons, arithmetic (`x < value + 3`, `value % 2 == 0`; `//` and `**` are not supported),
-`and`/`or`/`not`, `in`, `is None`, `x if c else y`, `len(...)`, lists, dicts and nested calls
-are supported; `other.child` or `other["child"]` addresses a field inside
-the value of port `other`. Operators desugar onto the **base catalog** (`gt`, `lte`, `and`,
-`if`, `len_between`, ...), a versioned vocabulary every UI implements and the server checks
-every definition against; `annotated_types` markers (`Gt`, `Le`, `Len`) become such
-validators too. UIs may register extension catalogs with more operations; name them with
-`@app.register(catalogs=["..."])` (several may be combined; `base@1` is always applied) to use them (`clamp(value=value, min=0, max=10) == value`, keyword arguments because the client cannot name positionals of extension operations). Operations neither
-catalog provides do not block registration: the server stores a warning on the
-implementation (`diagnostics`). Inside a call `value` always means the port's own value, so
-a sibling port named `value` cannot be referenced from another port's call.
-
-## Bloks — dashboards from BSX
-
-A **blok** is a declarative UI panel an app contributes to the platform — a small
-dashboard built from a component tree, wired straight to your actions and state. You
-write it as a BSX/XML string; `bsx(...)` parses it into a component tree (with helpful
-line/column errors when it can't):
-
-```python
-from rekuest import bsx
-
-panel = bsx(
-    """
-    <Page>
-      <Label text="Camera" />
-      <Text value="$state.camera.connected" />
-      <Button title="Snap" onClick="@camera.snap(exposure_ms=10)" />
-    </Page>
-    """
-)
-
-app.register_blok(name="camera_panel", component=panel, description="Camera dashboard")
-```
-
-Props follow three conventions, which is what ties a blok to the rest of your app:
-
-| Prop value          | Meaning                                                                 |
-| ------------------- | ----------------------------------------------------------------------- |
-| `text="Camera"`     | A **static** value.                                                      |
-| `value="$state.camera.connected"` | A **dynamic binding** to a dependency's state (`$state.<dependency>.<path>`). |
-| `onClick="@camera.snap(exposure_ms=10)"` | An **action callback** that calls a dependency's action (`@<dependency>.<operation>(...)`). Use `@utils.<op>(...)` for built-in utilities. |
-
-Bloks derive their action and state dependencies automatically from the paths they
-reference, so the platform knows exactly what each panel needs to run.
+- [Agent dependencies](docs/agent-dependencies.md) — declare the actions and states an app depends on
+- [Disconnect policy](docs/disconnect-policy.md) — what happens to in-flight work when the agent loses its connection
+- [The agent journal](docs/journal.md) — the ordered, persisted record of everything an agent reports
 
 ## Development
 
@@ -393,5 +125,9 @@ calls against it; see `tests/conftest.py`.
 
 ## Learn more
 
-- [Arkitekt platform](https://arkitekt.live)
-- [Documentation](https://arkitekt.live/docs)
+- 📚 [arkitekt.live](https://arkitekt.live)
+- 🐙 [github.com/arkitektio/rekuest](https://github.com/arkitektio/rekuest)
+
+## License
+
+GPL-3.0-or-later
