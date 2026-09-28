@@ -15,7 +15,7 @@ from rekuest.contrib.fastapi.retriever.protocol import (
     Snapshot,
     TaskBoundary,
 )
-from rekuest.messages import JSONSerializable
+from arkitekt_runtime.messages import JSONSerializable
 
 
 def build_patch_document(

@@ -9,15 +9,15 @@ through its startup hooks — exactly once per start.
 
 from collections.abc import Generator
 
-from rekuest.agents.hooks.materialize import materialize_hook
+from arkitekt_runtime.agents.hooks.materialize import materialize_hook
 import pytest
 
 from arkitekt_spec.declare.app import AppRegistry
-from rekuest.agents.hooks.shutdown import (
+from arkitekt_runtime.agents.hooks.shutdown import (
     ThreadedShutdownHook,
     WrappedShutdownHook,
 )
-from rekuest.agents.base import RekuestAgent
+from rekuest.agents.agent import RekuestAgent
 
 
 # These contexts and states belong to a registry, as they would to an app.

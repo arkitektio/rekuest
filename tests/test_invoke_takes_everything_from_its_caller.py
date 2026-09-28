@@ -9,7 +9,7 @@ import inspect
 
 import pytest
 
-import rekuest.invoke as invoke
+import arkitekt_runtime.invoke as invoke
 from rekuest.api.schema import Action
 
 
@@ -112,6 +112,6 @@ def test_the_module_it_replaced_is_gone() -> None:
 
 def test_the_parent_is_only_ever_what_was_passed() -> None:
     """Unchanged, and still true: there is no ambient parent to discover."""
-    from rekuest.calls import _resolve_parent
+    from arkitekt_runtime.calls import _resolve_parent
 
     assert _resolve_parent(None) is None

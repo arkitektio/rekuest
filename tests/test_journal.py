@@ -10,15 +10,16 @@ import contextlib
 import json
 import threading
 import time
+from rekuest.agents.agent import RekuestAgent
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 
 import pytest
 import websockets
 
-from rekuest import messages
-from rekuest.agents.base import BaseAgent
-from rekuest.agents.journal import (
+from arkitekt_runtime import messages
+from arkitekt_runtime.agents.base import BaseAgent
+from arkitekt_runtime.agents.journal import (
     Journal,
     JournalEntry,
     TaskClosedError,
@@ -28,11 +29,11 @@ from rekuest.agents.journal import (
     iso_from_ms,
     world_from_entries,
 )
-from rekuest.agents.policy import ConnectionPolicy
+from arkitekt_runtime.agents.policy import ConnectionPolicy
 from rekuest.agents.transport.websocket import WebsocketAgentTransport
 from arkitekt_spec.declare.app import AppRegistry
-from rekuest.state.observable import Mutation, StateConfig, make_evented
-from rekuest.state.write import write_view
+from arkitekt_runtime.state.observable import Mutation, StateConfig, make_evented
+from arkitekt_runtime.state.write import write_view
 
 from .memory_transport import MemoryAgentTransport
 from .test_transport_lifecycle import (
@@ -386,7 +387,7 @@ def transport() -> MemoryAgentTransport:
 
 @pytest.fixture()
 def agent(transport: MemoryAgentTransport) -> BaseAgent:
-    return BaseAgent(name="journal-test", transport=transport, app_registry=AppRegistry())
+    return RekuestAgent(name="journal-test", transport=transport, app_registry=AppRegistry())
 
 
 async def _process(agent: BaseAgent, message: messages.ToAgentMessage) -> None:
@@ -524,7 +525,7 @@ async def test_reporting_never_waits_on_the_processor(
     reports must not wait on the processor, or both wait forever."""
     import janus
 
-    from rekuest.agents.dataclasses import QueuedPatchEvent
+    from arkitekt_runtime.agents.dataclasses import QueuedPatchEvent
     from arkitekt_spec.declare.state.publish import Patch
 
     replied = asyncio.Event()

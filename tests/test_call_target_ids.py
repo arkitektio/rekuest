@@ -13,9 +13,9 @@ from typing import Any
 
 import pytest
 
-from rekuest import messages
-from rekuest.protocol.schema import TaskEventKind
-from rekuest.task import Task
+from arkitekt_runtime import messages
+from arkitekt_runtime.types import TaskEventKind
+from arkitekt_runtime.task import Task
 
 
 class RecordingPostman:
@@ -54,7 +54,7 @@ class _Target:
 
 
 async def _stream(postman: RecordingPostman, **kwargs: Any) -> list[Any]:  # noqa: ANN401
-    from rekuest.calls import _astream_raw
+    from arkitekt_runtime.calls import _astream_raw
 
     return [item async for item in _astream_raw(postman, **kwargs)]
 
@@ -102,7 +102,7 @@ async def test_a_call_with_no_target_sends_neither_id() -> None:
 
 
 async def _iterate(postman: RecordingPostman, **kwargs: Any) -> list[Any]:  # noqa: ANN401
-    from rekuest.invoke import _aiterate_raw as aiterate_raw
+    from arkitekt_runtime.invoke import _aiterate_raw as aiterate_raw
 
     return [item async for item in aiterate_raw(postman=postman, **kwargs)]
 

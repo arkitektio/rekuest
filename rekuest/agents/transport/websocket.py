@@ -7,15 +7,15 @@ from typing import Self, cast
 from collections.abc import Awaitable, Callable
 import pydantic
 import websockets
-from rekuest.agents.policy import Backoff, ConnectionPolicy
-from rekuest.agents.transport.base import AgentTransport
-from rekuest.agents.transport.types import HandshakeParams
+from arkitekt_runtime.agents.policy import Backoff, ConnectionPolicy
+from arkitekt_runtime.agents.transport.base import AgentTransport
+from arkitekt_runtime.agents.transport.types import HandshakeParams
 import asyncio
 import json
 from rekuest.agents.transport.errors import (
     AgentTransportException,
 )
-from rekuest import messages
+from arkitekt_runtime import messages
 import logging
 from websockets.exceptions import (
     ConnectionClosedError,

@@ -1,6 +1,6 @@
 from typing import Protocol, runtime_checkable
 
-from rekuest import messages
+from arkitekt_runtime import messages
 from arkitekt_spec.declare.protocol.types import AnyState
 
 

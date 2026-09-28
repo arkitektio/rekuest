@@ -28,20 +28,20 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 from fastapi import WebSocket, WebSocketDisconnect
 from pydantic import ConfigDict, Field, PrivateAttr
 
-from rekuest import messages
+from arkitekt_runtime import messages
 from arkitekt_spec.actions import StateImplementationInput
-from rekuest.protocol.schema import AssignInput
-from rekuest.agents.base import BaseAgent
-from rekuest.agents.dataclasses import QueuedAssign, RevisedState
-from rekuest.agents.journal import (
+from arkitekt_runtime.types import AssignInput
+from arkitekt_runtime.agents.base import BaseAgent
+from arkitekt_runtime.agents.dataclasses import QueuedAssign, RevisedState
+from arkitekt_runtime.agents.journal import (
     FLUSH_TIMEOUT,
     JournalEntry,
     JournalReader,
     JournalSink,
     Route,
 )
-from rekuest.agents.transport.base import AgentTransport
-from rekuest.agents.backend import LocalAgentBackend
+from arkitekt_runtime.agents.transport.base import AgentTransport
+from arkitekt_runtime.agents.backend import LocalAgentBackend
 from rekuest.contrib.fastapi.sink.backend import SinkAgentBackend
 from rekuest.contrib.fastapi.retriever.memory_retriever import MemoryRetriever
 from rekuest.contrib.fastapi.retriever.protocol import StateRetriever

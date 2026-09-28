@@ -9,18 +9,19 @@ They drive a real ``BaseAgent`` message loop over
 """
 
 import asyncio
+from rekuest.agents.agent import RekuestAgent
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 
 import pytest
 
-from rekuest import messages
-from rekuest.agents.base import BaseAgent
-from rekuest.protocol.schema import TaskEventKind
+from arkitekt_runtime import messages
+from arkitekt_runtime.agents.base import BaseAgent
+from arkitekt_runtime.types import TaskEventKind
 from rekuest.api.schema import TaskEventChange
 from arkitekt_spec.declare.app import AppRegistry
 from arkitekt_spec.declare.errors import CriticalCallError
-from rekuest.calls import _astream_raw
+from arkitekt_runtime.calls import _astream_raw
 
 from .memory_transport import MemoryAgentTransport
 
@@ -46,7 +47,7 @@ def transport() -> MemoryAgentTransport:
 @pytest.fixture()
 def agent(transport: MemoryAgentTransport) -> BaseAgent:
     """A bare agent with its own registry, so nothing leaks between tests."""
-    return BaseAgent(
+    return RekuestAgent(
         name="never-hangs-test", transport=transport, app_registry=AppRegistry()
     )
 

@@ -10,11 +10,12 @@ import warnings
 
 import pytest
 
-from rekuest import messages
+from arkitekt_runtime import messages
 from rekuest.agents.backend import SocketAgentBackend
-from rekuest.agents.base import BaseAgent, RekuestAgent
+from rekuest.agents.agent import RekuestAgent
+from arkitekt_runtime.agents.base import BaseAgent
 from arkitekt_spec.declare.agents.errors import AgentException
-from rekuest.agents.transport.types import HandshakeParams
+from arkitekt_runtime.agents.transport.types import HandshakeParams
 from arkitekt_spec.declare.app import AppRegistry
 from arkitekt_spec.declare.catalogs import CatalogWarning
 from rekuest.scalars import Identifier

@@ -1,12 +1,12 @@
 """Test the reactify function which converts a function or generator into an actor definition."""
 
-from rekuest.agents.hooks.materialize import materialize_hook
+from arkitekt_runtime.agents.hooks.materialize import materialize_hook
 from dataclasses import dataclass
 
 
-from rekuest.agents.hooks.startup import ThreadedStartupHook
-from rekuest.agents.hooks.background import WrappedThreadedBackgroundTask
-from rekuest.agents.base import RekuestAgent
+from arkitekt_runtime.agents.hooks.startup import ThreadedStartupHook
+from arkitekt_runtime.agents.hooks.background import WrappedThreadedBackgroundTask
+from rekuest.agents.agent import RekuestAgent
 from rekuest.client.client import Rekuest
 from arkitekt_spec.declare.app import AppRegistry
 

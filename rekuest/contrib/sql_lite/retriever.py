@@ -4,7 +4,7 @@ from collections.abc import Sequence
 from datetime import datetime, UTC
 from typing import Any
 
-from rekuest.agents.journal import Fold, JournalEntry
+from arkitekt_runtime.agents.journal import Fold, JournalEntry
 
 from rekuest.contrib.fastapi.retriever.protocol import (
     PatchEvent,

@@ -24,9 +24,9 @@ import asyncio
 import logging
 import uuid
 
-from rekuest import messages
+from arkitekt_runtime import messages
 from arkitekt_spec.declare.agents.errors import AgentException
-from rekuest.agents.transport.types import MessageSink
+from arkitekt_runtime.agents.transport.types import MessageSink
 from rekuest.scalars import Identifier
 
 logger = logging.getLogger(__name__)

@@ -2,8 +2,8 @@ import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 
-from rekuest import messages
-from rekuest.agents.journal import JournalEntry
+from arkitekt_runtime import messages
+from arkitekt_runtime.agents.journal import JournalEntry
 from arkitekt_spec.declare.protocol.types import AnyState
 
 

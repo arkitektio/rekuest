@@ -17,7 +17,7 @@ from rath.links.compose import compose
 from rath.links.graphql_ws import GraphQLWSLink
 from rath.links.split import SplitLink
 
-from rekuest.agents.base import RekuestAgent
+from rekuest.agents.agent import RekuestAgent
 from rekuest.api.schema import (
     Action,
     Implementation,

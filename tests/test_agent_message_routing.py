@@ -8,12 +8,13 @@ drive it (the pre-existing ones had no ``areceive``). That is what makes the rou
 
 import asyncio
 import json
+from rekuest.agents.agent import RekuestAgent
 from collections.abc import AsyncIterator
 
 import pytest
 
-from rekuest import messages
-from rekuest.agents.base import BaseAgent
+from arkitekt_runtime import messages
+from arkitekt_runtime.agents.base import BaseAgent
 from arkitekt_spec.declare.app import AppRegistry
 from arkitekt_spec.declare.agents.hooks.registry import StartupHookReturns
 
@@ -30,7 +31,7 @@ def transport() -> MemoryAgentTransport:
 @pytest.fixture()
 def agent(transport: MemoryAgentTransport) -> BaseAgent:
     """A bare agent with its own registry, so nothing leaks between tests."""
-    return BaseAgent(
+    return RekuestAgent(
         name="routing-test", transport=transport, app_registry=AppRegistry()
     )
 

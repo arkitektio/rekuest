@@ -11,8 +11,8 @@ from typing import Any
 import pytest
 from rath.expansion import ExpandsStructures
 
-from rekuest import messages
-from rekuest.agents.base import BaseAgent
+from arkitekt_runtime import messages
+from arkitekt_runtime.agents.base import BaseAgent
 from arkitekt_spec.declare.agents.errors import StateRequirementsNotMet
 from arkitekt_spec.declare.app import AppRegistry
 
@@ -208,7 +208,7 @@ async def test_a_shutdown_hook_gets_its_own_apps_client() -> None:
 
 
 def test_a_hook_asking_for_a_client_its_app_lacks_names_the_cause() -> None:
-    from rekuest.agents.hooks.background import WrappedBackgroundTask
+    from arkitekt_runtime.agents.hooks.background import WrappedBackgroundTask
 
     class Other:
         pass
@@ -226,8 +226,8 @@ def test_a_hook_asking_for_a_client_its_app_lacks_names_the_cause() -> None:
 
 
 def test_a_hook_cannot_ask_for_a_task() -> None:
-    from rekuest.agents.hooks.background import WrappedBackgroundTask
-    from rekuest.task import Task
+    from arkitekt_runtime.agents.hooks.background import WrappedBackgroundTask
+    from arkitekt_runtime.task import Task
 
     async def worker(task: Task) -> None:
         """A hook runs for no task."""

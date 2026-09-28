@@ -6,10 +6,10 @@ gathers implementations from the registry, and the actor-builder used by the
 spawn path is resolvable from the same registry.
 """
 
-from rekuest.actors.build import actor_builder_for
+from arkitekt_runtime.actors.build import actor_builder_for
 import pytest
 
-from rekuest.agents.base import RekuestAgent
+from rekuest.agents.agent import RekuestAgent
 
 
 def test_collect_from_registry_reads_app_registry(mock_agent: RekuestAgent) -> None:

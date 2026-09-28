@@ -81,6 +81,18 @@ projects:
               - ValidatorInput
               - WindowFunction
               - WindowInput
+          - module: arkitekt_runtime.types
+            kinds: [enum, input]
+            include: &runtime_protocol
+              - AssignInput
+              - CancelInput
+              - HookInput
+              - HookKind
+              - MappedAgentInput
+              - PauseInput
+              - ResolvedDependencyInput
+              - ResumeInput
+              - TaskEventKind
         always_resolve_interfaces: true
         exclude_typenames: true
         dump_configuration: true
@@ -138,6 +150,9 @@ projects:
           - module: arkitekt_spec.actions
             kinds: [enum, input]
             include: *action_language
+          - module: arkitekt_runtime.types
+            kinds: [enum, input]
+            include: *runtime_protocol
           - module: rekuest.protocol.schema
             kinds: [enum, input]
             from_project: rekuest_protocol

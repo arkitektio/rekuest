@@ -5,8 +5,8 @@ import uuid
 from collections.abc import Sequence
 from datetime import datetime, UTC
 
-from rekuest import messages
-from rekuest.agents.journal import JournalEntry
+from arkitekt_runtime import messages
+from arkitekt_runtime.agents.journal import JournalEntry
 from rekuest.contrib.sql_lite.schema import ensure_sqlite_schema
 from arkitekt_spec.declare.protocol.types import AnyState
 

@@ -5,7 +5,7 @@ from typing import Any
 from collections.abc import AsyncGenerator, Sequence
 from rath.scalars import ID
 from rekuest.client.graphql import RekuestGraphQL
-from rekuest.protocol.schema import (
+from arkitekt_runtime.types import (
     HookInput,
     ResolvedDependencyInput,
     TaskEventKind,
@@ -17,7 +17,7 @@ import asyncio
 import uuid
 from pydantic import Field, PrivateAttr
 import logging
-from rekuest.postmans.errors import PostmanException, RootOnlyAssignError
+from arkitekt_runtime.postmans.errors import PostmanException, RootOnlyAssignError
 from rekuest.client.rath import RekuestRath
 from koil.composition import KoiledModel
 

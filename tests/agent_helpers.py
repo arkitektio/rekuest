@@ -4,8 +4,8 @@ import asyncio
 from collections.abc import AsyncIterator
 from typing import Any
 
-from rekuest import messages
-from rekuest.agents.base import BaseAgent
+from arkitekt_runtime import messages
+from arkitekt_runtime.agents.base import BaseAgent
 
 from .memory_transport import MemoryAgentTransport
 

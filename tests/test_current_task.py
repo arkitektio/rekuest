@@ -14,6 +14,7 @@ reader meets them as decisions.
 import asyncio
 import threading
 import time
+from rekuest.agents.agent import RekuestAgent
 from collections.abc import AsyncGenerator, Generator
 from types import SimpleNamespace
 from concurrent.futures import ThreadPoolExecutor
@@ -23,8 +24,8 @@ import pytest
 from koil import unkoil
 from rath.task import current_task, token_of
 
-from rekuest import messages
-from rekuest.agents.base import BaseAgent
+from arkitekt_runtime import messages
+from arkitekt_runtime.agents.base import BaseAgent
 from arkitekt_spec.declare.app import AppRegistry
 
 from .agent_helpers import run_assignment
@@ -32,7 +33,7 @@ from .memory_transport import MemoryAgentTransport
 
 
 def build_agent(name: str = "agent") -> BaseAgent:
-    return BaseAgent(
+    return RekuestAgent(
         name=name,
         transport=MemoryAgentTransport(),
         app_registry=AppRegistry(),

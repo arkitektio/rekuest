@@ -2,7 +2,7 @@ import copy
 from datetime import datetime, UTC
 from collections.abc import Callable, Sequence
 
-from rekuest import messages
+from arkitekt_runtime import messages
 from rekuest.contrib.fastapi.retriever.protocol import (
     PatchEvent,
     SessionBoundary,
@@ -15,9 +15,9 @@ from rekuest.contrib.fastapi.retriever.replay import (
     merge_state_ids,
     replay,
 )
-from rekuest.agents.journal import Fold, JournalEntry, entry_matches, world_from_entries
+from arkitekt_runtime.agents.journal import Fold, JournalEntry, entry_matches, world_from_entries
 from rekuest.contrib.fastapi.sink.memory_sink import MemoryStore
-from rekuest.messages import JSONSerializable
+from arkitekt_runtime.messages import JSONSerializable
 
 
 class MemoryRetriever:

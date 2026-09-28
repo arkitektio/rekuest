@@ -14,7 +14,7 @@ from typing import Any
 import pytest
 from rath.expansion import ExpandsStructures
 
-from rekuest.agents.base import BaseAgent
+from arkitekt_runtime.agents.base import BaseAgent
 from arkitekt_spec.declare.app import AppRegistry
 from arkitekt_spec.declare.structures.errors import StructureClientError
 from arkitekt_spec.declare.structures.registry import StructureRegistry

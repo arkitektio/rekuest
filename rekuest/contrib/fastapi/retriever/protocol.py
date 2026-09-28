@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Protocol, runtime_checkable
 
-from rekuest.messages import JSONSerializable
+from arkitekt_runtime.messages import JSONSerializable
 
 
 @dataclass

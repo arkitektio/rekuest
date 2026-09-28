@@ -7,17 +7,17 @@ opposite declaration orders cannot deadlock), and the actor ``concurrency``
 policy controls whether assignments to one actor run serially or in parallel.
 """
 
-from rekuest.actors.build import actor_builder_for
+from arkitekt_runtime.actors.build import actor_builder_for
 import asyncio
 
 import pytest
 
-from rekuest.agents.lock import LockGroup, TaskLock
+from arkitekt_runtime.agents.lock import LockGroup, TaskLock
 from arkitekt_spec.actions import (
     LockDefinitionInput,
     LockImplementationInput,
 )
-from rekuest.agents.base import RekuestAgent
+from rekuest.agents.agent import RekuestAgent
 
 
 def test_collect_from_registry_builds_task_locks(mock_agent: RekuestAgent) -> None:

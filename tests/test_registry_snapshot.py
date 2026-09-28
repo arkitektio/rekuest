@@ -6,7 +6,7 @@ So one declaration runs any number of times, concurrently too, and is still
 open for registration afterwards.
 """
 
-from rekuest.actors.build import actor_builder_for
+from arkitekt_runtime.actors.build import actor_builder_for
 import asyncio
 from dataclasses import dataclass
 import inspect
@@ -15,11 +15,11 @@ from typing import Annotated
 
 import pytest
 
-from rekuest.agents.base import BaseAgent
+from arkitekt_runtime.agents.base import BaseAgent
 from arkitekt_spec.declare.state.utils import prepare_injected_variables
 from arkitekt_spec.declare.app import AppRegistry
 from arkitekt_spec.declare.errors import RegistryFrozenError
-from rekuest.task import Task
+from arkitekt_runtime.task import Task
 
 from .memory_transport import MemoryAgentTransport
 from .agent_helpers import run_assignment

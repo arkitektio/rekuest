@@ -10,8 +10,12 @@ from rekuest.contrib.fastapi.auth import (
     AuthenticationError,
     ExpandUserFromRequest,
 )
-from rekuest.messages import Cancel, Pause, Resume
-from rekuest.protocol.schema import CancelInput, PauseInput, ResumeInput
+from arkitekt_runtime.messages import Cancel, Pause, Resume
+from arkitekt_runtime.types import (
+    CancelInput,
+    PauseInput,
+    ResumeInput,
+)
 from rekuest.contrib.fastapi.agent import FastApiAgent
 
 

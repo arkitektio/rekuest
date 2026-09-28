@@ -17,14 +17,14 @@ import websockets
 from websockets.exceptions import ConnectionClosedError
 from websockets.frames import Close
 
-from rekuest import messages
-from rekuest.agents.policy import Backoff, ConnectionPolicy
+from arkitekt_runtime import messages
+from arkitekt_runtime.agents.policy import Backoff, ConnectionPolicy
 from rekuest.agents.transport.errors import (
     AgentIsAlreadyBusy,
     AgentWasKicked,
     DefiniteConnectionFail,
 )
-from rekuest.agents.transport.types import HandshakeParams
+from arkitekt_runtime.agents.transport.types import HandshakeParams
 from rekuest.agents.transport.websocket import (
     BUSY_CODE,
     KICK_CODE,

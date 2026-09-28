@@ -137,6 +137,26 @@
                         "WindowInput"
                     ],
                     "from_project": null
+                },
+                {
+                    "module": "arkitekt_runtime.types",
+                    "kinds": [
+                        "enum",
+                        "input"
+                    ],
+                    "names": {},
+                    "include": [
+                        "AssignInput",
+                        "CancelInput",
+                        "HookInput",
+                        "HookKind",
+                        "MappedAgentInput",
+                        "PauseInput",
+                        "ResolvedDependencyInput",
+                        "ResumeInput",
+                        "TaskEventKind"
+                    ],
+                    "from_project": null
                 }
             ],
             "additional_bases": {

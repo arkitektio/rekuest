@@ -12,12 +12,12 @@ from typing import Any
 
 import pytest
 
-from rekuest import messages
+from arkitekt_runtime import messages
 from arkitekt_spec.actions import PortKind
 from arkitekt_spec.declare.definition.define import prepare_definition
 from arkitekt_spec.declare.structures.registry import StructureRegistry
 from rekuest.api.schema import Action
-from rekuest.task import Task
+from arkitekt_runtime.task import Task
 
 from .agent_helpers import run_assignment
 from .service_helpers import with_client
@@ -99,7 +99,7 @@ async def test_a_call_inside_a_task_goes_through_the_task(
         seen.update(kwargs, target=target, args=args)
         return "child-result"
 
-    monkeypatch.setattr("rekuest.invoke._acall", fake_acall)
+    monkeypatch.setattr("arkitekt_runtime.invoke._acall", fake_acall)
 
     async def parent(x: int, rekuest: Rekuest, task: Task) -> str:
         """Calls a child through the task it runs for."""
@@ -202,7 +202,7 @@ async def test_outside_a_task_the_rekuest_client_calls_over_its_own_postman(
         seen.update(kwargs)
         return "ok"
 
-    monkeypatch.setattr("rekuest.invoke._acall", fake_acall)
+    monkeypatch.setattr("arkitekt_runtime.invoke._acall", fake_acall)
     assert await rekuest.acall(ACTION) == "ok"
     assert seen["postman"] == "graphql-postman" and "parent" not in seen
 

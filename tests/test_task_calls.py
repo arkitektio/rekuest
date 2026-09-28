@@ -15,11 +15,15 @@ import pytest
 from koil.composition.base import KoiledModel
 from rath.origin import ContextBound
 
-from rekuest.invoke import CallTarget, ImplementationTarget
-from rekuest.task import Task
+from arkitekt_runtime.invoke import CallTarget, ImplementationTarget
+from arkitekt_runtime.task import Task
 from rekuest.traits.action import Callable
 
 PACKAGE = Path(__file__).resolve().parent.parent / "rekuest"
+#: The calling path (invoke, task) lives in the execution core now.
+import arkitekt_runtime  # noqa: E402
+
+CORE = Path(arkitekt_runtime.__file__).parent
 
 
 # --------------------------------------------------------------------------- #
@@ -79,14 +83,14 @@ def test_an_implementation_is_told_apart_by_carrying_an_action() -> None:
 
 
 def test_a_target_that_is_neither_is_refused_by_name() -> None:
-    from rekuest.invoke import _resolve_target
+    from arkitekt_runtime.invoke import _resolve_target
 
     with pytest.raises(ValueError, match="an Action or an Implementation"):
         _resolve_target(object())  # type: ignore[arg-type]
 
 
 def test_resolving_an_implementation_yields_its_action_and_its_own_id() -> None:
-    from rekuest.invoke import _resolve_target
+    from arkitekt_runtime.invoke import _resolve_target
 
     action, implementation_id = _resolve_target(_Implementation())  # type: ignore[arg-type]
     assert action.id == "action-1"
@@ -164,7 +168,7 @@ def test_the_calling_path_does_not_name_the_generated_surface(module: str) -> No
     described structurally instead, which is the same move
     ``structures/serialization/protocols.py`` already makes.
     """
-    reached = [n for n in _imports(PACKAGE / module) if "rekuest.api" in n]
+    reached = [n for n in _imports(CORE / module) if "rekuest.api" in n]
     assert not reached, f"{module} names {reached}"
 
 
@@ -177,7 +181,7 @@ def test_importing_the_calls_layer_stays_free_of_the_generated_surface() -> None
     A subprocess, because the test session has already imported the client.
     """
     code = (
-        "import sys, rekuest.calls;"
+        "import sys, arkitekt_runtime.calls;"
         "print('rekuest.api.schema' in sys.modules)"
     )
     out = subprocess.run(

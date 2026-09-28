@@ -10,7 +10,7 @@ import logging
 
 import pytest
 
-from rekuest import messages
+from arkitekt_runtime import messages
 from rekuest.agents.control import SocketControlPlane
 from arkitekt_spec.declare.agents.errors import AgentException
 from rekuest.scalars import Identifier

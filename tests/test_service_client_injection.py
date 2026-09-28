@@ -7,12 +7,13 @@ requests attributable is the ambient task, which the actor sets around the body.
 """
 
 import asyncio
+from rekuest.agents.agent import RekuestAgent
 from typing import Annotated, Any, Optional, Protocol
 
 import pytest
 
-from rekuest import messages
-from rekuest.agents.base import BaseAgent
+from arkitekt_runtime import messages
+from arkitekt_runtime.agents.base import BaseAgent
 from arkitekt_spec.declare.agents.errors import StateRequirementsNotMet
 from arkitekt_spec.actions import PortKind
 from arkitekt_spec.declare.app import AppRegistry
@@ -70,7 +71,7 @@ def registry_with_clients() -> AppRegistry:
 
 
 def build_agent(app: FakeApp | None) -> BaseAgent:
-    return BaseAgent(
+    return RekuestAgent(
         name=app.name if app else "standalone",
         transport=MemoryAgentTransport(),
         app_registry=registry_with_clients(),

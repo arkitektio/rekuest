@@ -9,13 +9,13 @@ import asyncio
 
 import pytest
 
-from rekuest import messages
+from arkitekt_runtime import messages
 
 from .memory_transport import MemoryAgentTransport
 from rekuest.agents.caller import AgentPostman, CallerTaskEvent
-from rekuest.protocol.schema import TaskEventKind
-from rekuest.postmans.errors import AssignException
-from rekuest.calls import _astream_raw
+from arkitekt_runtime.types import TaskEventKind
+from arkitekt_runtime.postmans.errors import AssignException
+from arkitekt_runtime.calls import _astream_raw
 from arkitekt_spec.declare.errors import ErrorCallError
 
 

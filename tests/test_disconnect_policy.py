@@ -11,19 +11,20 @@ exactly it: the socket is gone, the stream is not.
 import asyncio
 import threading
 import time
+from rekuest.agents.agent import RekuestAgent
 from collections.abc import AsyncIterator
 
 import pytest
 from koil import check_cancelled
 
-from rekuest import messages
+from arkitekt_runtime import messages
 from arkitekt_spec.declare.actors.policy import (
     CancelOnDisconnect,
     DisconnectPolicy,
     OnDisconnect,
 )
-from rekuest.agents.base import BaseAgent
-from rekuest.agents.policy import Backoff, ConnectionPolicy
+from arkitekt_runtime.agents.base import BaseAgent
+from arkitekt_runtime.agents.policy import Backoff, ConnectionPolicy
 from arkitekt_spec.declare.app import AppRegistry
 
 from .memory_transport import MemoryAgentTransport
@@ -37,7 +38,7 @@ def transport() -> MemoryAgentTransport:
 @pytest.fixture()
 def agent(transport: MemoryAgentTransport) -> BaseAgent:
     """A bare agent with its own registry, so nothing leaks between tests."""
-    agent = BaseAgent(
+    agent = RekuestAgent(
         name="policy-test", transport=transport, app_registry=AppRegistry()
     )
     # These tests drive process() directly rather than running aconnect(), so install

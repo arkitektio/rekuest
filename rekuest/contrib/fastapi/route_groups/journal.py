@@ -11,7 +11,7 @@ from typing import Any
 from fastapi import APIRouter, Path, Query
 from fastapi.responses import JSONResponse
 
-from rekuest.agents.journal import FLUSH_TIMEOUT, Fold, JournalReader
+from arkitekt_runtime.agents.journal import FLUSH_TIMEOUT, Fold, JournalReader
 from rekuest.contrib.fastapi.agent import FastApiAgent
 
 from .common import normalize_filter_values

@@ -11,12 +11,12 @@ from collections.abc import AsyncGenerator
 
 import pytest
 
-from rekuest.actors.dependency import AgentDependencyProxy
-from rekuest.actors.helper import AssignmentHelper
-from rekuest.agents.base import BaseAgent
+from arkitekt_runtime.actors.dependency import AgentDependencyProxy
+from arkitekt_runtime.actors.helper import AssignmentHelper
+from arkitekt_runtime.agents.base import BaseAgent
 from rekuest.agents.caller import CallerTaskEvent
-from rekuest.protocol.schema import TaskEventKind
-from rekuest.task import Task
+from arkitekt_runtime.types import TaskEventKind
+from arkitekt_runtime.task import Task
 
 from .agent_helpers import run_assignment
 from .test_service_client_injection import assign, build_agent

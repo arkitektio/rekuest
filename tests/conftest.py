@@ -12,7 +12,7 @@ from arkitekt_spec.declare.app import AppRegistry
 from arkitekt_spec.declare.structures.registry import StructureRegistry
 from rekuest.client.client import Rekuest, RekuestRath
 from rath.links.testing.direct_succeeding_link import DirectSucceedingLink
-from rekuest.agents.base import RekuestAgent
+from rekuest.agents.agent import RekuestAgent
 from rekuest.client.postman import GraphQLPostman
 from rekuest.agents.transport.websocket import WebsocketAgentTransport
 import os

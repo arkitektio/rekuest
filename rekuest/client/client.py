@@ -4,7 +4,7 @@ from typing import TypeVar
 from arkitekt_spec.declare.protocol.types import AnyFunction
 from rekuest.client.rath import RekuestRath
 from rekuest.api.schema import Action, Implementation, RekuestApi
-from rekuest.postmans.types import Postman
+from arkitekt_runtime.postmans.types import Postman
 from arkitekt_spec.declare.register import WrappedFunction
 from rath.scalars import ID
 from koil import unkoil, unkoil_gen
@@ -19,7 +19,7 @@ from typing import (
 )
 from collections.abc import AsyncGenerator, Generator
 from arkitekt_spec.declare.errors import RootOnlyCallError
-from rekuest.protocol.schema import HookInput
+from arkitekt_runtime.types import HookInput
 from arkitekt_spec.declare.structures.registry import StructureRegistry
 
 #: What :meth:`Rekuest.aresolve` accepts: a fetched model, an id, or a function this app
@@ -135,7 +135,7 @@ class Rekuest(Composition, RekuestApi):
     ) -> Any:  # noqa: ANN401 -- whatever the action returns
         """Call an action as a root task, through this client's own postman."""
         self._refuse_in_task("acall")
-        from rekuest.invoke import _acall
+        from arkitekt_runtime.invoke import _acall
 
         return await _acall(
             await self.aresolve(target),
@@ -174,7 +174,7 @@ class Rekuest(Composition, RekuestApi):
     ) -> Any:  # noqa: ANN401 -- the raw backend payload
         """Call with already-serialized arguments, as a root task."""
         self._refuse_in_task("acall_raw")
-        from rekuest.invoke import _acall_raw
+        from arkitekt_runtime.invoke import _acall_raw
 
         return await _acall_raw(
             postman=self.postman,
@@ -202,7 +202,7 @@ class Rekuest(Composition, RekuestApi):
     ) -> AsyncGenerator[Any, None]:
         """Stream with already-serialized arguments, as a root task."""
         self._refuse_in_task("aiterate_raw")
-        from rekuest.invoke import _aiterate_raw
+        from arkitekt_runtime.invoke import _aiterate_raw
 
         async for value in _aiterate_raw(
             postman=self.postman,
@@ -230,7 +230,7 @@ class Rekuest(Composition, RekuestApi):
     ) -> AsyncGenerator[Any, None]:
         """Stream a generator action's yields, as a root task."""
         self._refuse_in_task("aiterate")
-        from rekuest.invoke import _aiterate
+        from arkitekt_runtime.invoke import _aiterate
 
         async for value in _aiterate(
             await self.aresolve(target),

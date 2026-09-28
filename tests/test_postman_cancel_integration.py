@@ -13,7 +13,7 @@ import uuid
 import pytest
 from dokker import Deployment
 
-from rekuest.protocol.schema import TaskEventKind
+from arkitekt_runtime.types import TaskEventKind
 
 from .conftest import CONNECT_TIMEOUT, build_fresh_rekuest
 
