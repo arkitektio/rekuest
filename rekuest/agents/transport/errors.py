@@ -1,6 +1,6 @@
 """Exceptions raised by the Agent Transport."""
 
-from rekuest.agents.errors import AgentException
+from arkitekt_spec.declare.agents.errors import AgentException
 
 
 class AgentTransportException(AgentException):

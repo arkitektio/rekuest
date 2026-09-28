@@ -9,7 +9,7 @@ from rekuest.api.schema import (
     CatalogProp,
     UICatalog,
 )
-from rekuest.catalogs import BASE_CATALOG_DRIFT, load_base_catalog
+from arkitekt_spec.declare.catalogs import BASE_CATALOG_DRIFT, load_base_catalog
 from rekuest.client.catalogs import (
     catalog_from_base_catalog,
     catalog_from_ui_catalog,

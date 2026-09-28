@@ -23,10 +23,10 @@ from rekuest.protocol.schema import (
     HookInput,
     TaskEventKind,
 )
-from rekuest.errors import CriticalCallError, ErrorCallError
+from arkitekt_spec.declare.errors import CriticalCallError, ErrorCallError
 from rekuest.messages import Assign, JSONSerializable
 from rekuest.postmans.types import Postman
-from rekuest.structures.registry import StructureRegistry
+from arkitekt_spec.declare.structures.registry import StructureRegistry
 from rekuest.structures.serialization.actor import (
     aexpand_actor_returns,
     ashrink_actor_args,

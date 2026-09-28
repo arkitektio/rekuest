@@ -8,14 +8,14 @@ passed.)
 """
 
 import asyncio
-from typing import Any, Optional
+from typing import Any
 
 import pytest
 
 from rekuest import messages
 from arkitekt_spec.actions import PortKind
-from rekuest.definition.define import prepare_definition
-from rekuest.structures.registry import StructureRegistry
+from arkitekt_spec.declare.definition.define import prepare_definition
+from arkitekt_spec.declare.structures.registry import StructureRegistry
 from rekuest.api.schema import Action
 from rekuest.task import Task
 
@@ -28,7 +28,7 @@ ACTION = Action.model_construct(id="action-1")
 
 
 def test_task_parameter_is_not_a_port() -> None:
-    def takes_task(x: int, task: Task, maybe: Optional[Task] = None) -> int:
+    def takes_task(x: int, task: Task, maybe: Task | None = None) -> int:
         """Takes its task."""
         return x
 
@@ -125,7 +125,7 @@ async def test_the_client_refuses_to_make_a_root_call_inside_a_task(
     sibling rather than its child. It refuses, and points at the task.
     """
     from rekuest.client.client import Rekuest
-    from rekuest.errors import RootOnlyCallError
+    from arkitekt_spec.declare.errors import RootOnlyCallError
 
     app = FakeApp("A")
     agent = build_agent(app)
@@ -238,8 +238,11 @@ def test_actor_kwargs_carry_every_derived_field() -> None:
     """A new ImplementationDetails field must reach actors built by any actifier."""
     import dataclasses
 
-    from rekuest.actors.actify import derive_implementation_details
-    from rekuest.actors.types import ImplementationDetails, RegisterConfig
+    from arkitekt_spec.declare.actors.actify import derive_implementation_details
+    from arkitekt_spec.declare.actors.types import (
+        ImplementationDetails,
+        RegisterConfig,
+    )
 
     def f(x: int, task: Task) -> int:
         """F."""

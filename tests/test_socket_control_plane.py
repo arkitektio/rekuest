@@ -12,7 +12,7 @@ import pytest
 
 from rekuest import messages
 from rekuest.agents.control import SocketControlPlane
-from rekuest.agents.errors import AgentException
+from arkitekt_spec.declare.agents.errors import AgentException
 from rekuest.scalars import Identifier
 
 from .memory_transport import MemoryAgentTransport

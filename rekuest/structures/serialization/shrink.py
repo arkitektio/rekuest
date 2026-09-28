@@ -13,13 +13,13 @@ from collections.abc import Sequence
 
 from arkitekt_spec.actions import PortKind
 from rekuest.structures.serialization.protocols import SerializableDefinition
-from rekuest.structures.errors import (
+from arkitekt_spec.declare.structures.errors import (
     PortShrinkingError,
     ShrinkingError,
     StructureShrinkingError,
 )
-from rekuest.structures.quantities import shrink_quantity
-from rekuest.structures.registry import StructureRegistry
+from arkitekt_spec.declare.structures.quantities import shrink_quantity
+from arkitekt_spec.declare.structures.registry import StructureRegistry
 from rekuest.structures.serialization.context import (
     KindTable,
     SerializationContext,
@@ -28,7 +28,7 @@ from rekuest.structures.serialization.context import (
 from rekuest.structures.serialization.memory import shrink_memory_reference
 from rekuest.structures.serialization.predication import predicate_port
 from rekuest.structures.serialization.protocols import SerializablePort
-from rekuest.structures.types import JSONSerializable
+from arkitekt_spec.declare.structures.types import JSONSerializable
 
 
 async def _shrink(

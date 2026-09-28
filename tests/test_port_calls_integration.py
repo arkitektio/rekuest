@@ -25,11 +25,10 @@ from rekuest.protocol.schema import (
     CatalogOperationInput,
     CatalogValueKind,
 )
-from rekuest.blok.parser import parse_util_call
-from rekuest.definition.define import prepare_definition
-from rekuest.definition.errors import DefinitionError
-from rekuest.definition.define import prepare_definition
-from rekuest.widgets import withEffect, withValidator
+from arkitekt_spec.declare.blok.parser import parse_util_call
+from arkitekt_spec.declare.definition.define import prepare_definition
+from arkitekt_spec.declare.definition.errors import DefinitionError
+from arkitekt_spec.declare.widgets import withEffect, withValidator
 
 from .conftest import CONNECT_TIMEOUT, build_fresh_rekuest
 

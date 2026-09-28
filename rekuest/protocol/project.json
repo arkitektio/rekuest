@@ -141,7 +141,7 @@
             ],
             "additional_bases": {
                 "CreateBlokInput": [
-                    "rekuest.traits.blok.CreateBlokInputTrait"
+                    "arkitekt_spec.declare.traits.blok.CreateBlokInputTrait"
                 ]
             },
             "additional_config": {},

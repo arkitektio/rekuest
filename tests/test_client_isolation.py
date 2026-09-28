@@ -6,11 +6,11 @@ the arkitekt side, where a real app can be built.
 
 
 
-from rekuest.app import AppRegistry
+from arkitekt_spec.declare.app import AppRegistry
 from rekuest.client.postman import GraphQLPostman
 from rekuest.client.rath import RekuestRath
 from rekuest.client.client import Rekuest
-from rekuest.structures.registry import StructureRegistry
+from arkitekt_spec.declare.structures.registry import StructureRegistry
 
 from .conftest import DirectSucceedingLink
 
@@ -40,7 +40,7 @@ def test_the_state_decorator_keeps_the_structure_registry_it_was_given() -> None
     ``AppRegistry.state`` cannot express, because it supplies ``structure_reg=self.structure_registry``
     by design -- an app's structures are the app's. That is exactly what is pinned here.
     """
-    from rekuest.state.decorator import declare_state
+    from arkitekt_spec.declare.state.decorator import declare_state
 
     registry = AppRegistry()
     structures = StructureRegistry()

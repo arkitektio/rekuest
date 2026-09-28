@@ -1,6 +1,6 @@
 """The exceptions for the Postman module."""
 
-from rekuest.errors import RekuestError
+from arkitekt_spec.declare.errors import RekuestError
 
 
 class PostmanException(RekuestError):

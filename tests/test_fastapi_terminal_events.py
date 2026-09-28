@@ -12,7 +12,7 @@ from collections.abc import Generator
 import pytest
 from fastapi import FastAPI
 
-from rekuest.app import AppRegistry
+from arkitekt_spec.declare.app import AppRegistry
 from rekuest.contrib.fastapi.routes import configure_fastapi
 from rekuest.contrib.fastapi.testing import AsyncAgentTestClient
 

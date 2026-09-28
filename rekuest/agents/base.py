@@ -28,12 +28,13 @@ import janus
 import jsonpatch  # type: ignore[import-untyped]
 from pydantic import ConfigDict, Field, PrivateAttr
 
-from contextlib import AbstractContextManager, nullcontext
-from rekuest.agents.types import BoundApp
+from arkitekt_spec.declare.agents.types import BoundApp
 from koil.composition import KoiledModel
+from rekuest.actors.build import actor_builder_for
+from rekuest.agents.hooks.materialize import materialize_hook
 from rekuest import messages
 from rekuest.actors.types import Actor
-from rekuest.agents.errors import (
+from arkitekt_spec.declare.agents.errors import (
     AgentException,
     MissingServiceWarning,
     ProvisionException,
@@ -45,33 +46,33 @@ from rekuest.agents.dataclasses import (
     RevisedState,
 )
 from rekuest.agents.journal import Journal, JournalEntry, TaskGate
-from rekuest.agents.types import AppContext, T
+from arkitekt_spec.declare.agents.types import AppContext, T
 from rekuest.agents.policy import ConnectionPolicy
-from rekuest.agents.hooks.registry import (
+from arkitekt_spec.declare.agents.hooks.registry import (
     ShutdownHook,
     StartupHook,
     StartupHookReturns,
 )
 from rekuest.agents.lock import TaskLock
-from rekuest.app import AppRegistry
+from arkitekt_spec.declare.app import AppRegistry
 from rekuest.agents.transport.types import AgentTransport, HandshakeParams
-from rekuest.catalogs import CatalogWarning
+from arkitekt_spec.declare.catalogs import CatalogWarning
 from rekuest.agents.backend import (
     AgentBackend,
     LocalAgentBackend,
     SocketAgentBackend,
 )
 from arkitekt_spec.actions import StateDefinitionInput
-from rekuest.protocol.types import AnyState
+from arkitekt_spec.declare.protocol.types import AnyState
 from rekuest.scalars import Identifier
 from rekuest.state.observable import Mutation, adopt, evented
 from rekuest.state.write import write_view
-from rekuest.state.publish import Patch
+from arkitekt_spec.declare.state.publish import Patch
 from rekuest.state.readonly import read_only_view
 from rekuest.state.shrink import ashrink_state
-from rekuest.structures.registry import StructureRegistry
+from arkitekt_spec.declare.structures.registry import StructureRegistry
 from rekuest.structures.serialization.actor import ashrink_return
-from rekuest.structures.types import JSONSerializable
+from arkitekt_spec.declare.structures.types import JSONSerializable
 
 logger = logging.getLogger(__name__)
 
@@ -212,6 +213,8 @@ class BaseAgent(KoiledModel):
         default_factory=lambda: {}
     )
     _ran_startup_hooks: bool = PrivateAttr(default=False)
+    _actor_builders: dict[str, Any] = PrivateAttr(default_factory=dict)
+    """Built once per interface, from the registry's declarations (actors.build)."""
     """Set once the startup hooks have run, so teardown only runs the shutdown hooks
     for an agent that actually started (and only once per start)."""
 
@@ -551,12 +554,13 @@ class BaseAgent(KoiledModel):
             self._collected_state_schemas[interface] = schema.definition
 
         # Collect startup hooks, shutdown hooks and background workers
+        # The registry holds declarations; the agent runs them.
         for name, hook in app_registry.hooks_registry.startup_hooks.items():
-            self._collected_startup_hooks[name] = hook
+            self._collected_startup_hooks[name] = materialize_hook(hook)
         for name, shutdown_hook in app_registry.hooks_registry.shutdown_hooks.items():
-            self._collected_shutdown_hooks[name] = shutdown_hook
+            self._collected_shutdown_hooks[name] = materialize_hook(shutdown_hook)
         for name, worker in app_registry.hooks_registry.background_worker.items():
-            self._collected_background_workers[name] = worker
+            self._collected_background_workers[name] = materialize_hook(worker)
 
         # Build the runtime task locks
         for lock_schema in app_registry.get_locks():
@@ -1550,7 +1554,7 @@ class BaseAgent(KoiledModel):
         Returns:
             StartupHookReturns: The combined states and contexts from all hooks.
         """
-        from rekuest.agents.hooks.errors import StartupHookError
+        from arkitekt_spec.declare.agents.hooks.errors import StartupHookError
 
         states: dict[str, Any] = {}
         contexts: dict[str, Any] = {}
@@ -1587,7 +1591,7 @@ class BaseAgent(KoiledModel):
         and the remaining hooks still run: teardown must never fail because of a
         shutdown hook.
         """
-        from rekuest.agents.hooks.errors import ShutdownHookError
+        from arkitekt_spec.declare.agents.hooks.errors import ShutdownHookError
 
         if not self._ran_startup_hooks:
             return
@@ -1685,9 +1689,10 @@ class BaseAgent(KoiledModel):
         """
 
         try:
-            actor_builder = self.app_registry.get_builder_for_interface(
-                assign.interface
-            )
+            actor_builder = self._actor_builders.get(assign.interface)
+            if actor_builder is None:
+                actor_builder = actor_builder_for(self.app_registry, assign.interface)
+                self._actor_builders[assign.interface] = actor_builder
         except KeyError:
             raise ProvisionException(
                 f"No actor builder found for interface {assign.interface} in agent {self.name}"

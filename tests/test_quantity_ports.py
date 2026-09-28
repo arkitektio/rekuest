@@ -20,18 +20,18 @@ from arkitekt_spec.actions import (
     ArgPortInput,
     PortKind,
 )
-from rekuest.definition.define import (  # noqa: E402
+from arkitekt_spec.declare.definition.define import (  # noqa: E402
     prepare_definition,
     convert_object_to_argport,
     convert_object_to_returnport,
 )
-from rekuest import Units  # noqa: E402
-from rekuest.structures.registry import StructureRegistry  # noqa: E402
+from arkitekt_spec.declare.annotations import Units
+from arkitekt_spec.declare.structures.registry import StructureRegistry  # noqa: E402
 from rekuest.structures.serialization.actor import (  # noqa: E402
     expand_inputs,
     shrink_outputs,
 )
-from rekuest.structures.quantities import (  # noqa: E402
+from arkitekt_spec.declare.structures.quantities import (  # noqa: E402
     is_pint_quantity,
     dimension_of,
     proposed_units_of,

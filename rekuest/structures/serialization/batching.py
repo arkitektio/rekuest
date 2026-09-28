@@ -24,7 +24,7 @@ from typing import Any
 
 from rath.scalars import ID
 
-from rekuest.structures.types import FullFilledStructure
+from arkitekt_spec.declare.structures.types import FullFilledStructure
 
 
 class StructureNotFound(LookupError):

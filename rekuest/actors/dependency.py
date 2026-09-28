@@ -18,9 +18,9 @@ from typing import Any
 from rath.scalars import ID
 
 from rekuest.actors.types import ActorContext
-from rekuest.declare import DeclaredAgentAction, DeclaredAgentProtocol
+from arkitekt_spec.declare.declare import DeclaredAgentAction, DeclaredAgentProtocol
 from rekuest.calls import acall_dependency, call_dependency
-from rekuest.structures.registry import StructureRegistry
+from arkitekt_spec.declare.structures.registry import StructureRegistry
 from rekuest.task import Task
 
 

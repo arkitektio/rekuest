@@ -11,7 +11,7 @@ from typing import Any
 
 from fastapi import APIRouter, FastAPI, Request
 
-from rekuest.app import AppRegistry
+from arkitekt_spec.declare.app import AppRegistry
 from rekuest.contrib.fastapi.agent import FastApiAgent
 from rekuest.contrib.fastapi.detail_routes import (
     build_state_detail_router,

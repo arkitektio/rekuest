@@ -35,8 +35,8 @@ if TYPE_CHECKING:
     from rekuest.messages import Assign
     from rekuest.postmans.types import Postman
     from rekuest.protocol.schema import HookInput
-    from rekuest.structures.registry import StructureRegistry
-    from rekuest.structures.types import JSONSerializable
+    from arkitekt_spec.declare.structures.registry import StructureRegistry
+    from arkitekt_spec.declare.structures.types import JSONSerializable
 
 logger = logging.getLogger("rekuest.task")
 
@@ -48,14 +48,12 @@ _LOG_LEVELS = {
     LogLevel.CRITICAL: logging.CRITICAL,
 }
 
-TASK_MARKER = "__rekuest_task__"
-"""The class attribute that makes a parameter receive its :class:`Task`."""
 
 
 class Task:
     """One running assignment, as the action that runs it sees it."""
 
-    __rekuest_task__ = True
+    __arkitekt_task__ = True  # arkitekt_spec.declare.task.TASK_MARKER: injected, not a port
 
     def __init__(self, helper: "AssignmentHelper") -> None:
         self._helper = helper
@@ -361,12 +359,4 @@ class _LocalHelper:
         self.hooks.append(hook)
 
 
-def is_task(obj: object) -> bool:
-    """Whether ``obj`` (possibly ``Optional``/``Annotated``) is the Task class."""
-    from rekuest.agents.types import unwrap_injectable
-
-    cls = unwrap_injectable(obj)
-    return isinstance(cls, type) and getattr(cls, TASK_MARKER, False) is True
-
-
-__all__ = ["Task", "is_task", "TASK_MARKER"]
+__all__ = ["Task"]

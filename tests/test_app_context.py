@@ -14,11 +14,11 @@ from fastapi.testclient import TestClient
 
 from rekuest import messages
 from rekuest.agents.base import BaseAgent
-from rekuest.agents.errors import StateRequirementsNotMet
-from rekuest.agents.hooks.errors import StartupHookError
-from rekuest.app import AppRegistry
+from arkitekt_spec.declare.agents.errors import StateRequirementsNotMet
+from arkitekt_spec.declare.agents.hooks.errors import StartupHookError
+from arkitekt_spec.declare.app import AppRegistry
 from rekuest.contrib.fastapi.routes import configure_fastapi
-from rekuest.errors import AppContextError
+from arkitekt_spec.declare.errors import AppContextError
 from rekuest.task import Task
 
 from .agent_helpers import run_assignment

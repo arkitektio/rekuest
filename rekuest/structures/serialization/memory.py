@@ -10,7 +10,7 @@ next call.
 
 from typing import Any
 
-from rekuest.structures.errors import ExpandingError, ShrinkingError
+from arkitekt_spec.declare.structures.errors import ExpandingError, ShrinkingError
 from rekuest.structures.serialization.protocols import SerializablePort
 
 

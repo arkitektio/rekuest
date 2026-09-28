@@ -9,7 +9,7 @@ from rekuest.messages import Assign
 from rekuest.structures.serialization.actor import expand_inputs, shrink_outputs
 from rekuest.actors.helper import AssignmentHelper
 from rekuest.task import Task
-from rekuest.structures.errors import SerializationError
+from arkitekt_spec.declare.structures.errors import SerializationError
 from rekuest import messages
 from rekuest.actors.debug import capture_to_list
 from rath.task import task_scope

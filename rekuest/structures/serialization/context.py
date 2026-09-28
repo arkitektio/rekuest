@@ -7,10 +7,10 @@ from collections.abc import Awaitable, Callable, Sequence
 from rath.scalars import ID
 from rekuest.actors.types import Shelver
 from arkitekt_spec.actions import PortKind
-from rekuest.structures.registry import StructureRegistry
+from arkitekt_spec.declare.structures.registry import StructureRegistry
 from rekuest.structures.serialization.batching import ExpandBatcher
 from rekuest.structures.serialization.protocols import SerializablePort
-from rekuest.structures.types import FullFilledStructure, JSONSerializable
+from arkitekt_spec.declare.structures.types import FullFilledStructure, JSONSerializable
 
 
 @dataclass(frozen=True)

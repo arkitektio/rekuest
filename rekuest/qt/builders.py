@@ -16,19 +16,21 @@ from qtpy import QtCore, QtWidgets
 from koil.qt import QtGenerator, QtFuture, qt_to_async, qt_gen_to_async_gen
 from rekuest.actors.functional import FUNC, GEN, FunctionalActor
 
-from rekuest.actors.actify import (
+from arkitekt_spec.declare.actors.actify import (
     derive_implementation_details,
     prepare_definition_from_config,
 )
-from rekuest.definition.define import DefinitionInput
-from rekuest.actors.types import (
-    ActorBuilder,
-    Agent,
+from arkitekt_spec.declare.definition.define import DefinitionInput
+from arkitekt_spec.declare.actors.types import (
     ImplementationDetails,
     RegisterConfig,
 )
-from rekuest.protocol.types import AnyFunction
-from rekuest.structures.registry import StructureRegistry
+from rekuest.actors.types import (
+    ActorBuilder,
+    Agent,
+)
+from arkitekt_spec.declare.protocol.types import AnyFunction
+from arkitekt_spec.declare.structures.registry import StructureRegistry
 
 
 class QtInLoopBuilder(QtCore.QObject):

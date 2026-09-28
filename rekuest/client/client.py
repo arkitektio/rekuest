@@ -1,11 +1,11 @@
 """The base client for rekuest"""
 
 from typing import TypeVar
-from rekuest.protocol.types import AnyFunction
+from arkitekt_spec.declare.protocol.types import AnyFunction
 from rekuest.client.rath import RekuestRath
 from rekuest.api.schema import Action, Implementation, RekuestApi
 from rekuest.postmans.types import Postman
-from rekuest.register import WrappedFunction
+from arkitekt_spec.declare.register import WrappedFunction
 from rath.scalars import ID
 from koil import unkoil, unkoil_gen
 from koil.composition import Composition
@@ -18,9 +18,9 @@ from typing import (
     Any,
 )
 from collections.abc import AsyncGenerator, Generator
-from rekuest.errors import RootOnlyCallError
+from arkitekt_spec.declare.errors import RootOnlyCallError
 from rekuest.protocol.schema import HookInput
-from rekuest.structures.registry import StructureRegistry
+from arkitekt_spec.declare.structures.registry import StructureRegistry
 
 #: What :meth:`Rekuest.aresolve` accepts: a fetched model, an id, or a function this app
 #: registered. Only the client can turn the last two into the first -- that takes GraphQL.

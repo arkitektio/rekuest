@@ -15,9 +15,9 @@ import pytest
 from rath.expansion import ExpandsStructures
 
 from rekuest.agents.base import BaseAgent
-from rekuest.app import AppRegistry
-from rekuest.structures.errors import StructureClientError
-from rekuest.structures.registry import StructureRegistry
+from arkitekt_spec.declare.app import AppRegistry
+from arkitekt_spec.declare.structures.errors import StructureClientError
+from arkitekt_spec.declare.structures.registry import StructureRegistry
 
 from .memory_transport import MemoryAgentTransport
 from .test_service_client_injection import assign

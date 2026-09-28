@@ -6,18 +6,19 @@ So one declaration runs any number of times, concurrently too, and is still
 open for registration afterwards.
 """
 
+from rekuest.actors.build import actor_builder_for
 import asyncio
 from dataclasses import dataclass
 import inspect
 import pickle
-from typing import Annotated, Optional
+from typing import Annotated
 
 import pytest
 
 from rekuest.agents.base import BaseAgent
-from rekuest.state.utils import prepare_injected_variables
-from rekuest.app import AppRegistry
-from rekuest.errors import RegistryFrozenError
+from arkitekt_spec.declare.state.utils import prepare_injected_variables
+from arkitekt_spec.declare.app import AppRegistry
+from arkitekt_spec.declare.errors import RegistryFrozenError
 from rekuest.task import Task
 
 from .memory_transport import MemoryAgentTransport
@@ -150,7 +151,7 @@ def two_services() -> AppRegistry:
 def test_injected_parameters_are_the_ones_a_declared_service_returns() -> None:
     def segment(
         x: int,
-        fluss: Optional[Fluss],
+        fluss: Fluss | None,
         mikro: Annotated[Mikro, "doc"],
         again: Mikro,
         task: Task,
@@ -243,15 +244,16 @@ def test_snapshot_repoints_what_was_merged_in_from_a_package() -> None:
 
     snapshot = registry.snapshot()
 
-    builder = snapshot.actor_builders["owner"]
+    # The agent builds actors against the registry it serves: the snapshot's.
+    builder = actor_builder_for(snapshot, "owner")
     assert builder.keywords["structure_registry"] is snapshot.structure_registry
     assert all(
         schema is snapshot.structure_registry
         for schema in snapshot.state_registry_schemas.values()
     )
-    # Merging reads the package; its own builder still points at the package.
+    # Merging reads the package; building from the package itself uses the package's.
     assert (
-        package.actor_builders["owner"].keywords["structure_registry"]
+        actor_builder_for(package, "owner").keywords["structure_registry"]
         is package.structure_registry
     )
 

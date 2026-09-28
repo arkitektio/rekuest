@@ -9,7 +9,7 @@ that owns sessions. This is that difference expressed as a backend rather than a
 from pydantic import BaseModel, ConfigDict, Field
 
 from rekuest.contrib.fastapi.sink.protocol import StateSink
-from rekuest.protocol.types import AnyState
+from arkitekt_spec.declare.protocol.types import AnyState
 from rekuest.scalars import Identifier
 
 

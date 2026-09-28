@@ -13,11 +13,11 @@ import pytest
 
 from rekuest import messages
 from rekuest.agents.base import BaseAgent
-from rekuest.agents.errors import StateRequirementsNotMet
+from arkitekt_spec.declare.agents.errors import StateRequirementsNotMet
 from arkitekt_spec.actions import PortKind
-from rekuest.app import AppRegistry
-from rekuest.definition.define import prepare_definition
-from rekuest.structures.registry import StructureRegistry
+from arkitekt_spec.declare.app import AppRegistry
+from arkitekt_spec.declare.definition.define import prepare_definition
+from arkitekt_spec.declare.structures.registry import StructureRegistry
 from rath.task import current_task, token_of
 
 from .memory_transport import MemoryAgentTransport
@@ -131,7 +131,7 @@ async def test_async_and_threaded_functions_receive_their_apps_client() -> None:
         """Async."""
         return f"{client.owner}{x}"
 
-    def in_thread(x: int, client: Optional[FakeClient]) -> str:
+    def in_thread(x: int, client: FakeClient | None) -> str:
         """Sync, runs in a worker thread."""
         assert client is not None
         return f"{client.owner}{x}"

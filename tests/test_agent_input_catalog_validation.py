@@ -11,12 +11,12 @@ from arkitekt_spec.actions import (
     ImplementationInput,
     PortKind,
 )
-from rekuest.blok import bsx
-from rekuest.catalogs import UNKNOWN_CATALOG, UNKNOWN_OPERATION
+from arkitekt_spec.declare.blok import bsx
+from arkitekt_spec.declare.catalogs import UNKNOWN_CATALOG, UNKNOWN_OPERATION
 from rekuest.client.catalogs import DEFAULT_CATALOG_NAME, validate_agent_input
-from rekuest.widgets import withValidator
+from arkitekt_spec.declare.widgets import withValidator
 
-from .catalog_cases import BOX, ELECTRON, NAMED_ONLY, SLIDER
+from .catalog_cases import ELECTRON, NAMED_ONLY
 
 
 def _agent(bloks: tuple = (), implementations: tuple = ()) -> ImplementAgentInput:

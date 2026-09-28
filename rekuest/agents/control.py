@@ -25,7 +25,7 @@ import logging
 import uuid
 
 from rekuest import messages
-from rekuest.agents.errors import AgentException
+from arkitekt_spec.declare.agents.errors import AgentException
 from rekuest.agents.transport.types import MessageSink
 from rekuest.scalars import Identifier
 

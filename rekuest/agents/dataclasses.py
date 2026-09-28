@@ -9,8 +9,8 @@ from dataclasses import dataclass, field
 from datetime import datetime, UTC
 
 from rekuest import messages
-from rekuest.state.publish import Patch
-from rekuest.structures.types import JSONSerializable
+from arkitekt_spec.declare.state.publish import Patch
+from arkitekt_spec.declare.structures.types import JSONSerializable
 
 
 @dataclass

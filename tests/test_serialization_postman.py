@@ -1,7 +1,7 @@
 """Testing the serialization and deserialization of structures on the postman level."""
 
 import pytest
-from rekuest.definition.define import prepare_definition
+from arkitekt_spec.declare.definition.define import prepare_definition
 from rekuest.structures.serialization.postman import ashrink_args, aexpand_returns
 from rekuest.structures.serialization.actor import expand_inputs
 from .funcs import (
@@ -12,9 +12,9 @@ from .funcs import (
     union_structure_function,
 )
 from .structures import SecondObject, SerializableObject
-from rekuest.structures.errors import ShrinkingError, ExpandingError
+from arkitekt_spec.declare.structures.errors import ShrinkingError, ExpandingError
 from rekuest.actors.types import Shelver
-from rekuest.structures.registry import StructureRegistry
+from arkitekt_spec.declare.structures.registry import StructureRegistry
 
 
 @pytest.mark.shrink

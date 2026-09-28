@@ -30,7 +30,7 @@ from rekuest.agents.journal import (
 )
 from rekuest.agents.policy import ConnectionPolicy
 from rekuest.agents.transport.websocket import WebsocketAgentTransport
-from rekuest.app import AppRegistry
+from arkitekt_spec.declare.app import AppRegistry
 from rekuest.state.observable import Mutation, StateConfig, make_evented
 from rekuest.state.write import write_view
 
@@ -525,7 +525,7 @@ async def test_reporting_never_waits_on_the_processor(
     import janus
 
     from rekuest.agents.dataclasses import QueuedPatchEvent
-    from rekuest.state.publish import Patch
+    from arkitekt_spec.declare.state.publish import Patch
 
     replied = asyncio.Event()
 

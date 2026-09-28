@@ -17,7 +17,7 @@ from arkitekt_spec.actions import (
     OptimisticInput,
 )
 from rekuest.api.schema import BaseCatalogQueryBaseCatalog, CatalogOperation, UICatalog
-from rekuest.catalogs import (
+from arkitekt_spec.declare.catalogs import (
     ArgumentSpec,
     BASE_CATALOG_DRIFT,
     Catalog,
@@ -151,8 +151,8 @@ def validate_agent_input(
     Raises:
         ValueError: If any hard catalog rule is broken. Nothing has been uploaded yet.
     """
-    from rekuest.blok.validate import validate_blok_catalog
-    from rekuest.definition.catalogs import validate_definition_against_catalog
+    from arkitekt_spec.declare.blok.validate import validate_blok_catalog
+    from arkitekt_spec.declare.definition.catalogs import validate_definition_against_catalog
 
     diagnostics: list[Diagnostic] = []
 

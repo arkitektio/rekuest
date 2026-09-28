@@ -107,7 +107,7 @@ def test_registry(**kwargs: object) -> "StructureRegistry":
     ``StructureRegistry()`` and then names one of these in a signature gets a
     refusal. This is the preregistration those tests need, in one place.
     """
-    from rekuest.structures.registry import StructureRegistry
+    from arkitekt_spec.declare.structures.registry import StructureRegistry
 
     registry = StructureRegistry(**kwargs)
     register_test_structures(registry)

@@ -26,14 +26,14 @@ from arkitekt_spec.actions import (
 )
 from rekuest.constants import UNSET
 from rekuest.scalars import Identifier
-from rekuest.structures.errors import (
+from arkitekt_spec.declare.structures.errors import (
     StructureRegistryError,
     ExpandingError,
     ShrinkingError,
     StructureExpandingError,
 )
-from rekuest.structures.quantities import expand_quantity, shrink_quantity
-from rekuest.structures.registry import StructureRegistry
+from arkitekt_spec.declare.structures.quantities import expand_quantity, shrink_quantity
+from arkitekt_spec.declare.structures.registry import StructureRegistry
 from rekuest.structures.serialization.batching import ExpandBatcher
 from rekuest.structures.serialization.context import (
     KindTable,
@@ -52,7 +52,7 @@ from rekuest.structures.serialization.port_errors import (
 from rekuest.structures.serialization.predication import predicate_port
 from rekuest.structures.serialization.protocols import SerializablePort
 from rekuest.structures.serialization.shrink import ashrink_arg, ashrink_args
-from rekuest.structures.types import JSONSerializable
+from arkitekt_spec.declare.structures.types import JSONSerializable
 
 # --------------------------------------------------------------------------- #
 # Expanding incoming arguments

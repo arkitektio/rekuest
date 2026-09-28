@@ -16,7 +16,7 @@ from rekuest.agents.caller import AgentPostman, CallerTaskEvent
 from rekuest.protocol.schema import TaskEventKind
 from rekuest.postmans.errors import AssignException
 from rekuest.calls import _astream_raw
-from rekuest.errors import ErrorCallError
+from arkitekt_spec.declare.errors import ErrorCallError
 
 
 def _call(**kwargs: object) -> dict:

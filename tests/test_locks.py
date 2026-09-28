@@ -7,6 +7,7 @@ opposite declaration orders cannot deadlock), and the actor ``concurrency``
 policy controls whether assignments to one actor run serially or in parallel.
 """
 
+from rekuest.actors.build import actor_builder_for
 import asyncio
 
 import pytest
@@ -97,7 +98,7 @@ async def test_failed_lock_notification_releases_the_local_lock() -> None:
 
 
 def _spawn_actor(mock_agent: RekuestAgent, interface: str):
-    builder = mock_agent.app_registry.get_builder_for_interface(interface)
+    builder = actor_builder_for(mock_agent.app_registry, interface)
     return builder(agent=mock_agent)
 
 

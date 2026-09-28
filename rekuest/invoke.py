@@ -25,10 +25,10 @@ from rekuest.calls import _astream_raw, _resolve_parent
 from rekuest.messages import Assign
 from rekuest.postmans.types import Postman
 from rekuest.protocol.schema import HookInput
-from rekuest.structures.registry import StructureRegistry
+from arkitekt_spec.declare.structures.registry import StructureRegistry
 from rekuest.structures.serialization.postman import aexpand_returns, ashrink_args
 from rekuest.structures.serialization.protocols import SerializableDefinition
-from rekuest.structures.types import JSONSerializable
+from arkitekt_spec.declare.structures.types import JSONSerializable
 
 __all__: list[str] = []
 

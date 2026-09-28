@@ -1,6 +1,6 @@
 """The base class for all actors."""
 
-from rekuest.agents.dependency import dependency_to_protocol
+from arkitekt_spec.declare.agents.dependency import dependency_to_protocol
 
 import asyncio
 import contextlib
@@ -17,23 +17,25 @@ from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
 
 from rekuest.actors.dependency import AgentDependencyProxy
 from rekuest.actors.errors import UnknownMessageError
-from rekuest.actors.policy import KEEP, DisconnectPolicy
-from rekuest.agents.context import PreparedContextReturns, PreparedContextVariables
-from rekuest.agents.errors import StateRequirementsNotMet
-from rekuest.actors.types import (
-    Agent,
-    AssignmentHook,
+from arkitekt_spec.declare.actors.policy import KEEP, DisconnectPolicy
+from arkitekt_spec.declare.agents.context import PreparedContextReturns, PreparedContextVariables
+from arkitekt_spec.declare.agents.errors import StateRequirementsNotMet
+from arkitekt_spec.declare.actors.types import (
     PreparedInjectedVariables,
     PreparedDependencyVariables,
 )
+from rekuest.actors.types import (
+    Agent,
+    AssignmentHook,
+)
 from rekuest import messages
-from rekuest.definition.define import (
+from arkitekt_spec.declare.definition.define import (
     DefinitionInput,
 )
-from rekuest.protocol.types import AnyContext, AnyState
+from arkitekt_spec.declare.protocol.types import AnyContext, AnyState
 from rekuest.state.observable import Mutation
-from rekuest.state.utils import PreparedStateReturns, PreparedStateVariables
-from rekuest.structures.registry import StructureRegistry
+from arkitekt_spec.declare.state.utils import PreparedStateReturns, PreparedStateVariables
+from arkitekt_spec.declare.structures.registry import StructureRegistry
 from rekuest.task import Task
 from rekuest.agents.lock import LockGroup
 
@@ -620,7 +622,7 @@ class SerializingActor(Actor):
         if not wanted.service_client_variables:
             return kwargs
 
-        from rekuest.agents.types import resolve_service_clients
+        from arkitekt_spec.declare.agents.types import resolve_service_clients
 
         app = await self.agent.aget_bound_app()
         kwargs.update(

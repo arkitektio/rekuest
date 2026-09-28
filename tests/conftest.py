@@ -8,8 +8,8 @@ from typing import Any
 from collections.abc import AsyncGenerator, Awaitable, Callable, Generator
 from uuid import uuid4
 import pytest
-from rekuest.app import AppRegistry
-from rekuest.structures.registry import StructureRegistry
+from arkitekt_spec.declare.app import AppRegistry
+from arkitekt_spec.declare.structures.registry import StructureRegistry
 from rekuest.client.client import Rekuest, RekuestRath
 from rath.links.testing.direct_succeeding_link import DirectSucceedingLink
 from rekuest.agents.base import RekuestAgent
@@ -424,7 +424,7 @@ class FreshApp:
     ) -> None:
         import time as _time
 
-        from rekuest.agents.errors import AgentException
+        from arkitekt_spec.declare.agents.errors import AgentException
 
         if force is not None:
             self.agent.force = force

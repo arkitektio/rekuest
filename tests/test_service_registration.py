@@ -12,12 +12,12 @@ import pytest
 from fakts import Alias, Require
 
 from arkitekt_spec.actions import PortKind
-from rekuest.app import AppRegistry
-from rekuest.definition.errors import DefinitionError
-from rekuest.errors import RegistryFrozenError
-from rekuest.service import Service
-from rekuest.state.utils import prepare_injected_variables
-from rekuest.structures.errors import StructureDefinitionError
+from arkitekt_spec.declare.app import AppRegistry
+from arkitekt_spec.declare.definition.errors import DefinitionError
+from arkitekt_spec.declare.errors import RegistryFrozenError
+from arkitekt_spec.declare.service import Service
+from arkitekt_spec.declare.state.utils import prepare_injected_variables
+from arkitekt_spec.declare.structures.errors import StructureDefinitionError
 
 
 class Thing:

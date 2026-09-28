@@ -7,14 +7,14 @@ drift. What it returns is the client, and from then on a parameter annotated
 with that class is handed it.
 """
 
-from typing import Annotated, Any, Optional
+from typing import Annotated, Any
 
 import pytest
 from fakts import Alias, Fakts, Own, Require, TokenLoader
 from fakts.testing import build_testing_fakts
 
-from rekuest.app import AppRegistry
-from rekuest.service import Service, ServiceDefinitionError
+from arkitekt_spec.declare.app import AppRegistry
+from arkitekt_spec.declare.service import Service, ServiceDefinitionError
 
 
 class Thing:
@@ -35,7 +35,7 @@ def test_the_signature_is_the_declaration() -> None:
     @registry.service()
     def thing(
         thing: Annotated[Alias, Require("live.test.thing", "The thing")],
-        s3: Annotated[Optional[Alias], Require("live.test.s3", optional=True)],
+        s3: Annotated[Alias | None, Require("live.test.s3", optional=True)],
     ) -> Thing:
         """A thing."""
         return Thing()
@@ -99,7 +99,7 @@ async def test_an_optional_service_that_is_missing_yields_none() -> None:
     @AppRegistry().service()
     def thing(
         thing: Annotated[Alias, Require("live.test.thing")],
-        store: Annotated[Optional[Alias], Require("live.test.s3", optional=True)],
+        store: Annotated[Alias | None, Require("live.test.s3", optional=True)],
     ) -> Thing:
         """A thing."""
         return Thing(thing=thing, store=store)
@@ -126,7 +126,7 @@ async def test_a_builder_needs_no_fakts_at_all() -> None:
         async def aget_token(self) -> str:
             return "token"
 
-        async def arefresh_token(self, stale_token: Optional[str] = None) -> str:
+        async def arefresh_token(self, stale_token: str | None = None) -> str:
             return "token"
 
     @AppRegistry().service()
@@ -252,7 +252,7 @@ def test_an_optional_type_must_say_so_in_the_require() -> None:
 
         @AppRegistry().service()
         def thing(
-            thing: Annotated[Optional[Alias], Require("live.test.thing")],
+            thing: Annotated[Alias | None, Require("live.test.thing")],
         ) -> Thing:
             """Typed optional, but required."""
             return Thing()

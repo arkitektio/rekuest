@@ -14,8 +14,8 @@ from arkitekt_spec.actions import (
     StateDefinitionInput,
 )
 from rekuest.state.gate import TaskClosedError, TaskGate
-from rekuest.state.publish import Patch, StateHolder
-from rekuest.structures.types import StateDeclaration
+from arkitekt_spec.declare.state.publish import Patch, StateHolder
+from arkitekt_spec.declare.structures.types import StateDeclaration
 
 # --- JSON Pointer Utilities (RFC 6901) ---
 

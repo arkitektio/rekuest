@@ -25,7 +25,7 @@ from rath.task import current_task, token_of
 
 from rekuest import messages
 from rekuest.agents.base import BaseAgent
-from rekuest.app import AppRegistry
+from arkitekt_spec.declare.app import AppRegistry
 
 from .agent_helpers import run_assignment
 from .memory_transport import MemoryAgentTransport

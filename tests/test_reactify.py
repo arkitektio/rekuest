@@ -2,9 +2,9 @@
 
 from collections.abc import Callable, Generator
 from rekuest.actors.actify import reactify
-from rekuest.actors.types import RegisterConfig
+from arkitekt_spec.declare.actors.types import RegisterConfig
 from arkitekt_spec.actions import ActionKind
-from rekuest.structures.registry import StructureRegistry
+from arkitekt_spec.declare.structures.registry import StructureRegistry
 import pytest
 from .funcs import (
     nested_basic_function,

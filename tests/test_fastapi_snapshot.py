@@ -10,11 +10,11 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from rekuest.app import AppRegistry
+from arkitekt_spec.declare.app import AppRegistry
 from rekuest.contrib.fastapi.routes import configure_fastapi
 from rekuest.contrib.fastapi.testing import AsyncAgentTestClient
-from rekuest.errors import RegistryFrozenError
-from rekuest.structures.errors import StructureRegistryError
+from arkitekt_spec.declare.errors import RegistryFrozenError
+from arkitekt_spec.declare.structures.errors import StructureRegistryError
 
 
 @pytest.mark.asyncio

@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 import pytest
 
 from rekuest.agents.base import BaseAgent
-from rekuest.app import AppRegistry
+from arkitekt_spec.declare.app import AppRegistry
 from rekuest.state.observable import adopt, evented
 from rekuest.state.readonly import ReadOnlyStateError, read_only_view
 
@@ -145,7 +145,7 @@ async def test_readonly_annotation_reaches_an_actor_as_a_refusing_view() -> None
     read-only -> injected -> writes refused.
     """
     from rekuest import messages
-    from rekuest.state.types import ReadOnly
+    from arkitekt_spec.declare.state.types import ReadOnly
 
     agent = BaseAgent(
         name="ro-actor", transport=MemoryAgentTransport(), app_registry=AppRegistry()

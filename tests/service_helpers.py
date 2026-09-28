@@ -9,8 +9,8 @@ from typing import Annotated, Any
 
 from fakts import Alias, Require
 
-from rekuest.app import AppRegistry
-from rekuest.service import Service
+from arkitekt_spec.declare.app import AppRegistry
+from arkitekt_spec.declare.service import Service
 
 
 def with_client(registry: AppRegistry, cls: type, name: str) -> Service[Any]:

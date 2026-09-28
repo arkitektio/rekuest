@@ -8,17 +8,15 @@ requires-python = ">=3.11, <4.0"
 license = "GPL-3.0-or-later"
 license-files = ["LICENSE"]
 dependencies = [
-    "docstring-parser>=0.11",
-    "inflection>=0.5.1",
     "websockets>=12.0",
     "pydantic>=2",
     "rath>=4",
-    "fieldz>=0.0.2",
     "jsonpatch>=1.33",
     "koil>=3.3.3",
     "janus>=2.0.0",
     "fakts>=3",
-    # The action language (definitions, ports, states, locks, bloks) and its rules.
+    # The declaration an app is (the action language, AppRegistry, services, hooks)
+    # is arkitekt-spec's; rekuest is the runtime that runs it.
     "arkitekt-spec>=0.1",
 ]
 

@@ -13,7 +13,7 @@ from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
 
-from rekuest.app import AppRegistry
+from arkitekt_spec.declare.app import AppRegistry
 from rekuest.contrib.fastapi.agent import FastApiAgent
 from rekuest.contrib.fastapi.auth import (
     AuthenticationError,

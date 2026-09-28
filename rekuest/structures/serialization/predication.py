@@ -7,8 +7,8 @@ import datetime as dt
 from typing import Any
 
 from arkitekt_spec.actions import PortKind
-from rekuest.structures.quantities import matches_dimension
-from rekuest.structures.registry import StructureRegistry
+from arkitekt_spec.declare.structures.quantities import matches_dimension
+from arkitekt_spec.declare.structures.registry import StructureRegistry
 from rekuest.structures.serialization.protocols import SerializablePort
 
 

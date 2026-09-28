@@ -10,10 +10,10 @@ import pytest
 from rath.expansion import ExpandsStructures
 
 from rekuest.actors.types import Shelver
-from rekuest.app import AppRegistry
-from rekuest.definition.define import prepare_definition
-from rekuest.structures.errors import ExpandingError
-from rekuest.structures.registry import StructureRegistry
+from arkitekt_spec.declare.app import AppRegistry
+from arkitekt_spec.declare.definition.define import prepare_definition
+from arkitekt_spec.declare.structures.errors import ExpandingError
+from arkitekt_spec.declare.structures.registry import StructureRegistry
 from rekuest.structures.serialization.actor import expand_inputs
 from rekuest.structures.serialization.expand import aexpand_returns
 
@@ -243,7 +243,7 @@ async def test_a_hand_registered_structure_skips_the_batcher(
 ) -> None:
     """Only a structure registered by hand without ``aexpand_many`` does not batch
     now; the batcher expands its ids directly, one each."""
-    from rekuest.structures.utils import id_shrink
+    from arkitekt_spec.declare.structures.utils import id_shrink
 
     fetches = Fetches(Image)
 

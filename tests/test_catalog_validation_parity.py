@@ -15,7 +15,7 @@ from pathlib import Path
 import pytest
 
 from rekuest.protocol.schema import DiagnosticLevel
-from rekuest.catalogs import (
+from arkitekt_spec.declare.catalogs import (
     RULES,
     UNKNOWN_CATALOG,
     UNKNOWN_OPERATION,

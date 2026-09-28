@@ -1,5 +1,4 @@
 import pytest
-from rekuest.structures.registry import StructureRegistry
 from pydantic import ValidationError
 
 from arkitekt_spec.actions import (
@@ -14,14 +13,14 @@ from arkitekt_spec.actions import (
     StateImplementationInput,
 )
 from rekuest.protocol.schema import CreateBlokInput
-from rekuest.blok.registry import (
+from arkitekt_spec.declare.blok.registry import (
     _create_action_dependency,
     _create_state_dependency,
 )
-from rekuest.declare import DeclaredAgentAction, DeclaredAgentState
-from rekuest.definition.define import prepare_definition
-from rekuest.definition.match import build_port_match, build_port_matches
-from rekuest.app import AppRegistry
+from arkitekt_spec.declare.declare import DeclaredAgentAction, DeclaredAgentState
+from arkitekt_spec.declare.definition.define import prepare_definition
+from arkitekt_spec.declare.definition.match import build_port_match, build_port_matches
+from arkitekt_spec.declare.app import AppRegistry
 
 
 def test_build_port_match_preserves_nested_shape() -> None:

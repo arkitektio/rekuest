@@ -5,7 +5,7 @@ The table is the behaviour check: one row per rule outcome, parametrized by
 so the two sides can be held to the same rows.
 """
 
-from rekuest.catalogs import (
+from arkitekt_spec.declare.catalogs import (
     ArgumentSpec,
     Catalog,
     ComponentSpec,

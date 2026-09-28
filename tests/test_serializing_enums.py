@@ -1,9 +1,9 @@
 """Test the serialization of enums with partial functions"""
 
 import pytest
-from rekuest.definition.define import prepare_definition
+from arkitekt_spec.declare.definition.define import prepare_definition
 from rekuest.structures.serialization.actor import expand_inputs
-from rekuest.structures.registry import StructureRegistry
+from arkitekt_spec.declare.structures.registry import StructureRegistry
 from enum import Enum, member
 from functools import partial
 from rekuest.actors.types import Shelver

@@ -18,7 +18,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from starlette.testclient import WebSocketTestSession
 
-from rekuest.app import AppRegistry
+from arkitekt_spec.declare.app import AppRegistry
 from rekuest.contrib.fastapi.agent import FastApiAgent
 from rekuest.contrib.fastapi.routes import configure_fastapi
 

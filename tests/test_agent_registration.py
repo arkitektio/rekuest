@@ -13,10 +13,10 @@ import pytest
 from rekuest import messages
 from rekuest.agents.backend import SocketAgentBackend
 from rekuest.agents.base import BaseAgent, RekuestAgent
-from rekuest.agents.errors import AgentException
+from arkitekt_spec.declare.agents.errors import AgentException
 from rekuest.agents.transport.types import HandshakeParams
-from rekuest.app import AppRegistry
-from rekuest.catalogs import CatalogWarning
+from arkitekt_spec.declare.app import AppRegistry
+from arkitekt_spec.declare.catalogs import CatalogWarning
 from rekuest.scalars import Identifier
 
 from .memory_transport import MemoryAgentTransport

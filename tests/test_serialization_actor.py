@@ -2,8 +2,8 @@
 
 import pytest
 from rekuest.actors.types import Shelver
-from rekuest.definition.define import prepare_definition
-from rekuest.structures.registry import StructureRegistry
+from arkitekt_spec.declare.definition.define import prepare_definition
+from arkitekt_spec.declare.structures.registry import StructureRegistry
 from rekuest.structures.serialization.actor import shrink_outputs, expand_inputs
 from .funcs import (
     plain_basic_function,
@@ -15,7 +15,7 @@ from .funcs import (
     numeric_union_function,
 )
 from .structures import SecondObject, SecondSerializableObject, SerializableObject
-from rekuest.structures.errors import ShrinkingError, ExpandingError
+from arkitekt_spec.declare.structures.errors import ShrinkingError, ExpandingError
 from arkitekt_spec.actions import (
     ActionKind,
     DefinitionInput,

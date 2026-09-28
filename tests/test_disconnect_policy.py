@@ -17,14 +17,14 @@ import pytest
 from koil import check_cancelled
 
 from rekuest import messages
-from rekuest.actors.policy import (
+from arkitekt_spec.declare.actors.policy import (
     CancelOnDisconnect,
     DisconnectPolicy,
     OnDisconnect,
 )
 from rekuest.agents.base import BaseAgent
 from rekuest.agents.policy import Backoff, ConnectionPolicy
-from rekuest.app import AppRegistry
+from arkitekt_spec.declare.app import AppRegistry
 
 from .memory_transport import MemoryAgentTransport
 

@@ -15,7 +15,7 @@ import pytest
 from fakts import Alias
 from fakts.models import Manifest
 
-from rekuest.app import AppRegistry
+from arkitekt_spec.declare.app import AppRegistry
 from rekuest.arkitekt import rekuest_provider
 
 

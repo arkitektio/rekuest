@@ -15,14 +15,14 @@ from rath.scalars import ID
 
 from arkitekt_spec.actions import PortKind
 from rekuest.structures.serialization.protocols import SerializableDefinition
-from rekuest.structures.errors import (
+from arkitekt_spec.declare.structures.errors import (
     StructureRegistryError,
     ExpandingError,
     PortExpandingError,
     StructureExpandingError,
 )
-from rekuest.structures.quantities import expand_quantity
-from rekuest.structures.registry import StructureRegistry
+from arkitekt_spec.declare.structures.quantities import expand_quantity
+from arkitekt_spec.declare.structures.registry import StructureRegistry
 from rekuest.structures.serialization.batching import ExpandBatcher
 from rekuest.structures.serialization.context import (
     KindTable,
@@ -33,7 +33,7 @@ from rekuest.structures.serialization.context import (
 from rekuest.structures.serialization.memory import expand_memory_reference
 from rekuest.structures.serialization.port_errors import to_port_error
 from rekuest.structures.serialization.protocols import SerializablePort
-from rekuest.structures.types import JSONSerializable
+from arkitekt_spec.declare.structures.types import JSONSerializable
 
 
 async def _expand(

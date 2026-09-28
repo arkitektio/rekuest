@@ -983,7 +983,7 @@ class FastApiAgent(BaseAgent):
 
     async def aget_revised_state(self, interface: str) -> RevisedState:
         """Get the current agent-owned shrunk state and revision for an interface."""
-        from rekuest.agents.errors import AgentException
+        from arkitekt_spec.declare.agents.errors import AgentException
 
         if interface not in self._current_shrunk_states:
             raise AgentException(f"No shrunk state found for interface {interface}")

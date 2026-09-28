@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 
 from rekuest import messages
 from rekuest.agents.journal import JournalEntry
-from rekuest.protocol.types import AnyState
+from arkitekt_spec.declare.protocol.types import AnyState
 
 
 @dataclass

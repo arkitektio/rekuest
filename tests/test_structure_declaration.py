@@ -10,16 +10,16 @@ from typing import Any
 import pytest
 from rath.expansion import ExpandsStructures
 
-from rekuest.app import AppRegistry
+from arkitekt_spec.declare.app import AppRegistry
 from rekuest.arkitekt import registry as rekuest_registry
-from rekuest.structures.errors import (
+from arkitekt_spec.declare.structures.errors import (
     StructureDefinitionError,
     StructureOverwriteError,
     StructureRegistryError,
 )
-from rekuest.structures.registry import StructureRegistry
-from rekuest.structures.types import is_valid_identifier
-from rekuest.structures.utils import id_shrink
+from arkitekt_spec.declare.structures.registry import StructureRegistry
+from arkitekt_spec.declare.structures.types import is_valid_identifier
+from arkitekt_spec.declare.structures.utils import id_shrink
 
 from .service_helpers import with_client
 

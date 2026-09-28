@@ -1,5 +1,6 @@
 """Test the reactify function which converts a function or generator into an actor definition."""
 
+from rekuest.agents.hooks.materialize import materialize_hook
 from dataclasses import dataclass
 
 
@@ -7,7 +8,7 @@ from rekuest.agents.hooks.startup import ThreadedStartupHook
 from rekuest.agents.hooks.background import WrappedThreadedBackgroundTask
 from rekuest.agents.base import RekuestAgent
 from rekuest.client.client import Rekuest
-from rekuest.app import AppRegistry
+from arkitekt_spec.declare.app import AppRegistry
 
 # Hooks and states belong to a registry, as they would to an app.
 _REGISTRY = AppRegistry()
@@ -61,7 +62,7 @@ def test_actify_class_based_startup(mock_rekuest: Rekuest, mock_agent: RekuestAg
 
     app_registry = mock_agent.app_registry
     default = app_registry.hooks_registry.startup_hooks.get("basic_startup")
-    assert isinstance(default, ThreadedStartupHook)
+    assert isinstance(materialize_hook(default), ThreadedStartupHook)
 
 
 def test_actify_class_based_background(mock_rekuest: Rekuest, mock_agent: RekuestAgent) -> None:
@@ -91,4 +92,4 @@ def test_actify_class_based_background(mock_rekuest: Rekuest, mock_agent: Rekues
     app_registry = mock_agent.app_registry
     default = app_registry.hooks_registry.background_worker.get("basic_background")
     assert default is not None
-    assert isinstance(default, WrappedThreadedBackgroundTask)
+    assert isinstance(materialize_hook(default), WrappedThreadedBackgroundTask)

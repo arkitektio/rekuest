@@ -18,7 +18,7 @@ from fastapi.testclient import TestClient
 from httpx import ASGITransport, AsyncClient
 from starlette.testclient import WebSocketTestSession
 
-from rekuest.app import AppRegistry
+from arkitekt_spec.declare.app import AppRegistry
 
 from .agent import FastApiAgent
 
@@ -957,7 +957,7 @@ def create_test_app_and_agent(
         Implementation routes are added dynamically when the lifespan starts.
         The agent routes (task/state/lock websockets and task commands) are added immediately.
     """
-    from rekuest.app import AppRegistry
+    from arkitekt_spec.declare.app import AppRegistry
     from rekuest.contrib.fastapi.routes import configure_fastapi
 
     app_registry = app_registry or AppRegistry()

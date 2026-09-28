@@ -1,10 +1,9 @@
-"""rekuest must stay importable, and correct, without arkitekt.
+"""rekuest never imports arkitekt.
 
-arkitekt imports rekuest at module scope, so a module-scope import in the other
-direction is circular, and order-dependently so: ``import arkitekt`` first works,
-``import rekuest`` first raises from a half-initialized module. Only the
-integration module is exempt. It is imported last, behind ``try/except
-ImportError``, which is what keeps the package usable on its own.
+Both are runtimes of one declaration, and the declaration is arkitekt-spec's:
+rekuest depends on the spec, and arkitekt reaches rekuest only lazily, when it runs
+an app in distributed mode. An import of arkitekt from rekuest -- at any scope --
+would turn that one-way dependency into a cycle.
 """
 
 import ast
@@ -13,10 +12,9 @@ from pathlib import Path
 import rekuest
 
 PACKAGE = Path(rekuest.__file__).parent
-#: The one module allowed to import arkitekt. There used to be a
-#: ``contrib/arkitekt`` package beside it; it is gone, and keeping its exemption
-#: would have silently pre-authorised anything dropped back in there.
-INTEGRATION_MODULES = {PACKAGE / "arkitekt.py"}
+#: No module is exempt: ``rekuest/arkitekt.py`` declares its service and provider
+#: on arkitekt_spec, like every other package.
+INTEGRATION_MODULES: set[Path] = set()
 
 
 def _module_scope_imports(tree: ast.Module) -> list[str]:
@@ -48,6 +46,29 @@ def _module_scope_imports(tree: ast.Module) -> list[str]:
 
 def _is_integration(path: Path) -> bool:
     return path in INTEGRATION_MODULES
+
+
+def _all_imports(tree: ast.Module) -> list[str]:
+    """Every imported module name, at any scope (functions and TYPE_CHECKING too)."""
+    names: list[str] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            names.extend(alias.name for alias in node.names)
+        elif isinstance(node, ast.ImportFrom) and node.module and node.level == 0:
+            names.append(node.module)
+    return names
+
+
+def test_no_module_imports_arkitekt_at_all() -> None:
+    offenders = [
+        str(path.relative_to(PACKAGE))
+        for path in sorted(PACKAGE.rglob("*.py"))
+        if any(
+            name == "arkitekt" or name.startswith("arkitekt.")
+            for name in _all_imports(ast.parse(path.read_text()))
+        )
+    ]
+    assert not offenders, f"{offenders} import arkitekt; rekuest depends only on arkitekt_spec."
 
 
 def test_no_module_imports_arkitekt_at_module_scope() -> None:

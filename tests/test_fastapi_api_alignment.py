@@ -14,8 +14,8 @@ from rekuest.contrib.fastapi.route_groups.implementations import (
 )
 from rekuest.contrib.fastapi.route_groups.schemas import build_schema_router
 from rekuest.contrib.fastapi.routes import add_state_detail_routes
-from rekuest.app import AppRegistry
-from rekuest.definition.define import prepare_definition
+from arkitekt_spec.declare.app import AppRegistry
+from arkitekt_spec.declare.definition.define import prepare_definition
 
 
 def test_fastapi_agent_build_assign_input_defaults_flags() -> None:

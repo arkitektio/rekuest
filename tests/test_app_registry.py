@@ -12,12 +12,12 @@ import pytest
 
 from arkitekt_spec.actions import PortKind
 from rekuest.api.schema import Implementation
-from rekuest.app import AppRegistry
+from arkitekt_spec.declare.app import AppRegistry
 from rekuest.arkitekt import rekuest_service
-from rekuest.definition.errors import DefinitionError
-from rekuest.structures.errors import StructureRegistryError
-from rekuest.structures.types import service_from_identifier
-from rekuest.structures.utils import id_shrink
+from arkitekt_spec.declare.definition.errors import DefinitionError
+from arkitekt_spec.declare.structures.errors import StructureRegistryError
+from arkitekt_spec.declare.structures.types import service_from_identifier
+from arkitekt_spec.declare.structures.utils import id_shrink
 
 from .service_helpers import with_client
 

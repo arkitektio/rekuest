@@ -18,8 +18,8 @@ from rekuest import messages
 from rekuest.agents.base import BaseAgent
 from rekuest.protocol.schema import TaskEventKind
 from rekuest.api.schema import TaskEventChange
-from rekuest.app import AppRegistry
-from rekuest.errors import CriticalCallError
+from arkitekt_spec.declare.app import AppRegistry
+from arkitekt_spec.declare.errors import CriticalCallError
 from rekuest.calls import _astream_raw
 
 from .memory_transport import MemoryAgentTransport

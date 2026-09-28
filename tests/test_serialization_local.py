@@ -3,8 +3,8 @@
 import pytest
 
 from rekuest.actors.types import Shelver
-from rekuest.definition.define import prepare_definition
-from rekuest.structures.registry import StructureRegistry
+from arkitekt_spec.declare.definition.define import prepare_definition
+from arkitekt_spec.declare.structures.registry import StructureRegistry
 from rekuest.structures.serialization.actor import shrink_outputs
 
 from .funcs import localized_structure_function, LocalizedStructure

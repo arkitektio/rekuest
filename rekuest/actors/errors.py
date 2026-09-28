@@ -1,6 +1,6 @@
 """Exceptions for the actors module."""
 
-from rekuest.errors import RekuestError
+from arkitekt_spec.declare.errors import RekuestError
 
 
 class ActorException(RekuestError):

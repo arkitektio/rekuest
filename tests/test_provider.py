@@ -11,10 +11,10 @@ import pytest
 from fakts import Alias, Fakts, Require
 from fakts.testing import build_testing_fakts
 
-from rekuest.app import AppRegistry
-from rekuest.errors import RegistryFrozenError
-from rekuest.provider import ProviderBuildError, ProviderDefinitionError
-from rekuest.service import ServiceDefinitionError
+from arkitekt_spec.declare.app import AppRegistry
+from arkitekt_spec.declare.errors import RegistryFrozenError
+from arkitekt_spec.declare.provider import ProviderBuildError, ProviderDefinitionError
+from arkitekt_spec.declare.service import ServiceDefinitionError
 
 
 class Client:

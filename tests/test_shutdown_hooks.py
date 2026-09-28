@@ -9,9 +9,10 @@ through its startup hooks — exactly once per start.
 
 from collections.abc import Generator
 
+from rekuest.agents.hooks.materialize import materialize_hook
 import pytest
 
-from rekuest.app import AppRegistry
+from arkitekt_spec.declare.app import AppRegistry
 from rekuest.agents.hooks.shutdown import (
     ThreadedShutdownHook,
     WrappedShutdownHook,
@@ -60,8 +61,8 @@ def test_register_shutdown_lands_in_the_registry(mock_agent: RekuestAgent) -> No
     mock_agent.app_registry.shutdown(aclose_it)
 
     hooks = mock_agent.app_registry.hooks_registry.shutdown_hooks
-    assert isinstance(hooks["close_it"], ThreadedShutdownHook)
-    assert isinstance(hooks["aclose_it"], WrappedShutdownHook)
+    assert isinstance(materialize_hook(hooks["close_it"]), ThreadedShutdownHook)
+    assert isinstance(materialize_hook(hooks["aclose_it"]), WrappedShutdownHook)
 
 
 def test_app_registry_shutdown_decorator(mock_agent: RekuestAgent) -> None:
@@ -77,8 +78,8 @@ def test_app_registry_shutdown_decorator(mock_agent: RekuestAgent) -> None:
         pass
 
     hooks = registry.hooks_registry.shutdown_hooks
-    assert isinstance(hooks["close_it"], WrappedShutdownHook)
-    assert isinstance(hooks["renamed"], WrappedShutdownHook)
+    assert isinstance(materialize_hook(hooks["close_it"]), WrappedShutdownHook)
+    assert isinstance(materialize_hook(hooks["renamed"]), WrappedShutdownHook)
 
 
 @pytest.mark.asyncio

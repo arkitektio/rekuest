@@ -2,7 +2,7 @@
 
 import asyncio
 import pytest
-from rekuest.structures.registry import StructureRegistry
+from arkitekt_spec.declare.structures.registry import StructureRegistry
 from .conftest import CONNECT_TIMEOUT, DeployedRekuest
 
 

@@ -13,8 +13,8 @@ from rath.expansion import ExpandsStructures
 
 from rekuest import messages
 from rekuest.agents.base import BaseAgent
-from rekuest.agents.errors import StateRequirementsNotMet
-from rekuest.app import AppRegistry
+from arkitekt_spec.declare.agents.errors import StateRequirementsNotMet
+from arkitekt_spec.declare.app import AppRegistry
 
 from .agent_helpers import run_assignment
 from .memory_transport import MemoryAgentTransport
@@ -249,7 +249,7 @@ class AppWithoutFake(FakeApp):
 
 
 def test_a_structure_of_a_service_the_app_lacks_is_reported_at_collection() -> None:
-    from rekuest.agents.errors import MissingServiceWarning
+    from arkitekt_spec.declare.agents.errors import MissingServiceWarning
 
     registry = AppRegistry()
     registry.merge(fake_package(), service="fake")
@@ -274,7 +274,7 @@ def test_a_structure_of_a_service_the_app_lacks_is_reported_at_collection() -> N
 def test_no_warning_when_the_app_has_the_service(
     recwarn: pytest.WarningsRecorder,
 ) -> None:
-    from rekuest.agents.errors import MissingServiceWarning
+    from arkitekt_spec.declare.agents.errors import MissingServiceWarning
 
     agent = build_agent("A")
 

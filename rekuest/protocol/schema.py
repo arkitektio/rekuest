@@ -6,7 +6,7 @@ from enum import Enum
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 from rath.scalars import ID
 from rekuest.scalars import ActionHash, Args, Identifier, MediaLike
-from rekuest.traits.blok import CreateBlokInputTrait
+from arkitekt_spec.declare.traits.blok import CreateBlokInputTrait
 from typing import Annotated
 
 class GraphQLDefault:

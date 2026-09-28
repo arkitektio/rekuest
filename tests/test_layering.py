@@ -187,10 +187,10 @@ def test_importing_rekuest_does_not_load_the_client_surface() -> None:
     loaded = ast.literal_eval(result.stdout.strip())
 
     assert "rekuest.api.schema" not in loaded, (
-        "importing rekuest loads the whole GraphQL client surface. The declaration "
-        "surface should reach rekuest.protocol.schema and stop there."
+        "importing rekuest loads the whole GraphQL client surface. `import rekuest` "
+        "is the runtime's small public face (Task, the connection policies); the "
+        "client is reached through rekuest.arkitekt."
     )
-    assert "rekuest.protocol.schema" in loaded
 
 
 # --------------------------------------------------------------------------- #

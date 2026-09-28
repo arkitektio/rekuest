@@ -8,7 +8,7 @@ from datetime import datetime, UTC
 from rekuest import messages
 from rekuest.agents.journal import JournalEntry
 from rekuest.contrib.sql_lite.schema import ensure_sqlite_schema
-from rekuest.protocol.types import AnyState
+from arkitekt_spec.declare.protocol.types import AnyState
 
 
 # 2. Helpers

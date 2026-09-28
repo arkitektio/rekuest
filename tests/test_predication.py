@@ -7,8 +7,8 @@ from arkitekt_spec.actions import (
     ArgPortInput,
     PortKind,
 )
-from rekuest.definition.define import prepare_definition
-from rekuest.structures.registry import StructureRegistry
+from arkitekt_spec.declare.definition.define import prepare_definition
+from arkitekt_spec.declare.structures.registry import StructureRegistry
 from rekuest.structures.serialization.postman import ashrink_args
 from rekuest.structures.serialization.predication import predicate_port
 

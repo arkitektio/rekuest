@@ -6,6 +6,7 @@ gathers implementations from the registry, and the actor-builder used by the
 spawn path is resolvable from the same registry.
 """
 
+from rekuest.actors.build import actor_builder_for
 import pytest
 
 from rekuest.agents.base import RekuestAgent
@@ -38,7 +39,7 @@ def test_actor_builder_resolvable_from_app_registry(mock_agent: RekuestAgent) ->
     mock_agent.app_registry.register(myfunc)
 
     # The spawn path (aspawn_actor_from_assign) resolves the builder like this.
-    builder = mock_agent.app_registry.get_builder_for_interface("myfunc")
+    builder = actor_builder_for(mock_agent.app_registry, "myfunc")
     assert callable(builder)
 
 

@@ -31,14 +31,14 @@ from rekuest.api.schema import (
     TestCase,
     TestResult,
 )
-from rekuest.app import AppRegistry
+from arkitekt_spec.declare.app import AppRegistry
 from rekuest.agents.transport.websocket import WebsocketAgentTransport
 from rekuest.datalayer import DataLayer
 from rekuest.client.upload.link import UploadLink
 from rekuest.client.postman import GraphQLPostman
 from rekuest.client.rath import RekuestRath
 from rekuest.client.client import Rekuest
-from rekuest.widgets import SearchWidget
+from arkitekt_spec.declare.widgets import SearchWidget
 
 def build_relative_path(*path: str) -> str:
     """Build a path relative to this file, for the files shipped beside it."""

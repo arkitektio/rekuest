@@ -14,10 +14,10 @@ import pytest
 
 from rekuest import messages
 from rekuest.agents.base import BaseAgent
-from rekuest.app import AppRegistry
-from rekuest.agents.hooks.registry import StartupHookReturns
+from arkitekt_spec.declare.app import AppRegistry
+from arkitekt_spec.declare.agents.hooks.registry import StartupHookReturns
 
-from rekuest.agents.errors import AgentException
+from arkitekt_spec.declare.agents.errors import AgentException
 
 from .memory_transport import MemoryAgentTransport
 

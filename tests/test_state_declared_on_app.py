@@ -7,7 +7,7 @@ agent adopts it. So one class can be a state of two apps under different rules.
 
 from dataclasses import dataclass
 
-from rekuest.app import AppRegistry
+from arkitekt_spec.declare.app import AppRegistry
 from rekuest.state.observable import config_of, evented
 
 
