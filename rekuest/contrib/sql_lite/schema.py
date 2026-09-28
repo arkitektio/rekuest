@@ -55,6 +55,35 @@ async def ensure_sqlite_schema(db: aiosqlite.Connection) -> None:
         "CREATE INDEX IF NOT EXISTS idx_patches_session ON state_patches(state_id, session_id);"
     )
 
+    # The agent's journal (docs/journal.md): every report in one order.
+    await db.execute(
+        """
+        CREATE TABLE IF NOT EXISTS journal (
+            session_id TEXT NOT NULL,
+            pos INTEGER NOT NULL,
+            global_rev INTEGER NOT NULL,
+            event_time INTEGER NOT NULL,
+            kind TEXT NOT NULL,
+            task_id TEXT,
+            action_key TEXT,
+            subject TEXT,
+            message_id TEXT NOT NULL,
+            payload TEXT NOT NULL,
+            PRIMARY KEY (session_id, pos),
+            FOREIGN KEY (session_id) REFERENCES sessions(session_id)
+        );
+        """
+    )
+    await db.execute(
+        "CREATE INDEX IF NOT EXISTS idx_journal_task ON journal(task_id, session_id, pos);"
+    )
+    await db.execute(
+        "CREATE INDEX IF NOT EXISTS idx_journal_time ON journal(session_id, event_time);"
+    )
+    await db.execute(
+        "CREATE INDEX IF NOT EXISTS idx_journal_kind ON journal(session_id, kind, pos);"
+    )
+
     await ensure_column(
         db,
         table_name="state_snapshots",

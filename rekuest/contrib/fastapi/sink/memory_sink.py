@@ -1,7 +1,9 @@
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 
 from rekuest import messages
+from rekuest.agents.journal import JournalEntry
 from rekuest.protocol.types import AnyState
 
 
@@ -9,6 +11,8 @@ from rekuest.protocol.types import AnyState
 class MemoryStore:
     patches: list[messages.StatePatch] = field(default_factory=list)
     snapshots: list[messages.StateSnapshot] = field(default_factory=list)
+    journal: dict[tuple[str, int], JournalEntry] = field(default_factory=dict)
+    """The agent's journal, by ``(session_id, pos)`` (in insertion order)."""
 
 
 class MemorySink:
@@ -35,6 +39,11 @@ class MemorySink:
 
     async def awrite_patch(self, patch: messages.StatePatch):
         self.store.patches.append(patch)
+
+    async def awrite_journal(self, entries: Sequence[JournalEntry]) -> None:
+        for entry in entries:
+            # INSERT OR IGNORE: a re-sent entry is a no-op.
+            self.store.journal.setdefault((entry.session_id, entry.pos), entry)
 
     async def is_cought_up_to(self, revision: int) -> bool:
         return True

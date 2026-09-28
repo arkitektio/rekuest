@@ -2,9 +2,11 @@ import asyncio
 import aiosqlite
 import json
 import uuid
+from collections.abc import Sequence
 from datetime import datetime, UTC
 
 from rekuest import messages
+from rekuest.agents.journal import JournalEntry
 from rekuest.contrib.sql_lite.schema import ensure_sqlite_schema
 from rekuest.protocol.types import AnyState
 
@@ -122,6 +124,39 @@ class SQLLiteSink:
                     raise RuntimeError(
                         f"Database Integrity Violation on patch {global_current_rev}->{global_future_rev}: {e}"
                     )
+
+    async def awrite_journal(self, entries: Sequence[JournalEntry]) -> None:
+        """Persist journal entries in one transaction. A re-sent entry is a no-op."""
+        if not entries:
+            return
+        rows = [
+            (
+                entry.session_id,
+                entry.pos,
+                entry.global_rev,
+                entry.event_time,
+                entry.kind,
+                entry.task_id,
+                entry.action_key,
+                entry.subject,
+                entry.message_id,
+                json.dumps(entry.payload, separators=(",", ":")),
+            )
+            for entry in entries
+        ]
+        async with self._write_lock:
+            async with aiosqlite.connect(self.db_path) as db:
+                await db.executemany(
+                    """
+                    INSERT OR IGNORE INTO journal (
+                        session_id, pos, global_rev, event_time, kind,
+                        task_id, action_key, subject, message_id, payload
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    rows,
+                )
+                await db.commit()
 
     async def ateardown(self):
         """Cleans up resources, such as the background processing task."""

@@ -138,7 +138,11 @@ def _build_boundary_routes(agent: FastApiAgent, states_path: str) -> APIRouter:
     router = APIRouter()
 
     async def session_info() -> RetrieverSessionInfoResponse:
-        return RetrieverSessionInfoResponse(current_session=agent.current_session)
+        watermark = agent.journal.watermark()
+        return RetrieverSessionInfoResponse(
+            current_session=agent.current_session,
+            current_pos=watermark.pos if watermark is not None else None,
+        )
 
     async def task_boundaries(
         correlation_id: str,

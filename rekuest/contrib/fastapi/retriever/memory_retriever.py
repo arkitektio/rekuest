@@ -1,6 +1,6 @@
 import copy
 from datetime import datetime, UTC
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 
 from rekuest import messages
 from rekuest.contrib.fastapi.retriever.protocol import (
@@ -15,6 +15,7 @@ from rekuest.contrib.fastapi.retriever.replay import (
     merge_state_ids,
     replay,
 )
+from rekuest.agents.journal import Fold, JournalEntry, entry_matches, world_from_entries
 from rekuest.contrib.fastapi.sink.memory_sink import MemoryStore
 from rekuest.messages import JSONSerializable
 
@@ -30,6 +31,59 @@ class MemoryRetriever:
 
     async def ateardown(self) -> None:
         return None
+
+    # --- JOURNAL ---
+    def _session_entries(self, session_id: str) -> list[JournalEntry]:
+        if self.store is None:
+            return []
+        entries = [e for e in self.store.journal.values() if e.session_id == session_id]
+        return sorted(entries, key=lambda entry: entry.pos)
+
+    async def aget_journal_entries(
+        self,
+        session_id: str,
+        after: int = 0,
+        until: int | None = None,
+        limit: int | None = None,
+        kinds: Sequence[str] | None = None,
+        task_id: str | None = None,
+        action_keys: Sequence[str] | None = None,
+        state_keys: Sequence[str] | None = None,
+        lock_keys: Sequence[str] | None = None,
+    ) -> list[JournalEntry]:
+        """Journal entries of a session, in order, filtered as the sqlite retriever does."""
+        entries = [
+            entry
+            for entry in self._session_entries(session_id)
+            if entry.pos > after
+            and (until is None or entry.pos <= until)
+            and entry_matches(
+                entry,
+                kinds=kinds,
+                task_id=task_id,
+                action_keys=action_keys,
+                state_keys=state_keys,
+                lock_keys=lock_keys,
+            )
+        ]
+        return entries[:limit] if limit is not None else entries
+
+    async def aget_journal_task_entries(self, task_id: str) -> list[JournalEntry]:
+        if self.store is None:
+            return []
+        entries = [e for e in self.store.journal.values() if e.task_id == task_id]
+        return sorted(entries, key=lambda entry: (entry.session_id, entry.pos))
+
+    async def aget_journal_pos_at_time(self, session_id: str, ms: int) -> int | None:
+        return max(
+            (e.pos for e in self._session_entries(session_id) if e.event_time <= ms),
+            default=None,
+        )
+
+    async def aget_journal_world(
+        self, session_id: str, pos: int
+    ) -> tuple[JournalEntry, Fold] | None:
+        return world_from_entries(self._session_entries(session_id), pos)
 
     def _boundaries(
         self,

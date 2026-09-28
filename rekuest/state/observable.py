@@ -10,6 +10,7 @@ if TYPE_CHECKING:
     from _typeshed import SupportsKeysAndGetItem, SupportsRichComparison
 
 from rekuest.protocol.schema import ReturnPortInput, StateDefinitionInput
+from rekuest.state.gate import TaskClosedError, TaskGate
 from rekuest.state.publish import Patch, StateHolder
 from rekuest.structures.types import StateDeclaration
 
@@ -38,10 +39,15 @@ def _make_path(base: str, key: str | int) -> str:
 @dataclasses.dataclass(frozen=True)
 class Mutation:
     """Who is changing a state: the task (for the patches' correlation) and the
-    locks it holds. ``locks=None`` means unrestricted: a state being constructed."""
+    locks it holds. ``locks=None`` means unrestricted: a state being constructed.
+
+    With a ``gate`` (the task's), a change is refused -- before anything is
+    changed -- once the task's end has been reported.
+    """
 
     correlation_id: str | None = None
     locks: frozenset[str] | None = frozenset()
+    gate: TaskGate | None = dataclasses.field(default=None, compare=False)
 
 
 UNRESTRICTED = Mutation(locks=None)
@@ -92,14 +98,27 @@ class StateConfig:
 
     @contextlib.contextmanager
     def mutating(self, mutation: Mutation) -> Iterator[None]:
-        """Make one synchronous operation count as ``mutation`` (a task's view calls this)."""
+        """Make one synchronous operation count as ``mutation`` (a task's view calls this).
+
+        The task's gate is entered for the whole operation, and before it changes
+        anything: a task that has ended changes nothing, and one whose end is being
+        reported is waited for.
+        """
         with self.lock:
+            gate = mutation.gate
+            if gate is not None and not gate.enter():
+                raise TaskClosedError(
+                    f"Cannot modify state '{self.state_name}': task "
+                    f"{mutation.correlation_id} has already ended"
+                )
             previous = self.active
             self.active = mutation
             try:
                 yield
             finally:
                 self.active = previous
+                if gate is not None:
+                    gate.leave()
 
 
 def config_of(obj: Any) -> StateConfig | None:  # noqa: ANN401

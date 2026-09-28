@@ -1,7 +1,10 @@
 import aiosqlite
 import json
+from collections.abc import Sequence
 from datetime import datetime, UTC
 from typing import Any
+
+from rekuest.agents.journal import Fold, JournalEntry
 
 from rekuest.contrib.fastapi.retriever.protocol import (
     PatchEvent,
@@ -359,6 +362,146 @@ class SQLLiteRetriever:
             patch=patch_document,
         )
 
+    # --- JOURNAL ---
+    async def _aquery_entries(
+        self, sql: str, params: Sequence[object]
+    ) -> list[JournalEntry]:
+        async with aiosqlite.connect(self.db_path) as db:
+            async with db.execute(sql, tuple(params)) as cursor:
+                rows = await cursor.fetchall()
+        return [_entry_from_row(row) for row in rows]
+
+    async def aget_journal_entries(
+        self,
+        session_id: str,
+        after: int = 0,
+        until: int | None = None,
+        limit: int | None = None,
+        kinds: Sequence[str] | None = None,
+        task_id: str | None = None,
+        action_keys: Sequence[str] | None = None,
+        state_keys: Sequence[str] | None = None,
+        lock_keys: Sequence[str] | None = None,
+    ) -> list[JournalEntry]:
+        """Journal entries of a session, in order. Key filters route as the websocket
+        does: patches by state, locks by key, session-wide entries always, the rest
+        by action key."""
+        params: list[object] = [session_id, after]
+        sql = f"SELECT {JOURNAL_COLUMNS} FROM journal WHERE session_id = ? AND pos > ?"
+        if until is not None:
+            sql += " AND pos <= ?"
+            params.append(until)
+        if kinds:
+            sql += f" AND {_in_list('kind', kinds, params)}"
+        if task_id is not None:
+            sql += " AND task_id = ?"
+            params.append(task_id)
+        if action_keys is not None or state_keys is not None or lock_keys is not None:
+
+            def keyed(column: str, keys: Sequence[str] | None) -> str:
+                return _in_list(column, keys, params) if keys else "1"
+
+            state = keyed("subject", state_keys)
+            lock = keyed("subject", lock_keys)
+            action = keyed("action_key", action_keys)
+            sql += (
+                f" AND ((kind = 'STATE_PATCH' AND {state}) OR (kind IN ('LOCK', 'UNLOCK') AND {lock})"
+                f" OR kind IN ({SESSION_KINDS}) OR (kind NOT IN ('STATE_PATCH', 'LOCK', 'UNLOCK', {SESSION_KINDS})"
+                f" AND (action_key IS NULL OR {action})))"
+            )
+        sql += " ORDER BY pos ASC"
+        if limit is not None:
+            sql += " LIMIT ?"
+            params.append(limit)
+        return await self._aquery_entries(sql, params)
+
+    async def aget_journal_task_entries(self, task_id: str) -> list[JournalEntry]:
+        """Every entry of one task, in order."""
+        return await self._aquery_entries(
+            f"SELECT {JOURNAL_COLUMNS} FROM journal WHERE task_id = ? ORDER BY session_id, pos",
+            [task_id],
+        )
+
+    async def aget_journal_pos_at_time(self, session_id: str, ms: int) -> int | None:
+        """The last position of a session at or before ``ms`` (epoch milliseconds)."""
+        async with aiosqlite.connect(self.db_path) as db:
+            async with db.execute(
+                "SELECT MAX(pos) FROM journal WHERE session_id = ? AND event_time <= ?",
+                (session_id, ms),
+            ) as cursor:
+                row = await cursor.fetchone()
+        return row[0] if row and row[0] is not None else None
+
+    async def aget_journal_world(
+        self, session_id: str, pos: int
+    ) -> tuple[JournalEntry, Fold] | None:
+        """The entry at ``pos`` and the world as of it: states replayed from the last
+        snapshot entry, tasks and locks folded from every entry before."""
+        at = await self._aquery_entries(
+            f"SELECT {JOURNAL_COLUMNS} FROM journal WHERE session_id = ? AND pos = ?",
+            [session_id, pos],
+        )
+        if not at:
+            return None
+        async with aiosqlite.connect(self.db_path) as db:
+            async with db.execute(
+                f"SELECT COALESCE(MAX(pos), 0) FROM journal WHERE session_id = ? AND pos <= ? AND kind IN ({SESSION_KINDS})",
+                (session_id, pos),
+            ) as cursor:
+                row = await cursor.fetchone()
+        anchor = row[0] if row else 0
+        entries = await self._aquery_entries(
+            f"SELECT {JOURNAL_COLUMNS} FROM journal WHERE session_id = ? AND pos <= ? "
+            f"AND ((kind IN ({STATE_KINDS}) AND pos >= ?) OR kind NOT IN ({STATE_KINDS})) ORDER BY pos ASC",
+            [session_id, pos, anchor],
+        )
+        return at[0], Fold.from_entries(entries)
+
     async def ateardown(self) -> None:
         """Cleans up resources, such as database connections."""
         return None
+
+
+JOURNAL_COLUMNS = (
+    "session_id, pos, global_rev, event_time, kind, task_id, action_key, subject, message_id, payload"
+)
+#: Kinds that belong to the whole session rather than to a task, state or lock.
+SESSION_KINDS = "'SESSION_INIT', 'STATE_SNAPSHOT'"
+#: Kinds that carry state values.
+STATE_KINDS = "'SESSION_INIT', 'STATE_SNAPSHOT', 'STATE_PATCH'"
+
+
+def _in_list(column: str, values: Sequence[str], params: list[object]) -> str:
+    params.extend(values)
+    return f"{column} IN ({', '.join('?' for _ in values)})"
+
+
+def _entry_from_row(row: Sequence[Any]) -> JournalEntry:
+    (
+        session_id,
+        pos,
+        global_rev,
+        event_time,
+        kind,
+        task_id,
+        action_key,
+        subject,
+        message_id,
+        payload,
+    ) = row
+    try:
+        decoded = json.loads(payload)
+    except (TypeError, ValueError):
+        decoded = None
+    return JournalEntry(
+        session_id=session_id,
+        pos=pos,
+        global_rev=global_rev,
+        event_time=event_time,
+        kind=kind,
+        task_id=task_id,
+        action_key=action_key,
+        subject=subject,
+        message_id=message_id,
+        payload=decoded if isinstance(decoded, dict) else {},
+    )

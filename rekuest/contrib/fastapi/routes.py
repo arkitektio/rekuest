@@ -27,6 +27,7 @@ from rekuest.contrib.fastapi.route_groups import (
     add_implementation_route,
     build_core_router,
     build_implementation_router,
+    build_journal_router,
     build_lock_router,
     build_schema_router,
     build_state_router,
@@ -158,6 +159,15 @@ def add_task_detail_routes(
     _include_router(app, build_task_detail_router(agent, tasks_path=tasks_path))
 
 
+def add_journal_routes(
+    app: FastAPI,
+    agent: FastApiAgent,
+    tasks_path: str = "/tasks",
+) -> None:
+    """Include the journal routes: every report in order, and the world at any position."""
+    _include_router(app, build_journal_router(agent, tasks_path=tasks_path))
+
+
 def add_state_routes(
     app: FastAPI,
     agent: FastApiAgent,
@@ -223,6 +233,7 @@ def configure_fastapi(
     add_locks: bool = True,
     add_tasks: bool = True,
     add_task_details: bool = True,
+    add_journal: bool = True,
     ws_path: str = "/ws",
     tasks_path: str = "/tasks",
     assign_path: str = "/assign",
@@ -259,6 +270,8 @@ def configure_fastapi(
         get_user_from_request: Deprecated, HTTP-only predecessor of
             `expand_user_from_request`. Still honoured when the newer hook is
             absent, in which case the websocket stays unauthenticated as before.
+        add_journal: Serve the journal routes (``/journal…`` and
+            ``{tasks_path}/{task_id}/events``, see ``docs/journal.md``).
     """
     # Imported here: the sqlite retriever reads the protocol under this
     # package, so a module-level import would be circular.
@@ -286,6 +299,8 @@ def configure_fastapi(
             add_task_routes(fastapi_app, agent, tasks_path=tasks_path)
         if add_task_details:
             add_task_detail_routes(fastapi_app, agent, tasks_path=tasks_path)
+        if add_journal:
+            add_journal_routes(fastapi_app, agent, tasks_path=tasks_path)
         if add_states:
             add_state_routes(fastapi_app, agent, states_path=states_path)
         if add_state_details:
@@ -318,6 +333,7 @@ __all__ = [
     "add_agent_routes",
     "add_implementation_route",
     "add_implementation_routes",
+    "add_journal_routes",
     "add_lock_routes",
     "add_schema_routes",
     "add_state_detail_routes",

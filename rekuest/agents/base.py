@@ -19,6 +19,7 @@ from types import TracebackType
 from typing import (
     TYPE_CHECKING,
     Any,
+    ClassVar,
     Optional,
     Self,
 )
@@ -37,7 +38,13 @@ from rekuest.agents.errors import (
     MissingServiceWarning,
     ProvisionException,
 )
-from rekuest.agents.dataclasses import QueuedPatchEvent, RevisedState
+from rekuest.agents.dataclasses import (
+    QueuedAssign,
+    QueuedMessage,
+    QueuedPatchEvent,
+    RevisedState,
+)
+from rekuest.agents.journal import Journal, JournalEntry, TaskGate
 from rekuest.agents.types import AppContext, T
 from rekuest.agents.policy import ConnectionPolicy
 from rekuest.agents.hooks.registry import (
@@ -217,9 +224,26 @@ class BaseAgent(KoiledModel):
         default_factory=lambda: str(uuid.uuid4()),
         description="A unique identifier for the current session. This is used to group patches and snapshots that belong to the same logical session together. By default an agent start a new session when booting up",
     )
-    _event_queue: janus.Queue[QueuedPatchEvent] | None = PrivateAttr(default=None)
+    _event_queue: janus.Queue[QueuedPatchEvent | QueuedMessage | QueuedAssign] | None = (
+        PrivateAttr(default=None)
+    )
+    """The agent's one ordered path: state patches, task reports, lock changes and the
+    session baseline are numbered and handed to the transport from here, in the
+    order they were made (see ``docs/journal.md``)."""
     _patch_processor_task: asyncio.Task[None] | None = PrivateAttr(default=None)
     _event_seq: int = PrivateAttr(default=0)
+    _journal: Journal = PrivateAttr(default_factory=Journal)
+    _task_gates: dict[str, TaskGate] = PrivateAttr(default_factory=dict)
+    """Per task: once its end is reported, its reports and state changes are refused."""
+    _journal_acks: bool = PrivateAttr(default=False)
+    """The server persists journal positions (``Init.journal``): retain every journaled
+    frame until a ``JournalAck`` covers it."""
+    _retained: dict[int, messages.FromAgentMessage] = PrivateAttr(default_factory=dict)
+    """Journaled frames not yet covered by a ``JournalAck``, by position."""
+    _retained_session: str | None = PrivateAttr(default=None)
+    stamps_frames: ClassVar[bool] = True
+    """Whether journaled frames carry ``pos``/``journal_session``/``agent_ts`` on the
+    wire. The served agent adds them only for websocket clients that opt in."""
     # message id -> retained terminal event awaiting its EventAck (insertion-ordered dict)
     _unacked_events: dict[str, messages.FromAgentMessage] = PrivateAttr(
         default_factory=dict
@@ -254,6 +278,19 @@ class BaseAgent(KoiledModel):
     )
     running: bool = False
     model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    @property
+    def journal(self) -> Journal:
+        """The ordered record of everything this agent reports (see ``docs/journal.md``)."""
+        return self._journal
+
+    def task_gate(self, task: str) -> TaskGate | None:
+        """The gate of a task this agent was assigned, if it still knows it.
+
+        A task's state changes enter it (see :class:`~rekuest.state.observable.Mutation`),
+        so nothing is changed for a task after its end was reported.
+        """
+        return self._task_gates.get(task)
 
     @property
     def caller_postman(self) -> "AgentPostman":
@@ -296,9 +333,13 @@ class BaseAgent(KoiledModel):
         await self._areport_lock(messages.Unlock(key=key))
 
     async def _areport_lock(self, message: "messages.Lock | messages.Unlock") -> None:
-        """Send a lock report, logging rather than raising if it cannot go out."""
+        """Send a lock report, logging rather than raising if it cannot go out.
+
+        Through the ordered path like every report, so a task's ``LOCK`` comes after
+        what it reported before acquiring, and its ``UNLOCK`` after its end.
+        """
         try:
-            await self.transport.asend(message)
+            await self._adispatch(message)
         except Exception:
             logger.warning(
                 "Failed to report %s for key %s",
@@ -340,17 +381,50 @@ class BaseAgent(KoiledModel):
         if self._event_queue is None:
             raise AgentException("Patch queue is not initialized")
 
+        queue = self._event_queue
         try:
             logger.debug("Starting patch event loop")
             while True:
-                queued_patch = await self._event_queue.async_q.get()
+                item = await queue.async_q.get()
                 try:
-                    await self._aprocess_patch_event(queued_patch)
+                    await self._aprocess_queued(item)
                 finally:
-                    self._event_queue.async_q.task_done()
+                    queue.async_q.task_done()
         except asyncio.CancelledError:
             logger.debug("Patch event loop cancelled, shutting down")
             raise
+
+    async def _aprocess_queued(
+        self, item: QueuedPatchEvent | QueuedMessage | QueuedAssign
+    ) -> None:
+        """Process one item of the ordered queue. Never raises: the queue must keep going."""
+        if isinstance(item, QueuedMessage):
+            try:
+                await self._aemit(item.message)
+            except Exception as e:
+                logger.error("Could not send %s", type(item.message).__name__, exc_info=True)
+                if item.waiter is not None and not item.waiter.done():
+                    item.waiter.set_exception(e)
+                return
+            if item.waiter is not None and not item.waiter.done():
+                item.waiter.set_result(None)
+        elif isinstance(item, QueuedAssign):
+            try:
+                self._journal.record_assign(item.assign, item.action_key)
+            except Exception:
+                logger.error("Could not record assignment %s", item.assign.task, exc_info=True)
+        else:
+            try:
+                await self._aprocess_patch_event(item)
+            except Exception:
+                logger.error("Could not publish a patch of %s", item.interface, exc_info=True)
+
+    def _on_processor(self) -> bool:
+        """Whether we are running inside the ordered queue's processor."""
+        try:
+            return asyncio.current_task() is self._patch_processor_task
+        except RuntimeError:
+            return False
 
     def publish_patch(self, interface: str, patch: Patch) -> None:
         """Publish a patch to the agent. This is used to publish patches to the
@@ -380,7 +454,8 @@ class BaseAgent(KoiledModel):
 
         self.global_revision = future_global_rev
         if self.global_revision % self.snapshot_interval == 0:
-            await self.apublish_snapshot(
+            # Before the patch that reaches this revision, and already containing it.
+            await self._aemit(
                 messages.StateSnapshot(
                     session_id=self.current_session,
                     global_rev=self.global_revision,
@@ -391,7 +466,7 @@ class BaseAgent(KoiledModel):
                 )
             )
 
-        await self.apublish_patch(
+        await self._aemit(
             messages.StatePatch(
                 global_rev=self.global_revision,
                 state_name=interface,
@@ -598,7 +673,13 @@ class BaseAgent(KoiledModel):
         logger.info(f"Agent received {message}")
 
         if isinstance(
-            message, (messages.Init, messages.EventAck, messages.ProtocolError)
+            message,
+            (
+                messages.Init,
+                messages.EventAck,
+                messages.JournalAck,
+                messages.ProtocolError,
+            ),
         ):
             await self._aprocess_session_message(message)
         elif isinstance(
@@ -639,7 +720,7 @@ class BaseAgent(KoiledModel):
 
     async def _aprocess_session_message(
         self,
-        message: "messages.Init | messages.EventAck | messages.ProtocolError",
+        message: "messages.Init | messages.EventAck | messages.JournalAck | messages.ProtocolError",
     ) -> None:
         """Handle the connection's own bookkeeping."""
         if isinstance(message, messages.Init):
@@ -656,11 +737,14 @@ class BaseAgent(KoiledModel):
                     stacklevel=2,
                 )
             self._connected_event.set()
+            self._set_journal_acks(message.journal)
             await self._aresend_unacked_reports()
             await self._areply_to_inquiries(message.inquiries)
         elif isinstance(message, messages.EventAck):
             # Backend made the reported event durable; stop retaining it.
             self._unacked_events.pop(message.event, None)
+        elif isinstance(message, messages.JournalAck):
+            self._journal_ack(message.journal_session, message.pos)
         elif not self._connected_event.is_set():
             # Before Init, a protocol error is the backend refusing our Register: the
             # declaration did not fit (catalog mismatch, ownership conflict), or the
@@ -679,9 +763,48 @@ class BaseAgent(KoiledModel):
 
         Sent as-is rather than through ``_adispatch`` so the original ``seq`` survives and
         they are not retained a second time; the backend dedups terminal reports by task.
+
+        With a journal-acknowledging server, every journaled frame not yet covered by a
+        ``JournalAck`` is re-sent too, in ``pos`` order (after the terminal reports the
+        journal does not cover); the server drops duplicates by position.
         """
-        for retained in list(self._unacked_events.values()):
-            await self.transport.asend(retained)
+        retained = [self._retained[pos] for pos in sorted(self._retained)]
+        covered = {message.id for message in retained}
+        unacked = [
+            message
+            for message in self._unacked_events.values()
+            if message.id not in covered
+        ]
+        for message in [*unacked, *retained]:
+            await self.transport.asend(message)
+
+    def _set_journal_acks(self, journal: bool) -> None:
+        """Whether the server acknowledges journal positions (from its ``Init``)."""
+        self._journal_acks = journal
+        if not journal:
+            self._retained.clear()
+            self._retained_session = None
+
+    def _retain(self, message: messages.FromAgentMessage, entry: JournalEntry) -> None:
+        """Keep a journaled frame until a ``JournalAck`` covers it."""
+        if self._retained_session != entry.session_id:
+            self._retained.clear()
+            self._retained_session = entry.session_id
+        self._retained[entry.pos] = message
+
+    def _journal_ack(self, session: str, pos: int) -> None:
+        """Everything of ``session`` up to ``pos`` is persisted by the server."""
+        if self._retained_session == session:
+            for covered in [p for p in self._retained if p <= pos]:
+                del self._retained[covered]
+        for event_id, message in list(self._unacked_events.items()):
+            message_pos = getattr(message, "pos", None)
+            if (
+                getattr(message, "journal_session", None) == session
+                and message_pos is not None
+                and message_pos <= pos
+            ):
+                del self._unacked_events[event_id]
 
     async def _areply_to_inquiries(
         self, inquiries: "Sequence[messages.AssignInquiry]"
@@ -784,6 +907,9 @@ class BaseAgent(KoiledModel):
         """
         if await self._ais_duplicate_assign(message):
             return
+        # From here on the task can end, and after its end nothing more is recorded
+        # for it: its reports and state changes enter this gate.
+        self._task_gates[message.task] = TaskGate()
         try:
             actor = self.managed_actors.get(message.interface)
             if actor is None:
@@ -933,11 +1059,14 @@ class BaseAgent(KoiledModel):
                 pass
 
         if self._event_queue is not None:
+            queue = self._event_queue
+            # From here on, reports go straight to the transport.
+            self._event_queue = None
+            self._release_queued_waiters(queue)
             try:
-                await self._event_queue.aclose()
+                await queue.aclose()
             except RuntimeError:
                 pass
-            self._event_queue = None
 
         await self.astop_background()
         await self.transport.adisconnect()
@@ -948,6 +1077,24 @@ class BaseAgent(KoiledModel):
         self._receiver = None
         self._provider_ready = True
         self._held_provider_messages.clear()
+
+    def _release_queued_waiters(
+        self, queue: "janus.Queue[QueuedPatchEvent | QueuedMessage | QueuedAssign]"
+    ) -> None:
+        """Unblock whoever still waits on a report the stopped processor never sent."""
+        dropped = 0
+        while True:
+            try:
+                item = queue.async_q.get_nowait()
+            except (asyncio.QueueEmpty, RuntimeError):
+                break
+            queue.async_q.task_done()
+            dropped += 1
+            if isinstance(item, QueuedMessage) and item.waiter is not None:
+                if not item.waiter.done():
+                    item.waiter.set_result(None)
+        if dropped:
+            logger.warning("%d queued report(s) were not sent before teardown", dropped)
 
     async def _acancel_actors(self) -> None:
         """Cancel every managed actor's in-flight work, reporting each cancellation.
@@ -1087,20 +1234,108 @@ class BaseAgent(KoiledModel):
         return hashlib.sha256(canonical.encode()).hexdigest()
 
     async def _adispatch(self, message: messages.FromAgentMessage) -> None:
-        """Assign a stream seq to events, retain terminal reports for ack, then send.
+        """Report a message: through the ordered queue, behind everything made before it.
 
-        Every agent→backend event flows through here so it gets a monotonic ``seq``
-        and so terminal reports (completed/failed/critical/cancelled/interrupted) are
-        retained in ``_unacked_events`` until the backend confirms durability with an
-        ``EventAck`` (handled in ``process``) — the persist-then-ack contract.
+        Task reports, lock changes and the session baseline all go through here, and
+        state patches through :meth:`publish_patch`, into one queue. Its processor
+        numbers each message in the journal, stamps its ``seq``, and hands it to the
+        transport (:meth:`_aemit`), so the order on the wire is the order things
+        happened: a ``COMPLETED`` can no longer overtake its task's patches.
+
+        This returns once the message is queued, not once it is sent: the processor
+        may itself wait on the message loop (shrinking a patch value can shelve over
+        the socket, and the reply arrives through :meth:`process`), so nothing the
+        message loop waits for may wait on the processor.
+
+        A task's reports enter its gate first: once its end was reported, further
+        reports are dropped, and reporting the end closes the gate (waiting for the
+        state changes the task is making right now, so they are queued before it).
+
+        Before the queue exists (before activation) and after teardown, messages go
+        straight to the transport.
+        """
+        gate = self._gate_of(message)
+        if gate is not None:
+            if isinstance(message, messages.TERMINAL_REPORTS):
+                if gate.closed:
+                    logger.debug("Dropping a second end of task %s: %s", message.task, message)
+                    return
+                gate.close()
+            elif not gate.enter():
+                logger.debug("Dropping a report after the end of its task: %s", message)
+                return
+            else:
+                try:
+                    queued = self._enqueue(message)
+                finally:
+                    gate.leave()
+                if queued:
+                    await asyncio.sleep(0)  # let the processor keep up
+                else:
+                    await self._aemit(message)
+                return
+
+        if self._enqueue(message):
+            await asyncio.sleep(0)  # let the processor keep up
+        else:
+            await self._aemit(message)
+
+    def _gate_of(self, message: messages.FromAgentMessage) -> TaskGate | None:
+        """The gate a report has to pass: its task's, for task reports."""
+        if not isinstance(message, messages.FromAgentEvent):
+            return None
+        task = getattr(message, "task", None)
+        return self._task_gates.get(task) if task is not None else None
+
+    def _enqueue(self, message: messages.FromAgentMessage) -> bool:
+        """Put a message on the ordered queue; ``False`` when it has to be sent directly."""
+        queue = self._event_queue
+        if queue is None or self._on_processor():
+            return False
+        queue.async_q.put_nowait(QueuedMessage(message=message))
+        return True
+
+    def _action_key_for(self, message: messages.Message) -> str | None:
+        """The action key of the (still managed) task a message belongs to."""
+        if isinstance(message, messages.StatePatch):
+            task = message.task_id
+        else:
+            task = getattr(message, "task", None)
+        if task is None:
+            return None
+        assignment = self.managed_assignments.get(task)
+        if assignment is None:
+            return None
+        return assignment.interface or assignment.action or assignment.task
+
+    async def _aemit(self, message: messages.FromAgentMessage) -> None:
+        """Number, record and hand on one message: the single ordered step.
+
+        Every agent→backend event gets a monotonic ``seq`` here, and terminal reports
+        (completed/failed/critical/cancelled/interrupted) are retained in
+        ``_unacked_events`` until the backend confirms durability with an ``EventAck``
+        (handled in ``process``) — the persist-then-ack contract. Journaled messages get
+        their ``pos``; with a journal-acknowledging server they are retained until a
+        ``JournalAck`` covers them.
         """
         if isinstance(message, messages.FromAgentEvent):
             self._event_seq += 1
             # Messages are frozen, so produce a copy carrying the assigned seq.
             message = message.model_copy(update={"seq": self._event_seq})
-            if isinstance(message, messages.TERMINAL_REPORTS):
-                self._unacked_events[message.id] = message
-        await self.transport.asend(message)
+        entry = self._journal.append(message, self._action_key_for(message))
+        if entry is not None and self.stamps_frames:
+            message = message.model_copy(
+                update={
+                    "pos": entry.pos,
+                    "journal_session": entry.session_id,
+                    "agent_ts": entry.event_time / 1000,
+                }
+            )
+        if isinstance(message, messages.TERMINAL_REPORTS):
+            self._unacked_events[message.id] = message
+        if entry is not None and self._journal_acks:
+            self._retain(message, entry)
+        await self._adeliver(message, entry)
         if isinstance(message, messages.TERMINAL_REPORTS):
             # The task is done, so it is no longer running on any actor, and no
             # longer an assignment this agent is managing. Nothing used to pop
@@ -1116,7 +1351,28 @@ class BaseAgent(KoiledModel):
             self.managed_assignments.pop(message.task, None)
             self._finished_tasks[message.task] = None
             while len(self._finished_tasks) > _FINISHED_TASKS_REMEMBERED:
-                self._finished_tasks.pop(next(iter(self._finished_tasks)))
+                forgotten = next(iter(self._finished_tasks))
+                self._finished_tasks.pop(forgotten)
+                self._task_gates.pop(forgotten, None)
+
+    async def _adeliver(
+        self, message: messages.FromAgentMessage, entry: JournalEntry | None
+    ) -> None:
+        """Hand one numbered message to where it goes."""
+        if isinstance(message, messages.StatePatch):
+            await self.apublish_patch(message, entry)
+        elif isinstance(message, messages.StateSnapshot):
+            await self.apublish_snapshot(message, entry)
+        elif isinstance(message, messages.SessionInit):
+            await self.apublish_session_init(message, entry)
+        else:
+            await self._asend_out(message, entry)
+
+    async def _asend_out(
+        self, message: messages.FromAgentMessage, entry: JournalEntry | None = None
+    ) -> None:
+        """Put one message on the transport."""
+        await self.transport.asend(message)
 
     async def asend(self, actor: "Actor", message: messages.FromAgentMessage) -> None:
         """Sends a message to the actor. This is used for sending messages to the
@@ -1196,21 +1452,36 @@ class BaseAgent(KoiledModel):
             },
         )
         logger.debug("Publishing session init: %s ", session_init)
-        await self.apublish_session_init(session_init)
+        # Through the ordered queue: it starts the journal's session (pos 1). Waited
+        # for (activation is not awaited by the message loop, so this cannot wait on
+        # itself), so a baseline that cannot be published fails the start.
+        queue = self._event_queue
+        if queue is None:
+            await self._aemit(session_init)
+            return
+        waiter: asyncio.Future[None] = asyncio.get_running_loop().create_future()
+        queue.async_q.put_nowait(QueuedMessage(message=session_init, waiter=waiter))
+        await waiter
 
-    async def apublish_session_init(self, session_init: messages.SessionInit) -> None:
+    async def apublish_session_init(
+        self, session_init: messages.SessionInit, entry: JournalEntry | None = None
+    ) -> None:
         """Announce a new session, with the state snapshots it starts from."""
-        await self.transport.asend(session_init)
+        await self._asend_out(session_init, entry)
         logger.debug("Published session init %s", session_init)
 
-    async def apublish_patch(self, patch: messages.StatePatch) -> None:
+    async def apublish_patch(
+        self, patch: messages.StatePatch, entry: JournalEntry | None = None
+    ) -> None:
         """Publish a state patch over the socket."""
-        await self.transport.asend(patch)
+        await self._asend_out(patch, entry)
         logger.debug("Published patch %s", patch)
 
-    async def apublish_snapshot(self, snapshot: messages.StateSnapshot) -> None:
+    async def apublish_snapshot(
+        self, snapshot: messages.StateSnapshot, entry: JournalEntry | None = None
+    ) -> None:
         """Publish a full state snapshot over the socket."""
-        await self.transport.asend(snapshot)
+        await self._asend_out(snapshot, entry)
         logger.debug("Published snapshot %s", snapshot)
 
     async def aget_context(self, context: str) -> Any:  # noqa: ANN401
@@ -1384,8 +1655,9 @@ class BaseAgent(KoiledModel):
         # From here on the app has set up resources, so teardown owes it the
         # shutdown hooks (even if the rest of the startup fails).
         self._ran_startup_hooks = True
-        await self.ainit_states(hook_return=hook_return)
 
+        # The ordered queue runs before the states are initialized: the session
+        # baseline they announce is the journal's first entry.
         self.global_revision = 0
         self._event_queue = janus.Queue()
         self._patch_processor_task = asyncio.create_task(
@@ -1398,6 +1670,7 @@ class BaseAgent(KoiledModel):
                 else None
             )
         )
+        await self.ainit_states(hook_return=hook_return)
 
         for context_key, context_value in hook_return.contexts.items():
             self.contexts[context_key] = context_value

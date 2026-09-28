@@ -14,7 +14,7 @@ the caller stream carries the ``…Event`` suffix (``Pause`` cmd vs ``Paused`` r
 """
 
 from typing import Any, Literal, Union, get_args
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, SerializerFunctionWrapHandler, model_serializer
 from enum import Enum
 from pydantic import Field
 import uuid
@@ -82,6 +82,8 @@ class ToAgentMessageType(str, Enum):
     KICK = "KICK"
     PROTOCOL_ERROR = "PROTOCOL_ERROR"
     EVENT_ACK = "EVENT_ACK"
+    # Cumulative: everything of a journal session up to a position is persisted.
+    JOURNAL_ACK = "JOURNAL_ACK"
     ASSIGN_RESPONSE = "ASSIGN_RESPONSE"
     PROBE_RESPONSE = "PROBE_RESPONSE"
     # Replies to the agent's shelving requests.
@@ -154,7 +156,45 @@ class Message(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
 
 
-class FromAgentEvent(Message):
+#: The journal fields a journaled frame carries next to its ``id`` and ``seq``.
+JOURNAL_STAMP_FIELDS = ("pos", "journal_session", "agent_ts")
+
+
+class JournaledMessage(Message):
+    """Base for the agent reports the agent's journal numbers (see ``docs/journal.md``).
+
+    Task events, lock changes, state patches, snapshots and the session baseline. A
+    journaled frame sent to a server carries its position in the journal. The fields
+    are left out of the frame entirely while unset, so a frame that is not stamped
+    (every frame a FastAPI websocket client that did not opt in receives) is exactly
+    what it was before the journal existed. ``Register`` never has them: the server
+    forbids extras there.
+    """
+
+    pos: int | None = Field(
+        default=None,
+        description="The frame's position in its journal session (1, 2, 3, ... with no gaps). Unset for frames that are not journaled.",
+    )
+    journal_session: str | None = Field(
+        default=None,
+        description="The journal session ``pos`` counts in (the agent's session).",
+    )
+    agent_ts: float | None = Field(
+        default=None,
+        description="When the agent recorded the frame, in seconds since the epoch.",
+    )
+
+    @model_serializer(mode="wrap")
+    def _drop_unset_journal_stamp(self, handler: SerializerFunctionWrapHandler) -> Any:  # noqa: ANN401
+        data = handler(self)
+        if isinstance(data, dict):
+            for key in JOURNAL_STAMP_FIELDS:
+                if key in data and data[key] is None:
+                    del data[key]
+        return data
+
+
+class FromAgentEvent(JournaledMessage):
     """Base for agent→backend reporting events that participate in the ack/resume stream.
 
     ``seq`` is a monotonic, per-connection stream sequence used only for at-least-once
@@ -465,7 +505,7 @@ class HeartbeatEvent(Message):
     )
 
 
-class SessionInit(Message):
+class SessionInit(JournaledMessage):
     """A session init message
 
     A session init message is sent when the agent starts and wants to
@@ -482,7 +522,7 @@ class SessionInit(Message):
     )
 
 
-class StatePatch(Message):
+class StatePatch(JournaledMessage):
     """A state patch message
 
     A state patch is sent when the agent wants to send a granular state modification
@@ -508,7 +548,7 @@ class StatePatch(Message):
     )
 
 
-class StateSnapshot(Message):
+class StateSnapshot(JournaledMessage):
     """A state snapshot message
 
     A state snapshot is sent when the agent wants to send a full state snapshot
@@ -527,7 +567,7 @@ class StateSnapshot(Message):
     )
 
 
-class Lock(Message):
+class Lock(JournaledMessage):
     """A lock message
 
     Sent when the agent wants to acquire a distributed lock on the rekuest backend.
@@ -538,7 +578,7 @@ class Lock(Message):
     task: str
 
 
-class Unlock(Message):
+class Unlock(JournaledMessage):
     """An unlock message
 
     Sent when the agent wants to release a distributed lock on the rekuest backend.
@@ -625,6 +665,10 @@ class Init(Message):
     diagnostics: list["RegistrationDiagnostic"] = Field(
         default_factory=list,
         description="Non-fatal findings of the registration the Register carried; the agent surfaces them as CatalogWarnings.",
+    )
+    journal: bool = Field(
+        default=False,
+        description="The backend persists journal positions and acknowledges them with JOURNAL_ACK. The agent then retains every journaled frame until an ack covers it, and re-sends them in order after a reconnect.",
     )
 
 
@@ -921,6 +965,18 @@ class EventAck(Message):
     )
 
 
+class JournalAck(Message):
+    """Backend → agent: everything of ``journal_session`` up to ``pos`` is persisted.
+
+    Cumulative. Only sent by a backend that announced ``journal`` on ``Init``, and only
+    once the agent has sent it a ``pos``-carrying frame.
+    """
+
+    type: Literal[ToAgentMessageType.JOURNAL_ACK] = ToAgentMessageType.JOURNAL_ACK
+    journal_session: str = Field(description="The journal session the position counts in.")
+    pos: int = Field(description="Every position up to and including this one is persisted.")
+
+
 class ExecutionEvent(Message):
     """Base for backend→caller task-event mirrors.
 
@@ -1142,6 +1198,7 @@ ToAgentMessage = Union[
     Bounce,
     Kick,
     EventAck,
+    JournalAck,
     AssignResponse,
     ProbeResponse,
     ControlResponse,

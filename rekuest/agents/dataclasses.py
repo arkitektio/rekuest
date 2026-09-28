@@ -4,9 +4,11 @@ Kept apart from :mod:`rekuest.agents.types` (protocols and type variables)
 and from the agent's behaviour so that each can be imported without the other.
 """
 
+import asyncio
 from dataclasses import dataclass, field
 from datetime import datetime, UTC
 
+from rekuest import messages
 from rekuest.state.publish import Patch
 from rekuest.structures.types import JSONSerializable
 
@@ -21,6 +23,24 @@ class QueuedPatchEvent:
 
 
 @dataclass
+class QueuedMessage:
+    """A report waiting in the agent's ordered queue, behind the patches made before it."""
+
+    message: messages.FromAgentMessage
+    waiter: "asyncio.Future[None] | None" = None
+    """Resolved once the message was handed to the transport, for the few callers
+    that wait for it (the session baseline)."""
+
+
+@dataclass
+class QueuedAssign:
+    """An assignment to record as its task's first journal entry (served agents)."""
+
+    assign: messages.Assign
+    action_key: str
+
+
+@dataclass
 class RevisedState:
     """Current agent-owned shrunk state together with its local revision."""
 
@@ -28,4 +48,4 @@ class RevisedState:
     data: JSONSerializable
 
 
-__all__ = ["QueuedPatchEvent", "RevisedState"]
+__all__ = ["QueuedAssign", "QueuedMessage", "QueuedPatchEvent", "RevisedState"]

@@ -242,24 +242,25 @@ class Actor(BaseModel):
             How many assignments were stopped.
         """
         running = list(self._running_asyncio_tasks.items())
-        for _, task in running:
-            task.cancel()
-
         stopped = 0
         for key, task in running:
+            task.cancel()
+            # Reported before the task unwinds (nothing is awaited in between), so
+            # its end is recorded before what the unwinding reports (the release of
+            # its locks), and nothing it still does is recorded after it.
+            await self.agent.asend(
+                self, message=messages.Critical(task=key, error=error)
+            )
             try:
                 await task
             except asyncio.CancelledError:
-                logger.info(f"Task {key} was cancelled. Setting Critical")
+                logger.info(f"Task {key} was cancelled. Set Critical")
                 stopped += 1
             except Exception:  # noqa: BLE001 — the body failed on its way out
                 logger.error("Task %s errored while being stopped", key, exc_info=True)
             if prune:
                 self._running_asyncio_tasks.pop(key, None)
                 self.running_assignments.pop(key, None)
-            await self.agent.asend(
-                self, message=messages.Critical(task=key, error=error)
-            )
         return stopped
 
     async def abreak(self: Self, task_id: str) -> bool:
@@ -391,14 +392,20 @@ class Actor(BaseModel):
             return
 
         task.cancel()
+        # Reported before the task unwinds (nothing is awaited in between): the end
+        # closes the task's gate, so nothing the task still does -- a state change
+        # from a worker thread, a log on its way out -- is recorded after it, and the
+        # release of its locks (``UNLOCK``) follows it.
+        await self.agent.asend(self, message=terminal(task=task_id))
         try:
             await task
         except asyncio.CancelledError:
             logger.info(
-                f"Task {task_id} was {verb} through arkitekt. Setting {terminal.__name__}"
+                f"Task {task_id} was {verb} through arkitekt. Reported {terminal.__name__}"
             )
-            self._running_asyncio_tasks.pop(task_id, None)
-            await self.agent.asend(self, message=terminal(task=task_id))
+        except Exception:  # noqa: BLE001 — the body failed on its way out
+            logger.error("Task %s errored while being %s", task_id, verb, exc_info=True)
+        self._running_asyncio_tasks.pop(task_id, None)
 
     async def _aon_assign_reporting(self: Self, assignment: messages.Assign) -> None:
         """Run :meth:`on_assign`, guaranteeing the backend hears how it ended.
@@ -531,6 +538,7 @@ class SerializingActor(Actor):
                     Mutation(
                         correlation_id=assignment.task if assignment else None,
                         locks=frozenset(self.locks or ()),
+                        gate=self._task_gate(assignment),
                     ),
                 )
             except KeyError as e:
@@ -543,6 +551,13 @@ class SerializingActor(Actor):
                 raise StateRequirementsNotMet(f"State requirements not met: {e}") from e
 
         return context_kwargs, state_kwargs
+
+    def _task_gate(self, assignment: Any) -> Any:  # noqa: ANN401 - TaskGate | None
+        """The gate of the assignment's task: its state changes are refused after its end."""
+        task_gate = getattr(self.agent, "task_gate", None)
+        if assignment is None or task_gate is None:
+            return None
+        return task_gate(assignment.task)
 
     async def aget_dependency_locals(
         self: Self, task: Task

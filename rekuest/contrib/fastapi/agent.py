@@ -4,16 +4,24 @@ The FastAPI integration exposes one websocket endpoint. Clients send an init
 payload after connecting to declare which task action keys, state keys, and
 lock keys they want to receive. Outgoing agent messages are then filtered by
 message type and the matching subscription set.
+
+A client that sends ``"journal": true`` opts into the agent's journal (see
+``docs/journal.md``): its INIT carries the journal's watermark and the world as of
+it, every frame after it carries ``pos`` and ``journal_session``, it also gets the
+session-wide frames and ``ASSIGN``, and with ``resume_after`` it first gets what it
+missed. A client that does not opt in gets exactly the frames it always got.
 """
 
 import asyncio
 import copy
+import json
 import logging
 import uuid
 from dataclasses import dataclass
 from types import TracebackType
 from typing import (
     Any,
+    ClassVar,
     Self,
 )
 from collections.abc import AsyncIterator, Awaitable, Callable
@@ -23,7 +31,14 @@ from pydantic import ConfigDict, Field, PrivateAttr
 from rekuest import messages
 from rekuest.protocol.schema import AssignInput, StateImplementationInput
 from rekuest.agents.base import BaseAgent
-from rekuest.agents.dataclasses import RevisedState
+from rekuest.agents.dataclasses import QueuedAssign, RevisedState
+from rekuest.agents.journal import (
+    FLUSH_TIMEOUT,
+    JournalEntry,
+    JournalReader,
+    JournalSink,
+    Route,
+)
 from rekuest.agents.transport.base import AgentTransport
 from rekuest.agents.backend import LocalAgentBackend
 from rekuest.contrib.fastapi.sink.backend import SinkAgentBackend
@@ -101,6 +116,34 @@ class _WebSocketSubscriptions:
             state_keys=_normalize(payload.state_keys),
             lock_keys=_normalize(payload.lock_keys),
         )
+
+    def admits(self, route: Route) -> bool:
+        """Whether a journal subscriber gets an entry routed this way."""
+        kind, key = route
+        if kind == "state":
+            return self.state_keys is None or key in self.state_keys
+        if kind == "lock":
+            return self.lock_keys is None or key in self.lock_keys
+        if kind == "action":
+            return self.action_keys is None or key in self.action_keys
+        return True
+
+
+def _dump(frame: dict[str, Any]) -> str:
+    return json.dumps(frame, separators=(",", ":"), ensure_ascii=False)
+
+
+class _JournalSubscriber:
+    """A websocket client that opted into the journal.
+
+    Its frames are queued in ``pos`` order as the journal records them (under the
+    journal's lock), and sent by its own handler after its INIT and backlog, so it
+    misses nothing after the watermark its INIT carries, and gets nothing twice.
+    """
+
+    def __init__(self, subscriptions: _WebSocketSubscriptions) -> None:
+        self.subscriptions = subscriptions
+        self.frames: asyncio.Queue[str] = asyncio.Queue()
 
 
 
@@ -254,6 +297,10 @@ class FastApiTransport(AgentTransport):
         default=None
     )
     _connected: bool = PrivateAttr(default=False)
+    _journal_subscribers: set[_JournalSubscriber] = PrivateAttr(default_factory=set)
+    _on_submit: Callable[[messages.ToAgentMessage], None] | None = PrivateAttr(
+        default=None
+    )
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -277,6 +324,9 @@ class FastApiTransport(AgentTransport):
         if self._receive_queue is None:
             raise RuntimeError("Transport not connected. Call aconnect first.")
 
+        if self._on_submit is not None:
+            # Before the agent sees it: an ASSIGN is its task's first journal entry.
+            self._on_submit(message)
         # Put the message on the queue for the agent to process
         await self._receive_queue.put(message)
         logger.info(f"Submitted message to agent: {message}")
@@ -286,19 +336,73 @@ class FastApiTransport(AgentTransport):
             return message.task
         return getattr(message, "task", getattr(message, "id", "unknown"))
 
-    async def asend(self, message: messages.FromAgentMessage) -> None:
+    def set_submit_hook(
+        self, hook: Callable[[messages.ToAgentMessage], None] | None
+    ) -> None:
+        """Be told (synchronously) about every submitted message before the agent is."""
+        self._on_submit = hook
+
+    async def asend(
+        self,
+        message: messages.FromAgentMessage,
+        entry: JournalEntry | None = None,
+    ) -> None:
         """Route an outgoing agent message by message type and subscriptions.
 
         Task messages are matched against `action_keys`, state patch messages
         against `state_keys`, and lock lifecycle messages against `lock_keys`.
         The connection manager handles the actual per-socket filtering.
 
+        Journal subscribers got a journaled message (``entry``) already, from
+        :meth:`journal_fanout`; they get a message the journal did not record here.
+
         Args:
             message: The message to send to subscribed websocket clients.
+            entry: The journal entry recording the message, if it was recorded.
         """
         message_json = message.model_dump_json()
         logger.info(f"Agent sending message: {message_json}")
+        if entry is None and self._journal_subscribers:
+            for subscriber in list(self._journal_subscribers):
+                if self.connection_manager._matches_subscription(
+                    subscriber.subscriptions, message
+                ):
+                    subscriber.frames.put_nowait(message_json)
         await self.connection_manager.broadcast_model(message)
+
+    def journal_fanout(
+        self, entry: JournalEntry, message: messages.Message | None
+    ) -> None:
+        """Queue a new journal entry for the journal subscribers it is routed to.
+
+        Called by the journal under its lock, in ``pos`` order. The frame is the
+        message as every client gets it (with its stream ``seq``) plus ``pos`` and
+        ``journal_session``; an ``ASSIGN`` is its recorded payload.
+        """
+        if not self._journal_subscribers:
+            return
+        route = entry.route()
+        text: str | None = None
+        for subscriber in list(self._journal_subscribers):
+            if not subscriber.subscriptions.admits(route):
+                continue
+            if text is None:
+                frame = (
+                    message.model_dump(mode="json")
+                    if message is not None
+                    else dict(entry.payload)
+                )
+                frame["pos"] = entry.pos
+                frame["journal_session"] = entry.session_id
+                text = _dump(frame)
+            subscriber.frames.put_nowait(text)
+
+    def add_journal_subscriber(self, subscriber: _JournalSubscriber) -> None:
+        """Start queueing journal frames for a subscriber (call under the journal lock)."""
+        self._journal_subscribers.add(subscriber)
+
+    def remove_journal_subscriber(self, subscriber: _JournalSubscriber) -> None:
+        self._journal_subscribers.discard(subscriber)
 
     async def aconnect(self) -> None:
         """Connect the transport."""
@@ -340,12 +444,21 @@ class FastApiTransport(AgentTransport):
         ]
         | None = None,
         expand_user_from_request: ExpandUserFromRequest | None = None,
+        open_journal: Callable[
+            [WebSocketSubscriptionInit, _WebSocketSubscriptions],
+            Awaitable[tuple[_JournalSubscriber, dict[str, Any], list[JournalEntry]]],
+        ]
+        | None = None,
     ) -> None:
         """Serve the unified websocket endpoint.
 
         The websocket must send a JSON init payload immediately after connect.
         The payload may contain `action_keys`, `state_keys`, and `lock_keys`
         arrays that define which updates should be delivered.
+
+        With `"journal": true` (and an `open_journal` callback) the client is a
+        journal subscriber: its INIT gets a `journal` object, it first gets the
+        entries it asked to resume, then every journaled frame after the watermark.
 
         Args:
             websocket: The accepted websocket connection.
@@ -357,6 +470,8 @@ class FastApiTransport(AgentTransport):
         """
         print("WebSocket connection received, waiting for init payload...")
         await websocket.accept()
+        subscriber: _JournalSubscriber | None = None
+        pump: asyncio.Task[None] | None = None
         try:
             init_data = await websocket.receive_json()
             if not isinstance(init_data, dict):
@@ -377,12 +492,26 @@ class FastApiTransport(AgentTransport):
                     return
 
             subscriptions = _WebSocketSubscriptions.from_init(init_payload)
-            await self.connection_manager.connect(websocket, subscriptions)
+            journal_info: dict[str, Any] | None = None
+            backlog: list[JournalEntry] = []
+            if init_payload.journal and open_journal is not None:
+                subscriber, journal_info, backlog = await open_journal(
+                    init_payload, subscriptions
+                )
+            else:
+                await self.connection_manager.connect(websocket, subscriptions)
 
             if build_initial_payload is not None:
                 initial_message = await build_initial_payload(init_payload)
                 if initial_message is not None:
+                    if journal_info is not None:
+                        initial_message["journal"] = journal_info
                     await websocket.send_json(initial_message)
+
+            if subscriber is not None:
+                for entry in backlog:
+                    await websocket.send_text(_dump(entry.frame()))
+                pump = asyncio.create_task(self._apump(websocket, subscriber))
 
             # Keep the socket open for outbound events; nothing after INIT is
             # acted on. ``receive_text`` (unlike the raw ``receive``) raises
@@ -395,7 +524,24 @@ class FastApiTransport(AgentTransport):
         except Exception as e:
             logger.error(f"WebSocket error: {e}")
         finally:
-            await self.connection_manager.disconnect(websocket)
+            if pump is not None:
+                pump.cancel()
+            if subscriber is not None:
+                self.remove_journal_subscriber(subscriber)
+            else:
+                await self.connection_manager.disconnect(websocket)
+
+    async def _apump(self, websocket: WebSocket, subscriber: _JournalSubscriber) -> None:
+        """Send a journal subscriber's frames, in order, until the socket goes away."""
+        try:
+            while True:
+                text = await subscriber.frames.get()
+                await websocket.send_text(text)
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:  # noqa: BLE001 — the client went away mid-send
+            logger.info(f"Journal subscriber gone: {e}")
+            self.remove_journal_subscriber(subscriber)
 
     async def __aenter__(self) -> Self:
         """Enter the context manager."""
@@ -457,9 +603,18 @@ class FastApiAgent(BaseAgent):
         description="Polling interval in seconds used while waiting for the sink to catch up during shutdown.",
     )
 
+    # Websocket clients that opt into the journal get ``pos`` on their frames; the
+    # frames themselves stay exactly what every other client gets.
+    stamps_frames: ClassVar[bool] = False
+
     def model_post_init(self, __context: Any) -> None:
         """Wire task routing so websocket subscriptions use action keys."""
         super().model_post_init(__context)
+        # The journal is persisted with the state history, when the sink keeps one,
+        # and fanned out to the websocket clients that opted into it.
+        self._journal.sink = self.sink if isinstance(self.sink, JournalSink) else None
+        self._journal.add_listener(self.transport.journal_fanout)
+        self.transport.set_submit_hook(self._record_submitted)
         # This agent's control plane is its sink, not a remote server.
         if isinstance(self.backend, LocalAgentBackend):
             self.backend = SinkAgentBackend(sink=self.sink)
@@ -569,7 +724,89 @@ class FastApiAgent(BaseAgent):
             websocket,
             build_initial_payload=self.abuild_websocket_init_message,
             expand_user_from_request=expand_user_from_request,
+            open_journal=self.aopen_journal,
         )
+
+    def _record_submitted(self, message: messages.ToAgentMessage) -> None:
+        """Record a submitted assignment as its task's first journal entry.
+
+        Queued in the agent's ordered queue before the agent sees the assignment,
+        so it precedes everything the task reports.
+        """
+        queue = self._event_queue
+        if not isinstance(message, messages.Assign) or queue is None:
+            return
+        # Thread-safe: routes may submit from another event loop (the test clients do).
+        queue.sync_q.put_nowait(
+            QueuedAssign(assign=message, action_key=self.build_task_action_key(message))
+        )
+
+    async def aopen_journal(
+        self,
+        init_payload: WebSocketSubscriptionInit,
+        subscriptions: _WebSocketSubscriptions,
+    ) -> tuple[_JournalSubscriber, dict[str, Any], list[JournalEntry]]:
+        """Subscribe a journal client at the current watermark.
+
+        Returns the subscription, the INIT's ``journal`` object (the world exactly as
+        of the watermark) and the entries to replay (those after ``resume_after``).
+        The subscription, the watermark and the world are taken under the journal's
+        lock: live frames after the watermark queue up for the subscriber, so
+        nothing is missed or sent twice.
+        """
+        subscriber = _JournalSubscriber(subscriptions)
+        after = init_payload.resume_after
+        with self._journal.locked() as view:
+            watermark = view.watermark
+            recent = (
+                view.recent(after, watermark.pos)
+                if watermark is not None and after is not None and after <= watermark.pos
+                else None
+            )
+            self.transport.add_journal_subscriber(subscriber)
+            fold = view.fold.copy()
+
+        if watermark is None:
+            info: dict[str, Any] = {
+                "session_id": None,
+                "pos": 0,
+                "global_rev": 0,
+                "resync": after is not None,
+            }
+            return subscriber, info, []
+
+        # A position alone may be from before a restart: resuming needs the session
+        # it counts in, unless it resumes from the very start.
+        resync = after is not None and (
+            after > watermark.pos
+            or (after > 0 and init_payload.session_id != watermark.session_id)
+        )
+        backlog: list[JournalEntry] = []
+        if after is not None and not resync:
+            if recent is not None:
+                backlog = recent
+            elif isinstance(self.retriever, JournalReader):
+                await self._journal.aflush_to(watermark.pos, FLUSH_TIMEOUT)
+                try:
+                    backlog = await self.retriever.aget_journal_entries(
+                        watermark.session_id, after=after, until=watermark.pos
+                    )
+                except Exception:
+                    logger.error(
+                        "Could not read the journal to resume a subscriber", exc_info=True
+                    )
+        backlog = [entry for entry in backlog if subscriptions.admits(entry.route())]
+
+        info = fold.world(
+            action_keys=subscriptions.action_keys,
+            state_keys=subscriptions.state_keys,
+            lock_keys=subscriptions.lock_keys,
+        )
+        info["session_id"] = watermark.session_id
+        info["pos"] = watermark.pos
+        info["global_rev"] = watermark.global_rev
+        info["resync"] = resync
+        return subscriber, info, backlog
 
     def build_task_action_key(self, assign_message: messages.Assign) -> str:
         """Build the routing key used for task websocket subscriptions."""
@@ -707,22 +944,34 @@ class FastApiAgent(BaseAgent):
 
         return locks
 
-    async def apublish_patch(self, patch: messages.StatePatch) -> None:
+    async def _asend_out(
+        self, message: messages.FromAgentMessage, entry: JournalEntry | None = None
+    ) -> None:
+        """Broadcast to websocket clients (journal subscribers already have ``entry``)."""
+        await self.transport.asend(message, entry)
+
+    async def apublish_patch(
+        self, patch: messages.StatePatch, entry: JournalEntry | None = None
+    ) -> None:
         """Publish a state patch event: broadcast to websocket clients and persist to sink."""
-        await self.transport.asend(patch)
+        await self._asend_out(patch, entry)
         await self.sink.awrite_patch(patch)
 
-    async def apublish_snapshot(self, snapshot: messages.StateSnapshot) -> None:
-        await self.transport.asend(snapshot)
+    async def apublish_snapshot(
+        self, snapshot: messages.StateSnapshot, entry: JournalEntry | None = None
+    ) -> None:
+        await self._asend_out(snapshot, entry)
         return await self.sink.adump_snapshot(snapshot)
 
-    async def apublish_session_init(self, session_init: messages.SessionInit) -> None:
+    async def apublish_session_init(
+        self, session_init: messages.SessionInit, entry: JournalEntry | None = None
+    ) -> None:
         """Announce the session and give the sink its baseline snapshot.
 
         The sink stores snapshots, not session messages, so the states carried by the
         session init are handed to it in the shape it persists.
         """
-        await self.transport.asend(session_init)
+        await self._asend_out(session_init, entry)
         await self.sink.adump_snapshot(
             messages.StateSnapshot(
                 session_id=session_init.session_id,
@@ -794,5 +1043,8 @@ class FastApiAgent(BaseAgent):
         if self._ran_startup_hooks:
             # An agent that never started persisted nothing to catch up on.
             await self._await_persistence_caught_up()
+        await self._journal.aclose(
+            self.sink_catch_up_timeout if self.sink_catch_up_timeout is not None else FLUSH_TIMEOUT
+        )
         await self.sink.ateardown()
         await self.retriever.ateardown()

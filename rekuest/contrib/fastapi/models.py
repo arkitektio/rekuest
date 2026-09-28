@@ -10,6 +10,8 @@ class RetrieverSessionInfoResponse(BaseModel):
     """Response containing the active session identifier."""
 
     current_session: str | None
+    current_pos: int | None = None
+    """The journal's last position in the current session."""
 
 
 class RetrieverTaskBoundaryResponse(BaseModel):
@@ -135,3 +137,11 @@ class WebSocketSubscriptionInit(BaseModel):
     band: this is the websocket's equivalent of an `Authorization` header. It is read
     by the application's `expand_user_from_request` hook.
     """
+    journal: bool = False
+    """Opt into the agent's journal: frames carry `pos` and `journal_session`, the
+    session-wide frames and `ASSIGN` are included, and the INIT carries a consistent
+    `journal` object (see `docs/journal.md`)."""
+    resume_after: int | None = None
+    """With `journal`: first replay the entries after this position."""
+    session_id: str | None = None
+    """With `resume_after` (above 0): the journal session the position counts in."""

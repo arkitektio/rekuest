@@ -10,3 +10,7 @@ alone.
 - [Disconnect policy](./disconnect-policy.md) — declare what happens to an action's
   in-flight work when the agent loses its control channel (`CancelOnDisconnect`),
   and how hard the agent fights to keep it (`ConnectionPolicy`).
+- [The agent journal](./journal.md) — one ordered, persisted record of everything an
+  agent reports (task events, locks, state patches), resumable over the served
+  websocket (`"journal": true`) and replayable at any position (`/journal…` routes).
+  The contract shared with the Rust agent and the rekuest server.
