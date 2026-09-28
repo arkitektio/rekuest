@@ -163,8 +163,12 @@ class GraphQLPostman(KoiledModel):
 
         try:
             task = await RekuestGraphQL(self.rath).aassign(**assign_input.model_dump())
-        except Exception as e:
-            raise PostmanException(f"Cannot Assign: {e}") from e
+        except BaseException as e:
+            # No task was bound to this reference, so nothing else will drop its queue.
+            self._cleanup_reference(assign_reference)
+            if isinstance(e, Exception):
+                raise PostmanException(f"Cannot Assign: {e}") from e
+            raise
 
         # Bind task id -> reference so the change feed (which only knows the task
         # id) can route events to this queue. Also flushes any events that raced

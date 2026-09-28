@@ -253,7 +253,7 @@ class AgentPostman:
         which field of the answer carries the id, so the correlation, cancellation and
         cleanup below are identical for both.
         """
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         response_future: "asyncio.Future[messages.AssignResponse | messages.ProbeResponse]" = loop.create_future()
         self._pending_responses[request.id] = response_future
 
@@ -381,7 +381,7 @@ class AgentPostman:
         Bounded by ``timeout`` overall. Returns ``True`` if a matching mirror was
         seen, ``False`` on timeout.
         """
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         deadline = loop.time() + timeout
         while True:
             remaining = deadline - loop.time()
