@@ -12,7 +12,10 @@ is for a user-side tool that holds a client and wants the findings before it con
 
 from collections.abc import Sequence
 
-from rekuest.protocol.schema import ImplementAgentInput, OptimisticInput
+from arkitekt_spec.actions import (
+    ImplementAgentInput,
+    OptimisticInput,
+)
 from rekuest.api.schema import BaseCatalogQueryBaseCatalog, CatalogOperation, UICatalog
 from rekuest.catalogs import (
     ArgumentSpec,

@@ -12,7 +12,7 @@ It mirrors the server's ``facade.catalog_validation`` -- ``iter_definition_calls
 from collections.abc import Iterator, Sequence
 from typing import Any
 
-from rekuest.protocol.schema import (
+from arkitekt_spec.actions import (
     AssignWidgetInput,
     DefinitionInput,
     OptimisticInput,
@@ -20,7 +20,7 @@ from rekuest.protocol.schema import (
     UtilCallInput,
 )
 from rekuest.catalogs import CatalogView, Diagnostic, check_call, check_component
-from rekuest.traits.calls import iter_call_arguments
+from arkitekt_spec.rules import iter_call_arguments
 
 
 def _prop_calls(prop: Any) -> Iterator[UtilCallInput]:

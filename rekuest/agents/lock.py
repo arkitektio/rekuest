@@ -31,7 +31,7 @@ Deadlock invariants
 import asyncio
 import logging
 from types import TracebackType
-from rekuest.protocol.schema import LockImplementationInput
+from arkitekt_spec.actions import LockImplementationInput
 from typing import TYPE_CHECKING, Self
 
 if TYPE_CHECKING:

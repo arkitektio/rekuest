@@ -2,11 +2,10 @@ import pytest
 from rekuest.structures.registry import StructureRegistry
 from pydantic import ValidationError
 
-from rekuest.protocol.schema import (
+from arkitekt_spec.actions import (
     AgentDependencyInput,
     ArgPortInput,
     BlokImplementationInput,
-    CreateBlokInput,
     ImplementationInput,
     PortKind,
     ReturnPortInput,
@@ -14,6 +13,7 @@ from rekuest.protocol.schema import (
     StateDependencyInput,
     StateImplementationInput,
 )
+from rekuest.protocol.schema import CreateBlokInput
 from rekuest.blok.registry import (
     _create_action_dependency,
     _create_state_dependency,

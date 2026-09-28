@@ -8,7 +8,7 @@ from typing import (
     get_type_hints,
 )
 from collections.abc import Callable
-from rekuest.protocol.schema import (
+from arkitekt_spec.actions import (
     ReturnPortInput,
     StateImplementationInput,
     StateDefinitionInput,

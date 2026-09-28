@@ -9,7 +9,10 @@ default a state demand inherits its ``app`` from the protocol's core app and its
 from typing import Annotated, Any
 
 from rekuest.declare import demand_state
-from rekuest.protocol.schema import AgentDependencyInput, StateDemandInput
+from arkitekt_spec.actions import (
+    AgentDependencyInput,
+    StateDemandInput,
+)
 from rekuest.structures.registry import StructureRegistry
 
 

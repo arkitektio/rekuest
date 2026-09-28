@@ -1,7 +1,10 @@
 """General Tests for defininin actions"""
 
 
-from rekuest.protocol.schema import DefinitionInput, PortKind
+from arkitekt_spec.actions import (
+    DefinitionInput,
+    PortKind,
+)
 import pytest
 from rekuest.definition.define import prepare_definition
 from rekuest.structures.registry import StructureRegistry

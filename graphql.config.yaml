@@ -9,11 +9,14 @@
 # and restore the `schema` key to this URL before committing: rekuest/arkitekt.py ships
 # rekuest/api/project.json to downstream code generation.
 #
-# Needs turms >= 2.1.0, for `external_modules`.
+# Needs turms with `external_modules.include` (a module that owns part of the
+# vocabulary: here arkitekt_spec.actions).
 projects:
-  # The wire vocabulary: every enum and input in the schema, woven with the
-  # hand-written traits. An app speaks only this; importing rekuest loads it
-  # and stops there.
+  # The wire vocabulary. The action language -- how an app declares its
+  # actions, states, locks and bloks -- is arkitekt-spec's (arkitekt_spec.actions,
+  # hand-maintained, carrying its own structural rules); this project imports
+  # those names and generates the rest of the schema's enums and inputs. An app
+  # speaks only this; importing rekuest loads it and stops there.
   rekuest_protocol:
     schema: http://jhnnsrs-lab/rekuest/schema
     documents: graphql/**/**.graphql
@@ -21,6 +24,63 @@ projects:
       turms:
         out_dir: rekuest/protocol
         dump_schema: false
+        external_modules:
+          - module: arkitekt_spec.actions
+            kinds: [enum, input]
+            include: &action_language
+              - ActionArgumentInput
+              - ActionDemandInput
+              - ActionDependencyInput
+              - ActionKind
+              - AgentDependencyInput
+              - AgentProbeInput
+              - ArgPortInput
+              - AssignPolicy
+              - AssignWidgetInput
+              - BlokImplementationInput
+              - ChoiceAssignWidgetInput
+              - ChoiceInput
+              - ChoiceReturnWidgetInput
+              - ComponentNodeInput
+              - ComponentPropInput
+              - CustomAssignWidgetInput
+              - CustomReturnWidgetInput
+              - DefinitionInput
+              - DescriptorInput
+              - DescriptorOperator
+              - DynamicValueInput
+              - EffectClass
+              - EffectInput
+              - EffectKind
+              - ImplementAgentInput
+              - ImplementationInput
+              - LockDefinitionInput
+              - LockImplementationInput
+              - OptimisticInput
+              - OptionKey
+              - PortGroupInput
+              - PortKind
+              - PortMatchInput
+              - ProvidesInput
+              - ProxyAssignWidgetInput
+              - RequiresInput
+              - ReturnPortInput
+              - ReturnWidgetInput
+              - SearchAssignWidgetInput
+              - SliderAssignWidgetInput
+              - StateAccessorInput
+              - StateChoiceAssignWidgetInput
+              - StateDefinitionInput
+              - StateDemandInput
+              - StateDependencyInput
+              - StateImplementationInput
+              - StringAssignWidgetInput
+              - TestTargetInput
+              - TrackInput
+              - UtilCallInput
+              - ValidatorInput
+              - WindowFunction
+              - WindowInput
         always_resolve_interfaces: true
         exclude_typenames: true
         dump_configuration: true
@@ -60,30 +120,8 @@ projects:
           Identifier: rekuest.scalars.Identifier
           SearchQuery: rekuest.scalars.SearchQuery
         additional_bases:
-          ArgPortInput:
-            - rekuest.traits.ports.PortTrait
-          ReturnPortInput:
-            - rekuest.traits.ports.PortTrait
-          SearchAssignWidgetInput:
-            - rekuest.traits.ports.SearchWidgetInputTrait
-          SliderAssignWidgetInput:
-            - rekuest.traits.ports.SliderWidgetInputTrait
-          StateChoiceAssignWidgetInput:
-            - rekuest.traits.ports.StateChoiceWidgetInputTrait
           CreateBlokInput:
             - rekuest.traits.blok.CreateBlokInputTrait
-          ImplementationInput:
-            - rekuest.traits.implementation.ImplementationInputTrait
-          BlokImplementationInput:
-            - rekuest.traits.blok.BlokImplementationInputTrait
-          ImplementAgentInput:
-            - rekuest.traits.agent.ImplementAgentInputTrait
-          ValidatorInput:
-            - rekuest.traits.ports.ValidatorInputTrait
-          EffectInput:
-            - rekuest.traits.ports.EffectInputTrait
-          DefinitionInput:
-            - rekuest.traits.ports.DefinitionInputTrait
   # The client surface: fragments, operations and the RekuestApi mixin, over
   # the vocabulary above. Only rekuest/client/ and rekuest/arkitekt.py may
   # name it -- tests/test_layering.py enforces that.
@@ -95,6 +133,11 @@ projects:
         out_dir: rekuest/api
         dump_schema: true
         external_modules:
+          # The action language from arkitekt-spec, everything else from the
+          # protocol module (a module with `include` claims its names first).
+          - module: arkitekt_spec.actions
+            kinds: [enum, input]
+            include: *action_language
           - module: rekuest.protocol.schema
             kinds: [enum, input]
             from_project: rekuest_protocol

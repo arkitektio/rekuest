@@ -11,7 +11,7 @@ from enum import Enum
 from typing import Any, cast
 from collections.abc import Sequence
 
-from rekuest.protocol.schema import PortKind
+from arkitekt_spec.actions import PortKind
 from rekuest.structures.serialization.protocols import SerializableDefinition
 from rekuest.structures.errors import (
     PortShrinkingError,

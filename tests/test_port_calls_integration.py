@@ -13,15 +13,17 @@ from typing import Annotated
 import pytest
 from dokker import Deployment
 
-from rekuest.protocol.schema import (
+from arkitekt_spec.actions import (
     ActionArgumentInput,
-    CatalogArgumentInput,
-    CatalogOperationInput,
-    CatalogValueKind,
     EffectKind,
     ImplementationInput,
     UtilCallInput,
     ValidatorInput,
+)
+from rekuest.protocol.schema import (
+    CatalogArgumentInput,
+    CatalogOperationInput,
+    CatalogValueKind,
 )
 from rekuest.blok.parser import parse_util_call
 from rekuest.definition.define import prepare_definition

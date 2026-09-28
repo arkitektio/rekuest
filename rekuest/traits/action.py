@@ -1,6 +1,6 @@
 """Traits for actions , so that we can use them as reservable context"""
 
-from rekuest.protocol.schema import ActionKind
+from arkitekt_spec.actions import ActionKind
 from koil.composition.base import KoiledModel
 from rath.origin import ContextBound
 import typing

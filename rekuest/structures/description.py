@@ -13,7 +13,7 @@ identifier (:class:`~rekuest.structures.client.StructureClient`).
 
 from dataclasses import dataclass
 
-from rekuest.protocol.schema import AssignWidgetInput
+from arkitekt_spec.actions import AssignWidgetInput
 
 
 @dataclass(frozen=True)

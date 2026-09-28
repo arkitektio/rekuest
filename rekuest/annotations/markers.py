@@ -17,7 +17,10 @@ from the top-level :mod:`rekuest` package::
 
 from typing import TypeVar
 
-from rekuest.protocol.schema import ProvidesInput, RequiresInput
+from arkitekt_spec.actions import (
+    ProvidesInput,
+    RequiresInput,
+)
 from rekuest.structures.types import JSONSerializable
 
 T = TypeVar("T")

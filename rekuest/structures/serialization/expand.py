@@ -13,7 +13,7 @@ from collections.abc import Sequence
 
 from rath.scalars import ID
 
-from rekuest.protocol.schema import PortKind
+from arkitekt_spec.actions import PortKind
 from rekuest.structures.serialization.protocols import SerializableDefinition
 from rekuest.structures.errors import (
     StructureRegistryError,

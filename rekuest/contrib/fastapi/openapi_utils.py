@@ -6,7 +6,11 @@ from fastapi import FastAPI
 from fastapi import APIRouter
 from fastapi.openapi.utils import get_openapi
 
-from rekuest.protocol.schema import ArgPortInput, PortKind, ReturnPortInput
+from arkitekt_spec.actions import (
+    ArgPortInput,
+    PortKind,
+    ReturnPortInput,
+)
 
 
 CUSTOM_SCHEMAS_STATE_KEY = "rekuest_custom_schemas"

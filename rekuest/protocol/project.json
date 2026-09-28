@@ -73,43 +73,75 @@
             "skip_forwards": false,
             "min_python_version": "3.10",
             "type_annotation_style": "auto",
-            "external_modules": [],
+            "external_modules": [
+                {
+                    "module": "arkitekt_spec.actions",
+                    "kinds": [
+                        "enum",
+                        "input"
+                    ],
+                    "names": {},
+                    "include": [
+                        "ActionArgumentInput",
+                        "ActionDemandInput",
+                        "ActionDependencyInput",
+                        "ActionKind",
+                        "AgentDependencyInput",
+                        "AgentProbeInput",
+                        "ArgPortInput",
+                        "AssignPolicy",
+                        "AssignWidgetInput",
+                        "BlokImplementationInput",
+                        "ChoiceAssignWidgetInput",
+                        "ChoiceInput",
+                        "ChoiceReturnWidgetInput",
+                        "ComponentNodeInput",
+                        "ComponentPropInput",
+                        "CustomAssignWidgetInput",
+                        "CustomReturnWidgetInput",
+                        "DefinitionInput",
+                        "DescriptorInput",
+                        "DescriptorOperator",
+                        "DynamicValueInput",
+                        "EffectClass",
+                        "EffectInput",
+                        "EffectKind",
+                        "ImplementAgentInput",
+                        "ImplementationInput",
+                        "LockDefinitionInput",
+                        "LockImplementationInput",
+                        "OptimisticInput",
+                        "OptionKey",
+                        "PortGroupInput",
+                        "PortKind",
+                        "PortMatchInput",
+                        "ProvidesInput",
+                        "ProxyAssignWidgetInput",
+                        "RequiresInput",
+                        "ReturnPortInput",
+                        "ReturnWidgetInput",
+                        "SearchAssignWidgetInput",
+                        "SliderAssignWidgetInput",
+                        "StateAccessorInput",
+                        "StateChoiceAssignWidgetInput",
+                        "StateDefinitionInput",
+                        "StateDemandInput",
+                        "StateDependencyInput",
+                        "StateImplementationInput",
+                        "StringAssignWidgetInput",
+                        "TestTargetInput",
+                        "TrackInput",
+                        "UtilCallInput",
+                        "ValidatorInput",
+                        "WindowFunction",
+                        "WindowInput"
+                    ],
+                    "from_project": null
+                }
+            ],
             "additional_bases": {
-                "ArgPortInput": [
-                    "rekuest.traits.ports.PortTrait"
-                ],
-                "ReturnPortInput": [
-                    "rekuest.traits.ports.PortTrait"
-                ],
-                "SearchAssignWidgetInput": [
-                    "rekuest.traits.ports.SearchWidgetInputTrait"
-                ],
-                "SliderAssignWidgetInput": [
-                    "rekuest.traits.ports.SliderWidgetInputTrait"
-                ],
-                "StateChoiceAssignWidgetInput": [
-                    "rekuest.traits.ports.StateChoiceWidgetInputTrait"
-                ],
                 "CreateBlokInput": [
                     "rekuest.traits.blok.CreateBlokInputTrait"
-                ],
-                "ImplementationInput": [
-                    "rekuest.traits.implementation.ImplementationInputTrait"
-                ],
-                "BlokImplementationInput": [
-                    "rekuest.traits.blok.BlokImplementationInputTrait"
-                ],
-                "ImplementAgentInput": [
-                    "rekuest.traits.agent.ImplementAgentInputTrait"
-                ],
-                "ValidatorInput": [
-                    "rekuest.traits.ports.ValidatorInputTrait"
-                ],
-                "EffectInput": [
-                    "rekuest.traits.ports.EffectInputTrait"
-                ],
-                "DefinitionInput": [
-                    "rekuest.traits.ports.DefinitionInputTrait"
                 ]
             },
             "additional_config": {},

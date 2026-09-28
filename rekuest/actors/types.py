@@ -20,7 +20,7 @@ from rekuest.protocol.types import AnyFunction, AnyState
 from rekuest.scalars import Identifier
 from rekuest.state.publish import Patch
 from rekuest.structures.registry import StructureRegistry
-from rekuest.protocol.schema import (
+from arkitekt_spec.actions import (
     PortGroupInput,
     TestTargetInput,
     TrackInput,

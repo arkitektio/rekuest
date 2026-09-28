@@ -5,7 +5,7 @@ import re
 from enum import Enum
 from typing import Protocol
 from rath.scalars import ID
-from rekuest.protocol.schema import (
+from arkitekt_spec.actions import (
     StateDefinitionInput,
     AssignWidgetInput,
     ChoiceInput,

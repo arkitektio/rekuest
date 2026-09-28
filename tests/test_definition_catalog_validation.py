@@ -2,7 +2,7 @@
 
 import pytest
 
-from rekuest.protocol.schema import (
+from arkitekt_spec.actions import (
     ActionKind,
     ArgPortInput,
     ComponentPropInput,
@@ -167,7 +167,7 @@ def test_a_util_call_nested_in_a_prop_agent_call_is_checked() -> None:
     A prop bound via ``agent_call`` carries util calls in its arguments. Checking only
     ``prop.util_call`` would make the client accept what the server rejects.
     """
-    from rekuest.protocol.schema import (
+    from arkitekt_spec.actions import (
         ActionArgumentInput,
         AgentProbeInput,
         UtilCallInput,
@@ -200,7 +200,10 @@ def test_a_util_call_nested_in_a_prop_agent_call_is_checked() -> None:
 
 def test_prop_calls_are_checked_even_without_registered_components() -> None:
     """Operation arity is knowable base-only, so it is checked even when components are not."""
-    from rekuest.protocol.schema import ActionArgumentInput, UtilCallInput
+    from arkitekt_spec.actions import (
+        ActionArgumentInput,
+        UtilCallInput,
+    )
 
     bad = UtilCallInput(
         operation="gt",

@@ -11,7 +11,10 @@ from pydantic import ValidationError
 import pytest
 
 from rekuest.widgets import SearchWidget
-from rekuest.protocol.schema import ArgPortInput, PortKind
+from arkitekt_spec.actions import (
+    ArgPortInput,
+    PortKind,
+)
 from rekuest.definition.define import prepare_definition
 from rekuest.structures.registry import StructureRegistry
 
@@ -70,7 +73,7 @@ def test_extra_variable_backed_by_dependency() -> None:
 
 def test_extra_variable_without_backing_is_rejected() -> None:
     """An extra query variable with neither a filter nor a dependency errors."""
-    with pytest.raises(ValidationError, match="dataset"):
+    with pytest.raises(ValueError, match="dataset"):
         SearchWidget(query=QUERY_WITH_DATASET, ward="mikro")
 
 
@@ -78,19 +81,19 @@ def test_plain_query_needs_no_filters_or_dependencies() -> None:
     """A query with only $search/$values needs nothing extra (regression)."""
     widget = SearchWidget(query=PLAIN_QUERY, ward="mikro")
     assert widget.filters is None
-    assert widget.dependencies is None
+    assert widget.dependencies == ()
 
 
 def test_reserved_pagination_variables_need_no_backing() -> None:
     """The reserved $limit/$offset pagination variables need no filter/dependency."""
     widget = SearchWidget(query=QUERY_WITH_PAGINATION, ward="mikro")
     assert widget.filters is None
-    assert widget.dependencies is None
+    assert widget.dependencies == ()
 
 
 def test_filter_port_name_must_match_variable_exactly() -> None:
     """A filter port whose key differs from the variable name does not back it."""
-    with pytest.raises(ValidationError, match="dataset"):
+    with pytest.raises(ValueError, match="dataset"):
         SearchWidget(
             query=QUERY_WITH_DATASET,
             ward="mikro",

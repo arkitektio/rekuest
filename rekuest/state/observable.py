@@ -9,7 +9,10 @@ from collections.abc import Iterator
 if TYPE_CHECKING:
     from _typeshed import SupportsKeysAndGetItem, SupportsRichComparison
 
-from rekuest.protocol.schema import ReturnPortInput, StateDefinitionInput
+from arkitekt_spec.actions import (
+    ReturnPortInput,
+    StateDefinitionInput,
+)
 from rekuest.state.gate import TaskClosedError, TaskGate
 from rekuest.state.publish import Patch, StateHolder
 from rekuest.structures.types import StateDeclaration

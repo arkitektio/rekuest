@@ -24,10 +24,11 @@ from rekuest.definition.define import (
 )
 from rekuest.definition.utils import interface_name
 from rekuest.definition.dependencies import build_action_dependency_input
-from rekuest.definition.hash import hash_definition
+from rekuest.definition.checks import check_implementation
+from arkitekt_spec.actions import definition_hash
 from rekuest.protocol.types import AnyFunction
 from rekuest.structures.registry import StructureRegistry
-from rekuest.protocol.schema import (
+from arkitekt_spec.actions import (
     AssignWidgetInput,
     DefinitionInput,
     ActionDependencyInput,
@@ -66,7 +67,7 @@ class WrappedFunction(Generic[P, R]):
         self.func = func
         self.interface = interface
         self.definition = definition
-        self.hash = hash_definition(definition)
+        self.hash = definition_hash(definition)
 
     def __call__(self, *args: P.args, **kwargs: P.kwargs) -> R:
         """Call the actor's implementation."""
@@ -143,9 +144,11 @@ def register_func(
         for optimistic in (config.optimistics or [])
     ]
 
+    # The spec's models carry the structural rules; what needs rekuest (search
+    # queries, state references) is checked here, at the decorator.
     implementation_registry.register_at_interface(
         interface,
-        ImplementationInput(
+        check_implementation(ImplementationInput(
             interface=interface,
             definition=definition,
             locks=tuple(implementation_details.locks or []),
@@ -154,7 +157,7 @@ def register_func(
             tracks=tuple(implementation_details.tracks or []),
             needs_token=True,  # TODO: Make this configurable in the future, but for now, we want to ensure that all actors require tokens for security reasons.
             manipulates=tuple(implementation_details.manipulates or []),
-        ),
+        )),
         actor_builder,
     )
 

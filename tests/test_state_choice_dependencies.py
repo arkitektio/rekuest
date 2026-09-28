@@ -7,9 +7,7 @@ reference (``dependency=None``) points at the function's own state and is always
 """
 
 import pytest
-from pydantic import ValidationError
-
-from rekuest.protocol.schema import (
+from arkitekt_spec.actions import (
     AgentDependencyInput,
     ImplementationInput,
     PortKind,
@@ -17,10 +15,12 @@ from rekuest.protocol.schema import (
     StateDemandInput,
     StateDependencyInput,
 )
+
+from rekuest.app import AppRegistry
+from rekuest.definition.checks import check_implementation
 from rekuest.definition.define import prepare_definition
 from rekuest.definition.match import build_port_matches
-from rekuest.app import AppRegistry
-from rekuest.register import register_func, RegisterConfig
+from rekuest.register import RegisterConfig, register_func
 from rekuest.structures.registry import StructureRegistry
 from rekuest.widgets import withStateChoices
 
@@ -65,11 +65,13 @@ def _build_implementation(
         widgets={"exposure": withStateChoices(state_path)},
     )
 
-    return ImplementationInput(
-        definition=definition,
-        dependencies=dependencies,
-        interface="adjust",
-        needs_token=True,
+    return check_implementation(
+        ImplementationInput(
+            definition=definition,
+            dependencies=dependencies,
+            interface="adjust",
+            needs_token=True,
+        )
     )
 
 
@@ -91,7 +93,7 @@ def test_state_choice_with_matching_dependency_is_accepted(
 def test_state_choice_without_dependency_is_rejected(
     simple_registry: StructureRegistry,
 ) -> None:
-    with pytest.raises(ValidationError, match="camera"):
+    with pytest.raises(ValueError, match="camera"):
         _build_implementation(
             simple_registry,
             state_path="camera.state.exposure_ms",
@@ -108,7 +110,7 @@ def test_state_choice_with_mismatched_dependency_is_rejected(
         auto_resolvable=False,
     )
 
-    with pytest.raises(ValidationError, match="camera"):
+    with pytest.raises(ValueError, match="camera"):
         _build_implementation(
             simple_registry,
             state_path="camera.state.exposure_ms",
@@ -120,7 +122,7 @@ def test_state_choice_with_unresolvable_field_is_rejected(
     simple_registry: StructureRegistry,
 ) -> None:
     # The dependency exists and exposes a "state", but not the referenced field.
-    with pytest.raises(ValidationError, match="missing_field"):
+    with pytest.raises(ValueError, match="missing_field"):
         _build_implementation(
             simple_registry,
             state_path="camera.state.missing_field",
@@ -186,7 +188,7 @@ def test_register_with_unknown_state_choice_dependency_is_rejected(
         """Adjust the exposure of the camera."""
 
     definition_registry = AppRegistry()
-    with pytest.raises(ValidationError, match="ghost"):
+    with pytest.raises(ValueError, match="ghost"):
         register_func(
             adjust,
             simple_registry,

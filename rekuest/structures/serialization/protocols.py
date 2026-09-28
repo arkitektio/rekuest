@@ -3,7 +3,7 @@
 from collections.abc import Sequence
 from typing import Any, Protocol, runtime_checkable
 
-from rekuest.protocol.schema import PortKind
+from arkitekt_spec.actions import PortKind
 
 
 @runtime_checkable

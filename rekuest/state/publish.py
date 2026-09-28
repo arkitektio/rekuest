@@ -2,7 +2,7 @@ from typing import Any, Protocol, runtime_checkable
 
 from attr import dataclass
 
-from rekuest.protocol.schema import ReturnPortInput
+from arkitekt_spec.actions import ReturnPortInput
 
 @dataclass
 class Patch:

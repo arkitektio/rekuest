@@ -6,7 +6,7 @@ from typing import (
 )
 from collections.abc import Iterable, Sequence
 
-from rekuest.protocol.schema import (
+from arkitekt_spec.actions import (
     ActionDependencyInput,
     AgentProbeInput,
     AgentDependencyInput,
@@ -18,6 +18,7 @@ from rekuest.protocol.schema import (
     UtilCallInput,
 )
 from rekuest.blok.walk import BlokVisitor, action_key_for, walk_component
+from rekuest.definition.checks import check_blok
 from rekuest.definition.dependencies import (
     build_action_dependency_input,
     build_state_dependency_input,
@@ -44,14 +45,14 @@ def build_declared_bloks(
         if demo_state is None:
             demo_state = _autogenerate_demo_state(dependencies, app_registry)
 
-        declared_bloks[blok_key] = BlokImplementationInput(
+        declared_bloks[blok_key] = check_blok(BlokImplementationInput(
             key=blok_key,
             dependencies=tuple(dependencies),
             components=(declaration.component,),
             description=declaration.description,
             demo_state=demo_state,
             catalog=declaration.catalog,
-        )
+        ))
 
     return declared_bloks
 

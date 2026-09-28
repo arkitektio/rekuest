@@ -8,9 +8,7 @@ references) that a single ``ImplementationInput`` cannot see.
 from dataclasses import dataclass
 
 import pytest
-from pydantic import ValidationError
-
-from rekuest.protocol.schema import (
+from arkitekt_spec.actions import (
     AgentDependencyInput,
     ImplementAgentInput,
     ImplementationInput,
@@ -21,10 +19,12 @@ from rekuest.protocol.schema import (
     StateDependencyInput,
     StateImplementationInput,
 )
+
 from rekuest.app import AppRegistry
+from rekuest.definition.checks import check_agent_input
 from rekuest.definition.define import prepare_definition
 from rekuest.definition.match import build_port_matches
-from rekuest.register import register_func, RegisterConfig
+from rekuest.register import RegisterConfig, register_func
 from rekuest.structures.registry import StructureRegistry
 from rekuest.widgets import withStateChoices
 
@@ -98,50 +98,50 @@ def test_self_state_choice_resolving_against_own_state_is_accepted(
 def test_self_state_choice_without_own_state_is_rejected(
     simple_registry: StructureRegistry,
 ) -> None:
-    with pytest.raises(ValidationError, match="camera_state"):
-        ImplementAgentInput(
+    with pytest.raises(ValueError, match="camera_state"):
+        check_agent_input(ImplementAgentInput(
             implementations=(
                 _implementation(
                     simple_registry, state_path="self.camera_state.exposure_ms"
                 ),
             ),
             states=(),
-        )
+        ))
 
 
 def test_self_state_choice_with_unknown_field_is_rejected(
     simple_registry: StructureRegistry,
 ) -> None:
-    with pytest.raises(ValidationError, match="missing_field"):
-        ImplementAgentInput(
+    with pytest.raises(ValueError, match="missing_field"):
+        check_agent_input(ImplementAgentInput(
             implementations=(
                 _implementation(
                     simple_registry, state_path="self.camera_state.missing_field"
                 ),
             ),
             states=(_camera_state(),),
-        )
+        ))
 
 
 def test_duplicate_implementation_interface_is_rejected(
     simple_registry: StructureRegistry,
 ) -> None:
-    with pytest.raises(ValidationError, match="Duplicate implementation interface"):
-        ImplementAgentInput(
+    with pytest.raises(ValueError, match="Duplicate implementation interface"):
+        check_agent_input(ImplementAgentInput(
             implementations=(
                 _implementation(simple_registry, interface="dup"),
                 _implementation(simple_registry, interface="dup"),
             ),
-        )
+        ))
 
 
 def test_lock_reference_without_lock_implementation_is_rejected(
     simple_registry: StructureRegistry,
 ) -> None:
-    with pytest.raises(ValidationError, match="references lock 'mylock'"):
-        ImplementAgentInput(
+    with pytest.raises(ValueError, match="references lock 'mylock'"):
+        check_agent_input(ImplementAgentInput(
             implementations=(_implementation(simple_registry, locks=("mylock",)),),
-        )
+        ))
 
 
 def test_real_registration_path_self_widget_validates(
@@ -188,7 +188,7 @@ def test_real_registration_path_self_widget_unknown_field_is_rejected(
         ),
     )
 
-    with pytest.raises(ValidationError, match="missing_field"):
+    with pytest.raises(ValueError, match="missing_field"):
         app.to_implement_agent_input("inst")
 
 

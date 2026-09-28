@@ -2,7 +2,7 @@
 
 from typing import Any
 from rekuest.actors.types import Shelver
-from rekuest.protocol.schema import StateDefinitionInput
+from arkitekt_spec.actions import StateDefinitionInput
 from rekuest.messages import JSONSerializable
 from rekuest.protocol.types import AnyState
 from rekuest.structures.registry import StructureRegistry

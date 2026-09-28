@@ -3,7 +3,7 @@
 from collections.abc import Callable, Generator
 from rekuest.actors.actify import reactify
 from rekuest.actors.types import RegisterConfig
-from rekuest.protocol.schema import ActionKind
+from arkitekt_spec.actions import ActionKind
 from rekuest.structures.registry import StructureRegistry
 import pytest
 from .funcs import (

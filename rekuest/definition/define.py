@@ -7,7 +7,7 @@ from collections.abc import Callable, Sequence
 from rekuest.structures.model import inspect_model_class
 from .utils import is_local_var
 from rekuest.annotations import extract_annotations, PortAnnotations
-from rekuest.protocol.schema import (
+from arkitekt_spec.actions import (
     AgentDependencyInput,
     ArgPortInput,
     ProvidesInput,
@@ -26,7 +26,7 @@ from rekuest.protocol.schema import (
 import inspect
 from docstring_parser import parse, DocstringStyle
 from rekuest.definition.errors import DefinitionError, NonSufficientDocumentation
-from rekuest.traits.calls import OWN_VALUE
+from arkitekt_spec.rules import OWN_VALUE
 import datetime as dt
 from rekuest.structures.errors import StructureRegistryError
 from rekuest.structures.registry import (

@@ -18,6 +18,8 @@ dependencies = [
     "koil>=3.3.3",
     "janus>=2.0.0",
     "fakts>=3",
+    # The action language (definitions, ports, states, locks, bloks) and its rules.
+    "arkitekt-spec>=0.1",
 ]
 
 [project.urls]

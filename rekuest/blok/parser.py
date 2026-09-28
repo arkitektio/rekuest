@@ -5,7 +5,7 @@ import keyword
 import tokenize
 import xml.etree.ElementTree as ET
 
-from rekuest.protocol.schema import (
+from arkitekt_spec.actions import (
     ActionArgumentInput,
     AgentProbeInput,
     ComponentNodeInput,

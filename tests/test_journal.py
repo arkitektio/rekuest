@@ -308,7 +308,7 @@ class Camera:
 
 
 def _evented_camera() -> Camera:
-    from rekuest.protocol.schema import StateDefinitionInput
+    from arkitekt_spec.actions import StateDefinitionInput
 
     config = StateConfig(state_name="Camera", definition=StateDefinitionInput(name="Camera", ports=[]))
     return make_evented(Camera(), config, "")

@@ -3,7 +3,7 @@
 from typing import Annotated
 
 from rekuest.annotations import Provides, Requires
-from rekuest.protocol.schema import (
+from arkitekt_spec.actions import (
     StringAssignWidgetInput,
     PortKind,
     DescriptorOperator,

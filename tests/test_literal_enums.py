@@ -6,7 +6,7 @@ from typing import Literal
 import pytest
 
 from rekuest.actors.types import Shelver
-from rekuest.protocol.schema import PortKind
+from arkitekt_spec.actions import PortKind
 from rekuest.definition.define import prepare_definition
 from rekuest.structures.registry import StructureRegistry
 from rekuest.structures.serialization.actor import expand_inputs, shrink_outputs

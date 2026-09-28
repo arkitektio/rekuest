@@ -2,7 +2,7 @@
 
 import pytest
 
-from rekuest.protocol.schema import (
+from arkitekt_spec.actions import (
     ActionKind,
     ArgPortInput,
     BlokImplementationInput,

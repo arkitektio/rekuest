@@ -12,7 +12,10 @@ import asyncio
 import pytest
 
 from rekuest.agents.lock import LockGroup, TaskLock
-from rekuest.protocol.schema import LockDefinitionInput, LockImplementationInput
+from arkitekt_spec.actions import (
+    LockDefinitionInput,
+    LockImplementationInput,
+)
 from rekuest.agents.base import RekuestAgent
 
 

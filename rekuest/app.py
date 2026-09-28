@@ -19,7 +19,7 @@ from rekuest.coercible_types import OptimisticCoercible
 from rekuest.agents.hooks.registry import HooksRegistry
 from rekuest.provider import Provider, declare_provider
 from rekuest.service import Service, declare_service
-from rekuest.protocol.schema import (
+from arkitekt_spec.actions import (
     AgentDependencyInput,
     PortKind,
     AssignWidgetInput,
@@ -656,9 +656,12 @@ class AppRegistry(BaseModel):
     ) -> ImplementAgentInput:
         """Assemble (and validate) the full agent input from this registry.
 
-        Constructing the :class:`ImplementAgentInput` triggers its model
-        validation, so this is the single validated retrieval point for
-        everything the agent registers.
+        Constructing the :class:`ImplementAgentInput` runs the spec's structural
+        rules over every port, widget and call, and
+        :func:`~rekuest.definition.checks.check_agent_input` then runs the checks
+        that need rekuest (search queries, state references, blok components), so
+        this is the single validated retrieval point for everything the agent
+        registers.
 
         Args:
             name: What identifies the agent. The backend falls back to the
@@ -666,7 +669,9 @@ class AppRegistry(BaseModel):
             description: What the agent is, in a sentence. Omitting it leaves
                 whatever the agent already has, rather than clearing it.
         """
-        return ImplementAgentInput(
+        from rekuest.definition.checks import check_agent_input
+
+        return check_agent_input(ImplementAgentInput(
             name=name,
             # Passed only when there is one, so that an app declaring no
             # description leaves the field *unset* rather than sending an
@@ -679,7 +684,7 @@ class AppRegistry(BaseModel):
             states=tuple(self.states.values()),
             locks=tuple(self.get_locks()),
             bloks=tuple(self.get_declared_bloks().values()),
-        )
+        ))
 
     # ------------------------------------------------------------------ #
     # Merging                                                            #

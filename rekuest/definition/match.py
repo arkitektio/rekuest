@@ -1,4 +1,8 @@
-from rekuest.protocol.schema import ArgPortInput, PortMatchInput, ReturnPortInput
+from arkitekt_spec.actions import (
+    ArgPortInput,
+    PortMatchInput,
+    ReturnPortInput,
+)
 
 
 def build_port_match(

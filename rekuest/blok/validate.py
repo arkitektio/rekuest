@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from collections.abc import Iterable
 
-from rekuest.protocol.schema import (
+from arkitekt_spec.actions import (
     AgentDependencyInput,
     AgentProbeInput,
     ComponentNodeInput,

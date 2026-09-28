@@ -18,7 +18,7 @@ from typing import (
 )
 from collections.abc import Callable
 
-from rekuest.protocol.schema import (
+from arkitekt_spec.actions import (
     ChoiceAssignWidgetInput,
     ChoiceReturnWidgetInput,
     ChoiceInput,

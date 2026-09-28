@@ -14,7 +14,7 @@ from typing import Any
 from collections.abc import Callable
 
 from rekuest.annotations.markers import Default, Description, Units
-from rekuest.protocol.schema import (
+from arkitekt_spec.actions import (
     ActionArgumentInput,
     AssignWidgetInput,
     EffectInput,
@@ -26,7 +26,8 @@ from rekuest.protocol.schema import (
 )
 from rekuest.definition.errors import DefinitionError
 from rekuest.widgets import is_assign_widget_input, is_return_widget_input
-from rekuest.traits.calls import OWN_VALUE, resolve_base_arguments
+from arkitekt_spec.rules import OWN_VALUE
+from rekuest.traits.calls import resolve_base_arguments
 
 
 @dataclass

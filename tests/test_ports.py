@@ -1,6 +1,9 @@
 """Test the PortInput class  and its validation logic."""
 
-from rekuest.protocol.schema import ArgPortInput, PortKind
+from arkitekt_spec.actions import (
+    ArgPortInput,
+    PortKind,
+)
 from pydantic import ValidationError
 import pytest
 

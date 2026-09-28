@@ -4,7 +4,7 @@ from typing import get_args
 
 from pydantic import Field
 
-from rekuest.protocol.schema import (
+from arkitekt_spec.actions import (
     AssignWidgetInput,
     ChoiceAssignWidgetInput,
     ChoiceInput,
@@ -28,7 +28,7 @@ from rekuest.protocol.schema import (
 from rekuest.blok.parser import coerce_util_call, normalize_expression
 from rekuest.structures.types import JSONSerializable
 from rekuest.scalars import SearchQuery
-from rekuest.traits.calls import infer_dependencies
+from arkitekt_spec.rules import infer_dependencies
 
 
 ASSIGN_WIDGET_INPUT_TYPES: tuple[type, ...] = get_args(get_args(AssignWidgetInput)[0])
@@ -111,12 +111,18 @@ def SearchWidget(
     """
         """P"""
     )
-    return SearchAssignWidgetInput(
+    widget = SearchAssignWidgetInput(
         query=SearchQuery.validate(query),
         ward=ward,
-        dependencies=tuple(dependencies) if dependencies else None,
+        dependencies=tuple(dependencies or ()),
         filters=tuple(filters) if filters else None,
     )
+    # Every query variable is backed by a filter or a dependency: checked here,
+    # where the widget is written (graphql-core, so not a rule of the spec model).
+    from rekuest.definition.checks import check_search_widget
+
+    check_search_widget(widget, "SearchWidget")
+    return widget
 
 
 def StringWidget(as_paragraph: bool = False) -> AssignWidgetInput:
@@ -169,7 +175,7 @@ def CustomWidget(
     return CustomAssignWidgetInput(
         component=component,
         props=tuple(props) if props else None,
-        dependencies=tuple(dependencies) if dependencies else None,
+        dependencies=tuple(dependencies or ()),
         fallback=fallback,
     )
 

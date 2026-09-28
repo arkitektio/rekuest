@@ -3,7 +3,7 @@
 from enum import Enum
 import pytest
 from rekuest.definition.define import prepare_definition
-from rekuest.protocol.schema import (
+from arkitekt_spec.actions import (
     ActionArgumentInput,
     AgentProbeInput,
     ChoiceInput,
@@ -81,7 +81,7 @@ def test_validator_func() -> None:
         call=parse_util_call("gt(value, 3)"),
         error_message="Must be greater than 3",
     )
-    assert validator.dependencies is None
+    assert validator.dependencies == ()
     assert validator.call.operation == "gt"
 
 

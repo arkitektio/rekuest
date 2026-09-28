@@ -5,7 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import JSONResponse
 
-from rekuest.protocol.schema import StateImplementationInput
+from arkitekt_spec.actions import StateImplementationInput
 from rekuest.contrib.fastapi.retriever.protocol import (
     PatchEvent as RetrieverPatchEvent,
 )

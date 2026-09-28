@@ -11,7 +11,7 @@ from typing import Annotated
 import pytest
 from annotated_types import Gt, Le, Len
 
-from rekuest.protocol.schema import (
+from arkitekt_spec.actions import (
     ActionArgumentInput,
     AgentProbeInput,
     EffectInput,
@@ -23,7 +23,7 @@ from rekuest.blok.parser import coerce_util_call, parse_util_call
 from rekuest.definition.define import prepare_definition
 from rekuest.definition.errors import DefinitionError
 from rekuest.structures.registry import StructureRegistry
-from rekuest.traits.calls import check_pure_call, infer_dependencies
+from arkitekt_spec.rules import check_pure_call, infer_dependencies
 from rekuest.widgets import withEffect, withValidator
 
 from .funcs import annotated_basic_function, annotated_nested_structure_function
@@ -614,7 +614,7 @@ def test_definition_checks_return_ports_children_and_port_groups(
     simple_registry: StructureRegistry,
 ) -> None:
     """Dependencies are checked wherever an effect can sit, not only on top-level args."""
-    from rekuest.protocol.schema import PortGroupInput
+    from arkitekt_spec.actions import PortGroupInput
 
     @simple_registry.model
     class Inner:
@@ -691,7 +691,7 @@ def test_definition_carries_catalogs(simple_registry: StructureRegistry) -> None
 
     definition = prepare_definition(func, structure_registry=simple_registry, catalogs=["ui", "base@1"])
     assert definition.catalogs == ("ui", "base@1")
-    assert prepare_definition(func, structure_registry=simple_registry).catalogs is None
+    assert prepare_definition(func, structure_registry=simple_registry).catalogs == ()
 
 
 @pytest.mark.define
@@ -724,7 +724,7 @@ def test_annotated_types_bridge_emits_catalog_calls(
         own, bound = _args(validator.call)
         assert own.key == "a" and own.value_path == "value"
         assert bound.key == "b" and bound.value_literal == 4
-        assert validator.dependencies is None
+        assert validator.dependencies == ()
     assert [v.source for v in validators] == ["lte(value, 4)", "gt(value, 4)"]
 
 

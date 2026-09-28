@@ -1,6 +1,6 @@
 from collections.abc import Sequence
 
-from rekuest.protocol.schema import (
+from arkitekt_spec.actions import (
     ActionDemandInput,
     ActionDependencyInput,
     DefinitionInput,

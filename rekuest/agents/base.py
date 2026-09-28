@@ -61,7 +61,7 @@ from rekuest.agents.backend import (
     LocalAgentBackend,
     SocketAgentBackend,
 )
-from rekuest.protocol.schema import StateDefinitionInput
+from arkitekt_spec.actions import StateDefinitionInput
 from rekuest.protocol.types import AnyState
 from rekuest.scalars import Identifier
 from rekuest.state.observable import Mutation, adopt, evented

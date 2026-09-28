@@ -1,7 +1,7 @@
 from fastapi import APIRouter, FastAPI
 from fastapi.testclient import TestClient
 
-from rekuest.protocol.schema import (
+from arkitekt_spec.actions import (
     ImplementationInput,
     PortKind,
     ReturnPortInput,

@@ -18,7 +18,11 @@ from collections.abc import AsyncGenerator
 from koil import unkoil
 from rath.scalars import ID
 
-from rekuest.protocol.schema import DefinitionInput, HookInput, TaskEventKind
+from arkitekt_spec.actions import DefinitionInput
+from rekuest.protocol.schema import (
+    HookInput,
+    TaskEventKind,
+)
 from rekuest.errors import CriticalCallError, ErrorCallError
 from rekuest.messages import Assign, JSONSerializable
 from rekuest.postmans.types import Postman

@@ -29,7 +29,8 @@ from fastapi import WebSocket, WebSocketDisconnect
 from pydantic import ConfigDict, Field, PrivateAttr
 
 from rekuest import messages
-from rekuest.protocol.schema import AssignInput, StateImplementationInput
+from arkitekt_spec.actions import StateImplementationInput
+from rekuest.protocol.schema import AssignInput
 from rekuest.agents.base import BaseAgent
 from rekuest.agents.dataclasses import QueuedAssign, RevisedState
 from rekuest.agents.journal import (

@@ -19,7 +19,7 @@ from typing import (
     get_origin,
     get_type_hints,
 )
-from rekuest.protocol.schema import (
+from arkitekt_spec.actions import (
     DefinitionInput,
     ReturnPortInput,
     StateDependencyInput,
@@ -43,7 +43,7 @@ from rekuest.structures.registry import StructureRegistry
 from rekuest.definition.define import convert_object_to_returnport
 from rekuest.definition.utils import interface_name
 from rekuest.protocol.types import AnyFunction
-from rekuest.protocol.schema import (
+from arkitekt_spec.actions import (
     ActionDependencyInput,
     AgentDependencyInput,
     StateDefinitionInput,

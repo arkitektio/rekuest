@@ -8,7 +8,10 @@ name. Applying :func:`demand` to a method redirects it to *another* action.
 from typing import Any
 
 from rekuest.declare import demand
-from rekuest.protocol.schema import ActionDemandInput, AgentDependencyInput
+from arkitekt_spec.actions import (
+    ActionDemandInput,
+    AgentDependencyInput,
+)
 from rekuest.structures.registry import StructureRegistry
 
 

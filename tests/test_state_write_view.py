@@ -10,7 +10,7 @@ import threading
 
 import pytest
 
-from rekuest.protocol.schema import StateDefinitionInput
+from arkitekt_spec.actions import StateDefinitionInput
 from rekuest.state.observable import Mutation, StateConfig, adopt, make_evented
 from rekuest.state.write import write_view
 
