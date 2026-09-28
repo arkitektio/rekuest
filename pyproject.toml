@@ -16,8 +16,8 @@ dependencies = [
     # The declaration an app is (the action language, AppRegistry, services, hooks)
     # is arkitekt-spec's; executing it is arkitekt-runtime's. rekuest is the
     # distributed runtime on top: the socket agent, its transport, and the client.
-    "arkitekt-spec>=1.2",
-    "arkitekt-runtime>=2.0",
+    "arkitekt-spec>=1.3",
+    "arkitekt-runtime>=3.0",
 ]
 
 [project.urls]

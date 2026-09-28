@@ -19,7 +19,7 @@ from typing import (
 )
 from collections.abc import AsyncGenerator, Generator
 from arkitekt_spec.declare.errors import RootOnlyCallError
-from arkitekt_runtime.types import HookInput
+from arkitekt_spec.declare.task import HookInput
 from arkitekt_spec.declare.structures.registry import StructureRegistry
 
 #: What :meth:`Rekuest.aresolve` accepts: a fetched model, an id, or a function this app

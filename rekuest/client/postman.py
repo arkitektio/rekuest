@@ -5,8 +5,8 @@ from typing import Any
 from collections.abc import AsyncGenerator, Sequence
 from rath.scalars import ID
 from rekuest.client.graphql import RekuestGraphQL
+from arkitekt_spec.declare.task import HookInput
 from arkitekt_runtime.types import (
-    HookInput,
     ResolvedDependencyInput,
     TaskEventKind,
     AssignInput,

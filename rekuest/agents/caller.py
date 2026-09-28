@@ -36,10 +36,8 @@ from collections.abc import AsyncGenerator, Sequence
 from rath.scalars import ID
 
 from arkitekt_runtime import messages
-from arkitekt_runtime.types import (
-    HookInput,
-    TaskEventKind,
-)
+from arkitekt_runtime.types import TaskEventKind
+from arkitekt_spec.declare.task import HookInput
 from arkitekt_runtime.agents.transport.types import MessageSink
 from arkitekt_runtime.postmans.errors import AssignException
 from rekuest.scalars import ActionHash
