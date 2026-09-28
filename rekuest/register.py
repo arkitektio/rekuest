@@ -104,8 +104,8 @@ def register_func(
     """Register a function or actor with the provided app registry.
 
     This function wraps a callable or actor into an ActorBuilder and registers it
-    with an AppRegistry instance, at ``config.interface`` or an interface name
-    inferred from the function name.
+    with an AppRegistry instance, at ``config.interface``, else ``config.key``, else
+    an interface name inferred from the function name.
 
     Args:
         function_or_actor (AnyFunction): A function or actor to be registered.
@@ -119,7 +119,7 @@ def register_func(
         Tuple[DefinitionInput, ActorBuilder]: Registered definition and its actor builder.
     """
     config = config or RegisterConfig()
-    interface = config.interface or interface_name(function_or_actor)
+    interface = config.interface or config.key or interface_name(function_or_actor)
 
     definition, implementation_details, actor_builder = actifier(
         function_or_actor,
@@ -169,6 +169,7 @@ def declare_implementation(
     /,
     *,
     implementation_registry: "AppRegistry",
+    key: str | None = None,
     name: str | None = None,
     description: str | None = None,
     actifier: Actifier = reactify,
@@ -200,6 +201,7 @@ def declare_implementation(
     /,
     *,
     implementation_registry: "AppRegistry",
+    key: str | None = None,
     name: str | None = None,
     description: str | None = None,
     actifier: Actifier = reactify,
@@ -230,6 +232,7 @@ def declare_implementation(
     /,
     *,
     implementation_registry: "AppRegistry",
+    key: str | None = None,
     name: str | None = None,
     actifier: Actifier = reactify,
     interface: str | None = None,
@@ -274,12 +277,15 @@ def declare_implementation(
         func: The function or actor, when registering one directly. Omitted to get a
             configured decorator back.
         implementation_registry: The app registry the implementation is recorded in.
+        key (Optional[str]): The action's key: what the server identifies it by,
+            together with ``version``. Defaults to the function name, so functions
+            made by one factory need distinct keys. Also the default interface.
         name (Optional[str]): Display name. Defaults to the function name.
         description (Optional[str]): Description. Defaults to the docstring.
         actifier (Actifier): Converts the callable into an actor builder.
             Defaults to :func:`reactify`.
-        interface (Optional[str]): Interface name. Inferred from the function
-            name if not provided.
+        interface (Optional[str]): Interface name. Defaults to ``key``, else is
+            inferred from the function name.
         stateful (bool): Mark the definition stateful (auto-set when the
             function uses state variables).
         widgets (Optional[Dict[str, AssignWidgetInput]]): Widgets per argument.
@@ -309,6 +315,7 @@ def declare_implementation(
         structure_registry = implementation_registry.structure_registry
 
     config = RegisterConfig(
+        key=key,
         name=name,
         description=description,
         interface=interface,
@@ -331,7 +338,7 @@ def declare_implementation(
 
     def offer(function_or_actor: Callable[P, R]) -> WrappedFunction[P, R]:
         any_function = cast(AnyFunction, function_or_actor)
-        iface = config.interface or interface_name(any_function)
+        iface = config.interface or config.key or interface_name(any_function)
 
         definition, _ = register_func(
             any_function,

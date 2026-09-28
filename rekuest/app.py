@@ -7,12 +7,15 @@ and structure registries.
 
 import warnings
 from pathlib import Path
-from typing import Any, Callable, TypeVar
+from typing import TYPE_CHECKING, Any, Callable, Literal, ParamSpec, TypeVar
 from collections.abc import Mapping, Sequence
 
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
 
-from rekuest.actors.types import ActorBuilder
+from rekuest.actors.actify import reactify
+from rekuest.actors.policy import KEEP, DisconnectPolicy
+from rekuest.actors.types import Actifier, ActorBuilder
+from rekuest.coercible_types import OptimisticCoercible
 from rekuest.agents.hooks.registry import HooksRegistry
 from rekuest.provider import Provider, declare_provider
 from rekuest.service import Service, declare_service
@@ -20,7 +23,12 @@ from rekuest.protocol.schema import (
     AgentDependencyInput,
     PortKind,
     AssignWidgetInput,
+    EffectInput,
+    PortGroupInput,
     ReturnWidgetInput,
+    TestTargetInput,
+    TrackInput,
+    ValidatorInput,
     BlokImplementationInput,
     ComponentNodeInput,
     ImplementAgentInput,
@@ -51,6 +59,11 @@ from rekuest.structures.types import ExpanderT, ManyExpander, Shrinker, StateDec
 
 
 T = TypeVar("T")
+P = ParamSpec("P")
+R = TypeVar("R")
+
+if TYPE_CHECKING:
+    from rekuest.register import WrappedFunction
 
 
 class BlokDeclaration(BaseModel):
@@ -1223,6 +1236,100 @@ class AppRegistry(BaseModel):
         self._refuse_if_frozen(f"the memory structure {getattr(cls, '__name__', cls)}")
         self.structure_registry.register_as_memory_structure(
             cls, identifier=identifier, description=description
+        )
+
+    def register_action(
+        self,
+        func: Callable[P, R],
+        /,
+        *,
+        key: str | None = None,
+        name: str | None = None,
+        description: str | None = None,
+        actifier: Actifier = reactify,
+        interface: str | None = None,
+        stateful: bool = False,
+        widgets: dict[str, AssignWidgetInput] | None = None,
+        collections: list[str] | None = None,
+        port_groups: list[PortGroupInput] | None = None,
+        effects: dict[str, list[EffectInput]] | None = None,
+        is_test_for: list[TestTargetInput] | None = None,
+        validators: dict[str, list[ValidatorInput]] | None = None,
+        optimistics: list[OptimisticCoercible] | None = None,
+        in_process: bool = False,
+        tracks: list[TrackInput] | None = None,
+        locks: list[str] | None = None,
+        concurrency: Literal["parallel", "serial"] = "serial",
+        policy: DisconnectPolicy = KEEP,
+        version: str | None = None,
+        catalogs: list[str] | None = None,
+    ) -> "WrappedFunction[P, R]":
+        """Register a function as an action, as a plain call rather than a decorator.
+
+        Reads better where actions are declared conditionally or in a loop:
+
+        ```python
+        for line in ("488", "561"):
+            app.register_action(make_setter(line), key=f"set_laser_{line}")
+        ```
+
+        Args:
+            func: The function or actor to offer.
+            key: What the server identifies the action by (with ``version``).
+                Defaults to the function name, so functions built by one factory
+                need distinct keys. Also the default ``interface``.
+            name: Display name. Defaults to the function name.
+            description: Description. Defaults to the docstring.
+            actifier: Turns the function into an actor builder.
+            interface: Interface the action is offered at. Defaults to ``key``,
+                else one derived from the function name.
+            stateful: Mark the definition stateful (set automatically when it
+                uses states).
+            widgets: Widgets per argument.
+            collections: Collections the action is grouped into.
+            port_groups: Port group assignments.
+            effects: Effects per port.
+            is_test_for: Actions this one tests.
+            validators: Input validation rules per argument.
+            optimistics: Optimistic outputs.
+            in_process: Run in the event loop instead of a worker thread.
+            tracks: Tracks the implementation follows.
+            locks: Locks held while an assignment runs.
+            concurrency: Whether assignments may run concurrently.
+            policy: What happens to a running assignment when its caller
+                disconnects.
+            version: Version of the definition.
+            catalogs: Catalogs the action is listed in.
+
+        Returns:
+            The function, still callable as itself.
+        """
+        from rekuest.register import declare_implementation
+
+        return declare_implementation(
+            func,
+            implementation_registry=self,
+            structure_registry=self.structure_registry,
+            key=key,
+            name=name,
+            description=description,
+            actifier=actifier,
+            interface=interface,
+            stateful=stateful,
+            widgets=widgets,
+            collections=collections,
+            port_groups=port_groups,
+            effects=effects,
+            is_test_for=is_test_for,
+            validators=validators,
+            optimistics=optimistics,
+            in_process=in_process,
+            tracks=tracks,
+            locks=locks,
+            concurrency=concurrency,
+            policy=policy,
+            version=version,
+            catalogs=catalogs,
         )
 
     def register(
