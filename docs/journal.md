@@ -136,3 +136,13 @@ for the distributed agent (`rekuest.agents.agent.RekuestAgent`):
 - `shelve` mints the drawer's `resource_id` itself and sends a numbered `SHELVE`; nothing
   is awaited. `COLLECT` names drawers by `resource_id`; dropping one sends a numbered
   `UNSHELVE`.
+
+## Resuming a workflow
+
+A workflow whose agent died is sent again with `Assign.resume`: the effects it recorded, by key,
+and its last step (see the server's `docs/design/workflows.md`). The server's journal only has what
+it received. What the dead process took but never sent is still in this journal on disk, and a
+successor under the same agent name and journal path adds it before the task runs
+(`RekuestAgent._complete_resume`): the task's unsent `EFFECT` frames join the replay, and their
+steps count, so no step is numbered twice. The frames are resent after `INIT` as usual; the server
+keeps one value per effect key, so the resend changes nothing.
