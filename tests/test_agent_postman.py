@@ -16,7 +16,7 @@ from rekuest.agents.caller import AgentPostman, CallerTaskEvent
 from arkitekt_runtime.types import TaskEventKind
 from arkitekt_runtime.postmans.errors import AssignException
 from arkitekt_runtime.calls import _astream_raw
-from arkitekt_spec.declare.errors import ErrorCallError
+from arkitekt_spec.declare.errors import AgentLost, ErrorCallError
 
 
 def _call(**kwargs: object) -> dict:
@@ -174,6 +174,39 @@ async def test_failed_event_raises_error_call_error_through_stream() -> None:
 
     with pytest.raises(ErrorCallError, match="boom"):
         await asyncio.wait_for(task, timeout=1.0)
+
+
+@pytest.mark.asyncio
+async def test_a_lost_event_raises_agent_lost_with_what_is_known() -> None:
+    """A LostEvent is not a failure: it surfaces as AgentLost, carrying what is known."""
+    sink = MemoryAgentTransport()
+    pm = AgentPostman(sink)
+
+    async def run() -> None:
+        async for _ in _astream_raw(pm, **_call()):
+            pass
+
+    task = asyncio.create_task(run())
+    await _until(lambda: sink.sent)
+    req = _last_request(sink)
+
+    pm.handle_assign_response(
+        messages.AssignResponse(request=req.id, reference=req.reference, task="t1")
+    )
+    pm.handle_execution_event(
+        messages.LostEvent(
+            task="t1", event="e1", seq=1, started=True, last_progress=60,
+            effects="IRREVERSIBLE", reason="its agent died",
+        )
+    )
+
+    with pytest.raises(AgentLost, match="its agent died") as lost:
+        await asyncio.wait_for(task, timeout=1.0)
+    assert (lost.value.started, lost.value.last_progress, lost.value.effects) == (
+        True,
+        60,
+        "IRREVERSIBLE",
+    )
 
 
 @pytest.mark.asyncio

@@ -61,6 +61,8 @@ class CallerTaskEvent:
     kind: TaskEventKind
     returns: dict[str, object] | None = None
     message: str | None = None
+    value: dict[str, object] | None = None
+    """LOST: what is known (started, last_progress, effects, reason)."""
 
 
 #: Mirror message types that end a delegated task's stream. Every other mirror
@@ -85,6 +87,17 @@ def _adapt(event: "messages.ExecutionEvent") -> CallerTaskEvent | None:
         return CallerTaskEvent(kind=TaskEventKind.FAILED, message=event.error)
     if isinstance(event, messages.CriticalEvent):
         return CallerTaskEvent(kind=TaskEventKind.CRITICAL, message=event.error)
+    if isinstance(event, messages.LostEvent):
+        return CallerTaskEvent(
+            kind=TaskEventKind.LOST,
+            message=event.reason,
+            value={
+                "started": event.started,
+                "last_progress": event.last_progress,
+                "effects": event.effects,
+                "reason": event.reason,
+            },
+        )
     if isinstance(event, (messages.CancelledEvent, messages.InterruptedEvent)):
         return CallerTaskEvent(
             kind=TaskEventKind.CRITICAL,

@@ -202,7 +202,7 @@ class CatalogPropInput(BaseModel):
 
 class CollectInput(BaseModel):
     """The input for collecting a shelved item in a drawer."""
-    drawers: tuple[ID, ...] = Field(description='The drawer ID to collect')
+    drawers: tuple[ID, ...] = Field(description="The drawers to collect: each an ID or a resource ID (as agent-minted drawers are referenced), within the caller's organization")
     model_config = ConfigDict(frozen=True, extra='forbid', populate_by_name=True, use_enum_values=True)
 
 class CreateBlokInput(CreateBlokInputTrait, BaseModel):
@@ -457,7 +457,7 @@ ToolboxOrder = ToolboxOrderName
 
 class UnshelveMemoryDrawerInput(BaseModel):
     """No documentation"""
-    id: str = Field(description='The resource ID of the drawer.')
+    id: str = Field(description='The drawer: its resource ID (as agent-minted drawers are referenced) or its ID.')
     model_config = ConfigDict(frozen=True, extra='forbid', populate_by_name=True, use_enum_values=True)
 
 class WidgetDefaultInput(BaseModel):

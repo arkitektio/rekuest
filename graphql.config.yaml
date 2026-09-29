@@ -49,7 +49,8 @@ projects:
               - DescriptorInput
               - DescriptorOperator
               - DynamicValueInput
-              - EffectClass
+              - Effects
+              - Execution
               - EffectInput
               - EffectKind
               - ImplementAgentInput

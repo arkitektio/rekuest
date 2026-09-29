@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from arkitekt_runtime.task import Task
+from arkitekt_spec.actions import Effects
 
 #: Both processes run the agent under this name: retained frames are kept per agent name.
 AGENT_NAME = "durable-workflow-agent"
@@ -49,3 +50,19 @@ def declare_pipeline(app: Any) -> None:  # noqa: ANN401 - a FreshApp
         return f"{doubled}:{now}:{drawn}"
 
     app.register(idempotent=True)(pipeline)
+
+
+def declare_hang(app: Any) -> None:  # noqa: ANN401 - a FreshApp
+    """Declare ``hang``: a plain action that reports progress, then blocks where it is killed."""
+
+    def hang(x: int, task: Task) -> int:
+        """Report some progress, then wait at the crash point."""
+        task.progress(60, "halfway")
+        crash_point()
+        return x
+
+    app.register(effects=Effects.IRREVERSIBLE)(hang)
+
+
+#: What ``tests/durable_worker.py`` can serve, by ``DURABLE_DECLARE``.
+DECLARE = {"pipeline": declare_pipeline, "hang": declare_hang}

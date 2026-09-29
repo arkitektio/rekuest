@@ -45,6 +45,7 @@ fragment TaskEventChange on TaskEventChange {
   returns
   message
   progress
+  value
   createdAt
 }
 

@@ -1,7 +1,8 @@
 """The agent process the durable workflow test kills with SIGKILL. Not a test module.
 
 Run from the package root as ``python -m tests.durable_worker``, with ``DURABLE_PORT``,
-``DURABLE_JOURNAL``, ``DURABLE_READY`` and ``DURABLE_CRASH_MARKER`` set. It serves ``pipeline`` until
+``DURABLE_JOURNAL``, ``DURABLE_READY`` and ``DURABLE_CRASH_MARKER`` set, and ``DURABLE_DECLARE``
+naming what it serves (``pipeline`` by default). It serves that until
 killed: a real kill is the crash, since an orderly teardown would cancel the task and
 report it CANCELLED.
 """
@@ -12,7 +13,7 @@ import os
 from pathlib import Path
 
 from .conftest import CONNECT_TIMEOUT, build_rekuest_at
-from .durable_workflow import AGENT_NAME, declare_pipeline
+from .durable_workflow import AGENT_NAME, DECLARE
 
 
 async def main() -> None:
@@ -22,7 +23,7 @@ async def main() -> None:
         name=AGENT_NAME,
         journal_path=os.environ["DURABLE_JOURNAL"],
     )
-    declare_pipeline(app)
+    DECLARE[os.environ.get("DURABLE_DECLARE", "pipeline")](app)
     async with app:
         await app.aconnect(timeout=CONNECT_TIMEOUT)
         Path(os.environ["DURABLE_READY"]).write_text("connected")
