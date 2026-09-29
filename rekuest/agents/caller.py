@@ -69,7 +69,7 @@ class CallerTaskEvent:
 
 
 #: Mirror message types that end a delegated task's stream. Every other mirror
-#: (Bound/Queued/Started/Progress/Log/Delegate/Disconnected/…ing/…ed) is consumed for
+#: (Bound/Queued/Started/Progress/Log/Delegate/…ing/…ed) is consumed for
 #: bookkeeping only — ``_astream_raw`` would ignore it anyway. Defined alongside the
 #: reports it mirrors in :mod:`rekuest.messages`.
 _TERMINAL_TYPES = messages.TERMINAL_EVENT_MIRRORS
