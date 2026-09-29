@@ -414,3 +414,15 @@ async def test_a_replayed_event_that_also_arrives_live_is_delivered_once() -> No
     await asyncio.wait_for(task, timeout=1.0)
 
     assert [e.kind for e in out] == [TaskEventKind.YIELD, TaskEventKind.COMPLETED]
+
+
+@pytest.mark.asyncio
+async def test_a_parent_that_ended_is_forgotten() -> None:
+    sink = MemoryAgentTransport()
+    pm = AgentPostman(sink)
+    await _request_of(pm, sink, parent="p", action="a1", args={"x": 1})
+    assert pm._occurrences
+
+    pm.forget_parent("p")
+
+    assert pm._occurrences == {}

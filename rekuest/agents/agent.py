@@ -83,6 +83,12 @@ class RekuestAgent(BaseAgent):
                 AgentPostman(self.transport, child_step=self.areserve_call_step)
             )
 
+    def _task_ended(self, task: str) -> None:
+        """Its child calls' counters (the derived call keys' occurrences) go with it."""
+        postman = self.caller_postman
+        if isinstance(postman, AgentPostman):
+            postman.forget_parent(task)
+
     # ------------------------------------------------------------- retention
 
     @property
@@ -125,6 +131,40 @@ class RekuestAgent(BaseAgent):
                     "%d frames of earlier runs are waiting to be sent", len(self._retained)
                 )
         return self._store
+
+    def _complete_resume(self, message: messages.Assign) -> messages.Assign:
+        """Add the task's effects this agent still holds unsent to its resume journal.
+
+        A process that died may have recorded a value (the clock, a model's answer) that
+        never reached the server. Its successor has it in the journal on disk, and the frame
+        will be resent after ``Init``: the resumed run must replay that value, not take a
+        new one. Its steps count too, so none is numbered twice.
+        """
+        assert message.resume is not None
+        self._open_store()
+        known = {effect.key for effect in message.resume.effects}
+        held = [
+            frame
+            for frame in self._retained.values()
+            if isinstance(frame, messages.Effect) and frame.task == message.task and frame.key and frame.key not in known
+        ]
+        steps = [
+            frame.task_step
+            for frame in self._retained.values()
+            if getattr(frame, "task", None) == message.task and getattr(frame, "task_step", None)
+        ]
+        if not held and not steps:
+            return message
+        journal = message.resume.model_copy(
+            update={
+                "effects": [
+                    *message.resume.effects,
+                    *(messages.RecordedEffect(key=f.key, effect=f.effect, value=f.value) for f in held),
+                ],
+                "last_step": max([message.resume.last_step, *steps]),
+            }
+        )
+        return message.model_copy(update={"resume": journal})
 
     def _know_session(self, session: str) -> None:
         if session not in self._session_created:

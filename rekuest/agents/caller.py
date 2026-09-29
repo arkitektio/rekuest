@@ -282,6 +282,11 @@ class AgentPostman:
         ):
             yield event
 
+    def forget_parent(self, parent: str) -> None:
+        """A parent task ended: its call counters are no longer needed."""
+        for key in [k for k in self._occurrences if k[0] == parent]:
+            del self._occurrences[key]
+
     def _derive_call_key(self, parent: str, target: str, args: dict[str, Any] | None) -> str:
         """What a parent calls a child it gave no key: the target, its args, the occurrence.
 

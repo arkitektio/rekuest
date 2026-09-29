@@ -93,6 +93,22 @@ def declare_gathered(app: Any) -> None:  # noqa: ANN401 - a FreshApp
     app.register_workflow(gathered)
 
 
+def declare_stamped(app: Any) -> None:  # noqa: ANN401 - a FreshApp
+    """``stamped``: takes the clock and randomness right before it blocks.
+
+    Killed at once, the values may never have left the process: its successor still has them.
+    """
+
+    def stamped(task: Task) -> str:
+        """Take the clock and randomness, then block."""
+        now = task.now()
+        drawn = task.random(4)
+        crash_point()
+        return f"{now}:{drawn}"
+
+    app.register_workflow(stamped)
+
+
 def declare_held(app: Any) -> None:  # noqa: ANN401 - a FreshApp
     """``held``: takes the clock, then waits for a person."""
 
@@ -140,6 +156,7 @@ def declare_handles_a_lost_step(app: Any) -> None:  # noqa: ANN401 - a FreshApp
 DECLARE = {
     "pipeline": declare_pipeline,
     "gathered": declare_gathered,
+    "stamped": declare_stamped,
     "held": declare_held,
     "hang": declare_hang,
 }

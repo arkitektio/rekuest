@@ -5,9 +5,9 @@ takes the agent over under the same name and journal. The server sends the workf
 with its journal, and the successor's run replays it: recorded values come back the same,
 and calls it already made find their children again (and their results) by call key.
 
-Before each kill the test waits until the dying process has nothing unacknowledged left:
-what a process recorded but never sent is not in the journal the server resumes from
-(see the known gap in ``docs/journal.md``).
+Most kills wait until the dying process has nothing unacknowledged left, so the journal
+the server resumes from is complete; one kills at once, where the successor completes it
+from the dead process's journal on disk.
 """
 
 import asyncio
@@ -151,6 +151,7 @@ async def kill_and_take_over(
     successor_declares: Callable[[Any], None] | None = None,
     reached: Callable[[Any, str], Awaitable[bool]] | None = None,
     after_take_over: Callable[[Any, str], Awaitable[None]] | None = None,
+    wait_for_acks: bool = True,
 ) -> Run:
     """Call ``serve`` on a worker, kill it where it blocks, and let a successor take over."""
     port = rekuest_port(deployment)
@@ -179,7 +180,12 @@ async def kill_and_take_over(
                 await worker.wait_for(lambda: worker.marker.exists(), "the worker to reach its crash point")
             else:
                 await _eventually(lambda: reached(caller, task_id), WORKER_TIMEOUT, "the worker to get there")
-            await worker.kill_once_all_is_acknowledged()
+            if wait_for_acks:
+                await worker.kill_once_all_is_acknowledged()
+            else:
+                worker.kill()
+                assert worker.process is not None
+                await worker.process.wait()
 
             successor = build_rekuest_at(port, "durable_token", name=AGENT_NAME, journal_path=str(worker.journal))
             (successor_declares or DECLARE[serve])(successor)
@@ -309,3 +315,16 @@ async def test_a_workflow_handles_a_step_whose_agent_died(deployment: Deployment
             await asyncio.gather(loop, return_exceptions=True)
 
     assert result == "lost:True:60:IRREVERSIBLE"
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio(loop_scope="session")
+async def test_values_the_dead_process_never_sent_come_back_too(deployment: Deployment, tmp_path: Path) -> None:
+    """Killed at once: what it took may still be in its journal on disk, not on the server."""
+    run = await kill_and_take_over(deployment, tmp_path, serve="stamped", call={}, wait_for_acks=False)
+
+    assert run.error is None, (run.error, run.kinds())
+    now, drawn = run.result.split(":")
+    assert (len(run.effects("NOW")), len(run.effects("RANDOM"))) == (1, 1), run.kinds()
+    assert float(now) == pytest.approx(run.effects("NOW")[0]["value"])
+    assert drawn == run.effects("RANDOM")[0]["value"]
