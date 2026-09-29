@@ -89,7 +89,7 @@ async def test_workflow_calls_single_dependency(deployment: Deployment) -> None:
         """Call the declared atest dependency and return its result."""
         return atest.do_stuff("printer")
 
-    workflow_app.register(single_workflow)
+    workflow_app.register_workflow(single_workflow)
 
     async with provider as provider, workflow_app as workflow_app:
         # Connect the provider first and let it be fully acknowledged before the
@@ -167,7 +167,7 @@ async def test_workflow_calls_two_separate_apps(deployment: Deployment) -> None:
         """Compose the results of both declared dependencies."""
         return atest.do_stuff("printer") + "|" + btest.do_another_stuff("ptiner")
 
-    workflow_app.register(two_app_workflow)
+    workflow_app.register_workflow(two_app_workflow)
 
     async with (
         atest_app as atest_app,
@@ -277,7 +277,7 @@ async def test_workflow_cancel_propagates_to_dependency(
         """Call the long-running dependency and return its result."""
         return await atest.slow_stuff("printer")
 
-    workflow_app.register(cancel_workflow)
+    workflow_app.register_workflow(cancel_workflow)
 
     async with provider as provider, workflow_app as workflow_app:
         # Connect the provider before the workflow that depends on it, awaiting
@@ -389,7 +389,7 @@ async def test_workflow_calls_two_separate_apps_async(deployment: Deployment) ->
             + await btest.do_another_stuff("ptiner")
         )
 
-    workflow_app.register(two_app_workflow)
+    workflow_app.register_workflow(two_app_workflow)
 
     async with (
         atest_app as atest_app,

@@ -219,7 +219,7 @@ async def test_memory_structure_round_trips_through_dependency(
         )
         return atest.count_pixels(reference)
 
-    workflow_app.register(pipe_through_dependency)
+    workflow_app.register_workflow(pipe_through_dependency)
 
     async with provider as provider, workflow_app as workflow_app:
         await provider.aconnect(timeout=CONNECT_TIMEOUT)

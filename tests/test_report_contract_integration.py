@@ -143,7 +143,7 @@ async def test_a_child_call_is_stored_with_its_parents_step(
         """Double a number twice, on the provider."""
         return atest.double(atest.double(x))
 
-    workflow.register(twice)
+    workflow.register_workflow(twice)
 
     async with provider as provider, workflow as workflow:
         await provider.aconnect(timeout=CONNECT_TIMEOUT)

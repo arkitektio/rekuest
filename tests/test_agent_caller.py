@@ -66,7 +66,7 @@ async def test_actor_internal_dependency_call_uses_agent(
         """Call the declared atest dependency (this travels over the agent socket)."""
         return atest.do_stuff("printer")
 
-    workflow_app.register(single_workflow)
+    workflow_app.register_workflow(single_workflow)
 
     async with provider as provider, workflow_app as workflow_app:
         await provider.aconnect(timeout=CONNECT_TIMEOUT)

@@ -58,7 +58,8 @@ def agent_with(*bodies: Any) -> tuple[BaseAgent, RecordingCallerPostman]:  # noq
     agent = build_agent(None)
     agent.app_registry.declare(app="lab")(Lab)
     for body in bodies:
-        agent.app_registry.register(body)
+        # Calling another app is what only a workflow may do.
+        agent.app_registry.register_workflow(body)
     agent.collect_from_registry()
     postman = RecordingCallerPostman()
     agent._caller_postman = postman  # type: ignore[assignment]
