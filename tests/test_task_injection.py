@@ -106,7 +106,8 @@ async def test_a_call_inside_a_task_goes_through_the_task(
         await task.aprogress(10)
         return await task.acall(ACTION, x, reference="r")
 
-    agent.app_registry.register(parent)
+    # Calling a child is what only a workflow may do.
+    agent.app_registry.register_workflow(parent)
     agent.collect_from_registry()
 
     assert await run_assignment(agent, assign("parent", x=1)) == {"return0": "child-result"}

@@ -45,6 +45,7 @@ from arkitekt_runtime.types import TaskEventKind
 from arkitekt_spec.declare.task import HookInput
 from arkitekt_runtime.agents.transport.types import MessageSink
 from arkitekt_runtime.postmans.errors import AssignException
+from arkitekt_spec.declare.errors import NonDeterministicWorkflow
 from rekuest.scalars import ActionHash
 
 logger = logging.getLogger(__name__)
@@ -319,6 +320,8 @@ class AgentPostman:
             response = await response_future
 
             if response.error:
+                if response.error.startswith("Nondeterministic workflow"):
+                    raise NonDeterministicWorkflow(response.error)
                 raise AssignException(response.error)
             task = _response_id(response)
             if not task:
