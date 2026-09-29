@@ -29,6 +29,8 @@ The agent's message loop (``BaseAgent.process``) forwards ``AssignResponse`` /
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import json
 import logging
 import uuid
 from dataclasses import dataclass
@@ -150,6 +152,9 @@ class AgentPostman:
         self._task_queues: dict[str, "asyncio.Queue[messages.ExecutionEvent]"] = {}
         # task id -> mirrors that arrived before the AssignResponse was processed
         self._orphan_by_task: dict[str, list["messages.ExecutionEvent"]] = {}
+        # (parent task, call) -> how often the parent has made that call: the derived
+        # call key's occurrence
+        self._occurrences: dict[tuple[str, str], int] = {}
         # idempotency reference -> durable task id
         self._reference_to_task: dict[str, str] = {}
         # task id -> last seen seq (gap detection only)
@@ -181,6 +186,7 @@ class AgentPostman:
         step: bool | None = None,
         escalate_to_interrupt: bool = False,
         cancel_timeout: float | None = None,
+        call_key: str | None = None,
     ) -> AsyncGenerator[CallerTaskEvent, None]:
         """Originate a task over the agent socket and stream its events.
 
@@ -200,11 +206,18 @@ class AgentPostman:
             if parent is not None and self.child_step is not None
             else None
         )
+        if parent is not None and call_key is None:
+            call_key = self._derive_call_key(
+                str(parent),
+                action or action_hash or implementation or (f"{dependency}.{method}" if dependency else interface) or "call",
+                args,
+            )
         # The reference stays the caller's own; the parent's step travels next to it.
         request_reference = reference or str(uuid.uuid4())
         request = messages.AssignRequest(
             reference=request_reference,
             parent_step=parent_step,
+            call_key=call_key,
             args=dict(args or {}),
             action=action,
             action_hash=action_hash,
@@ -268,6 +281,20 @@ class AgentPostman:
         ):
             yield event
 
+    def _derive_call_key(self, parent: str, target: str, args: dict[str, Any] | None) -> str:
+        """What a parent calls a child it gave no key: the target, its args, the occurrence.
+
+        The same on every run of a deterministic parent, whatever order concurrent calls
+        take their steps in: that is what finds the child again when a workflow resumes.
+        Two calls with the same target and args are told apart by occurrence, and are
+        interchangeable anyway.
+        """
+        digest = hashlib.sha256(json.dumps(args or {}, sort_keys=True, default=str).encode()).hexdigest()[:8]
+        base = f"{target}:{digest}"
+        occurrence = self._occurrences.get((parent, base), 0) + 1
+        self._occurrences[(parent, base)] = occurrence
+        return f"{base}:{occurrence}"
+
     async def _astream(
         self,
         request: "messages.AssignRequest | messages.ProbeRequest",
@@ -301,8 +328,14 @@ class AgentPostman:
 
             queue = self._register_task(reference, task)
 
+            # A child found again (created=False) gets its events so far replayed, and live
+            # ones may overlap with them: the same event arrives with the same seq.
+            seen: set[int] = set()
             while True:
                 event = await queue.get()
+                if event.seq in seen:
+                    continue
+                seen.add(event.seq)
                 adapted = _adapt(event)
                 if adapted is not None:
                     yield adapted

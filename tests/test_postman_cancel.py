@@ -275,6 +275,7 @@ class RecordingPostman:
         method: str | None = None,  # noqa: ARG002 - part of the Postman protocol
         escalate_to_interrupt: bool = False,
         cancel_timeout: float | None = None,
+        call_key: str | None = None,  # noqa: ARG002 - part of the Postman protocol
     ) -> AsyncGenerator[TaskEventChange, None]:
         self.calls.append((escalate_to_interrupt, cancel_timeout))
         yield _change(TaskEventKind.COMPLETED)

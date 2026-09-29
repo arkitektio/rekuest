@@ -340,3 +340,77 @@ async def test_aprobe_surfaces_a_refusal() -> None:
 
     with pytest.raises(AssignException, match="allow_probe"):
         await asyncio.wait_for(task, timeout=1.0)
+
+
+async def _request_of(pm: AgentPostman, sink: MemoryAgentTransport, **kwargs: object) -> messages.AssignRequest:
+    """Start a call, return the AssignRequest it sent, and let it end."""
+    before = len(sink.sent)
+
+    async def run() -> None:
+        async for _ in pm.aassign(**_call(**kwargs)):
+            pass
+
+    task = asyncio.create_task(run())
+    await _until(lambda: len(sink.sent) > before)
+    req = _last_request(sink)
+    pm.handle_assign_response(messages.AssignResponse(request=req.id, reference=req.reference, task=f"t-{req.id}"))
+    pm.handle_execution_event(messages.CompletedEvent(task=f"t-{req.id}", event="e", seq=1))
+    await asyncio.wait_for(task, timeout=1.0)
+    return req
+
+
+@pytest.mark.asyncio
+async def test_a_child_call_is_keyed_by_target_args_and_occurrence() -> None:
+    """What a resuming workflow finds its child again by: the same on every run."""
+    sink = MemoryAgentTransport()
+    pm = AgentPostman(sink)
+
+    first = await _request_of(pm, sink, parent="p", action="a1", args={"x": 1})
+    again = await _request_of(pm, sink, parent="p", action="a1", args={"x": 1})
+    other_args = await _request_of(pm, sink, parent="p", action="a1", args={"x": 2})
+    other_parent = await _request_of(pm, sink, parent="q", action="a1", args={"x": 1})
+
+    target, digest, occurrence = first.call_key.split(":")
+    assert (target, occurrence) == ("a1", "1")
+    assert again.call_key == f"a1:{digest}:2"
+    assert other_args.call_key.split(":")[1] != digest
+    assert other_parent.call_key == first.call_key, "occurrences count per parent"
+
+    # A fresh postman (a restarted agent) derives the same keys in the same order.
+    replayed = await _request_of(AgentPostman(sink), sink, parent="p", action="a1", args={"x": 1})
+    assert replayed.call_key == first.call_key
+
+
+@pytest.mark.asyncio
+async def test_an_explicit_call_key_is_kept_and_roots_have_none() -> None:
+    sink = MemoryAgentTransport()
+    pm = AgentPostman(sink)
+
+    keyed = await _request_of(pm, sink, parent="p", action="a1", call_key="node-3:1")
+    root = await _request_of(pm, sink, parent=None, action="a1")
+
+    assert keyed.call_key == "node-3:1"
+    assert root.call_key is None
+
+
+@pytest.mark.asyncio
+async def test_a_replayed_event_that_also_arrives_live_is_delivered_once() -> None:
+    """A child found again gets its events so far replayed; live ones may overlap."""
+    sink = MemoryAgentTransport()
+    pm = AgentPostman(sink)
+    out: list[CallerTaskEvent] = []
+
+    async def run() -> None:
+        async for ev in pm.aassign(**_call(parent="p", action="a1")):
+            out.append(ev)
+
+    task = asyncio.create_task(run())
+    await _until(lambda: sink.sent)
+    req = _last_request(sink)
+    pm.handle_assign_response(messages.AssignResponse(request=req.id, reference=req.reference, task="t1", created=False))
+    pm.handle_execution_event(messages.YieldEvent(task="t1", event="e1", seq=1, returns={"0": 5}))
+    pm.handle_execution_event(messages.YieldEvent(task="t1", event="e1", seq=1, returns={"0": 5}))
+    pm.handle_execution_event(messages.CompletedEvent(task="t1", event="e2", seq=2))
+    await asyncio.wait_for(task, timeout=1.0)
+
+    assert [e.kind for e in out] == [TaskEventKind.YIELD, TaskEventKind.COMPLETED]

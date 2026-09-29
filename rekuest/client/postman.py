@@ -123,12 +123,15 @@ class GraphQLPostman(KoiledModel):
         step: bool | None = None,
         escalate_to_interrupt: bool = False,
         cancel_timeout: float | None = None,
+        call_key: str | None = None,
     ) -> AsyncGenerator[TaskEventChange, None]:
         """Originate a root task over GraphQL and stream its events.
 
         See :meth:`rekuest.postmans.types.Postman.aassign`. ``parent`` /
         ``dependency`` / ``method`` are accepted only so this postman can reject them
         loudly: the mutation creates a root task and has no way to express a child.
+        ``call_key`` names a child by its parent, so a root has none; it is accepted and
+        unused.
         """
         self._reject_non_root(parent, dependency, method)
         assign_input = AssignInput(
