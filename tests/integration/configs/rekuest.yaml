@@ -59,6 +59,16 @@ authentikate:
       client_app: standalone
       client_release: v0.0.1
       client_id: standalone
+    # The durable workflow test's agent, killed and restarted mid-task. Its own app so
+    # that no other test's agent competes for its lease.
+    durable_token:
+      sub: 6
+      iss: lok
+      active_org: test
+      client_device: durable_device
+      client_app: durable
+      client_release: v0.0.1
+      client_id: durable
 lok:
   issuer: lok
   key_type: RS256

@@ -13,6 +13,7 @@ from arkitekt_spec.declare.structures.registry import StructureRegistry
 from rekuest.client.client import Rekuest, RekuestRath
 from rath.links.testing.direct_succeeding_link import DirectSucceedingLink
 from rekuest.agents.agent import RekuestAgent
+from rekuest.agents.retention import default_journal_path
 from rekuest.client.postman import GraphQLPostman
 from rekuest.agents.transport.websocket import WebsocketAgentTransport
 import os
@@ -253,7 +254,8 @@ def make_token_loader(token: str = "test") -> Callable[[], Awaitable[str]]:
     Args:
         token: The static token to authenticate as. Must be one of the tokens
             configured in the deployment (``test``, ``atest_token``,
-            ``btest_token``, ``workflow_token``, ``standalone_token``).
+            ``btest_token``, ``workflow_token``, ``standalone_token``,
+            ``durable_token``).
 
     Returns:
         An async, no-argument token loader suitable for the auth link and agent
@@ -494,8 +496,35 @@ def build_fresh_rekuest(setup: Deployment, token: str = "test") -> FreshApp:
     Returns:
         A fresh, not-yet-entered app: its client and the agent serving its registry.
     """
+    return build_rekuest_at(rekuest_port(setup), token)
+
+
+def rekuest_port(setup: Deployment) -> int:
+    """The host port the deployment's rekuest server listens on."""
+    return setup.spec.find_service("rekuest").get_port_for_internal(80).published
+
+
+def build_rekuest_at(
+    port: int,
+    token: str = "test",
+    *,
+    name: str | None = None,
+    journal_path: str | None = None,
+) -> FreshApp:
+    """:func:`build_fresh_rekuest` by port, for a process that has no ``Deployment``.
+
+    Args:
+        port: The host port of the rekuest server.
+        token: Static token to authenticate as (see :func:`build_fresh_rekuest`).
+        name: The agent's name. Random by default; a restarted agent must reuse its
+            predecessor's, because retained frames are kept per agent name.
+        journal_path: Where the agent retains unacknowledged frames. Defaults to
+            ``REKUEST_JOURNAL_PATH``.
+
+    Returns:
+        A fresh, not-yet-entered app.
+    """
     loader = make_token_loader(token)
-    port = setup.spec.find_service("rekuest").get_port_for_internal(80).published
     http_url = f"http://localhost:{port}/graphql"
     ws_url = f"ws://localhost:{port}/graphql"
     agi_url = f"ws://localhost:{port}/agi"
@@ -516,8 +545,9 @@ def build_fresh_rekuest(setup: Deployment, token: str = "test") -> FreshApp:
             endpoint_url=agi_url,
             token_loader=loader,
         ),
-        name=f"Test-{token}-{uuid4().hex[:8]}",
+        name=name or f"Test-{token}-{uuid4().hex[:8]}",
         app_registry=AppRegistry(),
+        journal_path=journal_path or default_journal_path(),
     )
 
     return FreshApp(
