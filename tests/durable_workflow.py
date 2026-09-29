@@ -109,6 +109,28 @@ def declare_stamped(app: Any) -> None:  # noqa: ANN401 - a FreshApp
     app.register_workflow(stamped)
 
 
+class CounterState:
+    """What the workflow reads of the provider's counter."""
+
+    count: int
+
+
+def declare_guarded(app: Any) -> None:  # noqa: ANN401 - a FreshApp
+    """``guarded``: works under a guard on the provider's counter, then blocks."""
+
+    @app.declare(app="atest", auto_resolvable=True, min=1)
+    class Counting(Protocol):
+        counter: CounterState
+
+    def guarded(atest: Counting, task: Task) -> str:  # type: ignore[valid-type]
+        """Work while the counter stays as it was."""
+        with task.guard(atest.counter, "count"):
+            crash_point()
+            return "went on"
+
+    app.register_workflow(guarded)
+
+
 def declare_held(app: Any) -> None:  # noqa: ANN401 - a FreshApp
     """``held``: takes the clock, then waits for a person."""
 
@@ -157,6 +179,7 @@ DECLARE = {
     "pipeline": declare_pipeline,
     "gathered": declare_gathered,
     "stamped": declare_stamped,
+    "guarded": declare_guarded,
     "held": declare_held,
     "hang": declare_hang,
 }

@@ -245,7 +245,7 @@ class RekuestAgent(BaseAgent):
             logger.debug("Ignoring %s", message)
         elif isinstance(
             message,
-            (messages.AssignResponse, messages.ProbeResponse, messages.ExecutionEvent),
+            (messages.AssignResponse, messages.ProbeResponse, messages.StateRevisionResponse, messages.ExecutionEvent),
         ):
             self._process_caller_message(message)
         elif isinstance(message, (messages.Shelved, messages.Unshelved)):
@@ -259,7 +259,7 @@ class RekuestAgent(BaseAgent):
 
     def _process_caller_message(
         self,
-        message: "messages.AssignResponse | messages.ProbeResponse | messages.ExecutionEvent",
+        message: "messages.AssignResponse | messages.ProbeResponse | messages.StateRevisionResponse | messages.ExecutionEvent",
     ) -> None:
         """Route an answer to work this agent delegated to the caller postman.
 
@@ -272,6 +272,8 @@ class RekuestAgent(BaseAgent):
             self.caller_postman.handle_assign_response(message)
         elif isinstance(message, messages.ProbeResponse):
             self.caller_postman.handle_probe_response(message)
+        elif isinstance(message, messages.StateRevisionResponse):
+            self.caller_postman.handle_state_revision_response(message)
         else:
             self.caller_postman.handle_execution_event(message)
 

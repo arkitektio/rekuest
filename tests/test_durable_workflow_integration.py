@@ -24,7 +24,7 @@ from typing import Any
 import pytest
 from dokker import Deployment
 
-from arkitekt_spec.declare.errors import AgentLost
+from arkitekt_spec.declare.errors import AgentLost, CriticalCallError, ErrorCallError
 
 from .conftest import CONNECT_TIMEOUT, build_fresh_rekuest, build_rekuest_at, rekuest_port
 from .durable_workflow import (
@@ -152,6 +152,8 @@ async def kill_and_take_over(
     reached: Callable[[Any, str], Awaitable[bool]] | None = None,
     after_take_over: Callable[[Any, str], Awaitable[None]] | None = None,
     wait_for_acks: bool = True,
+    provide: Callable[[Any, Run], None] | None = None,
+    while_down: Callable[[Any], Awaitable[None]] | None = None,
 ) -> Run:
     """Call ``serve`` on a worker, kill it where it blocks, and let a successor take over."""
     port = rekuest_port(deployment)
@@ -164,6 +166,8 @@ async def kill_and_take_over(
 
     provider = build_fresh_rekuest(deployment, token="atest_token")
     provider.register(double)
+    if provide is not None:
+        provide(provider, run)
     caller = build_fresh_rekuest(deployment, token="durable_token")  # GraphQL only
     worker = Worker(scratch, port, serve)
 
@@ -186,6 +190,8 @@ async def kill_and_take_over(
                 worker.kill()
                 assert worker.process is not None
                 await worker.process.wait()
+            if while_down is not None:
+                await while_down(provider)
 
             successor = build_rekuest_at(port, "durable_token", name=AGENT_NAME, journal_path=str(worker.journal))
             (successor_declares or DECLARE[serve])(successor)
@@ -197,7 +203,7 @@ async def kill_and_take_over(
                         await after_take_over(caller, task_id)
                     try:
                         run.result = await asyncio.wait_for(pending, RESUME_TIMEOUT)
-                    except (AgentLost, TimeoutError) as e:
+                    except (AgentLost, CriticalCallError, ErrorCallError, TimeoutError) as e:
                         run.error = e
                     run.events = (await _history(caller, task_id))["events"]
                     seen = {t["id"]: t for t in [*await _tasks(caller), *await _tasks(provider)]}
@@ -328,3 +334,52 @@ async def test_values_the_dead_process_never_sent_come_back_too(deployment: Depl
     assert (len(run.effects("NOW")), len(run.effects("RANDOM"))) == (1, 1), run.kinds()
     assert float(now) == pytest.approx(run.effects("NOW")[0]["value"])
     assert drawn == run.effects("RANDOM")[0]["value"]
+
+
+def _provide_a_counter(provider: Any, run: Run) -> None:  # noqa: ANN401
+    """The provider publishes a counter, and anyone may bump it."""
+    registry = provider.agent.app_registry
+
+    @registry.state(name="counter")
+    class Counter:
+        """A counter others watch."""
+
+        count: int = 0
+
+    def start() -> Counter:
+        """Start counting from zero."""
+        return Counter()
+
+    def bump(counter: Counter) -> int:
+        """Count one up."""
+        counter.count += 1
+        return counter.count
+
+    provider.startup(start)
+    provider.register(bump)
+
+
+async def _bump_as_a_stranger(provider: Any) -> None:  # noqa: ANN401
+    """Someone else changes the counter while the workflow is down."""
+    await provider.acall(await provider.amy_implementation_at("bump"))
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio(loop_scope="session")
+async def test_a_guard_stops_a_resumed_workflow_when_its_state_changed(deployment: Deployment, tmp_path: Path) -> None:
+    run = await kill_and_take_over(
+        deployment, tmp_path, serve="guarded", call={}, provide=_provide_a_counter, while_down=_bump_as_a_stranger
+    )
+
+    # An exception from a workflow's body ends it CRITICAL (the runtime's rule for any body).
+    assert isinstance(run.error, CriticalCallError), (run.error, run.result, run.kinds())
+    assert "changed at /count" in str(run.error)
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio(loop_scope="session")
+async def test_a_guard_lets_a_resumed_workflow_on_when_nothing_changed(deployment: Deployment, tmp_path: Path) -> None:
+    run = await kill_and_take_over(deployment, tmp_path, serve="guarded", call={}, provide=_provide_a_counter)
+
+    assert run.error is None, (run.error, run.kinds())
+    assert run.result == "went on"

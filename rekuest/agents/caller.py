@@ -482,6 +482,34 @@ class AgentPostman:
         """Resolve the waiting ``aassign`` with its ``AssignResponse``."""
         self.handle_response(message)
 
+    async def astate_revision(
+        self,
+        *,
+        parent: str,
+        dependency: str,
+        state: str,
+        since: dict[str, Any] | None = None,
+        paths: Sequence[str] = (),
+    ) -> "messages.StateRevisionResponse":
+        """Ask the server about a state a workflow's guard watches (see ``task.guard``)."""
+        request = messages.StateRevisionRequest(parent=parent, dependency=dependency, state=state, since=since, paths=list(paths))
+        future: "asyncio.Future[Any]" = asyncio.get_running_loop().create_future()
+        self._pending_responses[request.id] = future
+        try:
+            await self.sink.asend(request)
+            response = await future
+        finally:
+            self._pending_responses.pop(request.id, None)
+        if response.error:
+            raise AssignException(response.error)
+        return response
+
+    def handle_state_revision_response(self, message: messages.StateRevisionResponse) -> None:
+        """Resolve the waiting ``astate_revision``."""
+        future = self._pending_responses.get(message.request)
+        if future is not None and not future.done():
+            future.set_result(message)
+
     def handle_probe_response(self, message: messages.ProbeResponse) -> None:
         """Resolve the waiting ``aprobe`` with its ``ProbeResponse``."""
         self.handle_response(message)
