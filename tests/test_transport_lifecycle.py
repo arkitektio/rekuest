@@ -831,3 +831,36 @@ async def test_an_unreadable_assign_is_answered_not_dropped(socket: FakeSocket) 
         criticals = [f for f in sent if f.get("type") == "CRITICAL"]
         assert criticals, f"the unreadable Assign must be refused, got {sent}"
         assert criticals[0]["task"] == "task-unreadable"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("proxy", ["http://127.0.0.1:41234", None])
+async def test_the_socket_is_opened_through_the_proxy_only_when_one_is_set(
+    monkeypatch: pytest.MonkeyPatch, proxy: str | None
+) -> None:
+    """A mesh-only rekuest is dialled through the mesh proxy; otherwise the
+    socket connects directly (``proxy=None``), never through proxy variables."""
+    fake = FakeSocket()
+    seen: list[dict[str, object]] = []
+
+    def connect(*args: object, **kwargs: object) -> FakeConnect:
+        seen.append(kwargs)
+        return FakeConnect(fake)
+
+    monkeypatch.setattr(websockets, "connect", connect)
+    transport = WebsocketAgentTransport(
+        endpoint_url="ws://mesh-host:8000/agi", token_loader=_token, proxy=proxy
+    )
+
+    async with transport as transport:
+        await transport.aconnect()
+        consumer = asyncio.create_task(_drain(transport))
+        await asyncio.sleep(0.05)
+        await transport.adisconnect()
+        await _stop(consumer)
+
+    assert seen, "the transport never dialled"
+    if proxy is None:
+        assert seen[0]["proxy"] is None
+    else:
+        assert seen[0]["proxy"] == proxy

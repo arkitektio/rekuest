@@ -5,7 +5,7 @@
 into a :class:`~rekuest.agents.base.RekuestAgent`. That one line is the whole
 seam between the two packages, and everything else about descriptions is
 testable without it -- which is exactly why it is worth pinning here: a typo in
-``fakts.manifest.description`` would leave every other test passing and simply
+``manifest.description`` would leave every other test passing and simply
 never show a description in the UI.
 """
 
@@ -64,3 +64,22 @@ async def test_an_app_without_one_gives_the_agent_none() -> None:
 
     assert agent.name == "com.test.described:1.2.3"
     assert agent.description is None
+
+
+class MeshStubFakts(StubFakts):
+    """Resolves rekuest to a mesh alias, as fakts does with the mesh on."""
+
+    async def aget_alias(self, name: str) -> Alias:
+        alias = Alias(id=name, host="100.64.0.9", port=8000, kind="mesh")
+        return alias.through_mesh("http://127.0.0.1:41234")
+
+
+@pytest.mark.asyncio
+async def test_the_agent_socket_goes_through_the_alias_proxy_with_the_run_tokens() -> None:
+    fakts = MeshStubFakts(_manifest(None))
+    agent = await rekuest_provider.build(fakts, AppRegistry(), {})
+
+    transport = agent.transport
+    assert transport.endpoint_url == "ws://100.64.0.9:8000/agi"
+    assert transport.proxy == "http://127.0.0.1:41234"
+    assert await transport.token_loader() == "token"

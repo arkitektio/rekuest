@@ -9,7 +9,8 @@ that client. An app takes all of it in with ``App(providers=[rekuest_provider])`
 import os
 from typing import Annotated
 
-from fakts import Alias, Fakts, Require, TokenLoader
+from arkitekt_spec import AppManifest
+from fakts import Alias, Require, TokenLoader
 from fakts.contrib.rath.auth import FaktsAuthLink
 from graphql import OperationType
 from rath.links.aiohttp import AIOHttpLink
@@ -80,8 +81,8 @@ def rekuest(
             UploadLink(datalayer=DataLayer.from_alias(s3)),
             FaktsAuthLink(token_loader=tokens),
             SplitLink(
-                left=AIOHttpLink(endpoint_url=rekuest.to_http_path("graphql")),
-                right=GraphQLWSLink(ws_endpoint_url=rekuest.to_ws_path("graphql")),
+                left=AIOHttpLink(endpoint_url=rekuest.to_http_path("graphql"), proxy=rekuest.proxy),
+                right=GraphQLWSLink(ws_endpoint_url=rekuest.to_ws_path("graphql"), proxy=rekuest.proxy),
                 split=lambda o: o.node.operation != OperationType.SUBSCRIPTION,
             ),
         )
@@ -101,7 +102,8 @@ def rekuest_agent(
             "live.arkitekt.rekuest", "Where this app's actions are offered and assigned"
         ),
     ],
-    fakts: Fakts,
+    tokens: TokenLoader,
+    manifest: AppManifest,
     registry: AppRegistry,
 ) -> RekuestAgent:
     """The agent that provides this app's actions to rekuest.
@@ -115,12 +117,13 @@ def rekuest_agent(
     return RekuestAgent(
         transport=WebsocketAgentTransport(
             endpoint_url=rekuest.to_ws_path("agi"),
-            token_loader=fakts.aget_token,
+            proxy=rekuest.proxy,
+            token_loader=tokens.aget_token,
         ),
-        name=f"{fakts.manifest.identifier}:{fakts.manifest.version}",
+        name=f"{manifest.identifier}:{manifest.version}",
         # What the app said it is, carried onto the agent: the name identifies
         # it, the description tells two of them apart.
-        description=fakts.manifest.description,
+        description=manifest.description,
         app_registry=registry,
     )
 

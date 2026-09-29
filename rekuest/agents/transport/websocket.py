@@ -126,6 +126,13 @@ class WebsocketAgentTransport(AgentTransport):
         default_factory=lambda: ssl.create_default_context(cafile=certifi.where())
     )
     token_loader: Callable[[], Awaitable[str]] = Field(exclude=True)
+    proxy: str | None = None
+    """An HTTP forward proxy (``http://host:port``) to tunnel the socket through.
+
+    Set when the agent socket is only reachable over a private mesh. ``None``
+    connects directly: never through ``HTTP_PROXY``/``ALL_PROXY``, which
+    websockets would otherwise pick up (and fail on outright when it is a
+    SOCKS proxy and python-socks is not installed)."""
     max_retries: int | None = None
     """Deprecated. Set ``ConnectionPolicy.max_retries`` on the agent instead."""
     time_between_retries: float | None = None
@@ -400,6 +407,8 @@ class WebsocketAgentTransport(AgentTransport):
                             if self.endpoint_url.startswith("wss")
                             else None
                         ),
+                        # None is direct; websockets' default reads the env.
+                        proxy=self.proxy,
                     ) as client:
                         connected_at = time.monotonic()
                         self._client = client
