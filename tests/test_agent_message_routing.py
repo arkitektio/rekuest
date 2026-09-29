@@ -59,17 +59,18 @@ def _errors(transport: MemoryAgentTransport) -> list[str]:
 async def test_init_releases_connect_and_resends_unacked_reports(
     agent: BaseAgent, transport: MemoryAgentTransport
 ) -> None:
-    """Init is the session signal: it acknowledges Register and replays retained reports.
+    """Init is the session signal: it acknowledges Register and re-sends retained frames.
 
     The backend re-sends Init on every connection, so this is also the only notice the
-    agent gets that a dropped connection was recovered -- which is why the persist-then-ack
-    replay hangs off it.
+    agent gets that a dropped connection was recovered. A numbered report is retained
+    until a JOURNAL_ACK covers it: an EVENT_ACK retires nothing.
     """
-    # A terminal report goes out and is retained until the backend acks it.
-    await agent._adispatch(messages.Completed(task="task-1", returns={}))
+    await agent._adispatch(messages.SessionInit(session_id="s", states={}))
+    agent.journal.begin_task("task-1")
+    await agent._adispatch(messages.Completed(task="task-1"))
     completed = transport.of_type(messages.Completed)
-    assert len(completed) == 1
-    assert agent._unacked_events, "a terminal report must be retained pending its ack"
+    assert len(completed) == 1 and (completed[0].pos, completed[0].task_step) == (2, 1)
+    assert agent.retained, "a numbered report must be retained pending its ack"
 
     transport.feed(messages.Init(agent="agent-1"))
     await _pump(agent, 1)
@@ -77,22 +78,21 @@ async def test_init_releases_connect_and_resends_unacked_reports(
     assert agent._connected_event.is_set(), "Init must release anyone awaiting aconnect"
     resent = transport.of_type(messages.Completed)
     assert len(resent) == 2, "the unacked report must be resent on the new connection"
-    assert resent[1].seq == resent[0].seq, (
-        "the resend must preserve the original seq, not be re-stamped"
-    )
+    assert resent[1] == resent[0], "the resend is the frame as it was (seq, pos, step)"
 
-    # Once acked it is dropped, so a later Init does not replay it again.
     transport.feed(messages.EventAck(event=completed[0].id))
     await _pump(agent, 1)
-    assert not agent._unacked_events
+    assert agent.retained, "only a JOURNAL_ACK retires a numbered frame"
+
+    transport.feed(messages.JournalAck(journal_session="s", pos=2))
+    await _pump(agent, 1)
+    assert not agent.retained
 
     transport.feed(messages.Init(agent="agent-1"))
     await _pump(agent, 1)
     assert len(transport.of_type(messages.Completed)) == 2, (
         "an acked report must not replay"
     )
-
-
 
 
 @pytest.mark.asyncio

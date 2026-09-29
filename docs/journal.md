@@ -25,7 +25,8 @@ No key related a `YIELD` to the patches around it. On top of that, several races
 | `pos` | 1, 2, 3, … per session, no gaps; `(session_id, pos)` is the durable key |
 | `global_rev` | the state revision **after** this entry (patches bump it; everything else carries the current value) |
 | `timepoint` / `event_time` | when the agent recorded it (ISO 8601 / epoch ms) |
-| `kind` | the wire `type`: `ASSIGN`, `PROGRESS`, `LOG`, `YIELD`, `STARTED`, `PAUSED`, `RESUMED`, `COMPLETED`, `FAILED`, `CRITICAL`, `CANCELLED`, `INTERRUPTED`, `LOCK`, `UNLOCK`, `STATE_PATCH`, `STATE_SNAPSHOT`, `SESSION_INIT` |
+| `kind` | the wire `type`: `ASSIGN`, `PROGRESS`, `LOG`, `YIELD`, `STARTED`, `PAUSED`, `RESUMED`, `COMPLETED`, `FAILED`, `CRITICAL`, `CANCELLED`, `INTERRUPTED`, `EFFECT`, `LOCK`, `UNLOCK`, `SHELVE`, `UNSHELVE`, `STATE_PATCH`, `STATE_SNAPSHOT`, `SESSION_INIT` |
+| `step` | the entry's step in its task (`task_step` on the wire): 1, 2, 3, … per task this process runs, shared with the task's child calls; none for `ASSIGN`, for entries of no task, and for a task this process never ran |
 | `task_id` | the task the entry belongs to (`STATE_PATCH`: the changing task; `UNLOCK`: the task that held the lock) |
 | `action_key` | the task's action key (`interface`, else `action`, else `task`) |
 | `subject` | the state (`STATE_PATCH`) or lock key (`LOCK`/`UNLOCK`) |
@@ -118,12 +119,20 @@ A client that sends `"journal": true` in its first frame opts in:
 
 ## Agent ↔ server (remote agents)
 
-- **Every journaled frame** carries `pos`, `journal_session` and `agent_ts` (seconds), in the envelope next to `id` and `seq`.
-  - `REGISTER` never gets new fields, because the server forbids extras there.
-  - Other frames tolerate extras, so old servers ignore the new fields.
-- **`INIT`** from a journal-capable server has `"journal": true`.
-- **Once the server has received a `pos`-carrying frame** on a connection, it acknowledges cumulatively with `{"type": "JOURNAL_ACK", "journal_session": "…", "pos": N}`, meaning "persisted up to N".
-  - It sends no `JOURNAL_ACK` before that, because an old agent would not parse an unknown message.
-- **With `journal: true` the agent retains every journaled frame** until a `JOURNAL_ACK` covers it. It re-sends them in `pos` order after reconnecting.
-  - The server makes them idempotent on `(agent, journal_session, pos)`.
-- **Without it**, today's behaviour applies: only terminal reports are retained, until `EVENT_ACK`.
+The wire contract is the server's: rekuest's `docs/design/journal.md`, with every frame
+in `tests/fixtures/agent_wire.json` (copied into this package's `tests/fixtures`). In short,
+for the distributed agent (`rekuest.agents.agent.RekuestAgent`):
+
+- Every numbered frame carries `pos`, `journal_session`, `agent_ts` and, for a task's frame,
+  `task_step`. A child call takes its parent's next step and is sent as
+  `ASSIGN_REQUEST {parent: task, parent_step: step}` (the `reference` stays the caller's own;
+  the server stores the step as the child's `parent_step`, idempotent on `(parent, parent_step)`). A probe's (`p-…`) reports are never numbered.
+- Every numbered frame is retained until a cumulative `JOURNAL_ACK` covers it (terminal
+  reports too; `EVENT_ACK` is ignored), in a SQLite file (`$REKUEST_JOURNAL_PATH`, else
+  `.arkitekt/rekuest_journal.db`) so it survives a restart. A new session never drops an
+  earlier one's frames.
+- Nothing is sent between `REGISTER` and `INIT`. After `INIT` the retained frames go out
+  first, in `(session created, pos)` order, then everything new.
+- `shelve` mints the drawer's `resource_id` itself and sends a numbered `SHELVE`; nothing
+  is awaited. `COLLECT` names drawers by `resource_id`; dropping one sends a numbered
+  `UNSHELVE`.

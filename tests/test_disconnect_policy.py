@@ -105,8 +105,8 @@ async def test_the_kill_report_is_retained_and_resent_on_reconnect(
 ) -> None:
     """A policy kill happens while the socket is down, so the report must survive it.
 
-    Terminal reports are retained until the backend acks them and replayed on the
-    next ``Init``. Without that the backend would never learn the task died.
+    Numbered reports are retained until a ``JOURNAL_ACK`` covers them and replayed on
+    the next ``Init``. Without that the backend would never learn the task died.
     """
     started = asyncio.Event()
 
@@ -121,6 +121,7 @@ async def test_the_kill_report_is_retained_and_resent_on_reconnect(
         policy=CancelOnDisconnect(),
     )
     agent.collect_from_registry()
+    await agent._adispatch(messages.SessionInit(session_id="s", states={}))
 
     transport.feed(_assign("task-1", "move_stage"))
     await _pump(agent, 1)

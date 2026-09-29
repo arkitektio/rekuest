@@ -161,19 +161,27 @@ async def test_a_stream_that_ends_before_init_fails_connect() -> None:
 
 
 @pytest.mark.asyncio
-async def test_put_on_shelve_round_trips_over_the_socket() -> None:
+async def test_put_on_shelve_is_one_frame_and_waits_for_no_reply() -> None:
     transport = RecordingTransport()
     agent = await _connected(transport)
     value = object()
 
-    shelving = asyncio.create_task(agent.aput_on_shelve(Identifier.validate("@test/thing"), value))
+    resource_id = await asyncio.wait_for(
+        agent.aput_on_shelve(Identifier.validate("@test/thing"), value), 1.0
+    )
+    assert agent.shelve[resource_id] is value, "kept before anything is sent"
     await _until(lambda: transport.of_type(messages.Shelve))
     (sent,) = transport.of_type(messages.Shelve)
+    assert (sent.ref, sent.resource_id) == (resource_id, resource_id)
+    assert sent.pos is not None and sent.task is None
     assert sent.identifier == "@test/thing" and sent.label == str(value)
+    assert agent.shelve[resource_id] is value
 
+    # An older server's reply changes nothing.
     transport.feed(messages.Shelved(ref=sent.ref, drawer="drawer-1"))
-    assert await shelving == "drawer-1"
-    assert agent.shelve["drawer-1"] is value
+    transport.feed(messages.Collect(drawers=[resource_id]))
+    await _until(lambda: transport.of_type(messages.Unshelve))
+    assert "drawer-1" not in agent.shelve and resource_id not in agent.shelve
     await agent.atear_down()
 
 

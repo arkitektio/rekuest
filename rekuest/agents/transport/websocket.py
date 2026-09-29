@@ -215,6 +215,9 @@ class WebsocketAgentTransport(AgentTransport):
     next connection, ahead of everything queued after it, so a drop never reorders
     what the agent sent. Still counted as unfinished by the queue (``join``)."""
     _in_queue: Contextual[asyncio.Queue[object]] = None
+    _released: Contextual[asyncio.Event] = None
+    """Set once this connection may send: at once, or -- for a host that holds sends
+    until it has handled the server's ``Init`` -- when the host releases them."""
     _connection_task: Contextual[asyncio.Task[None]] = None
     _client: Contextual["websockets.ClientConnection"] = None
 
@@ -428,6 +431,12 @@ class WebsocketAgentTransport(AgentTransport):
                             ).model_dump_json()
                         )
 
+                        # A host that re-sends what the server is missing after
+                        # its Init holds everything else until then: nothing goes
+                        # out between the Register and the Init.
+                        self._released = asyncio.Event()
+                        if not getattr(self._host, "holds_sends_until_init", False):
+                            self._released.set()
                         send_task = asyncio.create_task(self.sending(client))
                         self._healthy = True
                         await self.anotify_connection_change(True)
@@ -552,6 +561,8 @@ class WebsocketAgentTransport(AgentTransport):
             in_flight = None
 
         try:
+            if self._released is not None:
+                await self._released.wait()
             while True:
                 if self._held is not None:
                     in_flight, self._held = self._held, None
@@ -578,6 +589,49 @@ class WebsocketAgentTransport(AgentTransport):
             # first and cancels this task while it is still inside client.send().
             requeue()
             logger.info("Sending Task sucessfully Cancelled")
+
+    def release_sends(self) -> None:
+        """Let this connection send (the host has handled the server's ``Init``)."""
+        if self._released is not None:
+            self._released.set()
+
+    def discard_journaled(self) -> int:
+        """Drop the queued frames that carry a journal position (``pos``).
+
+        The host retains them and re-sends them, in order, once the server's ``Init``
+        says it is listening; sent from here they would go out ahead of that. Returns
+        how many were dropped.
+        """
+        queue = self._send_queue
+        if queue is None:
+            return 0
+
+        def journaled(frame: str) -> bool:
+            try:
+                decoded = json.loads(frame)
+            except ValueError:
+                return False
+            return isinstance(decoded, dict) and decoded.get("pos") is not None
+
+        dropped = 0
+        if self._held is not None and journaled(self._held):
+            self._held = None
+            queue.task_done()
+            dropped += 1
+        kept: list[str] = []
+        while True:
+            try:
+                frame = queue.get_nowait()
+            except asyncio.QueueEmpty:
+                break
+            queue.task_done()
+            if journaled(frame):
+                dropped += 1
+            else:
+                kept.append(frame)
+        for frame in kept:
+            queue.put_nowait(frame)
+        return dropped
 
     async def delayaction(self, action: messages.FromAgentMessage) -> None:
         """Serialize and enqueue an outbound message for the sender task.

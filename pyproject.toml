@@ -12,12 +12,12 @@ dependencies = [
     "pydantic>=2",
     "rath>=4.1.1",
     "koil>=3.3.3",
-    "fakts>=4",
+    "fakts>=4.1",
     # The declaration an app is (the action language, AppRegistry, services, hooks)
     # is arkitekt-spec's; executing it is arkitekt-runtime's. rekuest is the
     # distributed runtime on top: the socket agent, its transport, and the client.
-    "arkitekt-spec>=1.4",
-    "arkitekt-runtime>=3.0",
+    "arkitekt-spec>=1.5",
+    "arkitekt-runtime>=4.0.1",
 ]
 
 [project.urls]

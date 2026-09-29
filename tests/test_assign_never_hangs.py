@@ -103,6 +103,7 @@ async def test_duplicate_assign_for_finished_task_resends_its_report(
         return x
 
     _register(agent, aquick)
+    await agent._adispatch(messages.SessionInit(session_id="s", states={}))
 
     transport.feed(_assign("task-2", "aquick", x=1))
     await _pump(agent, 1)
@@ -116,7 +117,8 @@ async def test_duplicate_assign_for_finished_task_resends_its_report(
     assert completed[1].seq == completed[0].seq, "re-sent as-is, not re-executed"
 
     # Once acked the outcome is known to the backend: a further duplicate is just dropped.
-    transport.feed(messages.EventAck(event=completed[0].id))
+    assert completed[0].pos is not None
+    transport.feed(messages.JournalAck(journal_session="s", pos=completed[0].pos))
     transport.feed(_assign("task-2", "aquick", x=1))
     await _pump(agent, 2)
     await asyncio.sleep(0.05)

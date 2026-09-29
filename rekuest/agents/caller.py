@@ -13,7 +13,10 @@ it out of the ambient context.
 The translation is:
 
 - outbound: the call description (:meth:`Postman.aassign`'s arguments) → an
-  ``AssignRequest`` socket message; ``reference`` is reused as the idempotency key.
+  ``AssignRequest`` socket message; ``reference`` is the caller's own idempotency key. A
+  child call (one with a ``parent``) takes its parent's next task step and sends it as
+  ``parent_step``: the server makes ``ASSIGN_REQUEST`` idempotent on ``(parent, parent_step)``
+  too, and stores the step as the child's ``parent_step``.
 - inbound: the backend answers with an ``AssignResponse`` (carrying the durable task id) and
   then streams ``ExecutionEvent`` mirrors for that task. Each surfaced mirror is adapted into a
   :class:`CallerTaskEvent` that exposes exactly the ``.kind`` / ``.returns`` / ``.message``
@@ -31,7 +34,7 @@ import uuid
 from dataclasses import dataclass
 from types import TracebackType
 from typing import Any
-from collections.abc import AsyncGenerator, Sequence
+from collections.abc import AsyncGenerator, Awaitable, Callable, Sequence
 
 from rath.scalars import ID
 
@@ -113,8 +116,15 @@ class AgentPostman:
     message — rather than on the agent, so it cannot reach past the socket it was given.
     """
 
-    def __init__(self, sink: MessageSink, cancel_timeout: float = 5.0) -> None:
+    def __init__(
+        self,
+        sink: MessageSink,
+        cancel_timeout: float = 5.0,
+        child_step: "Callable[[str], Awaitable[int | None]] | None" = None,
+    ) -> None:
         self.sink = sink
+        # Takes the parent task's next step for a child call: its parent_step.
+        self.child_step = child_step
         # Max seconds to await a CANCELLED/INTERRUPTED confirmation when an assign
         # stream is cancelled. Bounds cancellation so it can never hang.
         self.cancel_timeout = cancel_timeout
@@ -172,9 +182,16 @@ class AgentPostman:
         confirmation is awaited (bounded by ``cancel_timeout``); if ``escalate_to_interrupt``
         is set and the cancel is not confirmed in time, an ``InterruptRequest`` follows.
         """
+        parent_step = (
+            await self.child_step(str(parent))
+            if parent is not None and self.child_step is not None
+            else None
+        )
+        # The reference stays the caller's own; the parent's step travels next to it.
         request_reference = reference or str(uuid.uuid4())
         request = messages.AssignRequest(
             reference=request_reference,
+            parent_step=parent_step,
             args=dict(args or {}),
             action=action,
             action_hash=action_hash,

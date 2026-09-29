@@ -73,6 +73,26 @@ def _stall_watchdog():  # noqa: ANN202
         signal.setitimer(signal.ITIMER_REAL, 0)
 
 
+@pytest.fixture(autouse=True, scope="session")
+def _journal_in_session_tmp(tmp_path_factory: pytest.TempPathFactory) -> Generator[None, None, None]:
+    """Agents built by session-scoped fixtures (before any test's own tmp dir exists)
+    keep their retained frames in a tmp dir too, never in the repository."""
+    from rekuest.agents.retention import JOURNAL_PATH_ENV
+
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setenv(JOURNAL_PATH_ENV, str(tmp_path_factory.mktemp("journal") / "journal.db"))
+        yield
+
+
+@pytest.fixture(autouse=True)
+def _journal_in_tmp(tmp_path: Any, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Every test's agents keep their retained frames in its own tmp dir: never in the
+    repository, and never a backlog of frames an earlier test left unacknowledged."""
+    from rekuest.agents.retention import JOURNAL_PATH_ENV
+
+    monkeypatch.setenv(JOURNAL_PATH_ENV, str(tmp_path / "journal.db"))
+
+
 class MockShelver:
     """A mock shelver that stores values in memory. This is used to test the
     shelver functionality without using a real shelver."""

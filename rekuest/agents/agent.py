@@ -4,33 +4,43 @@
 transport. :class:`RekuestAgent` is that agent in distributed mode, and adds what only
 means something against a Rekuest server over its websocket:
 
-* the connection's own session bookkeeping -- the ``Init`` acknowledging ``Register``,
-  ``EventAck``/``JournalAck``, and the retention and replay of what the server has not
-  confirmed yet (the persist-then-ack contract);
-* calls to other actions, routed through the server (:class:`~rekuest.agents.caller.AgentPostman`);
-* the shelve over the socket (:class:`~rekuest.agents.backend.SocketAgentBackend`);
+* the delivery side of the agent-report contract (rekuest's ``docs/design/journal.md``):
+  every numbered frame is retained -- on disk, :mod:`rekuest.agents.retention` -- until a
+  ``JOURNAL_ACK`` covers it; nothing goes out between ``REGISTER`` and ``INIT``; after
+  ``INIT`` the retained frames are sent again, earlier sessions' first, in
+  ``(session created, pos)`` order;
+* calls to other actions, routed through the server (:class:`~rekuest.agents.caller.AgentPostman`),
+  each child call taking its parent's next task step as its ``reference``;
 * rath's task scope, so rath-based service clients attribute requests to the running task.
 """
 
 import logging
-import warnings
+import time
 from collections.abc import Sequence
-from typing import Any, Optional
+from typing import Annotated, Any, ClassVar, Optional
 
-from pydantic import Field, PrivateAttr
+from pydantic import Field, PrivateAttr, TypeAdapter
 from rath.task import task_scope
 
 from arkitekt_runtime import messages
 from arkitekt_runtime.agents.backend import LocalAgentBackend
 from arkitekt_runtime.agents.base import BaseAgent
 from arkitekt_runtime.agents.journal import JournalEntry
-from arkitekt_spec.declare.agents.errors import AgentException
-from arkitekt_spec.declare.catalogs import CatalogWarning
+from arkitekt_spec.declare.agents.types import AppContext
 from rekuest.agents.backend import SocketAgentBackend
 from rekuest.agents.caller import AgentPostman
 from rekuest.agents.control import SocketControlPlane
+from rekuest.agents.retention import RetainedFrames, default_journal_path
 
 logger = logging.getLogger(__name__)
+
+#: Rebuilds a retained frame from what was sent.
+_FRAME: TypeAdapter[messages.FromAgentMessage] = TypeAdapter(
+    Annotated[messages.FromAgentMessage, Field(discriminator="type")]
+)
+
+#: A retained frame's key: its session and position.
+RetainedKey = tuple[str, int]
 
 
 class RekuestAgent(BaseAgent):
@@ -40,64 +50,212 @@ class RekuestAgent(BaseAgent):
         default_factory=lambda: [task_scope],
         description="Scopes entered around every assignment; rath's by default, so rath-based service clients attribute their requests to the running task.",
     )
+    journal_path: str | None = Field(
+        default_factory=default_journal_path,
+        description="The SQLite file the agent keeps its unacknowledged frames in, across restarts ($REKUEST_JOURNAL_PATH, else .arkitekt/rekuest_journal.db). None keeps them in memory only.",
+    )
+
+    holds_sends_until_init: ClassVar[bool] = True
+    """Tells the transport to send nothing between ``Register`` and ``Init``: after
+    ``Init`` the agent first re-sends what the server may be missing."""
+
+    _control_plane: Optional["SocketControlPlane"] = PrivateAttr(default=None)
+    _retained: dict[RetainedKey, messages.FromAgentMessage] = PrivateAttr(default_factory=dict)
+    """Numbered frames no ``JournalAck`` covered yet, every session's."""
+    _session_created: dict[str, float] = PrivateAttr(default_factory=dict)
+    """When each session with retained frames was created (orders the resend)."""
+    _store: RetainedFrames | None = PrivateAttr(default=None)
 
     @property
     def control_plane(self) -> "SocketControlPlane":
-        """Init bookkeeping and the shelve over this agent's socket (lazily built)."""
+        """Init bookkeeping over this agent's socket (lazily built)."""
         if self._control_plane is None:
-            from rekuest.agents.control import SocketControlPlane
-
             self._control_plane = SocketControlPlane(self.transport)
         return self._control_plane
 
+    def model_post_init(self, __context: Any) -> None:  # noqa: ANN401
+        """Register over the socket and call through it, unless the caller wired its own."""
+        super().model_post_init(__context)
+        if isinstance(self.backend, LocalAgentBackend):
+            self.backend = SocketAgentBackend(control_plane=self.control_plane)
+        if self._caller_postman is None:
+            self.use_caller(
+                AgentPostman(self.transport, child_step=self.areserve_call_step)
+            )
 
-    async def _aresend_unacked_reports(self) -> None:
-        """Re-send terminal reports we retained but never saw acked.
+    # ------------------------------------------------------------- retention
 
-        Sent as-is rather than through ``_adispatch`` so the original ``seq`` survives and
-        they are not retained a second time; the backend dedups terminal reports by task.
+    @property
+    def retained(self) -> list[messages.FromAgentMessage]:
+        """The frames no ``JournalAck`` covered yet, in the order they are re-sent."""
+        return [self._retained[key] for key in self._resend_order()]
 
-        With a journal-acknowledging server, every journaled frame not yet covered by a
-        ``JournalAck`` is re-sent too, in ``pos`` order (after the terminal reports the
-        journal does not cover); the server drops duplicates by position.
-        """
-        retained = [self._retained[pos] for pos in sorted(self._retained)]
-        covered = {message.id for message in retained}
-        unacked = [
-            message
-            for message in self._unacked_events.values()
-            if message.id not in covered
-        ]
-        for message in [*unacked, *retained]:
-            await self.transport.asend(message)
+    def _resend_order(self) -> list[RetainedKey]:
+        return sorted(
+            self._retained,
+            key=lambda key: (self._session_created.get(key[0], 0.0), key[0], key[1]),
+        )
 
-    def _set_journal_acks(self, journal: bool) -> None:
-        """Whether the server acknowledges journal positions (from its ``Init``)."""
-        self._journal_acks = journal
-        if not journal:
-            self._retained.clear()
-            self._retained_session = None
+    def _open_store(self) -> RetainedFrames:
+        """The on-disk store, opened on first use; loads what earlier runs left."""
+        if self._store is None:
+            try:
+                self._store = RetainedFrames(self.journal_path, agent=self.name or "")
+            except Exception:  # noqa: BLE001 — an unwritable path must not stop the agent
+                logger.error(
+                    "Could not open %s; unacknowledged frames are kept in memory only, "
+                    "and will not survive a restart",
+                    self.journal_path,
+                    exc_info=True,
+                )
+                self._store = RetainedFrames(None, agent=self.name or "")
+            for stored in self._store.load():
+                try:
+                    frame = _FRAME.validate_json(stored.frame)
+                except Exception:  # noqa: BLE001 — one unreadable frame must not stop the start
+                    logger.error(
+                        "Could not read retained frame %s/%s", stored.session_id, stored.pos,
+                        exc_info=True,
+                    )
+                    continue
+                self._session_created.setdefault(stored.session_id, stored.created_at)
+                self._retained.setdefault((stored.session_id, stored.pos), frame)
+            if self._retained:
+                logger.info(
+                    "%d frames of earlier runs are waiting to be sent", len(self._retained)
+                )
+        return self._store
 
-    def _retain(self, message: messages.FromAgentMessage, entry: JournalEntry) -> None:
-        """Keep a journaled frame until a ``JournalAck`` covers it."""
-        if self._retained_session != entry.session_id:
-            self._retained.clear()
-            self._retained_session = entry.session_id
-        self._retained[entry.pos] = message
+    def _know_session(self, session: str) -> None:
+        if session not in self._session_created:
+            self._session_created[session] = self._open_store().open_session(
+                session, time.time()
+            )
+
+    async def astart(self, app_context: AppContext | None = None) -> None:
+        """Mint the session, and read what earlier runs could not deliver: it is sent
+        first, after ``Init``."""
+        await super().astart(app_context)
+        self._open_store()
+        self._know_session(self.current_session)
+
+    def _retain_emitted(
+        self, message: messages.FromAgentMessage, entry: JournalEntry | None
+    ) -> None:
+        """Keep every numbered frame until a ``JournalAck`` covers it, on disk too."""
+        if entry is None:
+            return
+        self._retained[(entry.session_id, entry.pos)] = message
+        try:
+            self._know_session(entry.session_id)
+            self._open_store().add(entry.session_id, entry.pos, message.model_dump_json())
+        except Exception:  # noqa: BLE001 — memory still has it; report the loss of durability
+            logger.error("Could not persist frame %s/%s", entry.session_id, entry.pos, exc_info=True)
 
     def _journal_ack(self, session: str, pos: int) -> None:
-        """Everything of ``session`` up to ``pos`` is persisted by the server."""
-        if self._retained_session == session:
-            for covered in [p for p in self._retained if p <= pos]:
-                del self._retained[covered]
-        for event_id, message in list(self._unacked_events.items()):
-            message_pos = getattr(message, "pos", None)
-            if (
-                getattr(message, "journal_session", None) == session
-                and message_pos is not None
-                and message_pos <= pos
-            ):
-                del self._unacked_events[event_id]
+        """Everything of ``session`` up to ``pos`` is projected by the server."""
+        for key in [k for k in self._retained if k[0] == session and k[1] <= pos]:
+            del self._retained[key]
+        store = self._open_store()
+        try:
+            store.ack(session, pos)
+            if not any(key[0] == session for key in self._retained):
+                store.prune(keep=self.current_session)
+        except Exception:  # noqa: BLE001
+            logger.error("Could not record the ack %s/%s", session, pos, exc_info=True)
+
+    async def _aresend_retained(self) -> None:
+        """Send every retained frame again, as it was, in ``(session created, pos)``
+        order: earlier sessions' first, then this one's. The server skips what it has
+        already projected, and acks again."""
+        for key in self._resend_order():
+            message = self._retained.get(key)
+            if message is not None:
+                await self.transport.asend(message)
+
+    def _retained_terminal_reports(self, task: str) -> list[messages.FromAgentMessage]:
+        return [
+            message
+            for message in self.retained
+            if isinstance(message, messages.TERMINAL_REPORTS) and message.task == task
+        ]
+
+    def _has_retained_terminal_report(self, task: str) -> bool:
+        """Whether a terminal report for this task is still waiting to be acked."""
+        return bool(self._retained_terminal_reports(task))
+
+    async def _aresend_retained_report(self, task: str) -> bool:
+        """A redelivered Assign for a finished task gets its unconfirmed report again."""
+        reports = self._retained_terminal_reports(task)
+        if not reports:
+            return False
+        logger.warning(f"Duplicate Assign for finished task {task}; re-sending its report")
+        for report in reports:
+            await self.transport.asend(report)
+        return True
+
+    # ------------------------------------------------------------------ inbound
+
+    async def _aprocess_runtime_message(self, message: messages.ToAgentMessage) -> None:
+        """The socket protocol: acks, caller answers, older servers' shelve replies."""
+        if isinstance(message, messages.JournalAck):
+            self._journal_ack(message.journal_session, message.pos)
+        elif isinstance(message, messages.EventAck):
+            # Legacy: numbered frames retire on JOURNAL_ACK alone.
+            logger.debug("Ignoring %s", message)
+        elif isinstance(
+            message,
+            (messages.AssignResponse, messages.ProbeResponse, messages.ExecutionEvent),
+        ):
+            self._process_caller_message(message)
+        elif isinstance(message, (messages.Shelved, messages.Unshelved)):
+            self.control_plane.handle_shelve_reply(message)
+        elif isinstance(message, messages.ControlResponse):
+            # Acknowledgement of a fire-and-forget cancel/interrupt request; the
+            # outcome is observed through the task's own event mirrors instead.
+            logger.debug(f"Ignoring control acknowledgement {message}")
+        else:
+            await super()._aprocess_runtime_message(message)
+
+    def _process_caller_message(
+        self,
+        message: "messages.AssignResponse | messages.ProbeResponse | messages.ExecutionEvent",
+    ) -> None:
+        """Route an answer to work this agent delegated to the caller postman.
+
+        ``ExecutionEvent`` is the base of every backend→caller ``…Event`` mirror, so an
+        actor-internal ``acall``/``acall_dependency`` can observe what it delegated.
+        ``ControlResponse`` is not routed: cancel/interrupt requests are fire-and-forget
+        and their outcome is observed through the task's own event mirrors.
+        """
+        if isinstance(message, messages.AssignResponse):
+            self.caller_postman.handle_assign_response(message)
+        elif isinstance(message, messages.ProbeResponse):
+            self.caller_postman.handle_probe_response(message)
+        else:
+            self.caller_postman.handle_execution_event(message)
+
+    def _record_init(self, message: messages.Init) -> None:
+        """The server-assigned agent id, recorded before anyone waiting on ``Init`` resumes."""
+        self.control_plane.handle_init(message)
+
+    async def _aafter_init(self, message: messages.Init) -> None:
+        """Every connection's ``Init`` is also the signal a drop was recovered.
+
+        The transport sent nothing since ``Register``. What it still queues with a
+        ``pos`` is dropped there and re-sent from here, after the earlier sessions'
+        frames and in order, ahead of everything new; then the transport may send.
+        """
+        try:
+            discard = getattr(self.transport, "discard_journaled", None)
+            if discard is not None:
+                discard()
+            await self._aresend_retained()
+        finally:
+            release = getattr(self.transport, "release_sends", None)
+            if release is not None:
+                release()
+        await self._areply_to_inquiries(message.inquiries)
 
     async def _areply_to_inquiries(
         self, inquiries: "Sequence[messages.AssignInquiry]"
@@ -106,18 +264,11 @@ class RekuestAgent(BaseAgent):
         for inquiry in inquiries:
             await self._areport_task_liveness(inquiry.task)
 
-    def _has_retained_terminal_report(self, task: str) -> bool:
-        """Whether a terminal report for this task is still waiting to be acked."""
-        return any(
-            getattr(message, "task", None) == task
-            for message in self._unacked_events.values()
-        )
-
     async def _areport_task_liveness(self, task: str) -> None:
         """Report whether one task is still running on its actor."""
         if self._has_retained_terminal_report(task):
-            # Inquiries arrive on the same Init that just triggered the replay of
-            # retained reports, and that replay says precisely how this task ended.
+            # Inquiries arrive on the same Init that just triggered the resend of
+            # retained frames, and that says precisely how this task ended.
             # Answering again here would only contradict it.
             return
 
@@ -148,104 +299,14 @@ class RekuestAgent(BaseAgent):
                 )
             )
 
-    def _process_caller_message(
-        self,
-        message: "messages.AssignResponse | messages.ProbeResponse | messages.ExecutionEvent",
-    ) -> None:
-        """Route an answer to work this agent delegated to the caller postman.
-
-        ``ExecutionEvent`` is the base of every backend→caller ``…Event`` mirror, so an
-        actor-internal ``acall``/``acall_dependency`` can observe what it delegated.
-        ``ControlResponse`` is not routed: cancel/interrupt requests are fire-and-forget
-        and their outcome is observed through the task's own event mirrors.
-        """
-        if isinstance(message, messages.AssignResponse):
-            self.caller_postman.handle_assign_response(message)
-        elif isinstance(message, messages.ProbeResponse):
-            self.caller_postman.handle_probe_response(message)
-        else:
-            self.caller_postman.handle_execution_event(message)
-
-    _control_plane: Optional["SocketControlPlane"] = PrivateAttr(default=None)
-    """Init bookkeeping and the shelve over this socket, lazily built."""
-
-    _journal_acks: bool = PrivateAttr(default=False)
-    """The server persists journal positions (``Init.journal``): retain every journaled
-    frame until a ``JournalAck`` covers it."""
-
-    _retained: dict[int, messages.FromAgentMessage] = PrivateAttr(default_factory=dict)
-    """Journaled frames not yet covered by a ``JournalAck``, by position."""
-
-    _retained_session: str | None = PrivateAttr(default=None)
-
-    _unacked_events: dict[str, messages.FromAgentMessage] = PrivateAttr(
-        default_factory=dict
-    )
-
-    def model_post_init(self, __context: Any) -> None:  # noqa: ANN401
-        """Shelve over the socket and call through it, unless the caller wired its own."""
-        super().model_post_init(__context)
-        if isinstance(self.backend, LocalAgentBackend):
-            self.backend = SocketAgentBackend(control_plane=self.control_plane)
-        if self._caller_postman is None:
-            self.use_caller(AgentPostman(self.transport))
-
-    async def _aprocess_runtime_message(self, message: messages.ToAgentMessage) -> None:
-        """The socket protocol: session bookkeeping, caller answers, shelve replies."""
-        if isinstance(message, messages.EventAck):
-            # Backend made the reported event durable; stop retaining it.
-            self._unacked_events.pop(message.event, None)
-        elif isinstance(message, messages.JournalAck):
-            self._journal_ack(message.journal_session, message.pos)
-        elif isinstance(
-            message,
-            (messages.AssignResponse, messages.ProbeResponse, messages.ExecutionEvent),
-        ):
-            self._process_caller_message(message)
-        elif isinstance(message, messages.Shelved):
-            self.control_plane.handle_shelved(message)
-        elif isinstance(message, messages.Unshelved):
-            self.control_plane.handle_unshelved(message)
-        elif isinstance(message, messages.ControlResponse):
-            # Acknowledgement of a fire-and-forget cancel/interrupt request; the
-            # outcome is observed through the task's own event mirrors instead.
-            logger.debug(f"Ignoring control acknowledgement {message}")
-        else:
-            await super()._aprocess_runtime_message(message)
-
-    def _record_init(self, message: messages.Init) -> None:
-        """The server-assigned agent id, recorded before anyone waiting on ``Init`` resumes."""
-        self.control_plane.handle_init(message)
-
-    async def _aafter_init(self, message: messages.Init) -> None:
-        """Every connection's ``Init`` is also the signal a drop was recovered: replay and answer."""
-        self._set_journal_acks(message.journal)
-        await self._aresend_unacked_reports()
-        await self._areply_to_inquiries(message.inquiries)
-
-    def _retain_emitted(
-        self, message: messages.FromAgentMessage, entry: JournalEntry | None
-    ) -> None:
-        """Keep terminal reports until an ``EventAck``, journaled frames until a ``JournalAck``."""
-        if isinstance(message, messages.TERMINAL_REPORTS):
-            self._unacked_events[message.id] = message
-        if entry is not None and self._journal_acks:
-            self._retain(message, entry)
-
-    async def _aresend_retained_report(self, task: str) -> bool:
-        """A redelivered Assign for a finished task gets its unconfirmed report again."""
-        if not self._has_retained_terminal_report(task):
-            return False
-        logger.warning(f"Duplicate Assign for finished task {task}; re-sending its report")
-        for retained in list(self._unacked_events.values()):
-            if getattr(retained, "task", None) == task:
-                await self.transport.asend(retained)
-        return True
-
-    def _fail_pending_requests(self, error: Exception) -> None:
-        """Fail the shelve and control requests still waiting on the server."""
-        if self._control_plane is not None:
-            self._control_plane.fail_pending(error)
+    async def atear_down(self) -> None:
+        """Tear down, then close the store (what it holds is sent by the next run)."""
+        try:
+            await super().atear_down()
+        finally:
+            store, self._store = self._store, None
+            if store is not None:
+                store.close()
 
 
 __all__ = ["RekuestAgent"]
