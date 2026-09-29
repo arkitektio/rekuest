@@ -1,6 +1,11 @@
 """This file contains the structures used in the tests."""
 
+from typing import TYPE_CHECKING
+
 from pydantic.main import BaseModel
+
+if TYPE_CHECKING:
+    from arkitekt_spec.declare.structures.registry import StructureRegistry
 
 
 class SerializableObject(BaseModel):

@@ -96,7 +96,7 @@ def assign(interface: str, token: str | None = None, **args: Any) -> messages.As
 def test_a_client_is_what_a_declared_service_returns_seen_through_optional_and_annotated() -> None:
     structures = registry_with_clients().structure_registry
     assert structures.is_client(FakeClient)
-    assert structures.is_client(Optional[FakeClient])
+    assert structures.is_client(Optional[FakeClient])  # noqa: UP007 -- the Optional spelling is what is tested
     assert structures.is_client(FakeClient | None)
     assert structures.is_client(Annotated[FakeClient, "doc"])
     assert not structures.is_client(FakeClient | OtherClient)
@@ -107,7 +107,7 @@ def test_a_client_is_what_a_declared_service_returns_seen_through_optional_and_a
 
 
 @pytest.mark.parametrize(
-    "annotation", [FakeClient, Optional[FakeClient], Annotated[FakeClient, "doc"]]
+    "annotation", [FakeClient, Optional[FakeClient], Annotated[FakeClient, "doc"]]  # noqa: UP007 -- the Optional spelling is what is tested
 )
 def test_client_parameter_is_not_a_port(annotation: Any) -> None:
     def takes_client(x: int, client) -> int:  # noqa: ANN001

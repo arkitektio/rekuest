@@ -57,7 +57,7 @@ def test_declaring_records_the_service_and_what_it_returns() -> None:
     assert things.returns is ThingClient and things.registry is registry
     assert registry.structure_registry.clients == {"things": ThingClient}
     assert registry.structure_registry.is_client(ThingClient)
-    assert registry.structure_registry.is_client(Optional[ThingClient])
+    assert registry.structure_registry.is_client(Optional[ThingClient])  # noqa: UP007 -- the Optional spelling is what is tested
     assert not registry.structure_registry.is_client(OtherClient)
     assert not registry.structure_registry.is_client(int)
 
