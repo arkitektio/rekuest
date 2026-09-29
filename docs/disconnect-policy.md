@@ -122,3 +122,7 @@ is **not** a safety-rated interlock:
 
 Anything that must stop for real when its controller goes away needs a watchdog in
 the hardware controller too. Treat this as reducing the window, not eliminating it.
+
+What happens to a task whose *agent* died is not a disconnect policy either: after the
+grace window a plain task ends LOST and a workflow is resumed. See
+[Workflows](./workflows.md).

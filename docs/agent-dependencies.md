@@ -46,11 +46,13 @@ class can be declared on any number of apps. Two passes turn it into a dependenc
 
 ## Calling a dependency
 
-Type-hint a parameter with the protocol class and the actor hands the function a
-proxy made for the task it runs in:
+Only a **workflow** may call other actions (see [Workflows](./workflows.md)), so a
+protocol with action demands goes on an `@app.workflow`; declaring it on a plain
+`@app.action` is refused at registration. Type-hint a parameter with the protocol class
+and the actor hands the function a proxy made for the task it runs in:
 
 ```python
-@app.register
+@app.workflow
 def capture(camera: CameraDeps, task: Task) -> bytes:
     task.progress(10, "acquiring")
     return camera.acquire(exposure_ms=10.0)   # a child of this task
@@ -58,10 +60,16 @@ def capture(camera: CameraDeps, task: Task) -> bytes:
 
 `camera.acquire(...)` calls as the protocol declared the method: awaitable when it
 is `async`, blocking otherwise (`.acall(...)` / `.call(...)` are the explicit
-forms). The call leaves over your agent's socket, parented to the task the
-proxy was made for -- the very object a `task: Task` parameter receives -- and is
-(de)serialized with your app's structures. A name the protocol does not declare
-raises `AttributeError`; a state demand is not readable through the proxy.
+forms). A method whose return is annotated as a generator (`Generator[str, None,
+None]`, `AsyncGenerator[str, None]`, `Iterator[str]`, `AsyncIterator[str]`) streams:
+calling it gives an iterator over every yield of the remote action (`.iterate(...)` /
+`.aiterate(...)` are the explicit forms; `.acall` on it keeps only the last yield).
+
+The call leaves over your agent's socket, parented to the task the proxy was made for
+-- the very object a `task: Task` parameter receives -- and is (de)serialized with your
+app's structures. A name the protocol does not declare raises `AttributeError`. A
+state demand reads as a reference to the resolved agent's state: not its value, but
+what `task.guard(camera.state, "exposure_ms")` takes to notice a change across a resume.
 
 ## App + key: how a demand is identified
 

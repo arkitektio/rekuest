@@ -72,9 +72,10 @@ with easy("my-script", rekuest_service) as rekuest:
     result = rekuest.call("<action-id>", x=21)
 ```
 
-Inside a running action, a call is a *child* of the task it runs in, so it goes
-through the task. Resolve the target with the client, then call it on the task
-(`rekuest.acall` inside a task raises `RootOnlyCallError`, which says as much):
+Only a **workflow** may call other actions. A call made inside one is a *child* of the
+task it runs in, so it goes through the task: resolve the target with the client, then
+call it on the task. A plain `@app.action` that calls raises `NotAWorkflowError`, and
+`rekuest.acall` inside a task raises `RootOnlyCallError`:
 
 ```python
 from arkitekt import App, Task
@@ -84,7 +85,7 @@ from rekuest.client.client import Rekuest
 app = App("orchestrate", "0.1.0", services=[rekuest_service])
 
 
-@app.action
+@app.workflow
 async def double_twice(x: int, action_id: str, task: Task, rekuest: Rekuest) -> int:
     """Double Twice"""
     action = await rekuest.aresolve(action_id)
@@ -92,9 +93,30 @@ async def double_twice(x: int, action_id: str, task: Task, rekuest: Rekuest) -> 
     return await task.acall(action, x=once)
 ```
 
+Usually a workflow names what it needs of another app as a protocol instead
+(`@app.declare`, see [Agent dependencies](docs/agent-dependencies.md)) and calls its
+methods; a method annotated as a generator streams the other action's yields.
+
 Actions, implementations, shortcuts, test cases, test results and task events travel
 between actions by id (`@rekuest/action`, `@rekuest/implementation`, …), so an action
 can take and return them directly.
+
+## When an agent dies
+
+Nothing is re-run behind your back.
+
+- **A plain task** whose agent dies mid-run ends **LOST**: not failed, its fate unknown.
+  `rekuest.call` raises `AgentLost` with what is known (`started`, `last_progress`, and the
+  action's `effects`), and whoever called decides. Work that was never picked up is simply
+  delivered again.
+- **A workflow** is **resumed**: it runs again from the top, but the calls it already made
+  return their recorded results, and `task.now()`, `task.random()`, `task.sleep()` and
+  `task.record(fn)` return their recorded values. Inside it, a lost step raises `AgentLost`,
+  and `task.retry`, `task.hold` and `task.guard` cover the usual answers.
+
+`effects=` on an action (`NONE`, `REPEATABLE`, `UNKNOWN`, `IRREVERSIBLE`) says what running it
+again would do. It is information for whoever decides, never a rule the server acts on.
+See [Workflows](docs/workflows.md).
 
 ## Package layout
 
@@ -108,6 +130,7 @@ can take and return them directly.
 
 ## Guides
 
+- [Workflows](docs/workflows.md) — calling other actions, and what happens when an agent dies
 - [Agent dependencies](docs/agent-dependencies.md) — declare the actions and states an app depends on
 - [Disconnect policy](docs/disconnect-policy.md) — what happens to in-flight work when the agent loses its connection
 - [The agent journal](docs/journal.md) — the ordered, persisted record of everything an agent reports
