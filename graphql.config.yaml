@@ -35,7 +35,6 @@ projects:
               - AgentDependencyInput
               - AgentProbeInput
               - ArgPortInput
-              - AssignPolicy
               - AssignWidgetInput
               - BlokImplementationInput
               - ChoiceAssignWidgetInput
