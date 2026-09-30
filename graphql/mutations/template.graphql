@@ -1,5 +1,5 @@
-mutation createImplementation($input: CreateImplementationInput!) {
-  createImplementation(input: $input) {
+mutation createHigherOrderImplementation($input: CreateHigherOrderImplementationInput!) {
+  createHigherOrderImplementation(input: $input) {
     ...Implementation
   }
 }

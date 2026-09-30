@@ -2,11 +2,11 @@
     
 import builtins
 from arkitekt_runtime.types import AssignInput, CancelInput, HookInput, PauseInput, ResolvedDependencyInput, ResumeInput, TaskEventKind
-from arkitekt_spec.actions import ActionDemandInput, ActionKind, AgentDependencyInput, BlokImplementationInput, ComponentNodeInput, EffectKind, ImplementAgentInput, ImplementationInput, LockImplementationInput, PortKind, StateImplementationInput
+from arkitekt_spec.actions import ActionDemandInput, ActionKind, AgentDependencyInput, BlokImplementationInput, ComponentNodeInput, DefinitionInput, EffectKind, ImplementAgentInput, ImplementationInput, LockImplementationInput, PortKind, StateImplementationInput
 from datetime import datetime
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 from rath.scalars import ID, IDCoercible
-from rekuest.protocol.schema import ActionFilter, ActionOrder, AgentFilter, AgentInput, AgentKind, AssignWidgetKind, BlokAgentMappingInput, CatalogComponentInput, CatalogOperationInput, CatalogValueKind, CollectInput, CreateBlokInput, CreateDashboardInput, CreateImplementationInput, CreateShortcutInput, CreateSpaceInput, CreateTestCaseInput, CreateTestResultInput, CreateThreeDModelInput, DiagnosticLevel, FinishMediaUploadInput, ImplementationFilter, InterruptInput, LogLevel, MaterializeBlokInput, OffsetPaginationInput, PlacementInput, RegisterUiCatalogInput, RequestMediaAccessInput, RequestMediaUploadInput, ReturnWidgetKind, ShelveInMemoryDrawerInput, ShortcutFilter, ShortcutOrder, TaskInstructKind, ToolboxFilter, ToolboxOrder, UnshelveMemoryDrawerInput, WidgetDefaultInput
+from rekuest.protocol.schema import ActionFilter, ActionOrder, AgentFilter, AgentInput, AgentKind, AssignWidgetKind, BlokAgentMappingInput, CatalogComponentInput, CatalogOperationInput, CatalogValueKind, CollectInput, CreateBlokInput, CreateDashboardInput, CreateHigherOrderImplementationInput, CreateShortcutInput, CreateSpaceInput, CreateTestCaseInput, CreateTestResultInput, CreateThreeDModelInput, DiagnosticLevel, FinishMediaUploadInput, ImplementationFilter, InterruptInput, LogLevel, MaterializeBlokInput, OffsetPaginationInput, PlacementInput, RegisterUiCatalogInput, RequestMediaAccessInput, RequestMediaUploadInput, ReturnWidgetKind, ShelveInMemoryDrawerInput, ShortcutFilter, ShortcutOrder, TaskInstructKind, ToolboxFilter, ToolboxOrder, UnshelveMemoryDrawerInput, WidgetDefaultInput
 from rekuest.scalars import ActionHash, Args, Identifier, JSONSerializable, MediaLike
 from rekuest.traits.action import Callable
 from typing import Annotated, Any, AsyncIterator, Iterable, Iterator, Literal
@@ -1588,18 +1588,18 @@ class CollectMutation(BaseModel):
         """Meta class for collect """
         document = 'mutation collect($input: CollectInput!) {\n  collect(input: $input)\n}'
 
-class CreateImplementationMutation(BaseModel):
+class CreateHigherOrderImplementationMutation(BaseModel):
     """No documentation found for this operation."""
-    create_implementation: Implementation = Field(alias='createImplementation')
-    'Create a new implementation entry.'
+    create_higher_order_implementation: Implementation = Field(alias='createHigherOrderImplementation')
+    'Deploy a higher-order implementation: a wrapper onto the agent of the implementation it wraps, linked to it.'
 
     class Arguments(BaseModel):
-        """Arguments for createImplementation """
-        input: CreateImplementationInput
+        """Arguments for createHigherOrderImplementation """
+        input: CreateHigherOrderImplementationInput
 
     class Meta:
-        """Meta class for createImplementation """
-        document = 'fragment ActionArgumentLeaf on ActionArgument {\n  key\n  valueLiteral\n  valuePath\n  utilCall {\n    operation\n    __typename\n  }\n  __typename\n}\n\nfragment ActionArgumentNested on ActionArgument {\n  key\n  valueLiteral\n  valuePath\n  utilCall {\n    operation\n    arguments {\n      ...ActionArgumentLeaf\n      __typename\n    }\n    __typename\n  }\n  valueList {\n    ...ActionArgumentLeaf\n    __typename\n  }\n  valueDict {\n    ...ActionArgumentLeaf\n    __typename\n  }\n  __typename\n}\n\nfragment ComponentProp on ComponentProp {\n  key\n  staticValue\n  dynamicValue {\n    literal\n    path\n    __typename\n  }\n  declaresValue\n  utilCall {\n    ...UtilCall\n    __typename\n  }\n  __typename\n}\n\nfragment ActionArgument on ActionArgument {\n  key\n  valueLiteral\n  valuePath\n  utilCall {\n    operation\n    arguments {\n      ...ActionArgumentNested\n      __typename\n    }\n    __typename\n  }\n  valueList {\n    ...ActionArgumentNested\n    __typename\n  }\n  valueDict {\n    ...ActionArgumentNested\n    __typename\n  }\n  __typename\n}\n\nfragment ArgChildPortNested on ArgPort {\n  key\n  kind\n  children {\n    key\n    identifier\n    nullable\n    kind\n    referenceUnit\n    proposedUnits\n    dimension\n    __typename\n  }\n  choices {\n    value\n    label\n    description\n    __typename\n  }\n  identifier\n  nullable\n  default\n  referenceUnit\n  proposedUnits\n  dimension\n  __typename\n}\n\nfragment ChoiceAssignWidget on ChoiceAssignWidget {\n  __typename\n  kind\n  placeholder\n}\n\nfragment ChoiceReturnWidget on ChoiceReturnWidget {\n  __typename\n  kind\n}\n\nfragment CustomAssignWidget on CustomAssignWidget {\n  __typename\n  kind\n  component\n  props {\n    ...ComponentProp\n    __typename\n  }\n  dependencies\n}\n\nfragment CustomEffect on CustomEffect {\n  __typename\n  kind\n}\n\nfragment CustomReturnWidget on CustomReturnWidget {\n  __typename\n  kind\n  component\n  props {\n    ...ComponentProp\n    __typename\n  }\n}\n\nfragment MessageEffect on MessageEffect {\n  __typename\n  kind\n  message\n}\n\nfragment ReturnChildPortNested on ReturnPort {\n  key\n  kind\n  children {\n    key\n    identifier\n    nullable\n    kind\n    referenceUnit\n    proposedUnits\n    dimension\n    __typename\n  }\n  choices {\n    value\n    label\n    description\n    __typename\n  }\n  identifier\n  nullable\n  referenceUnit\n  proposedUnits\n  dimension\n  __typename\n}\n\nfragment SearchAssignWidget on SearchAssignWidget {\n  __typename\n  kind\n  query\n  ward\n  dependencies\n}\n\nfragment SliderAssignWidget on SliderAssignWidget {\n  __typename\n  kind\n  min\n  max\n  step\n}\n\nfragment StringAssignWidget on StringAssignWidget {\n  __typename\n  kind\n  placeholder\n  asParagraph\n}\n\nfragment ArgChildPort on ArgPort {\n  key\n  kind\n  identifier\n  children {\n    ...ArgChildPortNested\n    __typename\n  }\n  choices {\n    value\n    label\n    description\n    __typename\n  }\n  nullable\n  default\n  referenceUnit\n  proposedUnits\n  dimension\n  __typename\n}\n\nfragment PortAssignWidget on AssignWidget {\n  __typename\n  kind\n  ...StringAssignWidget\n  ...SearchAssignWidget\n  ...SliderAssignWidget\n  ...ChoiceAssignWidget\n  ...CustomAssignWidget\n}\n\nfragment PortEffect on Effect {\n  __typename\n  kind\n  dependencies\n  call {\n    ...UtilCall\n    __typename\n  }\n  callJson\n  source\n  ...CustomEffect\n  ...MessageEffect\n}\n\nfragment ReturnChildPort on ReturnPort {\n  key\n  kind\n  identifier\n  children {\n    ...ReturnChildPortNested\n    __typename\n  }\n  choices {\n    value\n    label\n    description\n    __typename\n  }\n  nullable\n  referenceUnit\n  proposedUnits\n  dimension\n  __typename\n}\n\nfragment ReturnWidget on ReturnWidget {\n  __typename\n  kind\n  ...CustomReturnWidget\n  ...ChoiceReturnWidget\n}\n\nfragment UtilCall on UtilCall {\n  operation\n  arguments {\n    ...ActionArgument\n    __typename\n  }\n  __typename\n}\n\nfragment ArgPort on ArgPort {\n  __typename\n  key\n  label\n  nullable\n  description\n  default\n  kind\n  identifier\n  referenceUnit\n  proposedUnits\n  dimension\n  children {\n    ...ArgChildPort\n    __typename\n  }\n  widget {\n    ...PortAssignWidget\n    __typename\n  }\n  choices {\n    value\n    label\n    description\n    __typename\n  }\n  validators {\n    call {\n      ...UtilCall\n      __typename\n    }\n    callJson\n    source\n    errorMessage\n    dependencies\n    label\n    __typename\n  }\n  effects {\n    ...PortEffect\n    __typename\n  }\n}\n\nfragment ReturnPort on ReturnPort {\n  __typename\n  key\n  label\n  nullable\n  description\n  kind\n  identifier\n  referenceUnit\n  proposedUnits\n  dimension\n  children {\n    ...ReturnChildPort\n    __typename\n  }\n  widget {\n    ...ReturnWidget\n    __typename\n  }\n  choices {\n    value\n    label\n    description\n    __typename\n  }\n  effects {\n    ...PortEffect\n    __typename\n  }\n}\n\nfragment Definition on Action {\n  args {\n    ...ArgPort\n    __typename\n  }\n  returns {\n    ...ReturnPort\n    __typename\n  }\n  kind\n  name\n  description\n  collections {\n    name\n    __typename\n  }\n  isDev\n  isTestFor {\n    id\n    __typename\n  }\n  portGroups {\n    key\n    __typename\n  }\n  stateful\n  __typename\n}\n\nfragment Action on Action {\n  hash\n  id\n  ...Definition\n  __typename\n}\n\nfragment Implementation on Implementation {\n  id\n  agent {\n    id\n    __typename\n  }\n  action {\n    ...Action\n    __typename\n  }\n  params\n  interface\n  diagnostics {\n    level\n    code\n    message\n    path\n    __typename\n  }\n  __typename\n}\n\nmutation createImplementation($input: CreateImplementationInput!) {\n  createImplementation(input: $input) {\n    ...Implementation\n    __typename\n  }\n}'
+        """Meta class for createHigherOrderImplementation """
+        document = 'fragment ActionArgumentLeaf on ActionArgument {\n  key\n  valueLiteral\n  valuePath\n  utilCall {\n    operation\n    __typename\n  }\n  __typename\n}\n\nfragment ActionArgumentNested on ActionArgument {\n  key\n  valueLiteral\n  valuePath\n  utilCall {\n    operation\n    arguments {\n      ...ActionArgumentLeaf\n      __typename\n    }\n    __typename\n  }\n  valueList {\n    ...ActionArgumentLeaf\n    __typename\n  }\n  valueDict {\n    ...ActionArgumentLeaf\n    __typename\n  }\n  __typename\n}\n\nfragment ComponentProp on ComponentProp {\n  key\n  staticValue\n  dynamicValue {\n    literal\n    path\n    __typename\n  }\n  declaresValue\n  utilCall {\n    ...UtilCall\n    __typename\n  }\n  __typename\n}\n\nfragment ActionArgument on ActionArgument {\n  key\n  valueLiteral\n  valuePath\n  utilCall {\n    operation\n    arguments {\n      ...ActionArgumentNested\n      __typename\n    }\n    __typename\n  }\n  valueList {\n    ...ActionArgumentNested\n    __typename\n  }\n  valueDict {\n    ...ActionArgumentNested\n    __typename\n  }\n  __typename\n}\n\nfragment ArgChildPortNested on ArgPort {\n  key\n  kind\n  children {\n    key\n    identifier\n    nullable\n    kind\n    referenceUnit\n    proposedUnits\n    dimension\n    __typename\n  }\n  choices {\n    value\n    label\n    description\n    __typename\n  }\n  identifier\n  nullable\n  default\n  referenceUnit\n  proposedUnits\n  dimension\n  __typename\n}\n\nfragment ChoiceAssignWidget on ChoiceAssignWidget {\n  __typename\n  kind\n  placeholder\n}\n\nfragment ChoiceReturnWidget on ChoiceReturnWidget {\n  __typename\n  kind\n}\n\nfragment CustomAssignWidget on CustomAssignWidget {\n  __typename\n  kind\n  component\n  props {\n    ...ComponentProp\n    __typename\n  }\n  dependencies\n}\n\nfragment CustomEffect on CustomEffect {\n  __typename\n  kind\n}\n\nfragment CustomReturnWidget on CustomReturnWidget {\n  __typename\n  kind\n  component\n  props {\n    ...ComponentProp\n    __typename\n  }\n}\n\nfragment MessageEffect on MessageEffect {\n  __typename\n  kind\n  message\n}\n\nfragment ReturnChildPortNested on ReturnPort {\n  key\n  kind\n  children {\n    key\n    identifier\n    nullable\n    kind\n    referenceUnit\n    proposedUnits\n    dimension\n    __typename\n  }\n  choices {\n    value\n    label\n    description\n    __typename\n  }\n  identifier\n  nullable\n  referenceUnit\n  proposedUnits\n  dimension\n  __typename\n}\n\nfragment SearchAssignWidget on SearchAssignWidget {\n  __typename\n  kind\n  query\n  ward\n  dependencies\n}\n\nfragment SliderAssignWidget on SliderAssignWidget {\n  __typename\n  kind\n  min\n  max\n  step\n}\n\nfragment StringAssignWidget on StringAssignWidget {\n  __typename\n  kind\n  placeholder\n  asParagraph\n}\n\nfragment ArgChildPort on ArgPort {\n  key\n  kind\n  identifier\n  children {\n    ...ArgChildPortNested\n    __typename\n  }\n  choices {\n    value\n    label\n    description\n    __typename\n  }\n  nullable\n  default\n  referenceUnit\n  proposedUnits\n  dimension\n  __typename\n}\n\nfragment PortAssignWidget on AssignWidget {\n  __typename\n  kind\n  ...StringAssignWidget\n  ...SearchAssignWidget\n  ...SliderAssignWidget\n  ...ChoiceAssignWidget\n  ...CustomAssignWidget\n}\n\nfragment PortEffect on Effect {\n  __typename\n  kind\n  dependencies\n  call {\n    ...UtilCall\n    __typename\n  }\n  callJson\n  source\n  ...CustomEffect\n  ...MessageEffect\n}\n\nfragment ReturnChildPort on ReturnPort {\n  key\n  kind\n  identifier\n  children {\n    ...ReturnChildPortNested\n    __typename\n  }\n  choices {\n    value\n    label\n    description\n    __typename\n  }\n  nullable\n  referenceUnit\n  proposedUnits\n  dimension\n  __typename\n}\n\nfragment ReturnWidget on ReturnWidget {\n  __typename\n  kind\n  ...CustomReturnWidget\n  ...ChoiceReturnWidget\n}\n\nfragment UtilCall on UtilCall {\n  operation\n  arguments {\n    ...ActionArgument\n    __typename\n  }\n  __typename\n}\n\nfragment ArgPort on ArgPort {\n  __typename\n  key\n  label\n  nullable\n  description\n  default\n  kind\n  identifier\n  referenceUnit\n  proposedUnits\n  dimension\n  children {\n    ...ArgChildPort\n    __typename\n  }\n  widget {\n    ...PortAssignWidget\n    __typename\n  }\n  choices {\n    value\n    label\n    description\n    __typename\n  }\n  validators {\n    call {\n      ...UtilCall\n      __typename\n    }\n    callJson\n    source\n    errorMessage\n    dependencies\n    label\n    __typename\n  }\n  effects {\n    ...PortEffect\n    __typename\n  }\n}\n\nfragment ReturnPort on ReturnPort {\n  __typename\n  key\n  label\n  nullable\n  description\n  kind\n  identifier\n  referenceUnit\n  proposedUnits\n  dimension\n  children {\n    ...ReturnChildPort\n    __typename\n  }\n  widget {\n    ...ReturnWidget\n    __typename\n  }\n  choices {\n    value\n    label\n    description\n    __typename\n  }\n  effects {\n    ...PortEffect\n    __typename\n  }\n}\n\nfragment Definition on Action {\n  args {\n    ...ArgPort\n    __typename\n  }\n  returns {\n    ...ReturnPort\n    __typename\n  }\n  kind\n  name\n  description\n  collections {\n    name\n    __typename\n  }\n  isDev\n  isTestFor {\n    id\n    __typename\n  }\n  portGroups {\n    key\n    __typename\n  }\n  stateful\n  __typename\n}\n\nfragment Action on Action {\n  hash\n  id\n  ...Definition\n  __typename\n}\n\nfragment Implementation on Implementation {\n  id\n  agent {\n    id\n    __typename\n  }\n  action {\n    ...Action\n    __typename\n  }\n  params\n  interface\n  diagnostics {\n    level\n    code\n    message\n    path\n    __typename\n  }\n  __typename\n}\n\nmutation createHigherOrderImplementation($input: CreateHigherOrderImplementationInput!) {\n  createHigherOrderImplementation(input: $input) {\n    ...Implementation\n    __typename\n  }\n}'
 
 class Create_testcaseMutation(BaseModel):
     """No documentation found for this operation."""
@@ -3091,39 +3091,59 @@ Returns:
         variables['input'] = _input
         return self.execute(CollectMutation, variables).collect
 
-    async def acreate_implementation(self, implementation: ImplementationInput) -> Implementation:
-        """createImplementation 
+    async def acreate_higher_order_implementation(self, lower: IDCoercible, interface: str, definition: DefinitionInput, config: Any | None | UnsetType=UNSET, dependencies: Iterable[AgentDependencyInput] | None | UnsetType=UNSET) -> Implementation:
+        """createHigherOrderImplementation 
 
-Create a new implementation entry.
+Deploy a higher-order implementation: a wrapper onto the agent of the implementation it wraps, linked to it.
 
 Args:
-    implementation: The implementation to create. This is used to identify the implementation in the system.
+    lower: The implementation to wrap; its agent hosts the wrapper.
+    interface: The wrapper's interface, unique on that agent (e.g. 'flow:123').
+    definition: The wrapper's typed contract, derived by the caller.
+    config: Projection config: bound params + arg/dependency/return maps (see Implementation.higher_order_config).
+    dependencies: Dependencies the wrapper declares, for a dependency_map sourcing 'from: caller'.
 
 Returns:
     Implementation
 """
         variables: dict[str, builtins.object] = {}
         _input: dict[str, builtins.object] = {}
-        _input['implementation'] = implementation
+        _input['lower'] = lower
+        _input['interface'] = interface
+        _input['definition'] = definition
+        if config is not UNSET:
+            _input['config'] = config
+        if dependencies is not UNSET:
+            _input['dependencies'] = dependencies
         variables['input'] = _input
-        return (await self.aexecute(CreateImplementationMutation, variables)).create_implementation
+        return (await self.aexecute(CreateHigherOrderImplementationMutation, variables)).create_higher_order_implementation
 
-    def create_implementation(self, implementation: ImplementationInput) -> Implementation:
-        """createImplementation 
+    def create_higher_order_implementation(self, lower: IDCoercible, interface: str, definition: DefinitionInput, config: Any | None | UnsetType=UNSET, dependencies: Iterable[AgentDependencyInput] | None | UnsetType=UNSET) -> Implementation:
+        """createHigherOrderImplementation 
 
-Create a new implementation entry.
+Deploy a higher-order implementation: a wrapper onto the agent of the implementation it wraps, linked to it.
 
 Args:
-    implementation: The implementation to create. This is used to identify the implementation in the system.
+    lower: The implementation to wrap; its agent hosts the wrapper.
+    interface: The wrapper's interface, unique on that agent (e.g. 'flow:123').
+    definition: The wrapper's typed contract, derived by the caller.
+    config: Projection config: bound params + arg/dependency/return maps (see Implementation.higher_order_config).
+    dependencies: Dependencies the wrapper declares, for a dependency_map sourcing 'from: caller'.
 
 Returns:
     Implementation
 """
         variables: dict[str, builtins.object] = {}
         _input: dict[str, builtins.object] = {}
-        _input['implementation'] = implementation
+        _input['lower'] = lower
+        _input['interface'] = interface
+        _input['definition'] = definition
+        if config is not UNSET:
+            _input['config'] = config
+        if dependencies is not UNSET:
+            _input['dependencies'] = dependencies
         variables['input'] = _input
-        return self.execute(CreateImplementationMutation, variables).create_implementation
+        return self.execute(CreateHigherOrderImplementationMutation, variables).create_higher_order_implementation
 
     async def acreate_testcase(self, action: IDCoercible, tester: IDCoercible, description: str | None | UnsetType=UNSET, name: str | None | UnsetType=UNSET) -> TestCase:
         """create_testcase 
