@@ -33,7 +33,6 @@ fragment TaskChange on TaskChange {
   isDone
   latestEventKind
   latestInstructKind
-  statusMessage
   updatedAt
   createdAt
 }

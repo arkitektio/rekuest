@@ -252,20 +252,22 @@ class CreateSpaceInput(BaseModel):
     model_config = ConfigDict(frozen=True, extra='forbid', populate_by_name=True, use_enum_values=True)
 
 class CreateTestCaseInput(BaseModel):
-    """No documentation"""
-    action: ID
-    tester: ID
+    """Declare that one action tests another."""
+    action: ID = Field(description='The action under test.')
+    tester: ID = Field(description='The action that performs the test.')
     description: str | None = None
     name: str | None = None
+    is_benchmark: Annotated[bool | None, GraphQLDefault('False')] = Field(validation_alias=AliasChoices('is_benchmark', 'isBenchmark'), serialization_alias='isBenchmark', default=None, description='Measures performance rather than correctness.')
+    'Measures performance rather than correctness.\nDefault: False'
     model_config = ConfigDict(frozen=True, extra='forbid', populate_by_name=True, use_enum_values=True)
 
 class CreateTestResultInput(BaseModel):
-    """No documentation"""
+    """Record one run of a test case."""
     case: ID
-    tester: ID
-    implementation: ID
+    tester: ID = Field(description='The implementation that ran the test.')
+    implementation: ID = Field(description='The implementation under test.')
     passed: bool
-    result: str | None = None
+    result: Any | None = Field(default=None, description='What the test produced, as JSON.')
     model_config = ConfigDict(frozen=True, extra='forbid', populate_by_name=True, use_enum_values=True)
 
 class CreateThreeDModelInput(BaseModel):
@@ -273,6 +275,8 @@ class CreateThreeDModelInput(BaseModel):
     name: str = Field(description='The name of the 3D model.')
     description: str | None = Field(default=None, description='A description of the 3D model.')
     media: MediaLike = Field(description='The media store file for the 3D model.')
+    transfer_function: str | None = Field(validation_alias=AliasChoices('transfer_function', 'transferFunction'), serialization_alias='transferFunction', default=None, description="How the agent's state maps onto the model's properties.")
+    dependency: AgentDependencyInput | None = Field(default=None, description='The agent this model shows: whose state the transfer function reads.')
     model_config = ConfigDict(frozen=True, extra='forbid', populate_by_name=True, use_enum_values=True)
 
 class FinishMediaUploadInput(BaseModel):
