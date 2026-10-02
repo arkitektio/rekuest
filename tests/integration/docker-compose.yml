@@ -8,7 +8,25 @@ services:
       POSTGRES_MULTIPLE_DATABASES: rekuest
       POSTGRES_PASSWORD: hello_django
       POSTGRES_USER: hello_django
+  # rekuest is a pair: the server (GraphQL, migrations) and takt (the agent protocol),
+  # released together under the same tags. The tests reach both through one port, so
+  # the service they know as `rekuest` is a small gateway: /agi and /agent go to takt,
+  # everything else to the server.
   rekuest:
+    image: caddy:2
+    command: caddy run --config /etc/caddy/Caddyfile --adapter caddyfile
+    stop_grace_period: 1s
+    configs:
+    - source: gateway
+      target: /etc/caddy/Caddyfile
+    depends_on:
+      rekuest-server:
+        condition: service_started
+      takt:
+        condition: service_healthy
+    ports:
+    - "${REKUEST_HOST_PORT:-5690}:80"
+  rekuest-server:
     depends_on:
     - redis
     - db
@@ -16,10 +34,21 @@ services:
     image: jhnnsrs/rekuest:${REKUEST_SERVICE_TAG:-latest}
     command: bash run-debug.sh
     stop_grace_period: 1s
-    ports:
-    - "${REKUEST_HOST_PORT:-5690}:80"
+    environment:
+      REKUEST__TAKT_URL: http://takt:8080
     volumes:
     - ./configs/rekuest.yaml:/workspace/config.yaml
+  takt:
+    depends_on:
+    - redis
+    - db
+    - rekuest-server
+    image: jhnnsrs/rekuest-takt:${REKUEST_SERVICE_TAG:-latest}
+    stop_grace_period: 1s
+    environment:
+      REKUEST__SERVER_URL: http://rekuest-server:80
+    volumes:
+    - ./configs/rekuest.yaml:/workspace/config.yaml:ro
   rustfs:
     environment:
       RUSTFS_VOLUMES: /data
@@ -42,3 +71,15 @@ services:
     - ./configs/rustfs.yaml:/workspace/config.yaml
 
 
+configs:
+  gateway:
+    content: |
+      :80 {
+        @takt path /agi /agi/* /agent /agent/*
+        handle @takt {
+          reverse_proxy takt:8080
+        }
+        handle {
+          reverse_proxy rekuest-server:80
+        }
+      }
