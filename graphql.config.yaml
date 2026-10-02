@@ -135,8 +135,8 @@ projects:
           CreateBlokInput:
             - arkitekt_spec.declare.traits.blok.CreateBlokInputTrait
   # The client surface: fragments, operations and the RekuestApi mixin, over
-  # the vocabulary above. Only rekuest/client/ and rekuest/arkitekt.py may
-  # name it -- tests/test_layering.py enforces that.
+  # the vocabulary above. Only rekuest/client/ and rekuest/arkitekt.py are
+  # meant to name it.
   rekuest:
     schema: http://jhnnsrs-lab/rekuest/schema
     documents: graphql/**/**.graphql

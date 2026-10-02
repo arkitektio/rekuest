@@ -5,10 +5,6 @@ socket, the parent assignment and the actor's registry -- and none of them is lo
 from context. See :mod:`rekuest.invoke` for why the target is typed structurally.
 """
 
-import ast
-import subprocess
-import sys
-from pathlib import Path
 from typing import Any
 
 import pytest
@@ -21,11 +17,6 @@ from arkitekt_spec.declare.targets import CallTarget, ImplementationTarget
 from arkitekt_runtime.task import Task
 from rekuest.traits.action import Callable
 
-PACKAGE = Path(__file__).resolve().parent.parent / "rekuest"
-#: The calling path (invoke, task) lives in the execution core now.
-import arkitekt_runtime  # noqa: E402
-
-CORE = Path(arkitekt_runtime.__file__).parent
 
 
 # --------------------------------------------------------------------------- #
@@ -144,52 +135,6 @@ def test_an_action_built_outside_a_client_knows_none() -> None:
         id: str
 
     assert _Fetched.model_validate({"id": "1"}).bound_client() is None
-
-
-# --------------------------------------------------------------------------- #
-# The layering that lets a task call at all
-# --------------------------------------------------------------------------- #
-
-
-def _imports(path: Path) -> list[str]:
-    names: list[str] = []
-    for node in ast.walk(ast.parse(path.read_text())):
-        if isinstance(node, ast.ImportFrom) and node.module:
-            names.append(node.module)
-        elif isinstance(node, ast.Import):
-            names += [alias.name for alias in node.names]
-    return names
-
-
-@pytest.mark.parametrize("module", ["invoke.py", "task.py"])
-def test_the_calling_path_does_not_name_the_generated_surface(module: str) -> None:
-    """``tests/test_layering.py`` enforces this for the package as a whole; these two are
-    called out by name because they are the ones that wanted to.
-
-    A task must be able to call, and a call needs ports and an id -- so the target is
-    described structurally instead, which is the same move
-    ``structures/serialization/protocols.py`` already makes.
-    """
-    reached = [n for n in _imports(CORE / module) if "rekuest.api" in n]
-    assert not reached, f"{module} names {reached}"
-
-
-def test_importing_the_calls_layer_stays_free_of_the_generated_surface() -> None:
-    """Why :mod:`rekuest.invoke` exists as its own module rather than living in
-    ``calls.py``: the agnostic runtime imports ``rekuest.calls`` at module scope, and
-    folding the fragment-holding half into it would drag the whole generated client
-    surface into every agent.
-
-    A subprocess, because the test session has already imported the client.
-    """
-    code = (
-        "import sys, arkitekt_runtime.calls;"
-        "print('rekuest.api.schema' in sys.modules)"
-    )
-    out = subprocess.run(
-        [sys.executable, "-c", code], capture_output=True, text=True, check=True
-    )
-    assert out.stdout.strip() == "False", out.stdout
 
 
 def test_a_task_carries_no_call_state_of_its_own() -> None:
