@@ -473,11 +473,15 @@ class TaskEvent(BaseModel):
     'Optional message associated with the event.'
     progress: int | None = Field(default=None)
     'Progress percentage.'
+    value: Any | None = Field(default=None)
+    'EFFECT events: the value the task took (NOW: epoch seconds, RANDOM: hex, SLEEP: deadline).'
+    created_at: datetime = Field(alias='createdAt')
+    'Time when event was created.'
     model_config = ConfigDict(frozen=True)
 
     class Meta:
         """Meta class for TaskEvent"""
-        document = 'fragment TaskEvent on TaskEvent {\n  id\n  kind\n  returns\n  reference\n  message\n  progress\n  __typename\n}'
+        document = 'fragment TaskEvent on TaskEvent {\n  id\n  kind\n  returns\n  reference\n  message\n  progress\n  value\n  createdAt\n  __typename\n}'
         name = 'TaskEvent'
         type = 'TaskEvent'
 
@@ -1988,7 +1992,30 @@ class GetEventQuery(BaseModel):
 
     class Meta:
         """Meta class for GetEvent """
-        document = 'fragment TaskEvent on TaskEvent {\n  id\n  kind\n  returns\n  reference\n  message\n  progress\n  __typename\n}\n\nquery GetEvent($id: ID!) {\n  event(id: $id) {\n    ...TaskEvent\n    __typename\n  }\n}'
+        document = 'fragment TaskEvent on TaskEvent {\n  id\n  kind\n  returns\n  reference\n  message\n  progress\n  value\n  createdAt\n  __typename\n}\n\nquery GetEvent($id: ID!) {\n  event(id: $id) {\n    ...TaskEvent\n    __typename\n  }\n}'
+
+class TaskEventsQueryTask(BaseModel):
+    """Tracks the assignment of an implementation to a specific task."""
+    typename: Literal['Task'] = Field(alias='__typename', default='Task', exclude=True)
+    id: ID
+    'Unique ID of the task.'
+    events: tuple[TaskEvent, ...]
+    'The events'
+    model_config = ConfigDict(frozen=True)
+
+class TaskEventsQuery(BaseModel):
+    """ A task's events so far, oldest first: what a caller reads when its change feed
+ was not subscribed yet while the task already ran."""
+    task: TaskEventsQueryTask
+    'Fetch task by ID.'
+
+    class Arguments(BaseModel):
+        """Arguments for TaskEvents """
+        id: ID
+
+    class Meta:
+        """Meta class for TaskEvents """
+        document = 'fragment TaskEvent on TaskEvent {\n  id\n  kind\n  returns\n  reference\n  message\n  progress\n  value\n  createdAt\n  __typename\n}\n\nquery TaskEvents($id: ID!) {\n  task(id: $id) {\n    id\n    events(ordering: [{createdAt: ASC}]) {\n      ...TaskEvent\n      __typename\n    }\n    __typename\n  }\n}'
 
 class SearchImplementationsQueryOptions(BaseModel):
     """Represents a concrete implementation of an action."""
@@ -4071,6 +4098,36 @@ Returns:
         variables: dict[str, builtins.object] = {}
         variables['id'] = id
         return self.execute(GetEventQuery, variables).event
+
+    async def atask_events(self, id: IDCoercible) -> TaskEventsQueryTask:
+        """TaskEvents 
+ A task's events so far, oldest first: what a caller reads when its change feed
+ was not subscribed yet while the task already ran.
+
+Args:
+    id (ID): No description
+
+Returns:
+    TaskEventsQueryTask
+"""
+        variables: dict[str, builtins.object] = {}
+        variables['id'] = id
+        return (await self.aexecute(TaskEventsQuery, variables)).task
+
+    def task_events(self, id: IDCoercible) -> TaskEventsQueryTask:
+        """TaskEvents 
+ A task's events so far, oldest first: what a caller reads when its change feed
+ was not subscribed yet while the task already ran.
+
+Args:
+    id (ID): No description
+
+Returns:
+    TaskEventsQueryTask
+"""
+        variables: dict[str, builtins.object] = {}
+        variables['id'] = id
+        return self.execute(TaskEventsQuery, variables).task
 
     async def asearch_implementations(self, search: str | None | UnsetType=UNSET, values: list[IDCoercible] | None | UnsetType=UNSET) -> tuple[SearchImplementationsQueryOptions, ...]:
         """SearchImplementations 

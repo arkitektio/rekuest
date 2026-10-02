@@ -25,6 +25,8 @@ fragment TaskEvent on TaskEvent {
   reference
   message
   progress
+  value
+  createdAt
 }
 
 fragment TaskChange on TaskChange {

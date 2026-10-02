@@ -10,3 +10,15 @@ query GetEvent($id: ID!){
     ...TaskEvent
   }
 }
+
+
+# A task's events so far, oldest first: what a caller reads when its change feed
+# was not subscribed yet while the task already ran.
+query TaskEvents($id: ID!) {
+  task(id: $id) {
+    id
+    events(ordering: [{createdAt: ASC}]) {
+      ...TaskEvent
+    }
+  }
+}

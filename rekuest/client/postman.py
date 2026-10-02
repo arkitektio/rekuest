@@ -2,7 +2,7 @@
 
 from types import TracebackType
 from typing import Any
-from collections.abc import AsyncGenerator, Sequence
+from collections.abc import AsyncGenerator, AsyncIterator, Sequence
 from rath.scalars import ID
 from rekuest.client.graphql import RekuestGraphQL
 from arkitekt_spec.declare.task import HookInput
@@ -11,7 +11,7 @@ from arkitekt_runtime.types import (
     TaskEventKind,
     AssignInput,
 )
-from rekuest.api.schema import TaskChange, TaskEventChange
+from rekuest.api.schema import Task, TaskChange, TaskChangeEvent, TaskEventChange
 from rekuest.scalars import ActionHash
 import asyncio
 import uuid
@@ -48,6 +48,10 @@ class GraphQLPostman(KoiledModel):
         default=5.0,
         description="Maximum seconds to wait for the server to confirm cancellation of a task when an assign stream is cancelled. Bounds cancellation so cancelling a call can never hang.",
     )
+    catch_up_interval: float = Field(
+        default=0.5,
+        description="Seconds until a call reads its task's events again while the change feed has delivered nothing yet (so is not known to be subscribed). Doubles with every read, up to ten times this.",
+    )
 
     _ass_update_queues: dict[str, asyncio.Queue[TaskEventChange | _FeedLost]] = PrivateAttr(
         default_factory=lambda: {}
@@ -66,7 +70,13 @@ class GraphQLPostman(KoiledModel):
 
     _watching: bool = PrivateAttr(default=False)
     _lock: asyncio.Lock | None = None
-    _received_something: bool = False
+    # Subscribing to the change feed is not acknowledged, so the feed is only known
+    # to be subscribed once it has delivered something. What a task reported before
+    # that never arrives on it: until then a call reads its task's events instead
+    # (`_acatch_up`), and whatever came both ways is handed on once (`_route`).
+    _feed_live: bool = PrivateAttr(default=False)
+    _routed_event_ids: dict[str, set[str]] = PrivateAttr(default_factory=lambda: {})
+    _catch_up_tasks: dict[str, asyncio.Task[None]] = PrivateAttr(default_factory=lambda: {})
 
     def _bind(self, task_id: str, reference: str) -> None:
         """Bind a durable task id to its client-generated reference.
@@ -81,6 +91,92 @@ class GraphQLPostman(KoiledModel):
         if queue is not None:
             for event in orphans:
                 queue.put_nowait(event)
+
+    def _route(self, event: TaskEventChange) -> None:
+        """Hand an event to the call waiting on its task, once.
+
+        An event can come both from the feed and from a catch-up read. One whose task
+        is not bound to a live reference yet is buffered, and flushed by `_bind`.
+        """
+        routed = self._routed_event_ids.setdefault(event.task, set())
+        if event.id in routed:
+            return
+        routed.add(event.id)
+        reference = self._task_to_reference.get(event.task)
+        queue = self._ass_update_queues.get(reference) if reference is not None else None
+        if queue is not None:
+            queue.put_nowait(event)
+        else:
+            self._orphan_events_by_task.setdefault(event.task, []).append(event)
+
+    async def _aread_events(self, task_id: str) -> list[TaskEventChange]:
+        """The events a task has so far, oldest first, as the feed would carry them."""
+        task = await RekuestGraphQL(self.rath).atask_events(id=task_id)
+        return [
+            TaskEventChange(
+                id=event.id,
+                task=task.id,
+                kind=event.kind,
+                returns=event.returns,
+                message=event.message,
+                progress=event.progress,
+                value=event.value,
+                createdAt=event.created_at,
+            )
+            for event in task.events
+        ]
+
+    async def _acatch_up(self, task_id: str) -> None:
+        """Hand on what a task reported and the feed did not deliver.
+
+        The task's own history decides the order: whatever is still waiting on the
+        call's queue is put back behind the events it missed, so a call never sees a
+        later event before an earlier one. Events the call already took are left out,
+        and ones newer than the history that was read stay at the end.
+        """
+        history = await self._aread_events(task_id)
+        reference = self._task_to_reference.get(task_id)
+        queue = self._ass_update_queues.get(reference) if reference is not None else None
+        if queue is None:
+            return  # the call ended while its history was read
+
+        waiting: list[TaskEventChange | _FeedLost] = []
+        while not queue.empty():
+            waiting.append(queue.get_nowait())
+        waiting_ids = {event.id for event in waiting if isinstance(event, TaskEventChange)}
+
+        routed = self._routed_event_ids.setdefault(task_id, set())
+        taken = routed - waiting_ids
+        read = {event.id for event in history}
+        for event in history:
+            if event.id not in taken:
+                routed.add(event.id)
+                queue.put_nowait(event)
+        for item in waiting:
+            if isinstance(item, _FeedLost) or item.id not in read:
+                queue.put_nowait(item)
+
+    async def _acatch_up_safely(self, task_id: str) -> None:
+        """Catch up, and leave the call to the feed alone if that fails."""
+        try:
+            await self._acatch_up(task_id)
+        except Exception:
+            logger.warning("Could not read the events of task %s", task_id, exc_info=True)
+
+    async def _acatch_up_until_live(self, task_id: str) -> None:
+        """Keep reading a task's events for as long as the feed has shown nothing.
+
+        A task that reported everything before the feed was subscribed never shows
+        up on it, so its call would wait forever. Backs off: a task that is merely
+        quiet is not asked twice a second for as long as it runs.
+        """
+        delay = self.catch_up_interval
+        while not self._feed_live:
+            await asyncio.sleep(delay)
+            if self._feed_live:
+                return  # `watch_tasks` caught every call up when the feed came alive
+            await self._acatch_up_safely(task_id)
+            delay = min(delay * 2, self.catch_up_interval * 10)
 
     @staticmethod
     def _reject_non_root(
@@ -151,9 +247,6 @@ class GraphQLPostman(KoiledModel):
         # `reference` is always set above, so this is a str for the queue keys below.
         assign_reference: str = assign_input.reference or ""
 
-        if not self._received_something:
-            await asyncio.sleep(0.5)  # Add an initial sleep
-
         if not self._lock:
             raise ValueError("Postman was never connected")
 
@@ -164,8 +257,11 @@ class GraphQLPostman(KoiledModel):
         self._ass_update_queues[assign_reference] = asyncio.Queue()
         queue = self._ass_update_queues[assign_reference]
 
+        # A task assigned while the feed is known to be subscribed misses nothing.
+        feed_was_live = self._feed_live
+
         try:
-            task = await RekuestGraphQL(self.rath).aassign(**assign_input.model_dump())
+            task = await self._send_assign(assign_input)
         except BaseException as e:
             # No task was bound to this reference, so nothing else will drop its queue.
             self._cleanup_reference(assign_reference)
@@ -177,6 +273,14 @@ class GraphQLPostman(KoiledModel):
         # id) can route events to this queue. Also flushes any events that raced
         # ahead of this http response.
         self._bind(task.id, assign_reference)
+
+        if not feed_was_live:
+            # Before the first event is handed on: this is what puts them in order.
+            await self._acatch_up_safely(task.id)
+            if not self._feed_live:
+                self._catch_up_tasks[assign_reference] = asyncio.create_task(
+                    self._acatch_up_until_live(task.id)
+                )
 
         try:
             while True:
@@ -217,7 +321,19 @@ class GraphQLPostman(KoiledModel):
         if tid is not None:
             self._task_to_reference.pop(tid, None)
             self._orphan_events_by_task.pop(tid, None)
+            self._routed_event_ids.pop(tid, None)
         self._ass_update_queues.pop(reference, None)
+        catching_up = self._catch_up_tasks.pop(reference, None)
+        if catching_up is not None:
+            catching_up.cancel()
+
+    async def _send_assign(self, assign_input: AssignInput) -> Task:
+        """Create the task on the backend."""
+        return await RekuestGraphQL(self.rath).aassign(**assign_input.model_dump())
+
+    def _feed(self) -> AsyncIterator[TaskChangeEvent]:
+        """The change feed of this client's tasks."""
+        return RekuestGraphQL(self.rath).awatch_my_tasks()
 
     async def _confirm_cancellation(
         self,
@@ -306,27 +422,22 @@ class GraphQLPostman(KoiledModel):
         ``TaskChange`` (carrying both the task id and the reference) and ``event``
         is a ``TaskEventChange`` (carrying only the task id). We bind on ``create``
         and route on ``event``, buffering events whose task id is not yet bound.
+
+        The first change is also the first proof that the feed is subscribed. Every
+        call already waiting is caught up before that change is handed on: what its
+        task reported until now comes from the task's history, in order, and
+        everything after it from the feed.
         """
         try:
-            async for change in RekuestGraphQL(self.rath).awatch_my_tasks():
-                self._received_something = True
+            async for change in self._feed():
+                if not self._feed_live:
+                    self._feed_live = True
+                    for task_id in list(self._task_to_reference):
+                        await self._acatch_up_safely(task_id)
                 if change.create and change.create.reference:
                     self._bind(change.create.id, change.create.reference)
                 if change.event:
-                    reference = self._task_to_reference.get(change.event.task)
-                    queue = (
-                        self._ass_update_queues.get(reference)
-                        if reference is not None
-                        else None
-                    )
-                    if queue is not None:
-                        await queue.put(change.event)
-                    else:
-                        # Task id not bound to a live reference yet: buffer the
-                        # event and flush it once `_bind` learns the reference.
-                        self._orphan_events_by_task.setdefault(
-                            change.event.task, []
-                        ).append(change.event)
+                    self._route(change.event)
 
         except asyncio.CancelledError:
             raise  # ``stop_watching``: an orderly shutdown, nobody is left waiting
@@ -347,6 +458,7 @@ class GraphQLPostman(KoiledModel):
         fed again. ``_watching`` is reset so the next call starts a fresh feed.
         """
         self._watching = False
+        self._feed_live = False
         for queue in list(self._ass_update_queues.values()):
             queue.put_nowait(_FeedLost(reason))
 
@@ -370,6 +482,7 @@ class GraphQLPostman(KoiledModel):
                 pass
 
         self._watching = False
+        self._feed_live = False
 
     async def __aenter__(self) -> "GraphQLPostman":
         """Enter the postman"""
