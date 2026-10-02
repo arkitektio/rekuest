@@ -11,7 +11,7 @@ satisfies it — either automatically (`auto_resolvable`) or by asking the user 
 pick one when your implementation is set up.
 
 ```python
-from rekuest.app import AppRegistry
+from arkitekt import AppRegistry
 
 app = AppRegistry()   # in arkitekt: `app = App(...)`
 
@@ -146,7 +146,7 @@ a camera protocol but delegates image opening to `imagej`'s `open_image` action.
 Decorate the method to override its demand target:
 
 ```python
-from rekuest.declare import demand
+from arkitekt_spec.declare.definition.demands import demand
 
 
 @app.declare(app="mymicroscope")
@@ -186,7 +186,7 @@ Instead, place a `demand_state(...)` marker inside `typing.Annotated`:
 ```python
 from typing import Annotated
 
-from rekuest.declare import demand_state
+from arkitekt_spec.declare.definition.demands import demand_state
 
 
 class ViewerState:
@@ -280,10 +280,10 @@ for matching actions and agents.
 | Symbol                                | Import                        |
 | ------------------------------------- | ----------------------------- |
 | `app.declare(app=..., ...)`           | a method of `AppRegistry` (arkitekt: `App.declare`) |
-| `demand(*, app=..., key=..., ...)`    | `from rekuest.declare import demand` |
-| `demand_state(*, app=..., key=..., ...)` | `from rekuest.declare import demand_state` |
+| `demand(*, app=..., key=..., ...)`    | `from arkitekt_spec.declare.definition.demands import demand` |
+| `demand_state(*, app=..., key=..., ...)` | `from arkitekt_spec.declare.definition.demands import demand_state` |
 
 The override dataclasses (`ActionDemandOverride`, `StateDemandOverride`) and the
 low-level builders (`build_action_dependency_input`,
-`build_state_dependency_input`) live in `rekuest.definition.demands` and
-`rekuest.definition.dependencies` respectively.
+`build_state_dependency_input`) live in `arkitekt_spec.declare.definition.demands` and
+`arkitekt_spec.declare.definition.dependencies` respectively.
