@@ -58,6 +58,9 @@ class DataLayer(KoiledModel):
     host: str = ""
     port: int | None = None
     protocol: str = "https"
+    proxy: str | None = None
+    """The HTTP forward proxy (``http://host:port``) the store is only reachable
+    through, when it is reached over the mesh."""
 
 
     @classmethod
@@ -75,6 +78,7 @@ class DataLayer(KoiledModel):
             host=alias.host,
             port=alias.port,
             protocol="https" if alias.ssl else "http",
+            proxy=alias.proxy,
         )
 
     async def get_endpoint_url(self):

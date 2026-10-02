@@ -80,9 +80,7 @@ class UploadLink(ParsingLink):
         self._executor_session = self.executor.__enter__()
         return self
 
-    async def aget_media_upload_credentials(
-        self, file: MediaLike, datalayer: DataLayer
-    ) -> "MediaUploadGrant":
+    async def aget_media_upload_credentials(self, file: MediaLike) -> "MediaUploadGrant":
         from rekuest.protocol.schema import RequestMediaUploadInput
         from rekuest.api.schema import RequestMediaUploadMutation
 
@@ -109,10 +107,7 @@ class UploadLink(ParsingLink):
         datalayer: "DataLayer",
     ) -> str:
         """Upload a media file to the DataLayer asynchronously."""
-        assert datalayer is not None, "Datalayer must be set"
-        endpoint_url = await datalayer.get_endpoint_url()
-
-        credentials = await self.aget_media_upload_credentials(file, endpoint_url)
+        credentials = await self.aget_media_upload_credentials(file)
 
         return await astore_media_file(
             file,

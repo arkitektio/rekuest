@@ -1,50 +1,62 @@
-"""Module for uploading various data types to a DataLayer using asynchronous methods."""
+"""Uploading media files to the datalayer through obstore."""
 
 from typing import TYPE_CHECKING
 
-from rekuest.scalars import MediaLike
-from rekuest.client.upload.errors import PermissionsError
+import obstore
+from obstore.store import S3Store
 
+from rekuest.client.upload.errors import UploadError
 from rekuest.datalayer import DataLayer
+from rekuest.scalars import MediaLike
 
 
 if TYPE_CHECKING:
     from rekuest.api.schema import MediaUploadGrant
 
 
+def create_s3_store(
+    endpoint_url: str, credentials: "MediaUploadGrant", proxy: str | None = None
+) -> S3Store:
+    """An S3 store for the bucket a grant writes into.
+
+    Path-style requests, because the datalayer is addressed by host (MinIO behind
+    the deployment's gateway), not by bucket subdomain. ``http://`` endpoints have to
+    be allowed explicitly, and ``proxy`` is the forward proxy a datalayer that is
+    only reachable through the mesh is reached through.
+    """
+    client_options: dict[str, object] = {}
+    if endpoint_url.startswith("http://"):
+        client_options["allow_http"] = True
+    if proxy:
+        client_options["proxy_url"] = proxy
+
+    store_kwargs: dict[str, object] = {
+        "access_key_id": credentials.access_key,
+        "secret_access_key": credentials.secret_key,
+        "endpoint": endpoint_url,
+        "virtual_hosted_style_request": False,
+        "client_options": client_options or None,
+    }
+    if credentials.session_token:
+        store_kwargs["session_token"] = credentials.session_token
+
+    return S3Store(credentials.bucket, **store_kwargs)
+
+
 async def astore_media_file(
     file: MediaLike,
     credentials: "MediaUploadGrant",
-    datalayer: "DataLayer",
+    datalayer: DataLayer,
 ) -> str:
-    """Store a media file using a presigned PUT URL built from datalayer endpoint and credentials."""
-    """Store a DataFrame in the DataLayer"""
-
-    from aiobotocore.session import get_session  # type: ignore
-    import botocore  # type: ignore
-
-    session = get_session()
-
+    """Put a media file at the key its grant names, and return the grant's store."""
     endpoint_url = await datalayer.get_endpoint_url()
+    store = create_s3_store(endpoint_url, credentials, proxy=datalayer.proxy)
 
-    async with session.create_client(  # type: ignore
-        "s3",
-        region_name="us-west-2",
-        endpoint_url=endpoint_url,
-        aws_secret_access_key=credentials.secret_key,
-        aws_access_key_id=credentials.access_key,
-        aws_session_token=credentials.session_token,
-    ) as client:
-        try:
-            await client.put_object(
-                Bucket=credentials.bucket, Key=credentials.key, Body=file.value
-            )  # type: ignore
-        except botocore.exceptions.ClientError as e:  # type: ignore
-            if e.response["Error"]["Code"] == "InvalidAccessKeyId":  # type: ignore
-                raise PermissionsError(
-                    "Access Key is invalid, trying to get new credentials"
-                ) from e
-
-            raise
+    try:
+        await obstore.put_async(store, credentials.key, file.value)
+    except Exception as e:
+        raise UploadError(
+            f"Error while uploading to s3://{credentials.bucket}/{credentials.key} on {endpoint_url}"
+        ) from e
 
     return credentials.store

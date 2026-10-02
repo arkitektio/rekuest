@@ -8,9 +8,3 @@ class UploadError(IoError):
     """Error while uploading to the DataLayer"""
 
     pass
-
-
-class PermissionsError(UploadError):
-    """Errror wrapper for permission errors"""
-
-    pass
