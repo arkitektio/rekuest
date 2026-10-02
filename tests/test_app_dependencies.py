@@ -426,3 +426,84 @@ async def test_workflow_calls_two_separate_apps_async(deployment: Deployment) ->
                 await task
             except asyncio.CancelledError:
                 pass
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio(loop_scope="session")
+async def test_workflow_calls_a_workflow(deployment: Deployment) -> None:
+    """A workflow depends on another app's workflow, which has a dependency of its own.
+
+    Three levels: ``workflow`` calls ``btest``'s ``relay``, and ``relay`` calls
+    ``atest``'s ``do_stuff``. The server resolves the whole tree when the root is
+    assigned; the relay's task inherits its part of it and finds ``atest`` there.
+
+    Both workflows name their dependency parameter ``atest``. A dependency key is
+    the parameter's name, so the same key means one thing at the root (the relay)
+    and another one level down (the provider): each level must read its own.
+    """
+
+    # --- Provider app: atest -------------------------------------------------
+    atest_app = build_fresh_rekuest(deployment, token="atest_token")
+
+    def do_stuff(printer: str) -> str:
+        """Stitch a list of images."""
+        return "stitched-" + printer
+
+    atest_app.register(do_stuff)
+
+    # --- Relay app: btest, itself a workflow over atest ----------------------
+    btest_app = build_fresh_rekuest(deployment, token="btest_token")
+
+    @btest_app.declare(app="atest", auto_resolvable=True, min=1)
+    class ATestLike(Protocol):
+        def do_stuff(self, printer: str) -> str:
+            """Stitch a list of images."""
+            ...
+
+    def relay(printer: str, atest: ATestLike) -> str:
+        """Pass the call on to atest."""
+        return "relayed-" + atest.do_stuff(printer)
+
+    btest_app.register_workflow(relay)
+
+    # --- Workflow app: depends on the relay ----------------------------------
+    workflow_app = build_fresh_rekuest(deployment, token="workflow_token")
+
+    @workflow_app.declare(app="btest", auto_resolvable=True, min=1)
+    class RelayLike(Protocol):
+        def relay(self, printer: str) -> str:
+            """Pass the call on to atest."""
+            ...
+
+    def nested_workflow(atest: RelayLike) -> str:
+        """Call the relay, which calls atest."""
+        return atest.relay("printer")
+
+    workflow_app.register_workflow(nested_workflow)
+
+    async with (
+        atest_app as atest_app,
+        btest_app as btest_app,
+        workflow_app as workflow_app,
+    ):
+        # Leaves first: each level's dependency must be live when the root is assigned.
+        await atest_app.aconnect(timeout=CONNECT_TIMEOUT)
+        atest_task = asyncio.create_task(atest_app.aloop())
+        await btest_app.aconnect(timeout=CONNECT_TIMEOUT)
+        btest_task = asyncio.create_task(btest_app.aloop())
+        await workflow_app.aconnect(timeout=CONNECT_TIMEOUT)
+        workflow_task = asyncio.create_task(workflow_app.aloop())
+
+        impl = await workflow_app.amy_implementation_at("nested_workflow")
+
+        answer = await workflow_app.acall(impl)
+        assert answer == "relayed-stitched-printer", (
+            f"Unexpected workflow result: {answer!r}"
+        )
+
+        for task in (atest_task, btest_task, workflow_task):
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
