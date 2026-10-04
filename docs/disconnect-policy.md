@@ -65,15 +65,15 @@ we raise into it at the next `check_cancelled()`, and a body that never polls wi
 not stop.
 
 ```python
-from koil import check_cancelled
-
-
-@app.register(policy=CancelOnDisconnect())
-def move_stage(direction: str) -> None:
+@app.action(policy=CancelOnDisconnect())
+def move_stage(direction: str, task: Task) -> None:
     while motor.moving():
-        check_cancelled()   # required — without this the loop never stops
+        task.check_cancelled()   # required — without this the loop never stops
         motor.step()
 ```
+
+`task.progress(...)` and `task.log(...)` are cancellation points too; code that has
+no task at hand calls `koil.check_cancelled()`.
 
 Registering a sync action with `CancelOnDisconnect` emits a warning at import, so
 the gap is visible rather than silently assumed away.
