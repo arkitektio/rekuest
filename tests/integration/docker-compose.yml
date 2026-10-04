@@ -35,9 +35,13 @@ services:
     command: bash run-debug.sh
     stop_grace_period: 1s
     environment:
+      # The server asks takt through the socket the two mount; the URL then only gives the
+      # path. An image from before the socket ignores it and uses the URL whole.
       REKUEST__TAKT_URL: http://takt:8080
+      REKUEST__TAKT_SOCKET: /run/takt/internal.sock
     volumes:
     - ./configs/rekuest.yaml:/workspace/config.yaml
+    - takt_run:/run/takt
   takt:
     depends_on:
     - redis
@@ -47,8 +51,10 @@ services:
     stop_grace_period: 1s
     environment:
       REKUEST__SERVER_URL: http://rekuest-server:80
+      TAKT_INTERNAL_BIND: unix:/run/takt/internal.sock
     volumes:
     - ./configs/rekuest.yaml:/workspace/config.yaml:ro
+    - takt_run:/run/takt
   rustfs:
     environment:
       RUSTFS_VOLUMES: /data
@@ -71,6 +77,8 @@ services:
     - ./configs/rustfs.yaml:/workspace/config.yaml
 
 
+volumes:
+  takt_run:
 configs:
   gateway:
     content: |
