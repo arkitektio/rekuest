@@ -17,7 +17,7 @@ from arkitekt_spec.declare.agents.errors import StateRequirementsNotMet
 from arkitekt_spec.declare.app import AppRegistry
 
 from .agent_helpers import run_assignment
-from .memory_transport import MemoryAgentTransport
+from arkitekt_runtime.local import MemoryAgentTransport
 from .service_helpers import with_client
 
 

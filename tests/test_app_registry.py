@@ -271,7 +271,7 @@ def test_validate_walks_blok_dependencies_on_another_apps_actions() -> None:
 
     app.register_blok(
         name="b",
-        component="<Action key='local' />",
+        component="<div />",
         dependencies={"dep": Remote},
     )
     app.validate()

@@ -21,7 +21,7 @@ from arkitekt_spec.declare.app import AppRegistry
 from arkitekt_spec.declare.errors import RegistryFrozenError
 from arkitekt_runtime.task import Task
 
-from .memory_transport import MemoryAgentTransport
+from arkitekt_runtime.local import MemoryAgentTransport
 from .agent_helpers import run_assignment
 from .service_helpers import with_client
 from .test_client_bound_expansion import (

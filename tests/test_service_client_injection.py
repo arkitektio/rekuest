@@ -21,7 +21,7 @@ from arkitekt_spec.declare.definition.define import prepare_definition
 from arkitekt_spec.declare.structures.registry import StructureRegistry
 from rath.task import current_task, token_of
 
-from .memory_transport import MemoryAgentTransport
+from arkitekt_runtime.local import MemoryAgentTransport
 from .agent_helpers import run_assignment
 from .service_helpers import with_client
 

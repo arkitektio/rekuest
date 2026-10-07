@@ -5,7 +5,7 @@ agent looked perfectly healthy: the agent received the ``Assign`` and then — f
 backend never learned about — simply never mentioned the task again.
 
 They drive a real ``BaseAgent`` message loop over
-:class:`tests.memory_transport.MemoryAgentTransport`.
+:class:`arkitekt_runtime.local.MemoryAgentTransport`.
 """
 
 import asyncio
@@ -21,7 +21,7 @@ from arkitekt_runtime.types import TaskEventKind
 from rekuest.api.schema import TaskEventChange
 from arkitekt_spec.declare.app import AppRegistry
 
-from .memory_transport import MemoryAgentTransport
+from arkitekt_runtime.local import MemoryAgentTransport
 
 
 # These states belong to a registry, as they would to an app. There is no

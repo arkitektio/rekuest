@@ -12,7 +12,7 @@ import pytest
 from arkitekt_runtime import messages
 from rekuest.agents.control import SocketControlPlane
 
-from .memory_transport import MemoryAgentTransport
+from arkitekt_runtime.local import MemoryAgentTransport
 
 
 def test_handle_init_records_the_agent_and_its_hash() -> None:

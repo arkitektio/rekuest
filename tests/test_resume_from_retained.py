@@ -13,7 +13,7 @@ from arkitekt_spec.declare.app import AppRegistry
 from rekuest.agents.agent import RekuestAgent
 from rekuest.agents.retention import RetainedFrames
 
-from .memory_transport import MemoryAgentTransport
+from arkitekt_runtime.local import MemoryAgentTransport
 
 NAME = "resume-agent"
 

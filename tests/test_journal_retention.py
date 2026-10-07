@@ -23,7 +23,7 @@ from rekuest.agents.agent import RekuestAgent
 from rekuest.agents.caller import AgentPostman
 from rekuest.agents.transport.websocket import WebsocketAgentTransport
 
-from .memory_transport import MemoryAgentTransport
+from arkitekt_runtime.local import MemoryAgentTransport
 from .test_transport_lifecycle import (
     _NO_DELAY,
     FakeConnect,

@@ -20,7 +20,7 @@ from arkitekt_spec.declare.app import AppRegistry
 from arkitekt_spec.declare.catalogs import CatalogWarning
 from rekuest.scalars import Identifier
 
-from .memory_transport import MemoryAgentTransport
+from arkitekt_runtime.local import MemoryAgentTransport
 
 
 class RecordingTransport(MemoryAgentTransport):

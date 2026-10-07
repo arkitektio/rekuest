@@ -53,6 +53,9 @@ registry = AppRegistry()
 @registry.service(
     schema=build_relative_path("api", "schema.graphql"),
     turms=build_relative_path("api", "project.json"),
+    # The server this release of the client is written against: what a hub made for
+    # an app's tests runs. Moves with the server's major, not with this package's.
+    image="jhnnsrs/rekuest:7",
 )
 def rekuest(
     rekuest: Annotated[

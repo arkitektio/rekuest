@@ -11,7 +11,7 @@ import pytest
 
 from arkitekt_runtime import messages
 
-from .memory_transport import MemoryAgentTransport
+from arkitekt_runtime.local import MemoryAgentTransport
 from rekuest.agents.caller import AgentPostman, CallerTaskEvent
 from arkitekt_runtime.types import TaskEventKind
 from arkitekt_runtime.postmans.errors import AssignException

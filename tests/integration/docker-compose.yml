@@ -26,13 +26,27 @@ services:
         condition: service_healthy
     ports:
     - "${REKUEST_HOST_PORT:-5690}:80"
+  # Brings the database to the image's release, once, before the server and takt are
+  # started: a service's own start only serves.
+  rekuest-migrate:
+    depends_on:
+    - db
+    image: jhnnsrs/rekuest:${REKUEST_SERVICE_TAG:-latest}
+    command: arkitekt-service run migrate
+    volumes:
+    - ./configs/rekuest.yaml:/workspace/config.yaml
   rekuest-server:
     depends_on:
-    - redis
-    - db
-    - rustfs
+      redis:
+        condition: service_started
+      db:
+        condition: service_started
+      rustfs:
+        condition: service_started
+      rekuest-migrate:
+        condition: service_completed_successfully
     image: jhnnsrs/rekuest:${REKUEST_SERVICE_TAG:-latest}
-    command: bash run-debug.sh
+    command: arkitekt-service debug
     stop_grace_period: 1s
     environment:
       # The server asks takt through the socket the two mount; the URL then only gives the

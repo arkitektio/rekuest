@@ -115,3 +115,23 @@ instance:
 scopes:
   rekuest_agent: Act as an agent
   rekuest_call: Call other apps with rekuest
+
+# What the hub's services host. A port may only constrain a descriptor key some
+# service declares (takt refuses the registration otherwise), so the keys the tests
+# constrain on are declared here, by a service that is catalogued from this entry and
+# never asked: it does not exist.
+rekuest:
+  services:
+    - name: testing
+      url: http://testing:80/testing/_rekuest/service
+      hosts:
+        structures:
+          - identifier: "@testing/capture"
+            description: What the Requires/Provides tests constrain on.
+            descriptors:
+              - key: filename
+                type: STRING
+                description: The name of the file a capture was read from.
+              - key: x
+                type: INT
+                description: Its extent along x.
