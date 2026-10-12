@@ -2,11 +2,11 @@
     
 import builtins
 from arkitekt_runtime.types import AssignInput, CancelInput, HookInput, PauseInput, ResolvedDependencyInput, ResumeInput, TaskEventKind
-from arkitekt_spec.actions import ActionDemandInput, ActionKind, AgentDependencyInput, BlokImplementationInput, ComponentNodeInput, DefinitionInput, EffectKind, ImplementAgentInput, ImplementationInput, LockImplementationInput, PortKind, StateImplementationInput
+from arkitekt_spec.actions import ActionDemandInput, ActionKind, AgentDependencyInput, AssetInput, AssetKind, BlokImplementationInput, ComponentNodeInput, DefinitionInput, EffectKind, ImplementAgentInput, ImplementationInput, LockImplementationInput, PortKind, StateImplementationInput
 from datetime import datetime
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 from rath.scalars import ID, IDCoercible
-from rekuest.protocol.schema import ActionFilter, ActionOrder, AgentFilter, AgentInput, AgentKind, AssignWidgetKind, BlokAgentMappingInput, CatalogComponentInput, CatalogOperationInput, CatalogValueKind, CollectInput, CreateBlokInput, CreateDashboardInput, CreateHigherOrderImplementationInput, CreateShortcutInput, CreateSpaceInput, CreateTestCaseInput, CreateTestResultInput, CreateThreeDModelInput, DiagnosticLevel, FinishMediaUploadInput, ImplementationFilter, InterruptInput, LogLevel, MaterializeBlokInput, OffsetPaginationInput, PlacementInput, RegisterUiCatalogInput, RequestMediaAccessInput, RequestMediaUploadInput, ReturnWidgetKind, ShelveInMemoryDrawerInput, ShortcutFilter, ShortcutOrder, TaskInstructKind, ToolboxFilter, ToolboxOrder, UnshelveMemoryDrawerInput, WidgetDefaultInput
+from rekuest.protocol.schema import ActionFilter, ActionOrder, AgentFilter, AgentInput, AgentKind, AssignWidgetKind, BlokAgentMappingInput, CatalogComponentInput, CatalogOperationInput, CatalogValueKind, CollectInput, ComponentContext, CreateAssetInput, CreateBlokInput, CreateDashboardInput, CreateHigherOrderImplementationInput, CreateShortcutInput, CreateSpaceInput, CreateTestCaseInput, CreateTestResultInput, CreateThreeDModelInput, DiagnosticLevel, FinishMediaUploadInput, ImplementationFilter, InterruptInput, LogLevel, MaterializeBlokInput, OffsetPaginationInput, PlacementInput, RegisterUiCatalogInput, RequestAssetUploadInput, RequestMediaAccessInput, RequestMediaUploadInput, ReturnWidgetKind, ShelveInMemoryDrawerInput, ShortcutFilter, ShortcutOrder, TaskInstructKind, ToolboxFilter, ToolboxOrder, UnshelveMemoryDrawerInput, WidgetDefaultInput
 from rekuest.scalars import ActionHash, Args, Identifier, JSONSerializable, MediaLike
 from rekuest.traits.action import Callable
 from typing import Annotated, Any, AsyncIterator, Iterable, Iterator, Literal
@@ -467,7 +467,7 @@ class TaskEvent(BaseModel):
     'Kind of task event.'
     returns: Any | None = Field(default=None)
     'Optional return values.'
-    reference: str
+    reference: str | None = Field(default=None)
     'Reference string for the event.'
     message: str | None = Field(default=None)
     'Optional message associated with the event.'
@@ -1358,6 +1358,42 @@ class ImplementAgentMutation(BaseModel):
         """Meta class for ImplementAgent """
         document = 'fragment Agent on Agent {\n  id\n  hash\n  client {\n    id\n    __typename\n  }\n  user {\n    sub\n    __typename\n  }\n  memoryShelve {\n    id\n    __typename\n  }\n  __typename\n}\n\nmutation ImplementAgent($input: ImplementAgentInput!) {\n  implementAgent(input: $input) {\n    ...Agent\n    __typename\n  }\n}'
 
+class RequestAssetUploadMutation(BaseModel):
+    """No documentation found for this operation."""
+    request_asset_upload: MediaUploadGrant = Field(alias='requestAssetUpload')
+    "A media upload grant for one asset. Issued only for a file the caller's own agent declares (it registered with it), and only if its size passes the policy."
+
+    class Arguments(BaseModel):
+        """Arguments for RequestAssetUpload """
+        input: RequestAssetUploadInput
+
+    class Meta:
+        """Meta class for RequestAssetUpload """
+        document = 'fragment MediaUploadGrant on MediaUploadGrant {\n  accessKey\n  secretKey\n  sessionToken\n  path\n  key\n  bucket\n  expiresIn\n  maxBytes\n  store\n  __typename\n}\n\nmutation RequestAssetUpload($input: RequestAssetUploadInput!) {\n  requestAssetUpload(input: $input) {\n    ...MediaUploadGrant\n    __typename\n  }\n}'
+
+class CreateAssetMutationCreateAsset(BaseModel):
+    """A verified file the organization holds, stored once by its content."""
+    typename: Literal['Asset'] = Field(alias='__typename', default='Asset', exclude=True)
+    id: ID
+    ref: str
+    "'sha256:' and the hex SHA-256 of the file's exact bytes."
+    kind: AssetKind
+    'What the file is.'
+    model_config = ConfigDict(frozen=True)
+
+class CreateAssetMutation(BaseModel):
+    """No documentation found for this operation."""
+    create_asset: CreateAssetMutationCreateAsset = Field(alias='createAsset')
+    'Verify an asset uploaded with a grant from `requestAssetUpload` (its hash and the rules of its kind) and record it. Returns the existing asset if the hash is stored already; a refusal carries its code in `extensions.code` and deletes the upload.'
+
+    class Arguments(BaseModel):
+        """Arguments for CreateAsset """
+        input: CreateAssetInput
+
+    class Meta:
+        """Meta class for CreateAsset """
+        document = 'mutation CreateAsset($input: CreateAssetInput!) {\n  createAsset(input: $input) {\n    id\n    ref\n    kind\n    __typename\n  }\n}'
+
 class CreateBlokMutation(BaseModel):
     """No documentation found for this operation."""
     create_blok: Blok = Field(alias='createBlok')
@@ -1690,6 +1726,29 @@ class GetAgentByIdentifiersQuery(BaseModel):
     class Meta:
         """Meta class for GetAgentByIdentifiers """
         document = 'fragment Agent on Agent {\n  id\n  hash\n  client {\n    id\n    __typename\n  }\n  user {\n    sub\n    __typename\n  }\n  memoryShelve {\n    id\n    __typename\n  }\n  __typename\n}\n\nquery GetAgentByIdentifiers($app: String!, $version: String, $deviceId: String) {\n  agent(app: $app, version: $version, deviceId: $deviceId) {\n    ...Agent\n    __typename\n  }\n}'
+
+class StoredAssetQueryAsset(BaseModel):
+    """A verified file the organization holds, stored once by its content."""
+    typename: Literal['Asset'] = Field(alias='__typename', default='Asset', exclude=True)
+    id: ID
+    ref: str
+    "'sha256:' and the hex SHA-256 of the file's exact bytes."
+    kind: AssetKind
+    'What the file is.'
+    model_config = ConfigDict(frozen=True)
+
+class StoredAssetQuery(BaseModel):
+    """No documentation found for this operation."""
+    asset: StoredAssetQueryAsset | None = Field(default=None)
+    "The stored asset of this reference ('sha256:...') in the caller's organization, or null if no agent has uploaded it."
+
+    class Arguments(BaseModel):
+        """Arguments for StoredAsset """
+        ref: str
+
+    class Meta:
+        """Meta class for StoredAsset """
+        document = 'query StoredAsset($ref: String!) {\n  asset(ref: $ref) {\n    id\n    ref\n    kind\n    __typename\n  }\n}'
 
 class UiCatalogsQuery(BaseModel):
     """No documentation found for this operation."""
@@ -2245,7 +2304,7 @@ Returns:
         variables['input'] = _input
         return self.execute(EnsureAgentMutation, variables).ensure_agent
 
-    async def aimplement_agent(self, name: str | None | UnsetType=UNSET, description: str | None | UnsetType=UNSET, states: Iterable[StateImplementationInput] | None | UnsetType=UNSET, implementations: Iterable[ImplementationInput] | None | UnsetType=UNSET, locks: Iterable[LockImplementationInput] | None | UnsetType=UNSET, bloks: Iterable[BlokImplementationInput] | None | UnsetType=UNSET, hash: str | None | UnsetType=UNSET) -> Agent:
+    async def aimplement_agent(self, name: str | None | UnsetType=UNSET, description: str | None | UnsetType=UNSET, states: Iterable[StateImplementationInput] | None | UnsetType=UNSET, implementations: Iterable[ImplementationInput] | None | UnsetType=UNSET, locks: Iterable[LockImplementationInput] | None | UnsetType=UNSET, bloks: Iterable[BlokImplementationInput] | None | UnsetType=UNSET, assets: Iterable[AssetInput] | None | UnsetType=UNSET, hash: str | None | UnsetType=UNSET) -> Agent:
         """ImplementAgent 
 
 Implement an agent with given states and implementations. This is used to set up an agent with its initial configuration and capabilities.
@@ -2257,6 +2316,7 @@ Args:
     implementations: The implementations of the agent. This is used to specify the initial implementations of the agent
     locks: The locks of the agent. This is used to specify which resources the agent needs to run
     bloks: The blocks of the agent. This is used to specify the initial blocks of the agent
+    assets: The files the agent brings with it, by name. The agent uploads the ones the server does not hold yet.
     hash: A unique hash of the agent definition. An agent can use this hash to check if its definition has changed and if it needs to update its implementations and states. This is used to optimize the update process by only updating the implementations and states that have changed.
 
 Returns:
@@ -2276,12 +2336,14 @@ Returns:
             _input['locks'] = locks
         if bloks is not UNSET:
             _input['bloks'] = bloks
+        if assets is not UNSET:
+            _input['assets'] = assets
         if hash is not UNSET:
             _input['hash'] = hash
         variables['input'] = _input
         return (await self.aexecute(ImplementAgentMutation, variables)).implement_agent
 
-    def implement_agent(self, name: str | None | UnsetType=UNSET, description: str | None | UnsetType=UNSET, states: Iterable[StateImplementationInput] | None | UnsetType=UNSET, implementations: Iterable[ImplementationInput] | None | UnsetType=UNSET, locks: Iterable[LockImplementationInput] | None | UnsetType=UNSET, bloks: Iterable[BlokImplementationInput] | None | UnsetType=UNSET, hash: str | None | UnsetType=UNSET) -> Agent:
+    def implement_agent(self, name: str | None | UnsetType=UNSET, description: str | None | UnsetType=UNSET, states: Iterable[StateImplementationInput] | None | UnsetType=UNSET, implementations: Iterable[ImplementationInput] | None | UnsetType=UNSET, locks: Iterable[LockImplementationInput] | None | UnsetType=UNSET, bloks: Iterable[BlokImplementationInput] | None | UnsetType=UNSET, assets: Iterable[AssetInput] | None | UnsetType=UNSET, hash: str | None | UnsetType=UNSET) -> Agent:
         """ImplementAgent 
 
 Implement an agent with given states and implementations. This is used to set up an agent with its initial configuration and capabilities.
@@ -2293,6 +2355,7 @@ Args:
     implementations: The implementations of the agent. This is used to specify the initial implementations of the agent
     locks: The locks of the agent. This is used to specify which resources the agent needs to run
     bloks: The blocks of the agent. This is used to specify the initial blocks of the agent
+    assets: The files the agent brings with it, by name. The agent uploads the ones the server does not hold yet.
     hash: A unique hash of the agent definition. An agent can use this hash to check if its definition has changed and if it needs to update its implementations and states. This is used to optimize the update process by only updating the implementations and states that have changed.
 
 Returns:
@@ -2312,12 +2375,86 @@ Returns:
             _input['locks'] = locks
         if bloks is not UNSET:
             _input['bloks'] = bloks
+        if assets is not UNSET:
+            _input['assets'] = assets
         if hash is not UNSET:
             _input['hash'] = hash
         variables['input'] = _input
         return self.execute(ImplementAgentMutation, variables).implement_agent
 
-    async def acreate_blok(self, name: str, dependencies: Iterable[AgentDependencyInput] | None | UnsetType=UNSET, description: str | None | UnsetType=UNSET, catalog: str | None | UnsetType=UNSET, components: Iterable[ComponentNodeInput] | None | UnsetType=UNSET, demo_state: Args | None | UnsetType=UNSET) -> Blok:
+    async def arequest_asset_upload(self, ref: str) -> MediaUploadGrant:
+        """RequestAssetUpload 
+
+A media upload grant for one asset. Issued only for a file the caller's own agent declares (it registered with it), and only if its size passes the policy.
+
+Args:
+    ref: The asset's reference, as the agent declared it: 'sha256:' and the hex SHA-256 of its exact bytes.
+
+Returns:
+    MediaUploadGrant
+"""
+        variables: dict[str, builtins.object] = {}
+        _input: dict[str, builtins.object] = {}
+        _input['ref'] = ref
+        variables['input'] = _input
+        return (await self.aexecute(RequestAssetUploadMutation, variables)).request_asset_upload
+
+    def request_asset_upload(self, ref: str) -> MediaUploadGrant:
+        """RequestAssetUpload 
+
+A media upload grant for one asset. Issued only for a file the caller's own agent declares (it registered with it), and only if its size passes the policy.
+
+Args:
+    ref: The asset's reference, as the agent declared it: 'sha256:' and the hex SHA-256 of its exact bytes.
+
+Returns:
+    MediaUploadGrant
+"""
+        variables: dict[str, builtins.object] = {}
+        _input: dict[str, builtins.object] = {}
+        _input['ref'] = ref
+        variables['input'] = _input
+        return self.execute(RequestAssetUploadMutation, variables).request_asset_upload
+
+    async def acreate_asset(self, ref: str, store: MediaLike) -> CreateAssetMutationCreateAsset:
+        """CreateAsset 
+
+Verify an asset uploaded with a grant from `requestAssetUpload` (its hash and the rules of its kind) and record it. Returns the existing asset if the hash is stored already; a refusal carries its code in `extensions.code` and deletes the upload.
+
+Args:
+    ref: The reference the uploaded bytes must hash to.
+    store: The store the grant was issued for.
+
+Returns:
+    CreateAssetMutationCreateAsset
+"""
+        variables: dict[str, builtins.object] = {}
+        _input: dict[str, builtins.object] = {}
+        _input['ref'] = ref
+        _input['store'] = store
+        variables['input'] = _input
+        return (await self.aexecute(CreateAssetMutation, variables)).create_asset
+
+    def create_asset(self, ref: str, store: MediaLike) -> CreateAssetMutationCreateAsset:
+        """CreateAsset 
+
+Verify an asset uploaded with a grant from `requestAssetUpload` (its hash and the rules of its kind) and record it. Returns the existing asset if the hash is stored already; a refusal carries its code in `extensions.code` and deletes the upload.
+
+Args:
+    ref: The reference the uploaded bytes must hash to.
+    store: The store the grant was issued for.
+
+Returns:
+    CreateAssetMutationCreateAsset
+"""
+        variables: dict[str, builtins.object] = {}
+        _input: dict[str, builtins.object] = {}
+        _input['ref'] = ref
+        _input['store'] = store
+        variables['input'] = _input
+        return self.execute(CreateAssetMutation, variables).create_asset
+
+    async def acreate_blok(self, name: str, dependencies: Iterable[AgentDependencyInput] | None | UnsetType=UNSET, description: str | None | UnsetType=UNSET, catalog: str | None | UnsetType=UNSET, components: Iterable[ComponentNodeInput] | None | UnsetType=UNSET, demo_state: Args | None | UnsetType=UNSET, context: ComponentContext | None | UnsetType=UNSET, for_model: str | None | UnsetType=UNSET, for_node: str | None | UnsetType=UNSET) -> Blok:
         """CreateBlok 
 
 Create a user interface panel.
@@ -2329,6 +2466,9 @@ Args:
     catalog: The universal id
     components: The schema of the blok. This can be used to validate the blok input and output.
     demo_state: The initial state of the blok. This is used to set the initial state of the blok when it is materialized.
+    context: The renderer for the blok's root: HTML, or SCENE for a full 3D view.
+    for_model: The model ('sha256:...') this blok decorates. HTML bloks only.
+    for_node: The node of `for_model` this blok attaches to; the model's root when absent.
 
 Returns:
     Blok
@@ -2346,10 +2486,16 @@ Returns:
             _input['components'] = components
         if demo_state is not UNSET:
             _input['demoState'] = demo_state
+        if context is not UNSET:
+            _input['context'] = context
+        if for_model is not UNSET:
+            _input['forModel'] = for_model
+        if for_node is not UNSET:
+            _input['forNode'] = for_node
         variables['input'] = _input
         return (await self.aexecute(CreateBlokMutation, variables)).create_blok
 
-    def create_blok(self, name: str, dependencies: Iterable[AgentDependencyInput] | None | UnsetType=UNSET, description: str | None | UnsetType=UNSET, catalog: str | None | UnsetType=UNSET, components: Iterable[ComponentNodeInput] | None | UnsetType=UNSET, demo_state: Args | None | UnsetType=UNSET) -> Blok:
+    def create_blok(self, name: str, dependencies: Iterable[AgentDependencyInput] | None | UnsetType=UNSET, description: str | None | UnsetType=UNSET, catalog: str | None | UnsetType=UNSET, components: Iterable[ComponentNodeInput] | None | UnsetType=UNSET, demo_state: Args | None | UnsetType=UNSET, context: ComponentContext | None | UnsetType=UNSET, for_model: str | None | UnsetType=UNSET, for_node: str | None | UnsetType=UNSET) -> Blok:
         """CreateBlok 
 
 Create a user interface panel.
@@ -2361,6 +2507,9 @@ Args:
     catalog: The universal id
     components: The schema of the blok. This can be used to validate the blok input and output.
     demo_state: The initial state of the blok. This is used to set the initial state of the blok when it is materialized.
+    context: The renderer for the blok's root: HTML, or SCENE for a full 3D view.
+    for_model: The model ('sha256:...') this blok decorates. HTML bloks only.
+    for_node: The node of `for_model` this blok attaches to; the model's root when absent.
 
 Returns:
     Blok
@@ -2378,6 +2527,12 @@ Returns:
             _input['components'] = components
         if demo_state is not UNSET:
             _input['demoState'] = demo_state
+        if context is not UNSET:
+            _input['context'] = context
+        if for_model is not UNSET:
+            _input['forModel'] = for_model
+        if for_node is not UNSET:
+            _input['forNode'] = for_node
         variables['input'] = _input
         return self.execute(CreateBlokMutation, variables).create_blok
 
@@ -3442,6 +3597,36 @@ Returns:
         if device_id is not UNSET:
             variables['deviceId'] = device_id
         return self.execute(GetAgentByIdentifiersQuery, variables).agent
+
+    async def astored_asset(self, ref: str) -> StoredAssetQueryAsset | None:
+        """StoredAsset 
+
+The stored asset of this reference ('sha256:...') in the caller's organization, or null if no agent has uploaded it.
+
+Args:
+    ref (str): No description
+
+Returns:
+    StoredAssetQueryAsset | None
+"""
+        variables: dict[str, builtins.object] = {}
+        variables['ref'] = ref
+        return (await self.aexecute(StoredAssetQuery, variables)).asset
+
+    def stored_asset(self, ref: str) -> StoredAssetQueryAsset | None:
+        """StoredAsset 
+
+The stored asset of this reference ('sha256:...') in the caller's organization, or null if no agent has uploaded it.
+
+Args:
+    ref (str): No description
+
+Returns:
+    StoredAssetQueryAsset | None
+"""
+        variables: dict[str, builtins.object] = {}
+        variables['ref'] = ref
+        return self.execute(StoredAssetQuery, variables).asset
 
     async def aui_catalogs(self) -> tuple[UICatalog, ...]:
         """UiCatalogs 

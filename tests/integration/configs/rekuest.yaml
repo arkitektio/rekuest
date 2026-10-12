@@ -82,6 +82,9 @@ datalayer:
   host: rustfs
   port: 9000
   protocol: http
+  # rustfs issues no scoped session credentials here: uploads use the service's own.
+  # A test stack only; a deployment never sets this.
+  allow_unscoped_fallback: true
   media:
     bucket: media
 postgres:

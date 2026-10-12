@@ -83,3 +83,15 @@ async def test_the_agent_socket_goes_through_the_alias_proxy_with_the_run_tokens
     assert transport.endpoint_url == "ws://100.64.0.9:8000/agi"
     assert transport.proxy == "http://127.0.0.1:41234"
     assert await transport.token_loader() == "token"
+
+
+@pytest.mark.asyncio
+async def test_only_an_app_with_assets_gets_something_to_do_after_registering(tmp_path) -> None:
+    assert (await _agent(None)).after_registration is None
+
+    (tmp_path / "scope.glb").write_bytes(b"glTF\x02\x00\x00\x00")
+    registry = AppRegistry(root=tmp_path)
+    registry.register_asset("scope", "scope.glb")
+    agent = await rekuest_provider.build(StubFakts(_manifest(None)), registry, {})
+
+    assert agent.after_registration is not None

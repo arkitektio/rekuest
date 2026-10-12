@@ -11,12 +11,15 @@ means something against a Rekuest server over its websocket:
   ``(session created, pos)`` order;
 * calls to other actions, routed through the server (:class:`~rekuest.agents.caller.AgentPostman`),
   each child call taking its parent's next task step as its ``reference``;
-* rath's task scope, so rath-based service clients attribute requests to the running task.
+* rath's task scope, so rath-based service clients attribute requests to the running task;
+* what follows a registration (``after_registration``): rekuest's provider uploads the
+  assets the app registered there, once the server knows the bloks that name them.
 """
 
+import asyncio
 import logging
 import time
-from collections.abc import Sequence
+from collections.abc import Awaitable, Callable, Sequence
 from typing import Annotated, Any, ClassVar, Optional
 
 from pydantic import Field, PrivateAttr, TypeAdapter
@@ -55,6 +58,12 @@ class RekuestAgent(BaseAgent):
         description="The SQLite file the agent keeps its unacknowledged frames in, across restarts ($REKUEST_JOURNAL_PATH, else .arkitekt/rekuest_journal.db). None keeps them in memory only.",
     )
 
+    after_registration: Callable[[], Awaitable[None]] | None = Field(
+        default=None,
+        exclude=True,
+        description="Run beside the agent once the server accepted its registration, and again after a reconnect if it failed. It never holds the agent back, and what it raises is logged.",
+    )
+
     holds_sends_until_init: ClassVar[bool] = True
     """Tells the transport to send nothing between ``Register`` and ``Init``: after
     ``Init`` the agent first re-sends what the server may be missing."""
@@ -65,6 +74,7 @@ class RekuestAgent(BaseAgent):
     _session_created: dict[str, float] = PrivateAttr(default_factory=dict)
     """When each session with retained frames was created (orders the resend)."""
     _store: RetainedFrames | None = PrivateAttr(default=None)
+    _after_registration_task: "asyncio.Task[None] | None" = PrivateAttr(default=None)
 
     @property
     def control_plane(self) -> "SocketControlPlane":
@@ -298,6 +308,18 @@ class RekuestAgent(BaseAgent):
             if release is not None:
                 release()
         await self._areply_to_inquiries(message.inquiries)
+        if self.after_registration is not None and self._after_registration_task is None:
+            self._after_registration_task = asyncio.create_task(
+                self._arun_after_registration(self.after_registration)
+            )
+
+    async def _arun_after_registration(self, follow_up: Callable[[], Awaitable[None]]) -> None:
+        """Run the follow-up once; one that failed is tried again at the next ``Init``."""
+        try:
+            await follow_up()
+        except Exception:
+            logger.exception("What follows this agent's registration failed")
+            self._after_registration_task = None
 
     async def _areply_to_inquiries(
         self, inquiries: "Sequence[messages.AssignInquiry]"
@@ -343,6 +365,10 @@ class RekuestAgent(BaseAgent):
 
     async def atear_down(self) -> None:
         """Tear down, then close the store (what it holds is sent by the next run)."""
+        follow_up, self._after_registration_task = self._after_registration_task, None
+        if follow_up is not None and not follow_up.done():
+            follow_up.cancel()
+            await asyncio.gather(follow_up, return_exceptions=True)
         try:
             await super().atear_down()
         finally:

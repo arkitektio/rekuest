@@ -89,6 +89,8 @@
                         "AgentDependencyInput",
                         "AgentProbeInput",
                         "ArgPortInput",
+                        "AssetInput",
+                        "AssetKind",
                         "AssignWidgetInput",
                         "BlokImplementationInput",
                         "ChoiceAssignWidgetInput",

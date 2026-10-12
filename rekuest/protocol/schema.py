@@ -45,6 +45,13 @@ class CatalogValueKind(str, Enum):
     LIST = 'LIST'
     ANY = 'ANY'
     CALLBACK = 'CALLBACK'
+    ASSET = 'ASSET'
+    __str__ = str.__str__
+
+class ComponentContext(str, Enum):
+    """The renderer a catalog component lives in. A component may only be placed where its context is in force."""
+    HTML = 'HTML'
+    SCENE = 'SCENE'
     __str__ = str.__str__
 
 class DemandKind(str, Enum):
@@ -180,6 +187,13 @@ class CatalogComponentInput(BaseModel):
     'The props this component accepts.\nDefault: []'
     accepts_children: Annotated[bool | None, GraphQLDefault('True')] = Field(validation_alias=AliasChoices('accepts_children', 'acceptsChildren'), serialization_alias='acceptsChildren', default=None, description='Whether ComponentNode.children may be nested under this component.')
     'Whether ComponentNode.children may be nested under this component.\nDefault: True'
+    context: Annotated[ComponentContext | None, GraphQLDefault('HTML')] = Field(default=None, description='The context this component may be placed in.')
+    'The context this component may be placed in.\nDefault: HTML'
+    children_context: ComponentContext | None = Field(validation_alias=AliasChoices('children_context', 'childrenContext'), serialization_alias='childrenContext', default=None, description="The context in force for this component's children, when it differs from its own: such a component bridges two renderers.")
+    downstream_of: Annotated[tuple[str, ...] | None, GraphQLDefault('[]')] = Field(validation_alias=AliasChoices('downstream_of', 'downstreamOf'), serialization_alias='downstreamOf', default=None, description='Component names of which at least one must be an ancestor, at any depth. Empty means no requirement.')
+    'Component names of which at least one must be an ancestor, at any depth. Empty means no requirement.\nDefault: []'
+    not_downstream_of: Annotated[tuple[str, ...] | None, GraphQLDefault('[]')] = Field(validation_alias=AliasChoices('not_downstream_of', 'notDownstreamOf'), serialization_alias='notDownstreamOf', default=None, description='Component names of which none may be an ancestor.')
+    'Component names of which none may be an ancestor.\nDefault: []'
     model_config = ConfigDict(frozen=True, extra='forbid', populate_by_name=True, use_enum_values=True)
 
 class CatalogOperationInput(BaseModel):
@@ -205,6 +219,12 @@ class CollectInput(BaseModel):
     drawers: tuple[ID, ...] = Field(description="The drawers to collect: each an ID or a resource ID (as agent-minted drawers are referenced), within the caller's organization")
     model_config = ConfigDict(frozen=True, extra='forbid', populate_by_name=True, use_enum_values=True)
 
+class CreateAssetInput(BaseModel):
+    """Record an asset that was uploaded with a grant from `requestAssetUpload`."""
+    ref: str = Field(description='The reference the uploaded bytes must hash to.')
+    store: MediaLike = Field(description='The store the grant was issued for.')
+    model_config = ConfigDict(frozen=True, extra='forbid', populate_by_name=True, use_enum_values=True)
+
 class CreateBlokInput(CreateBlokInputTrait, BaseModel):
     """The input for creating a blok."""
     name: str = Field(description='The name of the Blok, used for identification in the system.')
@@ -213,6 +233,10 @@ class CreateBlokInput(CreateBlokInputTrait, BaseModel):
     catalog: str | None = Field(default=None, description='The universal id')
     components: tuple[ComponentNodeInput, ...] | None = Field(default=None, description='The schema of the blok. This can be used to validate the blok input and output.')
     demo_state: Args | None = Field(validation_alias=AliasChoices('demo_state', 'demoState'), serialization_alias='demoState', default=None, description='The initial state of the blok. This is used to set the initial state of the blok when it is materialized.')
+    context: Annotated[ComponentContext | None, GraphQLDefault('HTML')] = Field(default=None, description="The renderer for the blok's root: HTML, or SCENE for a full 3D view.")
+    "The renderer for the blok's root: HTML, or SCENE for a full 3D view.\nDefault: HTML"
+    for_model: str | None = Field(validation_alias=AliasChoices('for_model', 'forModel'), serialization_alias='forModel', default=None, description="The model ('sha256:...') this blok decorates. HTML bloks only.")
+    for_node: str | None = Field(validation_alias=AliasChoices('for_node', 'forNode'), serialization_alias='forNode', default=None, description="The node of `for_model` this blok attaches to; the model's root when absent.")
     model_config = ConfigDict(frozen=True, extra='forbid', populate_by_name=True, use_enum_values=True)
 
 class CreateDashboardInput(BaseModel):
@@ -385,6 +409,11 @@ class RegisterUiCatalogInput(BaseModel):
     'The pure operations this catalog can evaluate for UtilCalls.\nDefault: []'
     widget_defaults: Annotated[tuple['WidgetDefaultInput', ...] | None, GraphQLDefault('[]')] = Field(validation_alias=AliasChoices('widget_defaults', 'widgetDefaults'), serialization_alias='widgetDefaults', default=None, description='Default widgets per port kind and/or structure identifier. A UI renders them for ports that declare no widget; an identifier match beats a kind match. Each widget is validated against this catalog plus base at registration.')
     'Default widgets per port kind and/or structure identifier. A UI renders them for ports that declare no widget; an identifier match beats a kind match. Each widget is validated against this catalog plus base at registration.\nDefault: []'
+    model_config = ConfigDict(frozen=True, extra='forbid', populate_by_name=True, use_enum_values=True)
+
+class RequestAssetUploadInput(BaseModel):
+    """Ask for a grant to upload one asset the caller's agent declares."""
+    ref: str = Field(description="The asset's reference, as the agent declared it: 'sha256:' and the hex SHA-256 of its exact bytes.")
     model_config = ConfigDict(frozen=True, extra='forbid', populate_by_name=True, use_enum_values=True)
 
 class RequestMediaAccessInput(BaseModel):

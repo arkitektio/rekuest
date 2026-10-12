@@ -1,0 +1,7 @@
+query StoredAsset($ref: String!) {
+  asset(ref: $ref) {
+    id
+    ref
+    kind
+  }
+}

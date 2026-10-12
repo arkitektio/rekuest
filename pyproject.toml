@@ -16,8 +16,8 @@ dependencies = [
     # The declaration an app is (the action language, AppRegistry, services, hooks)
     # is arkitekt-spec's; executing it is arkitekt-runtime's. rekuest is the
     # distributed runtime on top: the socket agent, its transport, and the client.
-    "arkitekt-spec>=3.5",
-    "arkitekt-runtime>=4.4",
+    "arkitekt-spec>=3.6",
+    "arkitekt-runtime>=4.5",
     # Media uploads (MediaLike arguments) are put into the datalayer through obstore.
     "obstore>=0.10.0",
 ]
@@ -25,6 +25,10 @@ dependencies = [
 [project.urls]
 Homepage = "https://arkitekt.live"
 Repository = "https://github.com/arkitektio/rekuest"
+
+[project.scripts]
+# Authoring device models; needs the kulisse extra.
+kulisse = "rekuest.kulisse.cli:main"
 
 [project.optional-dependencies]
 types = [
@@ -35,6 +39,12 @@ types = [
 # strings back into live quantities. Optional — quantity ports simply require it.
 units = [
     "kanne>=2.2",
+]
+kulisse = [
+    "numpy>=1.26",
+    "pycollada>=0.8",
+    "trimesh>=4",
+    "xacro>=2",
 ]
 
 [tool.uv]
