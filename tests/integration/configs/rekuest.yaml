@@ -69,6 +69,17 @@ authentikate:
       client_app: durable
       client_release: v0.0.1
       client_id: durable
+    # A member of the organization without the admin role a static token otherwise
+    # carries: what an admin may do that a member may not is tested against it.
+    member_token:
+      sub: 7
+      iss: lok
+      active_org: test
+      roles: []
+      client_device: member_device
+      client_app: member
+      client_release: v0.0.1
+      client_id: member
 lok:
   issuer: lok
   key_type: RS256

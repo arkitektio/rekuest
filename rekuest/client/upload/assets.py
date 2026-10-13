@@ -11,6 +11,7 @@ bloks are registered either way, and a viewer shows the asset as missing.
 import hashlib
 import logging
 from collections.abc import Iterable
+from pathlib import Path
 
 import rath
 from rath.operation import GraphQLException
@@ -30,22 +31,22 @@ logger = logging.getLogger(__name__)
 
 
 async def _aupload(
-    client: rath.Rath, datalayer: DataLayer, asset: AssetDeclaration
+    client: rath.Rath, datalayer: DataLayer, asset: AssetDeclaration, path: Path
 ) -> bool:
     """Put one asset into the server's store; whether anything was uploaded."""
     stored = await client.aquery(StoredAssetQuery.Meta.document, {"ref": asset.ref})
     if StoredAssetQuery.model_validate(stored.data).asset is not None:
         return False
 
-    data = asset.path.read_bytes()
+    data = path.read_bytes()
     if "sha256:" + hashlib.sha256(data).hexdigest() != asset.ref:
-        raise UploadError(f"{asset.path} changed since it was registered as '{asset.name}'")
+        raise UploadError(f"{path} changed since it was registered as '{asset.name}'")
 
     granted = await client.aquery(
         RequestAssetUploadMutation.Meta.document, {"input": {"ref": asset.ref}}
     )
     grant = RequestAssetUploadMutation.model_validate(granted.data).request_asset_upload
-    with asset.path.open("rb") as file:
+    with path.open("rb") as file:
         store = await astore_media_file(MediaLike(file), grant, datalayer)
 
     # The store's id, not a file: the bytes are where the grant put them already.
@@ -67,15 +68,19 @@ def _refusal_code(error: GraphQLException) -> str | None:
 async def aupload_assets(
     client: rath.Rath, datalayer: DataLayer, assets: Iterable[AssetDeclaration]
 ) -> None:
-    """Upload every asset the server does not hold yet, one after the other.
+    """Upload every asset the app holds and the server does not, one after the other.
 
     Each is tried on its own: one the server refuses, or whose file is gone, is
-    logged with its reason and the rest still go.
+    logged with its reason and the rest still go. An asset the app only names a
+    source for is not the app's to upload: an admin adds it from their client.
     """
     for asset in assets:
+        if asset.path is None:
+            logger.debug("The %s '%s' is fetched from %s, not uploaded by the app", asset.kind.label, asset.name, asset.source)
+            continue
         what = f"{asset.kind.label} '{asset.name}' ({asset.path.name})"
         try:
-            uploaded = await _aupload(client, datalayer, asset)
+            uploaded = await _aupload(client, datalayer, asset, asset.path)
         except GraphQLException as error:
             logger.warning(
                 "The server refused the %s (%s): %s",

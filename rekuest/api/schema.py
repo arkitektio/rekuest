@@ -1361,7 +1361,7 @@ class ImplementAgentMutation(BaseModel):
 class RequestAssetUploadMutation(BaseModel):
     """No documentation found for this operation."""
     request_asset_upload: MediaUploadGrant = Field(alias='requestAssetUpload')
-    "A media upload grant for one asset. Issued only for a file the caller's own agent declares (it registered with it), and only if its size passes the policy."
+    "A media upload grant for one asset. Issued for a file the caller's own agent declares (it registered with it), or, to an admin, for a file an agent of the organization names a source for; and only if its size passes the policy."
 
     class Arguments(BaseModel):
         """Arguments for RequestAssetUpload """
@@ -2382,13 +2382,14 @@ Returns:
         variables['input'] = _input
         return self.execute(ImplementAgentMutation, variables).implement_agent
 
-    async def arequest_asset_upload(self, ref: str) -> MediaUploadGrant:
+    async def arequest_asset_upload(self, ref: str, size: int | None | UnsetType=UNSET) -> MediaUploadGrant:
         """RequestAssetUpload 
 
-A media upload grant for one asset. Issued only for a file the caller's own agent declares (it registered with it), and only if its size passes the policy.
+A media upload grant for one asset. Issued for a file the caller's own agent declares (it registered with it), or, to an admin, for a file an agent of the organization names a source for; and only if its size passes the policy.
 
 Args:
     ref: The asset's reference, as the agent declared it: 'sha256:' and the hex SHA-256 of its exact bytes.
+    size: The size of the fetched file in bytes, for an asset declared without one. Ignored when the declaration has a size.
 
 Returns:
     MediaUploadGrant
@@ -2396,16 +2397,19 @@ Returns:
         variables: dict[str, builtins.object] = {}
         _input: dict[str, builtins.object] = {}
         _input['ref'] = ref
+        if size is not UNSET:
+            _input['size'] = size
         variables['input'] = _input
         return (await self.aexecute(RequestAssetUploadMutation, variables)).request_asset_upload
 
-    def request_asset_upload(self, ref: str) -> MediaUploadGrant:
+    def request_asset_upload(self, ref: str, size: int | None | UnsetType=UNSET) -> MediaUploadGrant:
         """RequestAssetUpload 
 
-A media upload grant for one asset. Issued only for a file the caller's own agent declares (it registered with it), and only if its size passes the policy.
+A media upload grant for one asset. Issued for a file the caller's own agent declares (it registered with it), or, to an admin, for a file an agent of the organization names a source for; and only if its size passes the policy.
 
 Args:
     ref: The asset's reference, as the agent declared it: 'sha256:' and the hex SHA-256 of its exact bytes.
+    size: The size of the fetched file in bytes, for an asset declared without one. Ignored when the declaration has a size.
 
 Returns:
     MediaUploadGrant
@@ -2413,6 +2417,8 @@ Returns:
         variables: dict[str, builtins.object] = {}
         _input: dict[str, builtins.object] = {}
         _input['ref'] = ref
+        if size is not UNSET:
+            _input['size'] = size
         variables['input'] = _input
         return self.execute(RequestAssetUploadMutation, variables).request_asset_upload
 

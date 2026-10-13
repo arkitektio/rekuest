@@ -123,3 +123,15 @@ async def test_a_file_that_changed_since_it_was_registered_is_not_uploaded(regis
 
     assert "changed since it was registered as 'scope'" in caplog.text
     assert [name for name, _ in server.asked if name != "StoredAsset"] == ["RequestAssetUpload", "CreateAsset"], "the image still goes"
+
+
+@pytest.mark.asyncio
+async def test_a_file_the_app_only_names_a_source_for_is_not_the_apps_to_upload(tmp_path: Path, bucket: MemoryStore) -> None:
+    registry = AppRegistry(root=tmp_path)
+    registry.register_asset("robot", source="https://vendor.example/ur5.glb", ref="sha256:" + "9f" * 32)
+    server = FakeServer()
+
+    await _upload(server, registry)
+
+    assert server.asked == []
+    assert obstore.list(bucket).collect() == []

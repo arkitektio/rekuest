@@ -160,7 +160,7 @@ def rekuest_agent(
         app_registry=registry,
         after_registration=(
             _asset_upload(rekuest, s3, tokens, registry)
-            if registry.registered_assets
+            if any(asset.path is not None for asset in registry.registered_assets.values())
             else None
         ),
     )
