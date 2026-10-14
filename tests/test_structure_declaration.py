@@ -271,6 +271,31 @@ def test_rekuests_own_structures_are_declared_the_same_way() -> None:
     assert {(s.service, s.declared) for s in declared} == {("rekuest", True)}
 
 
+@pytest.mark.asyncio
+async def test_a_materialized_blok_is_a_structure_under_the_identifier_orkestrator_links() -> None:
+    """``@rekuest/materialized_blok``, underscore and all: what a room message attaches."""
+    from rekuest.api.schema import DetailMaterializedBlok
+    from rekuest.arkitekt import expand_materialized_blok
+
+    structure = rekuest_registry.structure_registry.get_fullfilled_structure(
+        "@rekuest/materialized_blok"
+    )
+    assert structure.cls is DetailMaterializedBlok
+
+    class FakeRekuest:
+        def __init__(self) -> None:
+            self.asked: list[str] = []
+
+        async def aget_materialized_blok(self, id: str) -> Any:
+            self.asked.append(id)
+            return id
+
+    client = FakeRekuest()
+
+    assert await expand_materialized_blok("7", client) == "7"  # type: ignore[arg-type]
+    assert client.asked == ["7"]
+
+
 # --------------------------------------------------------------------------- #
 # Expanding many -- through the declaring service's client
 # --------------------------------------------------------------------------- #

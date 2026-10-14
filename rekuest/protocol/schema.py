@@ -498,6 +498,17 @@ class UnshelveMemoryDrawerInput(BaseModel):
     id: str = Field(description='The drawer: its resource ID (as agent-minted drawers are referenced) or its ID.')
     model_config = ConfigDict(frozen=True, extra='forbid', populate_by_name=True, use_enum_values=True)
 
+class UpdateBlokInput(BaseModel):
+    """The input for updating a blok. Omitted (null) fields are left unchanged; list fields replace wholesale."""
+    id: ID = Field(description='The ID of the blok to update.')
+    name: str | None = Field(default=None, description='The name of the blok, used for identification in the system.')
+    description: str | None = Field(default=None, description='The description of the blok and its purpose.')
+    components: tuple[ComponentNodeInput, ...] | None = Field(default=None, description='The full component tree of the blok. Replaces the existing tree when provided.')
+    demo_state: Args | None = Field(validation_alias=AliasChoices('demo_state', 'demoState'), serialization_alias='demoState', default=None, description='The demo state used to preview this blok. Replaces the existing demo state when provided.')
+    catalog: str | None = Field(default=None, description="Name of the UI catalog (in the caller's organization) this blok renders against. Created if missing.")
+    dependencies: tuple[AgentDependencyInput, ...] | None = Field(default=None, description='The full list of agent dependencies. When provided it replaces the existing set: keys not listed are deleted and their agent mappings on materialized bloks lose their dependency reference.')
+    model_config = ConfigDict(frozen=True, extra='forbid', populate_by_name=True, use_enum_values=True)
+
 class WidgetDefaultInput(BaseModel):
     """A catalog's default widget for ports matching a kind and/or structure identifier. A UI applies it when a port has no explicit widget; an identifier match beats a kind match."""
     kind: PortKind | None = Field(default=None, description='Port kind the default applies to. With `identifier`, both must match.')

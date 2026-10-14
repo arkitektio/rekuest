@@ -7,3 +7,123 @@ fragment Blok on Blok {
 fragment MaterializedBlok on MaterializedBlok {
   id
 }
+
+fragment BlokPortMatch on PortMatch {
+  at
+  key
+  kind
+  identifier
+  nullable
+  dimension
+  children {
+    at
+    key
+    kind
+    identifier
+    nullable
+    dimension
+    children {
+      at
+      key
+      kind
+      identifier
+      nullable
+      dimension
+      children {
+        at
+        key
+        kind
+        identifier
+        nullable
+        dimension
+      }
+    }
+  }
+}
+
+fragment BlokDependency on BlokDependency {
+  key
+  description
+  optional
+  actionDependencies {
+    key
+    description
+    optional
+    demand {
+      hash
+      key
+      app
+      version
+      name
+      argMatches {
+        ...BlokPortMatch
+      }
+      returnMatches {
+        ...BlokPortMatch
+      }
+      protocols
+      forceArgLength
+      forceReturnLength
+      pure
+      idempotent
+      stateful
+    }
+  }
+  stateDependencies {
+    key
+    description
+    optional
+    demand {
+      hash
+      key
+      app
+      matches {
+        ...BlokPortMatch
+      }
+      protocols
+    }
+  }
+}
+
+fragment BlokDiagnostic on Diagnostic {
+  level
+  code
+  message
+  path
+}
+
+fragment DetailBlok on Blok {
+  id
+  name
+  description
+  context
+  catalog {
+    id
+    name
+  }
+  componentTree
+  demoState
+  diagnostics {
+    ...BlokDiagnostic
+  }
+  dependencies {
+    ...BlokDependency
+  }
+}
+
+fragment DetailMaterializedBlok on MaterializedBlok {
+  id
+  name
+  description
+  blok {
+    ...DetailBlok
+  }
+  agentMappings {
+    key
+    agent {
+      id
+      declaredName
+      connected
+    }
+  }
+}

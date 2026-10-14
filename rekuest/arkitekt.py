@@ -22,9 +22,11 @@ from rath.links.split import SplitLink
 from rekuest.agents.agent import RekuestAgent
 from rekuest.api.schema import (
     Action,
+    DetailMaterializedBlok,
     Implementation,
     SearchActionsQuery,
     SearchImplementationsQuery,
+    SearchMaterializedBloksQuery,
     SearchShortcutsQuery,
     SearchTestCasesQuery,
     SearchTestResultsQuery,
@@ -206,6 +208,18 @@ async def expand_test_case(id: str, rekuest: Rekuest) -> TestCase:
 async def expand_test_result(id: str, rekuest: Rekuest) -> TestResult:
     """A test result, by id."""
     return await rekuest.aget_test_result(id)
+
+
+@registry.structure(
+    "@rekuest/materialized_blok", widget=_search(SearchMaterializedBloksQuery)
+)
+async def expand_materialized_blok(id: str, rekuest: Rekuest) -> DetailMaterializedBlok:
+    """A materialized blok, by id, with the blok it shows: its tree, demo state and dependencies.
+
+    The identifier is the one orkestrator already displays and links
+    (``rekuest/manifest.ts``), so a message carrying one renders as the blok.
+    """
+    return await rekuest.aget_materialized_blok(id)
 
 
 @registry.structure("@rekuest/taskevent")

@@ -6,8 +6,8 @@ from arkitekt_spec.actions import ActionDemandInput, ActionKind, AgentDependency
 from datetime import datetime
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 from rath.scalars import ID, IDCoercible
-from rekuest.protocol.schema import ActionFilter, ActionOrder, AgentFilter, AgentInput, AgentKind, AssignWidgetKind, BlokAgentMappingInput, CatalogComponentInput, CatalogOperationInput, CatalogValueKind, CollectInput, ComponentContext, CreateAssetInput, CreateBlokInput, CreateDashboardInput, CreateHigherOrderImplementationInput, CreateShortcutInput, CreateSpaceInput, CreateTestCaseInput, CreateTestResultInput, CreateThreeDModelInput, DiagnosticLevel, FinishMediaUploadInput, ImplementationFilter, InterruptInput, LogLevel, MaterializeBlokInput, OffsetPaginationInput, PlacementInput, RegisterUiCatalogInput, RequestAssetUploadInput, RequestMediaAccessInput, RequestMediaUploadInput, ReturnWidgetKind, ShelveInMemoryDrawerInput, ShortcutFilter, ShortcutOrder, TaskInstructKind, ToolboxFilter, ToolboxOrder, UnshelveMemoryDrawerInput, WidgetDefaultInput
-from rekuest.scalars import ActionHash, Args, Identifier, JSONSerializable, MediaLike
+from rekuest.protocol.schema import ActionFilter, ActionOrder, AgentFilter, AgentInput, AgentKind, AssignWidgetKind, BlokAgentMappingInput, CatalogComponentInput, CatalogOperationInput, CatalogValueKind, CollectInput, ComponentContext, CreateAssetInput, CreateBlokInput, CreateDashboardInput, CreateHigherOrderImplementationInput, CreateShortcutInput, CreateSpaceInput, CreateTestCaseInput, CreateTestResultInput, CreateThreeDModelInput, DiagnosticLevel, FinishMediaUploadInput, ImplementationFilter, InterruptInput, LogLevel, MaterializeBlokInput, OffsetPaginationInput, PlacementInput, RegisterUiCatalogInput, RequestAssetUploadInput, RequestMediaAccessInput, RequestMediaUploadInput, ReturnWidgetKind, ShelveInMemoryDrawerInput, ShortcutFilter, ShortcutOrder, TaskInstructKind, ToolboxFilter, ToolboxOrder, UnshelveMemoryDrawerInput, UpdateBlokInput, WidgetDefaultInput
+from rekuest.scalars import ActionHash, Args, Identifier, JSONSerializable, MediaLike, Props
 from rekuest.traits.action import Callable
 from typing import Annotated, Any, AsyncIterator, Iterable, Iterator, Literal
 
@@ -112,6 +112,74 @@ class MaterializedBlok(BaseModel):
         document = 'fragment MaterializedBlok on MaterializedBlok {\n  id\n  __typename\n}'
         name = 'MaterializedBlok'
         type = 'MaterializedBlok'
+
+class BlokPortMatchChildrenChildrenChildren(BaseModel):
+    """No documentation"""
+    typename: Literal['PortMatch'] = Field(alias='__typename', default='PortMatch', exclude=True)
+    at: int | None = Field(default=None)
+    key: str | None = Field(default=None)
+    kind: PortKind | None = Field(default=None)
+    identifier: str | None = Field(default=None)
+    nullable: bool | None = Field(default=None)
+    dimension: str | None = Field(default=None)
+    model_config = ConfigDict(frozen=True)
+
+class BlokPortMatchChildrenChildren(BaseModel):
+    """No documentation"""
+    typename: Literal['PortMatch'] = Field(alias='__typename', default='PortMatch', exclude=True)
+    at: int | None = Field(default=None)
+    key: str | None = Field(default=None)
+    kind: PortKind | None = Field(default=None)
+    identifier: str | None = Field(default=None)
+    nullable: bool | None = Field(default=None)
+    dimension: str | None = Field(default=None)
+    children: tuple[BlokPortMatchChildrenChildrenChildren, ...] | None = Field(default=None)
+    model_config = ConfigDict(frozen=True)
+
+class BlokPortMatchChildren(BaseModel):
+    """No documentation"""
+    typename: Literal['PortMatch'] = Field(alias='__typename', default='PortMatch', exclude=True)
+    at: int | None = Field(default=None)
+    key: str | None = Field(default=None)
+    kind: PortKind | None = Field(default=None)
+    identifier: str | None = Field(default=None)
+    nullable: bool | None = Field(default=None)
+    dimension: str | None = Field(default=None)
+    children: tuple[BlokPortMatchChildrenChildren, ...] | None = Field(default=None)
+    model_config = ConfigDict(frozen=True)
+
+class BlokPortMatch(BaseModel):
+    """No documentation"""
+    typename: Literal['PortMatch'] = Field(alias='__typename', default='PortMatch', exclude=True)
+    at: int | None = Field(default=None)
+    key: str | None = Field(default=None)
+    kind: PortKind | None = Field(default=None)
+    identifier: str | None = Field(default=None)
+    nullable: bool | None = Field(default=None)
+    dimension: str | None = Field(default=None)
+    children: tuple[BlokPortMatchChildren, ...] | None = Field(default=None)
+    model_config = ConfigDict(frozen=True)
+
+    class Meta:
+        """Meta class for BlokPortMatch"""
+        document = 'fragment BlokPortMatch on PortMatch {\n  at\n  key\n  kind\n  identifier\n  nullable\n  dimension\n  children {\n    at\n    key\n    kind\n    identifier\n    nullable\n    dimension\n    children {\n      at\n      key\n      kind\n      identifier\n      nullable\n      dimension\n      children {\n        at\n        key\n        kind\n        identifier\n        nullable\n        dimension\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  __typename\n}'
+        name = 'BlokPortMatch'
+        type = 'PortMatch'
+
+class BlokDiagnostic(BaseModel):
+    """A non-fatal registration finding, e.g. a validator call naming an operation neither the base catalog nor the named catalog provides."""
+    typename: Literal['Diagnostic'] = Field(alias='__typename', default='Diagnostic', exclude=True)
+    level: DiagnosticLevel
+    code: str
+    message: str
+    path: str | None = Field(default=None)
+    model_config = ConfigDict(frozen=True)
+
+    class Meta:
+        """Meta class for BlokDiagnostic"""
+        document = 'fragment BlokDiagnostic on Diagnostic {\n  level\n  code\n  message\n  path\n  __typename\n}'
+        name = 'BlokDiagnostic'
+        type = 'Diagnostic'
 
 class CatalogArgument(BaseModel):
     """An argument a catalog operation accepts."""
@@ -609,6 +677,99 @@ class ListToolbox(BaseModel):
         name = 'ListToolbox'
         type = 'Toolbox'
 
+class BlokDependencyActionDependenciesDemand(BaseModel):
+    """Pure matching criteria for an action (app/key preferred; matches loosen)."""
+    typename: Literal['ActionDemand'] = Field(alias='__typename', default='ActionDemand', exclude=True)
+    hash: ActionHash | None = Field(default=None)
+    'The exact hash of the action. When set, matching short-circuits on the hash.'
+    key: str | None = Field(default=None)
+    "The action's key within its app, e.g. 'open_image'."
+    app: str | None = Field(default=None)
+    "The identifier of the app providing the action, e.g. 'imagej'."
+    version: str | None = Field(default=None)
+    'The exact version of the action.'
+    name: str | None = Field(default=None)
+    'The display name of the action to match.'
+    arg_matches: tuple[BlokPortMatch, ...] | None = Field(default=None, alias='argMatches')
+    "The matches the action's arg ports must satisfy."
+    return_matches: tuple[BlokPortMatch, ...] | None = Field(default=None, alias='returnMatches')
+    "The matches the action's return ports must satisfy."
+    protocols: tuple[str, ...] | None = Field(default=None)
+    'Protocols (by name) the action must implement.'
+    force_arg_length: int | None = Field(default=None, alias='forceArgLength')
+    'Require that the action has exactly this number of root args.'
+    force_return_length: int | None = Field(default=None, alias='forceReturnLength')
+    'Require that the action has exactly this number of root returns.'
+    pure: bool | None = Field(default=None)
+    'Require the action to be (or not be) pure.'
+    idempotent: bool | None = Field(default=None)
+    'Require the action to be (or not be) idempotent.'
+    stateful: bool | None = Field(default=None)
+    'Require the action to be (or not be) stateful.'
+    model_config = ConfigDict(frozen=True)
+
+class BlokDependencyActionDependencies(BaseModel):
+    """A named action requirement of a dependency: a local slot key mapped to the demand the resolved action must satisfy."""
+    typename: Literal['ActionDependency'] = Field(alias='__typename', default='ActionDependency', exclude=True)
+    key: str
+    'The local slot key of this action requirement.'
+    description: str | None = Field(default=None)
+    'A description of the dependency.'
+    optional: bool
+    'Whether the dependency is optional.'
+    demand: BlokDependencyActionDependenciesDemand | None = Field(default=None)
+    'The matching criteria the resolved action must satisfy.'
+    model_config = ConfigDict(frozen=True)
+
+class BlokDependencyStateDependenciesDemand(BaseModel):
+    """Pure matching criteria for a state (app/key preferred; matches loosen)."""
+    typename: Literal['StateDemand'] = Field(alias='__typename', default='StateDemand', exclude=True)
+    hash: ActionHash | None = Field(default=None)
+    'The exact hash of the state definition.'
+    key: str | None = Field(default=None)
+    "The state's identity key on the agent."
+    app: str | None = Field(default=None)
+    'The identifier of the app providing the state.'
+    matches: tuple[BlokPortMatch, ...] | None = Field(default=None)
+    "The matches the state definition's ports must satisfy."
+    protocols: tuple[str, ...] | None = Field(default=None)
+    'Protocols (by name) the state must implement.'
+    model_config = ConfigDict(frozen=True)
+
+class BlokDependencyStateDependencies(BaseModel):
+    """A named state requirement of a dependency: a local slot key mapped to the demand the agent's state must satisfy."""
+    typename: Literal['StateDependency'] = Field(alias='__typename', default='StateDependency', exclude=True)
+    key: str
+    'The local slot key of this state requirement.'
+    description: str | None = Field(default=None)
+    'A description of the dependency.'
+    optional: bool
+    'Whether the dependency is optional.'
+    demand: BlokDependencyStateDependenciesDemand | None = Field(default=None)
+    "The matching criteria the agent's state must satisfy."
+    model_config = ConfigDict(frozen=True)
+
+class BlokDependency(BaseModel):
+    """An agent dependency declared by a blok."""
+    typename: Literal['BlokDependency'] = Field(alias='__typename', default='BlokDependency', exclude=True)
+    key: str
+    'Optional string identifier or tag for reference.'
+    description: str | None = Field(default=None)
+    'Optional description of the dependency.'
+    optional: bool
+    'Indicates if the dependency is optional.'
+    action_dependencies: tuple[BlokDependencyActionDependencies, ...] = Field(alias='actionDependencies')
+    'The named action requirements of this dependency.'
+    state_dependencies: tuple[BlokDependencyStateDependencies, ...] = Field(alias='stateDependencies')
+    'The named state requirements of this dependency.'
+    model_config = ConfigDict(frozen=True)
+
+    class Meta:
+        """Meta class for BlokDependency"""
+        document = 'fragment BlokPortMatch on PortMatch {\n  at\n  key\n  kind\n  identifier\n  nullable\n  dimension\n  children {\n    at\n    key\n    kind\n    identifier\n    nullable\n    dimension\n    children {\n      at\n      key\n      kind\n      identifier\n      nullable\n      dimension\n      children {\n        at\n        key\n        kind\n        identifier\n        nullable\n        dimension\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment BlokDependency on BlokDependency {\n  key\n  description\n  optional\n  actionDependencies {\n    key\n    description\n    optional\n    demand {\n      hash\n      key\n      app\n      version\n      name\n      argMatches {\n        ...BlokPortMatch\n        __typename\n      }\n      returnMatches {\n        ...BlokPortMatch\n        __typename\n      }\n      protocols\n      forceArgLength\n      forceReturnLength\n      pure\n      idempotent\n      stateful\n      __typename\n    }\n    __typename\n  }\n  stateDependencies {\n    key\n    description\n    optional\n    demand {\n      hash\n      key\n      app\n      matches {\n        ...BlokPortMatch\n        __typename\n      }\n      protocols\n      __typename\n    }\n    __typename\n  }\n  __typename\n}'
+        name = 'BlokDependency'
+        type = 'BlokDependency'
+
 class CatalogOperation(BaseModel):
     """A pure operation a UI catalog can evaluate for UtilCalls."""
     typename: Literal['CatalogOperation'] = Field(alias='__typename', default='CatalogOperation', exclude=True)
@@ -733,6 +894,38 @@ class TaskChangeEvent(BaseModel):
         name = 'TaskChangeEvent'
         type = 'TaskChangeEvent'
 
+class DetailBlokCatalog(BaseModel):
+    """A UI catalog: the components a UI app can render and the pure operations it can evaluate for UtilCalls, registered per organization."""
+    typename: Literal['UICatalog'] = Field(alias='__typename', default='UICatalog', exclude=True)
+    id: ID
+    name: str
+    model_config = ConfigDict(frozen=True)
+
+class DetailBlok(BaseModel):
+    """No documentation"""
+    typename: Literal['Blok'] = Field(alias='__typename', default='Blok', exclude=True)
+    id: ID
+    name: str
+    description: str | None = Field(default=None)
+    context: ComponentContext
+    "The renderer for this blok's root."
+    catalog: DetailBlokCatalog
+    component_tree: Any = Field(alias='componentTree')
+    'The whole component tree as one JSON value, in the wire spelling (snake_case keys). Unlike `components` it has no depth limit, which a selection set always has.'
+    demo_state: Props = Field(alias='demoState')
+    'Demo state used to render a preview of this blok without agents.'
+    diagnostics: tuple[BlokDiagnostic, ...]
+    "Non-fatal registration findings, e.g. manifest util calls naming operations that neither the base catalog nor this blok's catalog provides."
+    dependencies: tuple[BlokDependency, ...]
+    'Dependencies that need to be resolved for this blok.'
+    model_config = ConfigDict(frozen=True)
+
+    class Meta:
+        """Meta class for DetailBlok"""
+        document = 'fragment BlokPortMatch on PortMatch {\n  at\n  key\n  kind\n  identifier\n  nullable\n  dimension\n  children {\n    at\n    key\n    kind\n    identifier\n    nullable\n    dimension\n    children {\n      at\n      key\n      kind\n      identifier\n      nullable\n      dimension\n      children {\n        at\n        key\n        kind\n        identifier\n        nullable\n        dimension\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment BlokDependency on BlokDependency {\n  key\n  description\n  optional\n  actionDependencies {\n    key\n    description\n    optional\n    demand {\n      hash\n      key\n      app\n      version\n      name\n      argMatches {\n        ...BlokPortMatch\n        __typename\n      }\n      returnMatches {\n        ...BlokPortMatch\n        __typename\n      }\n      protocols\n      forceArgLength\n      forceReturnLength\n      pure\n      idempotent\n      stateful\n      __typename\n    }\n    __typename\n  }\n  stateDependencies {\n    key\n    description\n    optional\n    demand {\n      hash\n      key\n      app\n      matches {\n        ...BlokPortMatch\n        __typename\n      }\n      protocols\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment BlokDiagnostic on Diagnostic {\n  level\n  code\n  message\n  path\n  __typename\n}\n\nfragment DetailBlok on Blok {\n  id\n  name\n  description\n  context\n  catalog {\n    id\n    name\n    __typename\n  }\n  componentTree\n  demoState\n  diagnostics {\n    ...BlokDiagnostic\n    __typename\n  }\n  dependencies {\n    ...BlokDependency\n    __typename\n  }\n  __typename\n}'
+        name = 'DetailBlok'
+        type = 'Blok'
+
 class UICatalog(BaseModel):
     """A UI catalog: the components a UI app can render and the pure operations it can evaluate for UtilCalls, registered per organization."""
     typename: Literal['UICatalog'] = Field(alias='__typename', default='UICatalog', exclude=True)
@@ -776,6 +969,41 @@ class ActionArgument(BaseModel):
         document = 'fragment ActionArgumentLeaf on ActionArgument {\n  key\n  valueLiteral\n  valuePath\n  utilCall {\n    operation\n    __typename\n  }\n  __typename\n}\n\nfragment ActionArgumentNested on ActionArgument {\n  key\n  valueLiteral\n  valuePath\n  utilCall {\n    operation\n    arguments {\n      ...ActionArgumentLeaf\n      __typename\n    }\n    __typename\n  }\n  valueList {\n    ...ActionArgumentLeaf\n    __typename\n  }\n  valueDict {\n    ...ActionArgumentLeaf\n    __typename\n  }\n  __typename\n}\n\nfragment ActionArgument on ActionArgument {\n  key\n  valueLiteral\n  valuePath\n  utilCall {\n    operation\n    arguments {\n      ...ActionArgumentNested\n      __typename\n    }\n    __typename\n  }\n  valueList {\n    ...ActionArgumentNested\n    __typename\n  }\n  valueDict {\n    ...ActionArgumentNested\n    __typename\n  }\n  __typename\n}'
         name = 'ActionArgument'
         type = 'ActionArgument'
+
+class DetailMaterializedBlokAgentMappingsAgent(BaseModel):
+    """Represents a compute agent that can execute implementations."""
+    typename: Literal['Agent'] = Field(alias='__typename', default='Agent', exclude=True)
+    id: ID
+    'Unique ID of the agent.'
+    declared_name: str = Field(alias='declaredName')
+    'The name the agent declares for itself, whatever a user calls it.'
+    connected: bool
+    'Is the agent currently connected.'
+    model_config = ConfigDict(frozen=True)
+
+class DetailMaterializedBlokAgentMappings(BaseModel):
+    """No documentation"""
+    typename: Literal['BlokAgentMapping'] = Field(alias='__typename', default='BlokAgentMapping', exclude=True)
+    key: str
+    agent: DetailMaterializedBlokAgentMappingsAgent
+    model_config = ConfigDict(frozen=True)
+
+class DetailMaterializedBlok(BaseModel):
+    """A materialized instance of a Blok that can be placed on dashboards and linked to agent states."""
+    typename: Literal['MaterializedBlok'] = Field(alias='__typename', default='MaterializedBlok', exclude=True)
+    id: ID
+    name: str | None = Field(default=None)
+    description: str | None = Field(default=None)
+    blok: DetailBlok
+    agent_mappings: tuple[DetailMaterializedBlokAgentMappings, ...] = Field(alias='agentMappings')
+    'Mappings of states to this materialized blok.'
+    model_config = ConfigDict(frozen=True)
+
+    class Meta:
+        """Meta class for DetailMaterializedBlok"""
+        document = 'fragment BlokPortMatch on PortMatch {\n  at\n  key\n  kind\n  identifier\n  nullable\n  dimension\n  children {\n    at\n    key\n    kind\n    identifier\n    nullable\n    dimension\n    children {\n      at\n      key\n      kind\n      identifier\n      nullable\n      dimension\n      children {\n        at\n        key\n        kind\n        identifier\n        nullable\n        dimension\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment BlokDependency on BlokDependency {\n  key\n  description\n  optional\n  actionDependencies {\n    key\n    description\n    optional\n    demand {\n      hash\n      key\n      app\n      version\n      name\n      argMatches {\n        ...BlokPortMatch\n        __typename\n      }\n      returnMatches {\n        ...BlokPortMatch\n        __typename\n      }\n      protocols\n      forceArgLength\n      forceReturnLength\n      pure\n      idempotent\n      stateful\n      __typename\n    }\n    __typename\n  }\n  stateDependencies {\n    key\n    description\n    optional\n    demand {\n      hash\n      key\n      app\n      matches {\n        ...BlokPortMatch\n        __typename\n      }\n      protocols\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment BlokDiagnostic on Diagnostic {\n  level\n  code\n  message\n  path\n  __typename\n}\n\nfragment DetailBlok on Blok {\n  id\n  name\n  description\n  context\n  catalog {\n    id\n    name\n    __typename\n  }\n  componentTree\n  demoState\n  diagnostics {\n    ...BlokDiagnostic\n    __typename\n  }\n  dependencies {\n    ...BlokDependency\n    __typename\n  }\n  __typename\n}\n\nfragment DetailMaterializedBlok on MaterializedBlok {\n  id\n  name\n  description\n  blok {\n    ...DetailBlok\n    __typename\n  }\n  agentMappings {\n    key\n    agent {\n      id\n      declaredName\n      connected\n      __typename\n    }\n    __typename\n  }\n  __typename\n}'
+        name = 'DetailMaterializedBlok'
+        type = 'MaterializedBlok'
 
 class UtilCall(BaseModel):
     """Defines a utility call that can be invoked within the system."""
@@ -1420,6 +1648,19 @@ class MaterializeBlokMutation(BaseModel):
         """Meta class for MaterializeBlok """
         document = 'fragment MaterializedBlok on MaterializedBlok {\n  id\n  __typename\n}\n\nmutation MaterializeBlok($input: MaterializeBlokInput!) {\n  materializeBlok(input: $input) {\n    ...MaterializedBlok\n    __typename\n  }\n}'
 
+class UpdateBlokMutation(BaseModel):
+    """No documentation found for this operation."""
+    update_blok: DetailBlok = Field(alias='updateBlok')
+    'Update properties of a blok such as its name, description, components, demo state, catalog, or dependencies.'
+
+    class Arguments(BaseModel):
+        """Arguments for UpdateBlok """
+        input: UpdateBlokInput
+
+    class Meta:
+        """Meta class for UpdateBlok """
+        document = 'fragment BlokPortMatch on PortMatch {\n  at\n  key\n  kind\n  identifier\n  nullable\n  dimension\n  children {\n    at\n    key\n    kind\n    identifier\n    nullable\n    dimension\n    children {\n      at\n      key\n      kind\n      identifier\n      nullable\n      dimension\n      children {\n        at\n        key\n        kind\n        identifier\n        nullable\n        dimension\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment BlokDependency on BlokDependency {\n  key\n  description\n  optional\n  actionDependencies {\n    key\n    description\n    optional\n    demand {\n      hash\n      key\n      app\n      version\n      name\n      argMatches {\n        ...BlokPortMatch\n        __typename\n      }\n      returnMatches {\n        ...BlokPortMatch\n        __typename\n      }\n      protocols\n      forceArgLength\n      forceReturnLength\n      pure\n      idempotent\n      stateful\n      __typename\n    }\n    __typename\n  }\n  stateDependencies {\n    key\n    description\n    optional\n    demand {\n      hash\n      key\n      app\n      matches {\n        ...BlokPortMatch\n        __typename\n      }\n      protocols\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment BlokDiagnostic on Diagnostic {\n  level\n  code\n  message\n  path\n  __typename\n}\n\nfragment DetailBlok on Blok {\n  id\n  name\n  description\n  context\n  catalog {\n    id\n    name\n    __typename\n  }\n  componentTree\n  demoState\n  diagnostics {\n    ...BlokDiagnostic\n    __typename\n  }\n  dependencies {\n    ...BlokDependency\n    __typename\n  }\n  __typename\n}\n\nmutation UpdateBlok($input: UpdateBlokInput!) {\n  updateBlok(input: $input) {\n    ...DetailBlok\n    __typename\n  }\n}'
+
 class RegisterUiCatalogMutation(BaseModel):
     """No documentation found for this operation."""
     register_ui_catalog: UICatalog = Field(alias='registerUiCatalog')
@@ -1749,6 +1990,42 @@ class StoredAssetQuery(BaseModel):
     class Meta:
         """Meta class for StoredAsset """
         document = 'query StoredAsset($ref: String!) {\n  asset(ref: $ref) {\n    id\n    ref\n    kind\n    __typename\n  }\n}'
+
+class GetMaterializedBlokQuery(BaseModel):
+    """No documentation found for this operation."""
+    materialized_blok: DetailMaterializedBlok = Field(alias='materializedBlok')
+    'Get a materialized blok by ID.'
+
+    class Arguments(BaseModel):
+        """Arguments for GetMaterializedBlok """
+        id: ID
+
+    class Meta:
+        """Meta class for GetMaterializedBlok """
+        document = 'fragment BlokPortMatch on PortMatch {\n  at\n  key\n  kind\n  identifier\n  nullable\n  dimension\n  children {\n    at\n    key\n    kind\n    identifier\n    nullable\n    dimension\n    children {\n      at\n      key\n      kind\n      identifier\n      nullable\n      dimension\n      children {\n        at\n        key\n        kind\n        identifier\n        nullable\n        dimension\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment BlokDependency on BlokDependency {\n  key\n  description\n  optional\n  actionDependencies {\n    key\n    description\n    optional\n    demand {\n      hash\n      key\n      app\n      version\n      name\n      argMatches {\n        ...BlokPortMatch\n        __typename\n      }\n      returnMatches {\n        ...BlokPortMatch\n        __typename\n      }\n      protocols\n      forceArgLength\n      forceReturnLength\n      pure\n      idempotent\n      stateful\n      __typename\n    }\n    __typename\n  }\n  stateDependencies {\n    key\n    description\n    optional\n    demand {\n      hash\n      key\n      app\n      matches {\n        ...BlokPortMatch\n        __typename\n      }\n      protocols\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment BlokDiagnostic on Diagnostic {\n  level\n  code\n  message\n  path\n  __typename\n}\n\nfragment DetailBlok on Blok {\n  id\n  name\n  description\n  context\n  catalog {\n    id\n    name\n    __typename\n  }\n  componentTree\n  demoState\n  diagnostics {\n    ...BlokDiagnostic\n    __typename\n  }\n  dependencies {\n    ...BlokDependency\n    __typename\n  }\n  __typename\n}\n\nfragment DetailMaterializedBlok on MaterializedBlok {\n  id\n  name\n  description\n  blok {\n    ...DetailBlok\n    __typename\n  }\n  agentMappings {\n    key\n    agent {\n      id\n      declaredName\n      connected\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nquery GetMaterializedBlok($id: ID!) {\n  materializedBlok(id: $id) {\n    ...DetailMaterializedBlok\n    __typename\n  }\n}'
+
+class SearchMaterializedBloksQueryOptions(BaseModel):
+    """A materialized instance of a Blok that can be placed on dashboards and linked to agent states."""
+    typename: Literal['MaterializedBlok'] = Field(alias='__typename', default='MaterializedBlok', exclude=True)
+    label: str | None = Field(default=None)
+    value: ID
+    model_config = ConfigDict(frozen=True)
+
+class SearchMaterializedBloksQuery(BaseModel):
+    """No documentation found for this operation."""
+    options: tuple[SearchMaterializedBloksQueryOptions, ...]
+    'List of UI Blok.'
+
+    class Arguments(BaseModel):
+        """Arguments for SearchMaterializedBloks """
+        search: str | None = Field(default=None)
+        values: list[ID] | None = Field(default=None)
+        limit: int | None = Field(default=None)
+        offset: int | None = Field(default=None)
+
+    class Meta:
+        """Meta class for SearchMaterializedBloks """
+        document = 'query SearchMaterializedBloks($search: String, $values: [ID!], $limit: Int, $offset: Int) {\n  options: materializedBloks(\n    filters: {search: $search, ids: $values}\n    pagination: {limit: $limit, offset: $offset}\n  ) {\n    label: name\n    value: id\n    __typename\n  }\n}'
 
 class UiCatalogsQuery(BaseModel):
     """No documentation found for this operation."""
@@ -2599,6 +2876,76 @@ Returns:
             _input['description'] = description
         variables['input'] = _input
         return self.execute(MaterializeBlokMutation, variables).materialize_blok
+
+    async def aupdate_blok(self, id: IDCoercible, name: str | None | UnsetType=UNSET, description: str | None | UnsetType=UNSET, components: Iterable[ComponentNodeInput] | None | UnsetType=UNSET, demo_state: Args | None | UnsetType=UNSET, catalog: str | None | UnsetType=UNSET, dependencies: Iterable[AgentDependencyInput] | None | UnsetType=UNSET) -> DetailBlok:
+        """UpdateBlok 
+
+Update properties of a blok such as its name, description, components, demo state, catalog, or dependencies.
+
+Args:
+    id: The ID of the blok to update.
+    name: The name of the blok, used for identification in the system.
+    description: The description of the blok and its purpose.
+    components: The full component tree of the blok. Replaces the existing tree when provided.
+    demo_state: The demo state used to preview this blok. Replaces the existing demo state when provided.
+    catalog: Name of the UI catalog (in the caller's organization) this blok renders against. Created if missing.
+    dependencies: The full list of agent dependencies. When provided it replaces the existing set: keys not listed are deleted and their agent mappings on materialized bloks lose their dependency reference.
+
+Returns:
+    DetailBlok
+"""
+        variables: dict[str, builtins.object] = {}
+        _input: dict[str, builtins.object] = {}
+        _input['id'] = id
+        if name is not UNSET:
+            _input['name'] = name
+        if description is not UNSET:
+            _input['description'] = description
+        if components is not UNSET:
+            _input['components'] = components
+        if demo_state is not UNSET:
+            _input['demoState'] = demo_state
+        if catalog is not UNSET:
+            _input['catalog'] = catalog
+        if dependencies is not UNSET:
+            _input['dependencies'] = dependencies
+        variables['input'] = _input
+        return (await self.aexecute(UpdateBlokMutation, variables)).update_blok
+
+    def update_blok(self, id: IDCoercible, name: str | None | UnsetType=UNSET, description: str | None | UnsetType=UNSET, components: Iterable[ComponentNodeInput] | None | UnsetType=UNSET, demo_state: Args | None | UnsetType=UNSET, catalog: str | None | UnsetType=UNSET, dependencies: Iterable[AgentDependencyInput] | None | UnsetType=UNSET) -> DetailBlok:
+        """UpdateBlok 
+
+Update properties of a blok such as its name, description, components, demo state, catalog, or dependencies.
+
+Args:
+    id: The ID of the blok to update.
+    name: The name of the blok, used for identification in the system.
+    description: The description of the blok and its purpose.
+    components: The full component tree of the blok. Replaces the existing tree when provided.
+    demo_state: The demo state used to preview this blok. Replaces the existing demo state when provided.
+    catalog: Name of the UI catalog (in the caller's organization) this blok renders against. Created if missing.
+    dependencies: The full list of agent dependencies. When provided it replaces the existing set: keys not listed are deleted and their agent mappings on materialized bloks lose their dependency reference.
+
+Returns:
+    DetailBlok
+"""
+        variables: dict[str, builtins.object] = {}
+        _input: dict[str, builtins.object] = {}
+        _input['id'] = id
+        if name is not UNSET:
+            _input['name'] = name
+        if description is not UNSET:
+            _input['description'] = description
+        if components is not UNSET:
+            _input['components'] = components
+        if demo_state is not UNSET:
+            _input['demoState'] = demo_state
+        if catalog is not UNSET:
+            _input['catalog'] = catalog
+        if dependencies is not UNSET:
+            _input['dependencies'] = dependencies
+        variables['input'] = _input
+        return self.execute(UpdateBlokMutation, variables).update_blok
 
     async def aregister_ui_catalog(self, name: str, components: Iterable[CatalogComponentInput], operations: Iterable[CatalogOperationInput], widget_defaults: Iterable[WidgetDefaultInput], description: str | None | UnsetType=UNSET) -> UICatalog:
         """RegisterUiCatalog 
@@ -3633,6 +3980,86 @@ Returns:
         variables: dict[str, builtins.object] = {}
         variables['ref'] = ref
         return self.execute(StoredAssetQuery, variables).asset
+
+    async def aget_materialized_blok(self, id: IDCoercible) -> DetailMaterializedBlok:
+        """GetMaterializedBlok 
+
+Get a materialized blok by ID.
+
+Args:
+    id (ID): No description
+
+Returns:
+    DetailMaterializedBlok
+"""
+        variables: dict[str, builtins.object] = {}
+        variables['id'] = id
+        return (await self.aexecute(GetMaterializedBlokQuery, variables)).materialized_blok
+
+    def get_materialized_blok(self, id: IDCoercible) -> DetailMaterializedBlok:
+        """GetMaterializedBlok 
+
+Get a materialized blok by ID.
+
+Args:
+    id (ID): No description
+
+Returns:
+    DetailMaterializedBlok
+"""
+        variables: dict[str, builtins.object] = {}
+        variables['id'] = id
+        return self.execute(GetMaterializedBlokQuery, variables).materialized_blok
+
+    async def asearch_materialized_bloks(self, search: str | None | UnsetType=UNSET, values: list[IDCoercible] | None | UnsetType=UNSET, limit: int | None | UnsetType=UNSET, offset: int | None | UnsetType=UNSET) -> tuple[SearchMaterializedBloksQueryOptions, ...]:
+        """SearchMaterializedBloks 
+
+List of UI Blok.
+
+Args:
+    search (str | None, optional): No description. 
+    values (list[ID] | None, optional): No description. 
+    limit (int | None, optional): No description. 
+    offset (int | None, optional): No description. 
+
+Returns:
+    list[SearchMaterializedBloksQueryMaterializedBloks]
+"""
+        variables: dict[str, builtins.object] = {}
+        if search is not UNSET:
+            variables['search'] = search
+        if values is not UNSET:
+            variables['values'] = values
+        if limit is not UNSET:
+            variables['limit'] = limit
+        if offset is not UNSET:
+            variables['offset'] = offset
+        return (await self.aexecute(SearchMaterializedBloksQuery, variables)).options
+
+    def search_materialized_bloks(self, search: str | None | UnsetType=UNSET, values: list[IDCoercible] | None | UnsetType=UNSET, limit: int | None | UnsetType=UNSET, offset: int | None | UnsetType=UNSET) -> tuple[SearchMaterializedBloksQueryOptions, ...]:
+        """SearchMaterializedBloks 
+
+List of UI Blok.
+
+Args:
+    search (str | None, optional): No description. 
+    values (list[ID] | None, optional): No description. 
+    limit (int | None, optional): No description. 
+    offset (int | None, optional): No description. 
+
+Returns:
+    list[SearchMaterializedBloksQueryMaterializedBloks]
+"""
+        variables: dict[str, builtins.object] = {}
+        if search is not UNSET:
+            variables['search'] = search
+        if values is not UNSET:
+            variables['values'] = values
+        if limit is not UNSET:
+            variables['limit'] = limit
+        if offset is not UNSET:
+            variables['offset'] = offset
+        return self.execute(SearchMaterializedBloksQuery, variables).options
 
     async def aui_catalogs(self) -> tuple[UICatalog, ...]:
         """UiCatalogs 

@@ -26,6 +26,8 @@ ValueMap = dict[str, Any]
 SearchQueryCoercible = str | DocumentNode
 MediaLikeCoercible = str | IO[bytes]
 Args = dict[str, Any]
+#: A blok's demo state: the values its paths read before agents provide them.
+Props = dict[str, Any]
 JSONSerializable = str | int | float | bool | None | dict | list
 
 

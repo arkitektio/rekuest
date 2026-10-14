@@ -126,6 +126,7 @@ projects:
           UISchema: rekuest.scalars.UISchema
           AnyDefault: typing.Any
           Args: rekuest.scalars.Args
+          Props: rekuest.scalars.Props
           ValueMap: rekuest.scalars.ValueMap
           MediaLike: rekuest.scalars.MediaLike
           ID: rath.scalars.ID
@@ -203,6 +204,7 @@ projects:
           UISchema: rekuest.scalars.UISchema
           AnyDefault: typing.Any
           Args: rekuest.scalars.Args
+          Props: rekuest.scalars.Props
           ValueMap: rekuest.scalars.ValueMap
           MediaLike: rekuest.scalars.MediaLike
           ID: rath.scalars.ID
