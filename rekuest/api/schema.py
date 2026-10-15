@@ -2737,7 +2737,7 @@ Returns:
         variables['input'] = _input
         return self.execute(CreateAssetMutation, variables).create_asset
 
-    async def acreate_blok(self, name: str, dependencies: Iterable[AgentDependencyInput] | None | UnsetType=UNSET, description: str | None | UnsetType=UNSET, catalog: str | None | UnsetType=UNSET, components: Iterable[ComponentNodeInput] | None | UnsetType=UNSET, demo_state: Args | None | UnsetType=UNSET, context: ComponentContext | None | UnsetType=UNSET, for_model: str | None | UnsetType=UNSET, for_node: str | None | UnsetType=UNSET) -> Blok:
+    async def acreate_blok(self, name: str, dependencies: Iterable[AgentDependencyInput] | None | UnsetType=UNSET, description: str | None | UnsetType=UNSET, catalog: str | None | UnsetType=UNSET, components: Iterable[ComponentNodeInput] | None | UnsetType=UNSET, source: str | None | UnsetType=UNSET, demo_state: Args | None | UnsetType=UNSET, context: ComponentContext | None | UnsetType=UNSET, for_model: str | None | UnsetType=UNSET, for_node: str | None | UnsetType=UNSET) -> Blok:
         """CreateBlok 
 
 Create a user interface panel.
@@ -2748,6 +2748,7 @@ Args:
     description: The description of the blok. This can described the blok and its purpose.
     catalog: The universal id
     components: The schema of the blok. This can be used to validate the blok input and output.
+    source: The blok as BSX, which the server parses into `components`: send one of the two.
     demo_state: The initial state of the blok. This is used to set the initial state of the blok when it is materialized.
     context: The renderer for the blok's root: HTML, or SCENE for a full 3D view.
     for_model: The model ('sha256:...') this blok decorates. HTML bloks only.
@@ -2767,6 +2768,8 @@ Returns:
             _input['catalog'] = catalog
         if components is not UNSET:
             _input['components'] = components
+        if source is not UNSET:
+            _input['source'] = source
         if demo_state is not UNSET:
             _input['demoState'] = demo_state
         if context is not UNSET:
@@ -2778,7 +2781,7 @@ Returns:
         variables['input'] = _input
         return (await self.aexecute(CreateBlokMutation, variables)).create_blok
 
-    def create_blok(self, name: str, dependencies: Iterable[AgentDependencyInput] | None | UnsetType=UNSET, description: str | None | UnsetType=UNSET, catalog: str | None | UnsetType=UNSET, components: Iterable[ComponentNodeInput] | None | UnsetType=UNSET, demo_state: Args | None | UnsetType=UNSET, context: ComponentContext | None | UnsetType=UNSET, for_model: str | None | UnsetType=UNSET, for_node: str | None | UnsetType=UNSET) -> Blok:
+    def create_blok(self, name: str, dependencies: Iterable[AgentDependencyInput] | None | UnsetType=UNSET, description: str | None | UnsetType=UNSET, catalog: str | None | UnsetType=UNSET, components: Iterable[ComponentNodeInput] | None | UnsetType=UNSET, source: str | None | UnsetType=UNSET, demo_state: Args | None | UnsetType=UNSET, context: ComponentContext | None | UnsetType=UNSET, for_model: str | None | UnsetType=UNSET, for_node: str | None | UnsetType=UNSET) -> Blok:
         """CreateBlok 
 
 Create a user interface panel.
@@ -2789,6 +2792,7 @@ Args:
     description: The description of the blok. This can described the blok and its purpose.
     catalog: The universal id
     components: The schema of the blok. This can be used to validate the blok input and output.
+    source: The blok as BSX, which the server parses into `components`: send one of the two.
     demo_state: The initial state of the blok. This is used to set the initial state of the blok when it is materialized.
     context: The renderer for the blok's root: HTML, or SCENE for a full 3D view.
     for_model: The model ('sha256:...') this blok decorates. HTML bloks only.
@@ -2808,6 +2812,8 @@ Returns:
             _input['catalog'] = catalog
         if components is not UNSET:
             _input['components'] = components
+        if source is not UNSET:
+            _input['source'] = source
         if demo_state is not UNSET:
             _input['demoState'] = demo_state
         if context is not UNSET:
@@ -2877,7 +2883,7 @@ Returns:
         variables['input'] = _input
         return self.execute(MaterializeBlokMutation, variables).materialize_blok
 
-    async def aupdate_blok(self, id: IDCoercible, name: str | None | UnsetType=UNSET, description: str | None | UnsetType=UNSET, components: Iterable[ComponentNodeInput] | None | UnsetType=UNSET, demo_state: Args | None | UnsetType=UNSET, catalog: str | None | UnsetType=UNSET, dependencies: Iterable[AgentDependencyInput] | None | UnsetType=UNSET) -> DetailBlok:
+    async def aupdate_blok(self, id: IDCoercible, name: str | None | UnsetType=UNSET, description: str | None | UnsetType=UNSET, components: Iterable[ComponentNodeInput] | None | UnsetType=UNSET, source: str | None | UnsetType=UNSET, demo_state: Args | None | UnsetType=UNSET, catalog: str | None | UnsetType=UNSET, dependencies: Iterable[AgentDependencyInput] | None | UnsetType=UNSET) -> DetailBlok:
         """UpdateBlok 
 
 Update properties of a blok such as its name, description, components, demo state, catalog, or dependencies.
@@ -2887,6 +2893,7 @@ Args:
     name: The name of the blok, used for identification in the system.
     description: The description of the blok and its purpose.
     components: The full component tree of the blok. Replaces the existing tree when provided.
+    source: The blok as BSX, which the server parses into the tree it replaces the existing one with: send it or `components`, not both.
     demo_state: The demo state used to preview this blok. Replaces the existing demo state when provided.
     catalog: Name of the UI catalog (in the caller's organization) this blok renders against. Created if missing.
     dependencies: The full list of agent dependencies. When provided it replaces the existing set: keys not listed are deleted and their agent mappings on materialized bloks lose their dependency reference.
@@ -2903,6 +2910,8 @@ Returns:
             _input['description'] = description
         if components is not UNSET:
             _input['components'] = components
+        if source is not UNSET:
+            _input['source'] = source
         if demo_state is not UNSET:
             _input['demoState'] = demo_state
         if catalog is not UNSET:
@@ -2912,7 +2921,7 @@ Returns:
         variables['input'] = _input
         return (await self.aexecute(UpdateBlokMutation, variables)).update_blok
 
-    def update_blok(self, id: IDCoercible, name: str | None | UnsetType=UNSET, description: str | None | UnsetType=UNSET, components: Iterable[ComponentNodeInput] | None | UnsetType=UNSET, demo_state: Args | None | UnsetType=UNSET, catalog: str | None | UnsetType=UNSET, dependencies: Iterable[AgentDependencyInput] | None | UnsetType=UNSET) -> DetailBlok:
+    def update_blok(self, id: IDCoercible, name: str | None | UnsetType=UNSET, description: str | None | UnsetType=UNSET, components: Iterable[ComponentNodeInput] | None | UnsetType=UNSET, source: str | None | UnsetType=UNSET, demo_state: Args | None | UnsetType=UNSET, catalog: str | None | UnsetType=UNSET, dependencies: Iterable[AgentDependencyInput] | None | UnsetType=UNSET) -> DetailBlok:
         """UpdateBlok 
 
 Update properties of a blok such as its name, description, components, demo state, catalog, or dependencies.
@@ -2922,6 +2931,7 @@ Args:
     name: The name of the blok, used for identification in the system.
     description: The description of the blok and its purpose.
     components: The full component tree of the blok. Replaces the existing tree when provided.
+    source: The blok as BSX, which the server parses into the tree it replaces the existing one with: send it or `components`, not both.
     demo_state: The demo state used to preview this blok. Replaces the existing demo state when provided.
     catalog: Name of the UI catalog (in the caller's organization) this blok renders against. Created if missing.
     dependencies: The full list of agent dependencies. When provided it replaces the existing set: keys not listed are deleted and their agent mappings on materialized bloks lose their dependency reference.
@@ -2938,6 +2948,8 @@ Returns:
             _input['description'] = description
         if components is not UNSET:
             _input['components'] = components
+        if source is not UNSET:
+            _input['source'] = source
         if demo_state is not UNSET:
             _input['demoState'] = demo_state
         if catalog is not UNSET:

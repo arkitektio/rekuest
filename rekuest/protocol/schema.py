@@ -242,6 +242,7 @@ class CreateBlokInput(CreateBlokInputTrait, BaseModel):
     description: str | None = Field(default=None, description='The description of the blok. This can described the blok and its purpose.')
     catalog: str | None = Field(default=None, description='The universal id')
     components: tuple[ComponentNodeInput, ...] | None = Field(default=None, description='The schema of the blok. This can be used to validate the blok input and output.')
+    source: str | None = Field(default=None, description='The blok as BSX, which the server parses into `components`: send one of the two.')
     demo_state: Args | None = Field(validation_alias=AliasChoices('demo_state', 'demoState'), serialization_alias='demoState', default=None, description='The initial state of the blok. This is used to set the initial state of the blok when it is materialized.')
     context: Annotated[ComponentContext | None, GraphQLDefault('HTML')] = Field(default=None, description="The renderer for the blok's root: HTML, or SCENE for a full 3D view.")
     "The renderer for the blok's root: HTML, or SCENE for a full 3D view.\nDefault: HTML"
@@ -520,6 +521,7 @@ class UpdateBlokInput(BaseModel):
     name: str | None = Field(default=None, description='The name of the blok, used for identification in the system.')
     description: str | None = Field(default=None, description='The description of the blok and its purpose.')
     components: tuple[ComponentNodeInput, ...] | None = Field(default=None, description='The full component tree of the blok. Replaces the existing tree when provided.')
+    source: str | None = Field(default=None, description='The blok as BSX, which the server parses into the tree it replaces the existing one with: send it or `components`, not both.')
     demo_state: Args | None = Field(validation_alias=AliasChoices('demo_state', 'demoState'), serialization_alias='demoState', default=None, description='The demo state used to preview this blok. Replaces the existing demo state when provided.')
     catalog: str | None = Field(default=None, description="Name of the UI catalog (in the caller's organization) this blok renders against. Created if missing.")
     dependencies: tuple[AgentDependencyInput, ...] | None = Field(default=None, description='The full list of agent dependencies. When provided it replaces the existing set: keys not listed are deleted and their agent mappings on materialized bloks lose their dependency reference.')
