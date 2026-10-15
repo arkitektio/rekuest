@@ -53,6 +53,7 @@ class ComponentContext(str, Enum):
     HTML = 'HTML'
     SCENE = 'SCENE'
     LOGO = 'LOGO'
+    ACTION_LOGO = 'ACTION_LOGO'
     __str__ = str.__str__
 
 class DemandKind(str, Enum):
