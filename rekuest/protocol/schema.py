@@ -52,6 +52,7 @@ class ComponentContext(str, Enum):
     """The renderer a catalog component lives in. A component may only be placed where its context is in force."""
     HTML = 'HTML'
     SCENE = 'SCENE'
+    LOGO = 'LOGO'
     __str__ = str.__str__
 
 class DemandKind(str, Enum):
@@ -116,6 +117,7 @@ class ActionFilter(BaseModel):
     in_collection: str | None = Field(validation_alias=AliasChoices('in_collection', 'inCollection'), serialization_alias='inCollection', default=None)
     used_before: datetime | None = Field(validation_alias=AliasChoices('used_before', 'usedBefore'), serialization_alias='usedBefore', default=None)
     used_after: datetime | None = Field(validation_alias=AliasChoices('used_after', 'usedAfter'), serialization_alias='usedAfter', default=None)
+    assignable: bool | None = Field(default=None, description='Whether an agent that can take the action is connected now (`Action.assignable`).')
     stateful: bool | None = None
     app_identifier: str | None = Field(validation_alias=AliasChoices('app_identifier', 'appIdentifier'), serialization_alias='appIdentifier', default=None, description='Filter using app identifier')
     model_config = ConfigDict(frozen=True, extra='forbid', populate_by_name=True, use_enum_values=True)
@@ -129,7 +131,12 @@ class ActionOrderUsedAt(BaseModel):
     """'usedAt' variant of the @oneOf input 'ActionOrder'"""
     used_at: Ordering = Field(validation_alias=AliasChoices('used_at', 'usedAt'), serialization_alias='usedAt')
     model_config = ConfigDict(frozen=True, extra='forbid', populate_by_name=True, use_enum_values=True)
-ActionOrder = ActionOrderDefinedAt | ActionOrderUsedAt
+
+class ActionOrderAssignable(BaseModel):
+    """Runnable first (DESC) or last (ASC) by `Action.assignable`. The order the filters set (a `search`'s ranking) is kept as the tie-break, so `search` with this ordering lists runnable matches first, each group still ranked by relevance."""
+    assignable: Ordering = Field(description="Runnable first (DESC) or last (ASC) by `Action.assignable`. The order the filters set (a `search`'s ranking) is kept as the tie-break, so `search` with this ordering lists runnable matches first, each group still ranked by relevance.")
+    model_config = ConfigDict(frozen=True, extra='forbid', populate_by_name=True, use_enum_values=True)
+ActionOrder = ActionOrderDefinedAt | ActionOrderUsedAt | ActionOrderAssignable
 
 class AgentFilter(BaseModel):
     """A way to filter agents"""
@@ -138,6 +145,7 @@ class AgentFilter(BaseModel):
     not_: 'AgentFilter | None' = Field(validation_alias=AliasChoices('not_', 'NOT'), serialization_alias='NOT', default=None)
     distinct: bool | None = Field(validation_alias=AliasChoices('distinct', 'DISTINCT'), serialization_alias='DISTINCT', default=None)
     client_id: str | None = Field(validation_alias=AliasChoices('client_id', 'clientId'), serialization_alias='clientId', default=None, description='Filter by client ID of the app the agent is registered to')
+    available: bool | None = Field(default=None, description="Agents that can receive work now: a webhook agent, or a connected one with a fresh heartbeat (takt's rule).")
     ids: tuple[ID, ...] | None = Field(default=None, description='Filter by IDs of the agents')
     has_implementations: tuple[str, ...] | None = Field(validation_alias=AliasChoices('has_implementations', 'hasImplementations'), serialization_alias='hasImplementations', default=None, description='Filter by implementations of the agents')
     has_states: tuple[str, ...] | None = Field(validation_alias=AliasChoices('has_states', 'hasStates'), serialization_alias='hasStates', default=None, description='Filter by states of the agents')
@@ -190,6 +198,8 @@ class CatalogComponentInput(BaseModel):
     context: Annotated[ComponentContext | None, GraphQLDefault('HTML')] = Field(default=None, description='The context this component may be placed in.')
     'The context this component may be placed in.\nDefault: HTML'
     children_context: ComponentContext | None = Field(validation_alias=AliasChoices('children_context', 'childrenContext'), serialization_alias='childrenContext', default=None, description="The context in force for this component's children, when it differs from its own: such a component bridges two renderers.")
+    inherits_context: Annotated[bool | None, GraphQLDefault('False')] = Field(validation_alias=AliasChoices('inherits_context', 'inheritsContext'), serialization_alias='inheritsContext', default=None, description="Whether the component may be placed in any context, taking its parent's for itself and its children (control flow such as foreach or if). Its context is then ignored.")
+    "Whether the component may be placed in any context, taking its parent's for itself and its children (control flow such as foreach or if). Its context is then ignored.\nDefault: False"
     downstream_of: Annotated[tuple[str, ...] | None, GraphQLDefault('[]')] = Field(validation_alias=AliasChoices('downstream_of', 'downstreamOf'), serialization_alias='downstreamOf', default=None, description='Component names of which at least one must be an ancestor, at any depth. Empty means no requirement.')
     'Component names of which at least one must be an ancestor, at any depth. Empty means no requirement.\nDefault: []'
     not_downstream_of: Annotated[tuple[str, ...] | None, GraphQLDefault('[]')] = Field(validation_alias=AliasChoices('not_downstream_of', 'notDownstreamOf'), serialization_alias='notDownstreamOf', default=None, description='Component names of which none may be an ancestor.')
@@ -345,7 +355,7 @@ class ImplementationFilter(BaseModel):
     or_: 'ImplementationFilter | None' = Field(validation_alias=AliasChoices('or_', 'OR'), serialization_alias='OR', default=None)
     not_: 'ImplementationFilter | None' = Field(validation_alias=AliasChoices('not_', 'NOT'), serialization_alias='NOT', default=None)
     distinct: bool | None = Field(validation_alias=AliasChoices('distinct', 'DISTINCT'), serialization_alias='DISTINCT', default=None)
-    active: bool | None = None
+    active: bool | None = Field(default=None, description="Whether an agent can run it now: a webhook agent, or a connected one with a fresh heartbeat (takt's rule).")
     ids: tuple[ID, ...] | None = None
     action_hash: ActionHash | None = Field(validation_alias=AliasChoices('action_hash', 'actionHash'), serialization_alias='actionHash', default=None)
     parameters: tuple['ParamPair', ...] | None = None
@@ -446,6 +456,7 @@ class ShortcutFilter(BaseModel):
     search: str | None = None
     ids: tuple[ID, ...] | None = None
     demands: tuple[PortDemandInput, ...] | None = None
+    assignable: bool | None = Field(default=None, description="Whether an agent that can take the shortcut's action is connected now (`Action.assignable`).")
     toolbox: ID | None = None
     model_config = ConfigDict(frozen=True, extra='forbid', populate_by_name=True, use_enum_values=True)
 
@@ -453,7 +464,12 @@ class ShortcutOrderName(BaseModel):
     """'name' variant of the @oneOf input 'ShortcutOrder'"""
     name: Ordering
     model_config = ConfigDict(frozen=True, extra='forbid', populate_by_name=True, use_enum_values=True)
-ShortcutOrder = ShortcutOrderName
+
+class ShortcutOrderAssignable(BaseModel):
+    """Runnable first (DESC) or last (ASC) by the shortcut's `Action.assignable`; the order the filters set is the tie-break."""
+    assignable: Ordering = Field(description="Runnable first (DESC) or last (ASC) by the shortcut's `Action.assignable`; the order the filters set is the tie-break.")
+    model_config = ConfigDict(frozen=True, extra='forbid', populate_by_name=True, use_enum_values=True)
+ShortcutOrder = ShortcutOrderName | ShortcutOrderAssignable
 
 class StrFilterLookup(BaseModel):
     """No documentation"""

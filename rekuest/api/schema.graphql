@@ -78,6 +78,16 @@ type Action {
   """Timestamp when the action was defined."""
   definedAt: DateTime!
 
+  """
+  How many of its implementations sit on an agent that can take work now (connected, or a webhook agent) — one per agent. Kept by the database as agents connect and leave, a moment behind (takt recomputes it on commit); a crashed agent counts until takt's stale sweep notices (seconds).
+  """
+  liveImplementations: Int!
+
+  """
+  Whether an agent that can take this action is connected (or is a webhook agent) right now: `liveImplementations > 0`.
+  """
+  assignable: Boolean!
+
   """Test cases for this action."""
   testCases(filters: TestCaseFilter, pagination: OffsetPaginationInput): [TestCase!]
 
@@ -330,6 +340,11 @@ input ActionFilter {
   inCollection: String
   usedBefore: DateTime
   usedAfter: DateTime
+
+  """
+  Whether an agent that can take the action is connected now (`Action.assignable`).
+  """
+  assignable: Boolean
   stateful: Boolean
 
   """Filter using app identifier"""
@@ -350,6 +365,11 @@ enum ActionKind {
 input ActionOrder @oneOf {
   definedAt: Ordering
   usedAt: Ordering
+
+  """
+  Runnable first (DESC) or last (ASC) by `Action.assignable`. The order the filters set (a `search`'s ranking) is kept as the tie-break, so `search` with this ordering lists runnable matches first, each group still ranked by relevance.
+  """
+  assignable: Ordering
 }
 
 enum ActionScope {
@@ -479,6 +499,11 @@ type Agent {
 
   """Fetch a specific implementation by interface."""
   implementation(interface: String!): Implementation
+
+  """
+  The blok this agent declared as its default for a context, if any: its panel, its scene or its logo.
+  """
+  defaultBlok(context: ComponentContext!): MaterializedBlok
 
   """
   Determine if the agent is currently active based on last seen timestamp.
@@ -631,6 +656,11 @@ input AgentFilter {
 
   """Filter by client ID of the app the agent is registered to"""
   clientId: String
+
+  """
+  Agents that can receive work now: a webhook agent, or a connected one with a fresh heartbeat (takt's rule).
+  """
+  available: Boolean
 
   """Filter by IDs of the agents"""
   ids: [ID!]
@@ -1186,6 +1216,11 @@ type Blok {
   demoState: Props!
 
   """
+  A SHA-256 of what the blok renders: its component tree, demo state and context. Two bloks with the same hash draw the same thing, so a client may cache what it rendered under it.
+  """
+  hash: String!
+
+  """
   Non-fatal registration findings, e.g. manifest util calls naming operations that neither the base catalog nor this blok's catalog provides.
   """
   diagnostics: [Diagnostic!]!
@@ -1379,6 +1414,7 @@ type CatalogComponent {
   acceptsChildren: Boolean!
   context: ComponentContext!
   childrenContext: ComponentContext
+  inheritsContext: Boolean!
   downstreamOf: [String!]!
   notDownstreamOf: [String!]!
 }
@@ -1406,6 +1442,11 @@ input CatalogComponentInput {
   The context in force for this component's children, when it differs from its own: such a component bridges two renderers.
   """
   childrenContext: ComponentContext = null
+
+  """
+  Whether the component may be placed in any context, taking its parent's for itself and its children (control flow such as foreach or if). Its context is then ignored.
+  """
+  inheritsContext: Boolean! = false
 
   """
   Component names of which at least one must be an ancestor, at any depth. Empty means no requirement.
@@ -1606,6 +1647,7 @@ The renderer a catalog component lives in. A component may only be placed where 
 enum ComponentContext {
   HTML
   SCENE
+  LOGO
 }
 
 """
@@ -2830,6 +2872,10 @@ input ImplementationFilter {
   OR: ImplementationFilter
   NOT: ImplementationFilter
   DISTINCT: Boolean
+
+  """
+  Whether an agent can run it now: a webhook agent, or a connected one with a fresh heartbeat (takt's rule).
+  """
   active: Boolean
   ids: [ID!]
   actionHash: ActionHash
@@ -2925,6 +2971,10 @@ type ImplementationMapping {
 
 input ImplementationOrder @oneOf {
   createdAt: Ordering
+
+  """
+  Implementations an agent can run now first (DESC), or last (ASC): takt's rule, `liveness.agent_available_q`.
+  """
   active: Ordering
 }
 
@@ -3000,6 +3050,28 @@ input KickInput {
   """The reason for kicking the agent."""
   reason: String = null
 }
+
+"""
+The task an implementation last ran as, with what its record is made of. The first message of `latestTask`, and again whenever a newer task takes its place.
+"""
+type LatestTaskSnapshot {
+  """
+  The implementation the agent offers under the interface; null if it offers none, and nothing follows then.
+  """
+  implementation: ID
+
+  """
+  The task it last ran as, whoever started it and whether or not it has ended; null if it never ran. (Not `task`: beside `TaskEventChange.task`, an id, one selection could not ask for both.)
+  """
+  latest: TaskChange
+
+  """
+  The task's last PROGRESS, last YIELD and its terminal event, oldest first: enough to say how far it is, what it returned and how it ended.
+  """
+  events: [TaskEventChange!]!
+}
+
+union LatestTaskSnapshotTaskChangeTaskEventChange = LatestTaskSnapshot | TaskChange | TaskEventChange
 
 """
 A resource of an agent that one of its tasks holds at a time: the agent takes it while an implementation that requires it runs.
@@ -5038,11 +5110,21 @@ input ShortcutFilter {
   search: String
   ids: [ID!]
   demands: [PortDemandInput!]
+
+  """
+  Whether an agent that can take the shortcut's action is connected now (`Action.assignable`).
+  """
+  assignable: Boolean
   toolbox: ID
 }
 
 input ShortcutOrder @oneOf {
   name: Ordering
+
+  """
+  Runnable first (DESC) or last (ASC) by the shortcut's `Action.assignable`; the order the filters set is the tie-break.
+  """
+  assignable: Ordering
 }
 
 """
@@ -5775,6 +5857,11 @@ type Subscription {
 
   """Subscribe to task create/update for a specific agent."""
   agentTasks(agent: ID!): AgentTaskUpdate! @auth(required_scopes: null, required_roles: null, required_org_roles: null)
+
+  """
+  The task an agent's action last ran as, whoever started it, kept current. Yields a `LatestTaskSnapshot` first, then that task's events (`TaskEventChange`: progress, results, its end) and, as a `TaskChange`, every task of the action that starts or ends: a started one with a higher id is the latest from then on. A snapshot without an implementation means the agent offers no action under that interface, and nothing follows.
+  """
+  latestTask(agent: ID!, interface: String!): LatestTaskSnapshotTaskChangeTaskEventChange! @auth(required_scopes: null, required_roles: null, required_org_roles: null)
 
   """
   Stream the events of one probe (caller-scoped, payload-carrying). Emits a state snapshot first when events already happened.
