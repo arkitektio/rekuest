@@ -12,12 +12,12 @@ dependencies = [
     "pydantic>=2",
     "rath>=4.1.1",
     "koil>=3.3.6",
-    "fakts>=5.4",
+    "fakts>=6.0",
     # The declaration an app is (the action language, AppRegistry, services, hooks)
     # is arkitekt-spec's; executing it is arkitekt-runtime's. rekuest is the
     # distributed runtime on top: the socket agent, its transport, and the client.
     "arkitekt-spec>=3.11",
-    "arkitekt-runtime>=4.5",
+    "arkitekt-runtime>=4.6",
     # Media uploads (MediaLike arguments) are put into the datalayer through obstore.
     "obstore>=0.10.0",
 ]
