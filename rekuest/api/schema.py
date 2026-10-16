@@ -2,7 +2,7 @@
     
 import builtins
 from arkitekt_runtime.types import AssignInput, CancelInput, HookInput, PauseInput, ResolvedDependencyInput, ResumeInput, TaskEventKind
-from arkitekt_spec.actions import ActionDemandInput, ActionKind, AgentDependencyInput, AssetInput, AssetKind, BlokImplementationInput, ComponentNodeInput, DefinitionInput, EffectKind, ImplementAgentInput, ImplementationInput, LockImplementationInput, PortKind, StateImplementationInput
+from arkitekt_spec.actions import ActionDemandInput, ActionKind, AgentDependencyInput, AssetInput, AssetKind, BlokImplementationInput, ComponentNodeInput, DefinitionInput, EffectKind, ImplementAgentInput, ImplementationInput, LockImplementationInput, PortKind, RequiresInput, StateImplementationInput
 from datetime import datetime
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 from rath.scalars import ID, IDCoercible
@@ -51,6 +51,8 @@ class AgentClient(BaseModel):
     typename: Literal['Client'] = Field(alias='__typename', default='Client', exclude=True)
     id: ID
     'Unique ID of the client.'
+    client_id: str = Field(alias='clientId')
+    'OAuth2 client ID.'
     model_config = ConfigDict(frozen=True)
 
 class AgentUser(BaseModel):
@@ -58,6 +60,13 @@ class AgentUser(BaseModel):
     typename: Literal['User'] = Field(alias='__typename', default='User', exclude=True)
     sub: ID
     'The subject identifier of the user.'
+    model_config = ConfigDict(frozen=True)
+
+class AgentOrganization(BaseModel):
+    """Represents an organization in the system."""
+    typename: Literal['Organization'] = Field(alias='__typename', default='Organization', exclude=True)
+    slug: str
+    'Slug of the organization.'
     model_config = ConfigDict(frozen=True)
 
 class AgentMemoryShelve(BaseModel):
@@ -72,19 +81,29 @@ class Agent(BaseModel):
     typename: Literal['Agent'] = Field(alias='__typename', default='Agent', exclude=True)
     id: ID
     'Unique ID of the agent.'
+    name: str
+    'Agent name: the one a user gave it (updateAgent), else the one it declares.'
     hash: str
     "Hash representing the agent's definition for change detection."
+    supervisor: str | None = Field(default=None)
+    "The app this agent says controls its lifecycle (e.g. 'plugin_engine'), as stated on its last registration. Self-declared: a hint for pickers (descriptor @rekuest/supervisor), never authority."
+    connected: bool
+    'Is the agent currently connected.'
+    active: bool
+    'Determine if the agent is currently active based on last seen timestamp.'
     client: AgentClient
     'The client (app instance) this agent runs as.'
     user: AgentUser
     'The user this agent belongs to.'
+    organization: AgentOrganization
+    'The organization this agent belongs to.'
     memory_shelve: AgentMemoryShelve | None = Field(default=None, alias='memoryShelve')
     "Agent's associated memory shelve."
     model_config = ConfigDict(frozen=True)
 
     class Meta:
         """Meta class for Agent"""
-        document = 'fragment Agent on Agent {\n  id\n  hash\n  client {\n    id\n    __typename\n  }\n  user {\n    sub\n    __typename\n  }\n  memoryShelve {\n    id\n    __typename\n  }\n  __typename\n}'
+        document = 'fragment Agent on Agent {\n  id\n  name\n  hash\n  supervisor\n  connected\n  active\n  client {\n    id\n    clientId\n    __typename\n  }\n  user {\n    sub\n    __typename\n  }\n  organization {\n    slug\n    __typename\n  }\n  memoryShelve {\n    id\n    __typename\n  }\n  __typename\n}'
         name = 'Agent'
         type = 'Agent'
 
@@ -1571,7 +1590,7 @@ class EnsureAgentMutation(BaseModel):
 
     class Meta:
         """Meta class for EnsureAgent """
-        document = 'fragment Agent on Agent {\n  id\n  hash\n  client {\n    id\n    __typename\n  }\n  user {\n    sub\n    __typename\n  }\n  memoryShelve {\n    id\n    __typename\n  }\n  __typename\n}\n\nmutation EnsureAgent($input: AgentInput!) {\n  ensureAgent(input: $input) {\n    ...Agent\n    __typename\n  }\n}'
+        document = 'fragment Agent on Agent {\n  id\n  name\n  hash\n  supervisor\n  connected\n  active\n  client {\n    id\n    clientId\n    __typename\n  }\n  user {\n    sub\n    __typename\n  }\n  organization {\n    slug\n    __typename\n  }\n  memoryShelve {\n    id\n    __typename\n  }\n  __typename\n}\n\nmutation EnsureAgent($input: AgentInput!) {\n  ensureAgent(input: $input) {\n    ...Agent\n    __typename\n  }\n}'
 
 class ImplementAgentMutation(BaseModel):
     """No documentation found for this operation."""
@@ -1584,7 +1603,7 @@ class ImplementAgentMutation(BaseModel):
 
     class Meta:
         """Meta class for ImplementAgent """
-        document = 'fragment Agent on Agent {\n  id\n  hash\n  client {\n    id\n    __typename\n  }\n  user {\n    sub\n    __typename\n  }\n  memoryShelve {\n    id\n    __typename\n  }\n  __typename\n}\n\nmutation ImplementAgent($input: ImplementAgentInput!) {\n  implementAgent(input: $input) {\n    ...Agent\n    __typename\n  }\n}'
+        document = 'fragment Agent on Agent {\n  id\n  name\n  hash\n  supervisor\n  connected\n  active\n  client {\n    id\n    clientId\n    __typename\n  }\n  user {\n    sub\n    __typename\n  }\n  organization {\n    slug\n    __typename\n  }\n  memoryShelve {\n    id\n    __typename\n  }\n  __typename\n}\n\nmutation ImplementAgent($input: ImplementAgentInput!) {\n  implementAgent(input: $input) {\n    ...Agent\n    __typename\n  }\n}'
 
 class RequestAssetUploadMutation(BaseModel):
     """No documentation found for this operation."""
@@ -1937,7 +1956,7 @@ class GetAgentQuery(BaseModel):
 
     class Meta:
         """Meta class for GetAgent """
-        document = 'fragment Agent on Agent {\n  id\n  hash\n  client {\n    id\n    __typename\n  }\n  user {\n    sub\n    __typename\n  }\n  memoryShelve {\n    id\n    __typename\n  }\n  __typename\n}\n\nquery GetAgent($id: ID!) {\n  agent(id: $id) {\n    ...Agent\n    __typename\n  }\n}'
+        document = 'fragment Agent on Agent {\n  id\n  name\n  hash\n  supervisor\n  connected\n  active\n  client {\n    id\n    clientId\n    __typename\n  }\n  user {\n    sub\n    __typename\n  }\n  organization {\n    slug\n    __typename\n  }\n  memoryShelve {\n    id\n    __typename\n  }\n  __typename\n}\n\nquery GetAgent($id: ID!) {\n  agent(id: $id) {\n    ...Agent\n    __typename\n  }\n}'
 
 class ListAgentsQuery(BaseModel):
     """No documentation found for this operation."""
@@ -1951,7 +1970,7 @@ class ListAgentsQuery(BaseModel):
 
     class Meta:
         """Meta class for ListAgents """
-        document = 'fragment Agent on Agent {\n  id\n  hash\n  client {\n    id\n    __typename\n  }\n  user {\n    sub\n    __typename\n  }\n  memoryShelve {\n    id\n    __typename\n  }\n  __typename\n}\n\nquery ListAgents($filters: AgentFilter, $pagination: OffsetPaginationInput) {\n  agents(filters: $filters, pagination: $pagination) {\n    ...Agent\n    __typename\n  }\n}'
+        document = 'fragment Agent on Agent {\n  id\n  name\n  hash\n  supervisor\n  connected\n  active\n  client {\n    id\n    clientId\n    __typename\n  }\n  user {\n    sub\n    __typename\n  }\n  organization {\n    slug\n    __typename\n  }\n  memoryShelve {\n    id\n    __typename\n  }\n  __typename\n}\n\nquery ListAgents($filters: AgentFilter, $pagination: OffsetPaginationInput) {\n  agents(filters: $filters, pagination: $pagination) {\n    ...Agent\n    __typename\n  }\n}'
 
 class GetAgentByIdentifiersQuery(BaseModel):
     """No documentation found for this operation."""
@@ -1966,7 +1985,33 @@ class GetAgentByIdentifiersQuery(BaseModel):
 
     class Meta:
         """Meta class for GetAgentByIdentifiers """
-        document = 'fragment Agent on Agent {\n  id\n  hash\n  client {\n    id\n    __typename\n  }\n  user {\n    sub\n    __typename\n  }\n  memoryShelve {\n    id\n    __typename\n  }\n  __typename\n}\n\nquery GetAgentByIdentifiers($app: String!, $version: String, $deviceId: String) {\n  agent(app: $app, version: $version, deviceId: $deviceId) {\n    ...Agent\n    __typename\n  }\n}'
+        document = 'fragment Agent on Agent {\n  id\n  name\n  hash\n  supervisor\n  connected\n  active\n  client {\n    id\n    clientId\n    __typename\n  }\n  user {\n    sub\n    __typename\n  }\n  organization {\n    slug\n    __typename\n  }\n  memoryShelve {\n    id\n    __typename\n  }\n  __typename\n}\n\nquery GetAgentByIdentifiers($app: String!, $version: String, $deviceId: String) {\n  agent(app: $app, version: $version, deviceId: $deviceId) {\n    ...Agent\n    __typename\n  }\n}'
+
+class SearchAgentsQueryOptions(BaseModel):
+    """Represents a compute agent that can execute implementations."""
+    typename: Literal['Agent'] = Field(alias='__typename', default='Agent', exclude=True)
+    label: str
+    'Agent name: the one a user gave it (updateAgent), else the one it declares.'
+    value: ID
+    'Unique ID of the agent.'
+    model_config = ConfigDict(frozen=True)
+
+class SearchAgentsQuery(BaseModel):
+    """No documentation found for this operation."""
+    options: tuple[SearchAgentsQueryOptions, ...]
+    'Retrieve all compute agents.'
+
+    class Arguments(BaseModel):
+        """Arguments for SearchAgents """
+        search: str | None = Field(default=None)
+        values: list[ID] | None = Field(default=None)
+        requires: list[RequiresInput] | None = Field(default=None)
+        limit: int | None = Field(default=None)
+        offset: int | None = Field(default=None)
+
+    class Meta:
+        """Meta class for SearchAgents """
+        document = 'query SearchAgents($search: String, $values: [ID!], $requires: [RequiresInput!], $limit: Int, $offset: Int) {\n  options: agents(\n    filters: {search: $search, ids: $values, requires: $requires}\n    pagination: {limit: $limit, offset: $offset}\n  ) {\n    label: name\n    value: id\n    __typename\n  }\n}'
 
 class StoredAssetQueryAsset(BaseModel):
     """A verified file the organization holds, stored once by its content."""
@@ -3962,6 +4007,62 @@ Returns:
         if device_id is not UNSET:
             variables['deviceId'] = device_id
         return self.execute(GetAgentByIdentifiersQuery, variables).agent
+
+    async def asearch_agents(self, search: str | None | UnsetType=UNSET, values: list[IDCoercible] | None | UnsetType=UNSET, requires: list[RequiresInput] | None | UnsetType=UNSET, limit: int | None | UnsetType=UNSET, offset: int | None | UnsetType=UNSET) -> tuple[SearchAgentsQueryOptions, ...]:
+        """SearchAgents 
+
+Retrieve all compute agents.
+
+Args:
+    search (str | None, optional): No description. 
+    values (list[ID] | None, optional): No description. 
+    requires (list[RequiresInput] | None, optional): No description. 
+    limit (int | None, optional): No description. 
+    offset (int | None, optional): No description. 
+
+Returns:
+    list[SearchAgentsQueryAgents]
+"""
+        variables: dict[str, builtins.object] = {}
+        if search is not UNSET:
+            variables['search'] = search
+        if values is not UNSET:
+            variables['values'] = values
+        if requires is not UNSET:
+            variables['requires'] = requires
+        if limit is not UNSET:
+            variables['limit'] = limit
+        if offset is not UNSET:
+            variables['offset'] = offset
+        return (await self.aexecute(SearchAgentsQuery, variables)).options
+
+    def search_agents(self, search: str | None | UnsetType=UNSET, values: list[IDCoercible] | None | UnsetType=UNSET, requires: list[RequiresInput] | None | UnsetType=UNSET, limit: int | None | UnsetType=UNSET, offset: int | None | UnsetType=UNSET) -> tuple[SearchAgentsQueryOptions, ...]:
+        """SearchAgents 
+
+Retrieve all compute agents.
+
+Args:
+    search (str | None, optional): No description. 
+    values (list[ID] | None, optional): No description. 
+    requires (list[RequiresInput] | None, optional): No description. 
+    limit (int | None, optional): No description. 
+    offset (int | None, optional): No description. 
+
+Returns:
+    list[SearchAgentsQueryAgents]
+"""
+        variables: dict[str, builtins.object] = {}
+        if search is not UNSET:
+            variables['search'] = search
+        if values is not UNSET:
+            variables['values'] = values
+        if requires is not UNSET:
+            variables['requires'] = requires
+        if limit is not UNSET:
+            variables['limit'] = limit
+        if offset is not UNSET:
+            variables['offset'] = offset
+        return self.execute(SearchAgentsQuery, variables).options
 
     async def astored_asset(self, ref: str) -> StoredAssetQueryAsset | None:
         """StoredAsset 

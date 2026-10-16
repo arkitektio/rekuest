@@ -22,9 +22,11 @@ from rath.links.split import SplitLink
 from rekuest.agents.agent import RekuestAgent
 from rekuest.api.schema import (
     Action,
+    Agent,
     DetailMaterializedBlok,
     Implementation,
     SearchActionsQuery,
+    SearchAgentsQuery,
     SearchImplementationsQuery,
     SearchMaterializedBloksQuery,
     SearchShortcutsQuery,
@@ -220,6 +222,30 @@ async def expand_materialized_blok(id: str, rekuest: Rekuest) -> DetailMateriali
     (``rekuest/manifest.ts``), so a message carrying one renders as the blok.
     """
     return await rekuest.aget_materialized_blok(id)
+
+
+SUPERVISOR = "@rekuest/supervisor"
+"""The descriptor of ``@rekuest/agent``: the app the agent says controls its lifecycle.
+
+Self-declared (``ARKITEKT_SUPERVISOR``), so a supervisor's port narrows its picker with it
+(``Requires(SUPERVISOR, DescriptorOperator.EQUALS, "plugin_engine")``) and still maps the
+agent to its own records before acting: it is a hint, never authority."""
+
+
+def describe_agent(agent: Agent) -> dict[str, str]:
+    """An agent's descriptors: the supervisor it declared, if any.
+
+    None declared is no descriptor at all, not ``None``: a constraint on a key the object
+    does not carry is not tested, so an app that predates ``ARKITEKT_SUPERVISOR`` still
+    reaches its supervisor's actions (which decide by their own records anyway).
+    """
+    return {SUPERVISOR: agent.supervisor} if agent.supervisor else {}
+
+
+@registry.structure("@rekuest/agent", widget=_search(SearchAgentsQuery), describe=describe_agent)
+async def expand_agent(id: str, rekuest: Rekuest) -> Agent:
+    """An agent, by id: an app instance connected to rekuest, with its lok client id."""
+    return await rekuest.aget_agent(id)
 
 
 @registry.structure("@rekuest/taskevent")

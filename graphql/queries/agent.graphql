@@ -17,3 +17,14 @@ query GetAgentByIdentifiers($app: String!, $version: String, $deviceId: String) 
     ...Agent
   }
 }
+
+
+query SearchAgents($search: String, $values: [ID!], $requires: [RequiresInput!], $limit: Int, $offset: Int) {
+  options: agents(
+    filters: {search: $search, ids: $values, requires: $requires}
+    pagination: {limit: $limit, offset: $offset}
+  ) {
+    label: name
+    value: id
+  }
+}

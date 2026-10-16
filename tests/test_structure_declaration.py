@@ -296,6 +296,53 @@ async def test_a_materialized_blok_is_a_structure_under_the_identifier_orkestrat
     assert client.asked == ["7"]
 
 
+@pytest.mark.asyncio
+async def test_an_agent_is_a_structure_described_by_its_supervisor() -> None:
+    """``@rekuest/agent``: what a supervisor's actions take, narrowed by ``@rekuest/supervisor``."""
+    from rekuest.api.schema import Agent
+    from rekuest.arkitekt import SUPERVISOR, expand_agent
+
+    structure = rekuest_registry.structure_registry.get_fullfilled_structure(
+        "@rekuest/agent"
+    )
+    assert structure.cls is Agent
+
+    def agent(supervisor: str | None) -> Agent:
+        return Agent.model_validate(
+            {
+                "id": "1",
+                "name": "segmentation",
+                "hash": "h",
+                "supervisor": supervisor,
+                "connected": True,
+                "active": True,
+                "client": {"id": "3", "clientId": "lok-client"},
+                "user": {"sub": "1"},
+                "organization": {"slug": "lab"},
+                "memoryShelve": {"id": "9"},
+            }
+        )
+
+    assert structure.describe is not None
+    assert structure.describe(agent("plugin_engine")) == {SUPERVISOR: "plugin_engine"}
+    # None declared is no descriptor: a Requires on it is then not tested, never failed.
+    assert structure.describe(agent(None)) == {}
+    assert agent(None).client.client_id == "lok-client"
+
+    class FakeRekuest:
+        def __init__(self) -> None:
+            self.asked: list[str] = []
+
+        async def aget_agent(self, id: str) -> Any:
+            self.asked.append(id)
+            return id
+
+    client = FakeRekuest()
+
+    assert await expand_agent("7", client) == "7"  # type: ignore[arg-type]
+    assert client.asked == ["7"]
+
+
 # --------------------------------------------------------------------------- #
 # Expanding many -- through the declaring service's client
 # --------------------------------------------------------------------------- #

@@ -297,3 +297,39 @@ def test_a_description_changes_the_definition_hash() -> None:
     assert canonical() == canonical(description=None)
     assert canonical(description="One thing.") != canonical()
     assert canonical(description="One thing.") != canonical(description="Another thing.")
+
+
+@pytest.mark.asyncio
+async def test_register_carries_the_supervisor_outside_the_declaration() -> None:
+    """The supervisor the agent states goes with every ``Register``, beside the declaration.
+
+    It is a connection-level hint (who started this process), so it must not move the
+    definition hash: the backend writes it on every registration, including the
+    hash-equal fast path that skips reconciling the declaration.
+    """
+    supervised = RecordingTransport()
+    agent = RekuestAgent(
+        transport=supervised,
+        app_registry=AppRegistry(),
+        name="reg-test",
+        supervisor="plugin_engine",
+    )
+    connecting = asyncio.create_task(agent.aconnect(timeout=2.0))
+    await _until(lambda: supervised.handshakes)
+    supervised.feed(
+        messages.Init(agent="agent-1", hash=supervised.handshakes[0].declaration.hash)
+    )
+    await connecting
+    (handshake,) = supervised.handshakes
+    assert handshake.supervisor == "plugin_engine"
+    await agent.atear_down()
+
+    plain = RecordingTransport()
+    await _connected(plain)
+    (plain_handshake,) = plain.handshakes
+    assert plain_handshake.supervisor is None
+    assert plain_handshake.declaration is not None and handshake.declaration is not None
+    assert plain_handshake.declaration.hash == handshake.declaration.hash
+
+    frame = messages.Register(token="t", supervisor="plugin_engine").model_dump()
+    assert frame["supervisor"] == "plugin_engine"

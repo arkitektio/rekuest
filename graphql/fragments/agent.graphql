@@ -1,11 +1,19 @@
 fragment Agent on Agent {
   id
+  name
   hash
+  supervisor
+  connected
+  active
   client {
     id
+    clientId
   }
   user {
     sub
+  }
+  organization {
+    slug
   }
   memoryShelve {
     id

@@ -427,6 +427,7 @@ class WebsocketAgentTransport(AgentTransport):
                                 token=token,
                                 force=bool(handshake.force),
                                 session_id=handshake.session_id,
+                                supervisor=handshake.supervisor,
                                 **declaration,
                             ).model_dump_json()
                         )
