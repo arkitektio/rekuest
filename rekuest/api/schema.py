@@ -6,7 +6,7 @@ from arkitekt_spec.actions import ActionDemandInput, ActionKind, AgentDependency
 from datetime import datetime
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 from rath.scalars import ID, IDCoercible
-from rekuest.protocol.schema import ActionFilter, ActionOrder, AgentFilter, AgentInput, AgentKind, AssignWidgetKind, BlokAgentMappingInput, CatalogComponentInput, CatalogOperationInput, CatalogValueKind, CollectInput, ComponentContext, CreateAssetInput, CreateBlokInput, CreateDashboardInput, CreateHigherOrderImplementationInput, CreateShortcutInput, CreateSpaceInput, CreateTestCaseInput, CreateTestResultInput, CreateThreeDModelInput, DiagnosticLevel, FinishMediaUploadInput, ImplementationFilter, InterruptInput, LogLevel, MaterializeBlokInput, OffsetPaginationInput, PlacementInput, RegisterUiCatalogInput, RequestAssetUploadInput, RequestMediaAccessInput, RequestMediaUploadInput, ReturnWidgetKind, ShelveInMemoryDrawerInput, ShortcutFilter, ShortcutOrder, TaskInstructKind, ToolboxFilter, ToolboxOrder, UnshelveMemoryDrawerInput, UpdateBlokInput, WidgetDefaultInput
+from rekuest.protocol.schema import ActionFilter, ActionOrder, AgentFilter, AgentInput, AgentKind, AssignWidgetKind, BlokAgentMappingInput, CatalogComponentInput, CatalogOperationInput, CatalogValueKind, CollectInput, ComponentContext, CreateAssetInput, CreateBlokInput, CreateDashboardInput, CreateHigherOrderImplementationInput, CreateShortcutInput, CreateSpaceInput, CreateTestCaseInput, CreateTestResultInput, CreateThreeDModelInput, DiagnosticLevel, FinishMediaUploadInput, ForkBlokInput, ImplementationFilter, InterruptInput, LogLevel, MaterializeBlokInput, OffsetPaginationInput, PlacementInput, RegisterUiCatalogInput, RequestAssetUploadInput, RequestMediaAccessInput, RequestMediaUploadInput, ReturnWidgetKind, ShelveInMemoryDrawerInput, ShortcutFilter, ShortcutOrder, TaskInstructKind, ToolboxFilter, ToolboxOrder, UnshelveMemoryDrawerInput, UpdateBlokInput, WidgetDefaultInput
 from rekuest.scalars import ActionHash, Args, Identifier, JSONSerializable, MediaLike, Props
 from rekuest.traits.action import Callable
 from typing import Annotated, Any, AsyncIterator, Iterable, Iterator, Literal
@@ -913,6 +913,15 @@ class TaskChangeEvent(BaseModel):
         name = 'TaskChangeEvent'
         type = 'TaskChangeEvent'
 
+class DetailBlokApp(BaseModel):
+    """Profile information for a user."""
+    typename: Literal['App'] = Field(alias='__typename', default='App', exclude=True)
+    id: ID
+    'Unique ID of the app.'
+    identifier: str
+    'Name of the app.'
+    model_config = ConfigDict(frozen=True)
+
 class DetailBlokCatalog(BaseModel):
     """A UI catalog: the components a UI app can render and the pure operations it can evaluate for UtilCalls, registered per organization."""
     typename: Literal['UICatalog'] = Field(alias='__typename', default='UICatalog', exclude=True)
@@ -926,6 +935,10 @@ class DetailBlok(BaseModel):
     id: ID
     name: str
     description: str | None = Field(default=None)
+    provided: bool
+    "Whether an app's agents provide this blok (see `app`)."
+    app: DetailBlokApp | None = Field(default=None)
+    "The app whose agents provide this blok; null for a custom blok a user made. A provided blok changes and goes with its agents' registrations and cannot be edited or materialized by hand: fork it."
     context: ComponentContext
     "The renderer for this blok's root."
     catalog: DetailBlokCatalog
@@ -941,7 +954,7 @@ class DetailBlok(BaseModel):
 
     class Meta:
         """Meta class for DetailBlok"""
-        document = 'fragment BlokPortMatch on PortMatch {\n  at\n  key\n  kind\n  identifier\n  nullable\n  dimension\n  children {\n    at\n    key\n    kind\n    identifier\n    nullable\n    dimension\n    children {\n      at\n      key\n      kind\n      identifier\n      nullable\n      dimension\n      children {\n        at\n        key\n        kind\n        identifier\n        nullable\n        dimension\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment BlokDependency on BlokDependency {\n  key\n  description\n  optional\n  actionDependencies {\n    key\n    description\n    optional\n    demand {\n      hash\n      key\n      app\n      version\n      name\n      argMatches {\n        ...BlokPortMatch\n        __typename\n      }\n      returnMatches {\n        ...BlokPortMatch\n        __typename\n      }\n      protocols\n      forceArgLength\n      forceReturnLength\n      pure\n      idempotent\n      stateful\n      __typename\n    }\n    __typename\n  }\n  stateDependencies {\n    key\n    description\n    optional\n    demand {\n      hash\n      key\n      app\n      matches {\n        ...BlokPortMatch\n        __typename\n      }\n      protocols\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment BlokDiagnostic on Diagnostic {\n  level\n  code\n  message\n  path\n  __typename\n}\n\nfragment DetailBlok on Blok {\n  id\n  name\n  description\n  context\n  catalog {\n    id\n    name\n    __typename\n  }\n  componentTree\n  demoState\n  diagnostics {\n    ...BlokDiagnostic\n    __typename\n  }\n  dependencies {\n    ...BlokDependency\n    __typename\n  }\n  __typename\n}'
+        document = 'fragment BlokPortMatch on PortMatch {\n  at\n  key\n  kind\n  identifier\n  nullable\n  dimension\n  children {\n    at\n    key\n    kind\n    identifier\n    nullable\n    dimension\n    children {\n      at\n      key\n      kind\n      identifier\n      nullable\n      dimension\n      children {\n        at\n        key\n        kind\n        identifier\n        nullable\n        dimension\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment BlokDependency on BlokDependency {\n  key\n  description\n  optional\n  actionDependencies {\n    key\n    description\n    optional\n    demand {\n      hash\n      key\n      app\n      version\n      name\n      argMatches {\n        ...BlokPortMatch\n        __typename\n      }\n      returnMatches {\n        ...BlokPortMatch\n        __typename\n      }\n      protocols\n      forceArgLength\n      forceReturnLength\n      pure\n      idempotent\n      stateful\n      __typename\n    }\n    __typename\n  }\n  stateDependencies {\n    key\n    description\n    optional\n    demand {\n      hash\n      key\n      app\n      matches {\n        ...BlokPortMatch\n        __typename\n      }\n      protocols\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment BlokDiagnostic on Diagnostic {\n  level\n  code\n  message\n  path\n  __typename\n}\n\nfragment DetailBlok on Blok {\n  id\n  name\n  description\n  provided\n  app {\n    id\n    identifier\n    __typename\n  }\n  context\n  catalog {\n    id\n    name\n    __typename\n  }\n  componentTree\n  demoState\n  diagnostics {\n    ...BlokDiagnostic\n    __typename\n  }\n  dependencies {\n    ...BlokDependency\n    __typename\n  }\n  __typename\n}'
         name = 'DetailBlok'
         type = 'Blok'
 
@@ -989,6 +1002,15 @@ class ActionArgument(BaseModel):
         name = 'ActionArgument'
         type = 'ActionArgument'
 
+class DetailMaterializedBlokDeclaredBy(BaseModel):
+    """Represents a compute agent that can execute implementations."""
+    typename: Literal['Agent'] = Field(alias='__typename', default='Agent', exclude=True)
+    id: ID
+    'Unique ID of the agent.'
+    declared_name: str = Field(alias='declaredName')
+    'The name the agent declares for itself, whatever a user calls it.'
+    model_config = ConfigDict(frozen=True)
+
 class DetailMaterializedBlokAgentMappingsAgent(BaseModel):
     """Represents a compute agent that can execute implementations."""
     typename: Literal['Agent'] = Field(alias='__typename', default='Agent', exclude=True)
@@ -1013,6 +1035,8 @@ class DetailMaterializedBlok(BaseModel):
     id: ID
     name: str | None = Field(default=None)
     description: str | None = Field(default=None)
+    declared_by: DetailMaterializedBlokDeclaredBy | None = Field(default=None, alias='declaredBy')
+    "The agent this materialization belongs to, for a blok its app provides; null when a user made it. An agent's materialization follows its registrations."
     blok: DetailBlok
     agent_mappings: tuple[DetailMaterializedBlokAgentMappings, ...] = Field(alias='agentMappings')
     'Mappings of states to this materialized blok.'
@@ -1020,7 +1044,7 @@ class DetailMaterializedBlok(BaseModel):
 
     class Meta:
         """Meta class for DetailMaterializedBlok"""
-        document = 'fragment BlokPortMatch on PortMatch {\n  at\n  key\n  kind\n  identifier\n  nullable\n  dimension\n  children {\n    at\n    key\n    kind\n    identifier\n    nullable\n    dimension\n    children {\n      at\n      key\n      kind\n      identifier\n      nullable\n      dimension\n      children {\n        at\n        key\n        kind\n        identifier\n        nullable\n        dimension\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment BlokDependency on BlokDependency {\n  key\n  description\n  optional\n  actionDependencies {\n    key\n    description\n    optional\n    demand {\n      hash\n      key\n      app\n      version\n      name\n      argMatches {\n        ...BlokPortMatch\n        __typename\n      }\n      returnMatches {\n        ...BlokPortMatch\n        __typename\n      }\n      protocols\n      forceArgLength\n      forceReturnLength\n      pure\n      idempotent\n      stateful\n      __typename\n    }\n    __typename\n  }\n  stateDependencies {\n    key\n    description\n    optional\n    demand {\n      hash\n      key\n      app\n      matches {\n        ...BlokPortMatch\n        __typename\n      }\n      protocols\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment BlokDiagnostic on Diagnostic {\n  level\n  code\n  message\n  path\n  __typename\n}\n\nfragment DetailBlok on Blok {\n  id\n  name\n  description\n  context\n  catalog {\n    id\n    name\n    __typename\n  }\n  componentTree\n  demoState\n  diagnostics {\n    ...BlokDiagnostic\n    __typename\n  }\n  dependencies {\n    ...BlokDependency\n    __typename\n  }\n  __typename\n}\n\nfragment DetailMaterializedBlok on MaterializedBlok {\n  id\n  name\n  description\n  blok {\n    ...DetailBlok\n    __typename\n  }\n  agentMappings {\n    key\n    agent {\n      id\n      declaredName\n      connected\n      __typename\n    }\n    __typename\n  }\n  __typename\n}'
+        document = 'fragment BlokPortMatch on PortMatch {\n  at\n  key\n  kind\n  identifier\n  nullable\n  dimension\n  children {\n    at\n    key\n    kind\n    identifier\n    nullable\n    dimension\n    children {\n      at\n      key\n      kind\n      identifier\n      nullable\n      dimension\n      children {\n        at\n        key\n        kind\n        identifier\n        nullable\n        dimension\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment BlokDependency on BlokDependency {\n  key\n  description\n  optional\n  actionDependencies {\n    key\n    description\n    optional\n    demand {\n      hash\n      key\n      app\n      version\n      name\n      argMatches {\n        ...BlokPortMatch\n        __typename\n      }\n      returnMatches {\n        ...BlokPortMatch\n        __typename\n      }\n      protocols\n      forceArgLength\n      forceReturnLength\n      pure\n      idempotent\n      stateful\n      __typename\n    }\n    __typename\n  }\n  stateDependencies {\n    key\n    description\n    optional\n    demand {\n      hash\n      key\n      app\n      matches {\n        ...BlokPortMatch\n        __typename\n      }\n      protocols\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment BlokDiagnostic on Diagnostic {\n  level\n  code\n  message\n  path\n  __typename\n}\n\nfragment DetailBlok on Blok {\n  id\n  name\n  description\n  provided\n  app {\n    id\n    identifier\n    __typename\n  }\n  context\n  catalog {\n    id\n    name\n    __typename\n  }\n  componentTree\n  demoState\n  diagnostics {\n    ...BlokDiagnostic\n    __typename\n  }\n  dependencies {\n    ...BlokDependency\n    __typename\n  }\n  __typename\n}\n\nfragment DetailMaterializedBlok on MaterializedBlok {\n  id\n  name\n  description\n  declaredBy {\n    id\n    declaredName\n    __typename\n  }\n  blok {\n    ...DetailBlok\n    __typename\n  }\n  agentMappings {\n    key\n    agent {\n      id\n      declaredName\n      connected\n      __typename\n    }\n    __typename\n  }\n  __typename\n}'
         name = 'DetailMaterializedBlok'
         type = 'MaterializedBlok'
 
@@ -1667,6 +1691,19 @@ class MaterializeBlokMutation(BaseModel):
         """Meta class for MaterializeBlok """
         document = 'fragment MaterializedBlok on MaterializedBlok {\n  id\n  __typename\n}\n\nmutation MaterializeBlok($input: MaterializeBlokInput!) {\n  materializeBlok(input: $input) {\n    ...MaterializedBlok\n    __typename\n  }\n}'
 
+class ForkBlokMutation(BaseModel):
+    """No documentation found for this operation."""
+    fork_blok: DetailBlok = Field(alias='forkBlok')
+    'Copy a blok an app provides into a custom blok, to edit it or bind other agents to it. The copy lives on whatever the providing agents do.'
+
+    class Arguments(BaseModel):
+        """Arguments for ForkBlok """
+        input: ForkBlokInput
+
+    class Meta:
+        """Meta class for ForkBlok """
+        document = 'fragment BlokPortMatch on PortMatch {\n  at\n  key\n  kind\n  identifier\n  nullable\n  dimension\n  children {\n    at\n    key\n    kind\n    identifier\n    nullable\n    dimension\n    children {\n      at\n      key\n      kind\n      identifier\n      nullable\n      dimension\n      children {\n        at\n        key\n        kind\n        identifier\n        nullable\n        dimension\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment BlokDependency on BlokDependency {\n  key\n  description\n  optional\n  actionDependencies {\n    key\n    description\n    optional\n    demand {\n      hash\n      key\n      app\n      version\n      name\n      argMatches {\n        ...BlokPortMatch\n        __typename\n      }\n      returnMatches {\n        ...BlokPortMatch\n        __typename\n      }\n      protocols\n      forceArgLength\n      forceReturnLength\n      pure\n      idempotent\n      stateful\n      __typename\n    }\n    __typename\n  }\n  stateDependencies {\n    key\n    description\n    optional\n    demand {\n      hash\n      key\n      app\n      matches {\n        ...BlokPortMatch\n        __typename\n      }\n      protocols\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment BlokDiagnostic on Diagnostic {\n  level\n  code\n  message\n  path\n  __typename\n}\n\nfragment DetailBlok on Blok {\n  id\n  name\n  description\n  provided\n  app {\n    id\n    identifier\n    __typename\n  }\n  context\n  catalog {\n    id\n    name\n    __typename\n  }\n  componentTree\n  demoState\n  diagnostics {\n    ...BlokDiagnostic\n    __typename\n  }\n  dependencies {\n    ...BlokDependency\n    __typename\n  }\n  __typename\n}\n\nmutation ForkBlok($input: ForkBlokInput!) {\n  forkBlok(input: $input) {\n    ...DetailBlok\n    __typename\n  }\n}'
+
 class UpdateBlokMutation(BaseModel):
     """No documentation found for this operation."""
     update_blok: DetailBlok = Field(alias='updateBlok')
@@ -1678,7 +1715,7 @@ class UpdateBlokMutation(BaseModel):
 
     class Meta:
         """Meta class for UpdateBlok """
-        document = 'fragment BlokPortMatch on PortMatch {\n  at\n  key\n  kind\n  identifier\n  nullable\n  dimension\n  children {\n    at\n    key\n    kind\n    identifier\n    nullable\n    dimension\n    children {\n      at\n      key\n      kind\n      identifier\n      nullable\n      dimension\n      children {\n        at\n        key\n        kind\n        identifier\n        nullable\n        dimension\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment BlokDependency on BlokDependency {\n  key\n  description\n  optional\n  actionDependencies {\n    key\n    description\n    optional\n    demand {\n      hash\n      key\n      app\n      version\n      name\n      argMatches {\n        ...BlokPortMatch\n        __typename\n      }\n      returnMatches {\n        ...BlokPortMatch\n        __typename\n      }\n      protocols\n      forceArgLength\n      forceReturnLength\n      pure\n      idempotent\n      stateful\n      __typename\n    }\n    __typename\n  }\n  stateDependencies {\n    key\n    description\n    optional\n    demand {\n      hash\n      key\n      app\n      matches {\n        ...BlokPortMatch\n        __typename\n      }\n      protocols\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment BlokDiagnostic on Diagnostic {\n  level\n  code\n  message\n  path\n  __typename\n}\n\nfragment DetailBlok on Blok {\n  id\n  name\n  description\n  context\n  catalog {\n    id\n    name\n    __typename\n  }\n  componentTree\n  demoState\n  diagnostics {\n    ...BlokDiagnostic\n    __typename\n  }\n  dependencies {\n    ...BlokDependency\n    __typename\n  }\n  __typename\n}\n\nmutation UpdateBlok($input: UpdateBlokInput!) {\n  updateBlok(input: $input) {\n    ...DetailBlok\n    __typename\n  }\n}'
+        document = 'fragment BlokPortMatch on PortMatch {\n  at\n  key\n  kind\n  identifier\n  nullable\n  dimension\n  children {\n    at\n    key\n    kind\n    identifier\n    nullable\n    dimension\n    children {\n      at\n      key\n      kind\n      identifier\n      nullable\n      dimension\n      children {\n        at\n        key\n        kind\n        identifier\n        nullable\n        dimension\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment BlokDependency on BlokDependency {\n  key\n  description\n  optional\n  actionDependencies {\n    key\n    description\n    optional\n    demand {\n      hash\n      key\n      app\n      version\n      name\n      argMatches {\n        ...BlokPortMatch\n        __typename\n      }\n      returnMatches {\n        ...BlokPortMatch\n        __typename\n      }\n      protocols\n      forceArgLength\n      forceReturnLength\n      pure\n      idempotent\n      stateful\n      __typename\n    }\n    __typename\n  }\n  stateDependencies {\n    key\n    description\n    optional\n    demand {\n      hash\n      key\n      app\n      matches {\n        ...BlokPortMatch\n        __typename\n      }\n      protocols\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment BlokDiagnostic on Diagnostic {\n  level\n  code\n  message\n  path\n  __typename\n}\n\nfragment DetailBlok on Blok {\n  id\n  name\n  description\n  provided\n  app {\n    id\n    identifier\n    __typename\n  }\n  context\n  catalog {\n    id\n    name\n    __typename\n  }\n  componentTree\n  demoState\n  diagnostics {\n    ...BlokDiagnostic\n    __typename\n  }\n  dependencies {\n    ...BlokDependency\n    __typename\n  }\n  __typename\n}\n\nmutation UpdateBlok($input: UpdateBlokInput!) {\n  updateBlok(input: $input) {\n    ...DetailBlok\n    __typename\n  }\n}'
 
 class RegisterUiCatalogMutation(BaseModel):
     """No documentation found for this operation."""
@@ -2047,7 +2084,7 @@ class GetMaterializedBlokQuery(BaseModel):
 
     class Meta:
         """Meta class for GetMaterializedBlok """
-        document = 'fragment BlokPortMatch on PortMatch {\n  at\n  key\n  kind\n  identifier\n  nullable\n  dimension\n  children {\n    at\n    key\n    kind\n    identifier\n    nullable\n    dimension\n    children {\n      at\n      key\n      kind\n      identifier\n      nullable\n      dimension\n      children {\n        at\n        key\n        kind\n        identifier\n        nullable\n        dimension\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment BlokDependency on BlokDependency {\n  key\n  description\n  optional\n  actionDependencies {\n    key\n    description\n    optional\n    demand {\n      hash\n      key\n      app\n      version\n      name\n      argMatches {\n        ...BlokPortMatch\n        __typename\n      }\n      returnMatches {\n        ...BlokPortMatch\n        __typename\n      }\n      protocols\n      forceArgLength\n      forceReturnLength\n      pure\n      idempotent\n      stateful\n      __typename\n    }\n    __typename\n  }\n  stateDependencies {\n    key\n    description\n    optional\n    demand {\n      hash\n      key\n      app\n      matches {\n        ...BlokPortMatch\n        __typename\n      }\n      protocols\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment BlokDiagnostic on Diagnostic {\n  level\n  code\n  message\n  path\n  __typename\n}\n\nfragment DetailBlok on Blok {\n  id\n  name\n  description\n  context\n  catalog {\n    id\n    name\n    __typename\n  }\n  componentTree\n  demoState\n  diagnostics {\n    ...BlokDiagnostic\n    __typename\n  }\n  dependencies {\n    ...BlokDependency\n    __typename\n  }\n  __typename\n}\n\nfragment DetailMaterializedBlok on MaterializedBlok {\n  id\n  name\n  description\n  blok {\n    ...DetailBlok\n    __typename\n  }\n  agentMappings {\n    key\n    agent {\n      id\n      declaredName\n      connected\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nquery GetMaterializedBlok($id: ID!) {\n  materializedBlok(id: $id) {\n    ...DetailMaterializedBlok\n    __typename\n  }\n}'
+        document = 'fragment BlokPortMatch on PortMatch {\n  at\n  key\n  kind\n  identifier\n  nullable\n  dimension\n  children {\n    at\n    key\n    kind\n    identifier\n    nullable\n    dimension\n    children {\n      at\n      key\n      kind\n      identifier\n      nullable\n      dimension\n      children {\n        at\n        key\n        kind\n        identifier\n        nullable\n        dimension\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment BlokDependency on BlokDependency {\n  key\n  description\n  optional\n  actionDependencies {\n    key\n    description\n    optional\n    demand {\n      hash\n      key\n      app\n      version\n      name\n      argMatches {\n        ...BlokPortMatch\n        __typename\n      }\n      returnMatches {\n        ...BlokPortMatch\n        __typename\n      }\n      protocols\n      forceArgLength\n      forceReturnLength\n      pure\n      idempotent\n      stateful\n      __typename\n    }\n    __typename\n  }\n  stateDependencies {\n    key\n    description\n    optional\n    demand {\n      hash\n      key\n      app\n      matches {\n        ...BlokPortMatch\n        __typename\n      }\n      protocols\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment BlokDiagnostic on Diagnostic {\n  level\n  code\n  message\n  path\n  __typename\n}\n\nfragment DetailBlok on Blok {\n  id\n  name\n  description\n  provided\n  app {\n    id\n    identifier\n    __typename\n  }\n  context\n  catalog {\n    id\n    name\n    __typename\n  }\n  componentTree\n  demoState\n  diagnostics {\n    ...BlokDiagnostic\n    __typename\n  }\n  dependencies {\n    ...BlokDependency\n    __typename\n  }\n  __typename\n}\n\nfragment DetailMaterializedBlok on MaterializedBlok {\n  id\n  name\n  description\n  declaredBy {\n    id\n    declaredName\n    __typename\n  }\n  blok {\n    ...DetailBlok\n    __typename\n  }\n  agentMappings {\n    key\n    agent {\n      id\n      declaredName\n      connected\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nquery GetMaterializedBlok($id: ID!) {\n  materializedBlok(id: $id) {\n    ...DetailMaterializedBlok\n    __typename\n  }\n}'
 
 class SearchMaterializedBloksQueryOptions(BaseModel):
     """A materialized instance of a Blok that can be placed on dashboards and linked to agent states."""
@@ -2071,6 +2108,22 @@ class SearchMaterializedBloksQuery(BaseModel):
     class Meta:
         """Meta class for SearchMaterializedBloks """
         document = 'query SearchMaterializedBloks($search: String, $values: [ID!], $limit: Int, $offset: Int) {\n  options: materializedBloks(\n    filters: {search: $search, ids: $values}\n    pagination: {limit: $limit, offset: $offset}\n  ) {\n    label: name\n    value: id\n    __typename\n  }\n}'
+
+class ListBloksQuery(BaseModel):
+    """No documentation found for this operation."""
+    bloks: tuple[DetailBlok, ...]
+    'List of UI Blok.'
+
+    class Arguments(BaseModel):
+        """Arguments for ListBloks """
+        search: str | None = Field(default=None)
+        provided: bool | None = Field(default=None)
+        limit: int | None = Field(default=None)
+        offset: int | None = Field(default=None)
+
+    class Meta:
+        """Meta class for ListBloks """
+        document = 'fragment BlokPortMatch on PortMatch {\n  at\n  key\n  kind\n  identifier\n  nullable\n  dimension\n  children {\n    at\n    key\n    kind\n    identifier\n    nullable\n    dimension\n    children {\n      at\n      key\n      kind\n      identifier\n      nullable\n      dimension\n      children {\n        at\n        key\n        kind\n        identifier\n        nullable\n        dimension\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment BlokDependency on BlokDependency {\n  key\n  description\n  optional\n  actionDependencies {\n    key\n    description\n    optional\n    demand {\n      hash\n      key\n      app\n      version\n      name\n      argMatches {\n        ...BlokPortMatch\n        __typename\n      }\n      returnMatches {\n        ...BlokPortMatch\n        __typename\n      }\n      protocols\n      forceArgLength\n      forceReturnLength\n      pure\n      idempotent\n      stateful\n      __typename\n    }\n    __typename\n  }\n  stateDependencies {\n    key\n    description\n    optional\n    demand {\n      hash\n      key\n      app\n      matches {\n        ...BlokPortMatch\n        __typename\n      }\n      protocols\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment BlokDiagnostic on Diagnostic {\n  level\n  code\n  message\n  path\n  __typename\n}\n\nfragment DetailBlok on Blok {\n  id\n  name\n  description\n  provided\n  app {\n    id\n    identifier\n    __typename\n  }\n  context\n  catalog {\n    id\n    name\n    __typename\n  }\n  componentTree\n  demoState\n  diagnostics {\n    ...BlokDiagnostic\n    __typename\n  }\n  dependencies {\n    ...BlokDependency\n    __typename\n  }\n  __typename\n}\n\nquery ListBloks($search: String, $provided: Boolean, $limit: Int, $offset: Int) {\n  bloks(\n    filters: {search: $search, provided: $provided}\n    pagination: {limit: $limit, offset: $offset}\n  ) {\n    ...DetailBlok\n    __typename\n  }\n}'
 
 class UiCatalogsQuery(BaseModel):
     """No documentation found for this operation."""
@@ -2927,6 +2980,46 @@ Returns:
             _input['description'] = description
         variables['input'] = _input
         return self.execute(MaterializeBlokMutation, variables).materialize_blok
+
+    async def afork_blok(self, id: IDCoercible, name: str | None | UnsetType=UNSET) -> DetailBlok:
+        """ForkBlok 
+
+Copy a blok an app provides into a custom blok, to edit it or bind other agents to it. The copy lives on whatever the providing agents do.
+
+Args:
+    id: The provided blok to fork.
+    name: The custom blok's name. Defaults to the provided blok's.
+
+Returns:
+    DetailBlok
+"""
+        variables: dict[str, builtins.object] = {}
+        _input: dict[str, builtins.object] = {}
+        _input['id'] = id
+        if name is not UNSET:
+            _input['name'] = name
+        variables['input'] = _input
+        return (await self.aexecute(ForkBlokMutation, variables)).fork_blok
+
+    def fork_blok(self, id: IDCoercible, name: str | None | UnsetType=UNSET) -> DetailBlok:
+        """ForkBlok 
+
+Copy a blok an app provides into a custom blok, to edit it or bind other agents to it. The copy lives on whatever the providing agents do.
+
+Args:
+    id: The provided blok to fork.
+    name: The custom blok's name. Defaults to the provided blok's.
+
+Returns:
+    DetailBlok
+"""
+        variables: dict[str, builtins.object] = {}
+        _input: dict[str, builtins.object] = {}
+        _input['id'] = id
+        if name is not UNSET:
+            _input['name'] = name
+        variables['input'] = _input
+        return self.execute(ForkBlokMutation, variables).fork_blok
 
     async def aupdate_blok(self, id: IDCoercible, name: str | None | UnsetType=UNSET, description: str | None | UnsetType=UNSET, components: Iterable[ComponentNodeInput] | None | UnsetType=UNSET, source: str | None | UnsetType=UNSET, demo_state: Args | None | UnsetType=UNSET, catalog: str | None | UnsetType=UNSET, dependencies: Iterable[AgentDependencyInput] | None | UnsetType=UNSET) -> DetailBlok:
         """UpdateBlok 
@@ -4173,6 +4266,56 @@ Returns:
         if offset is not UNSET:
             variables['offset'] = offset
         return self.execute(SearchMaterializedBloksQuery, variables).options
+
+    async def alist_bloks(self, search: str | None | UnsetType=UNSET, provided: bool | None | UnsetType=UNSET, limit: int | None | UnsetType=UNSET, offset: int | None | UnsetType=UNSET) -> tuple[DetailBlok, ...]:
+        """ListBloks 
+
+List of UI Blok.
+
+Args:
+    search (str | None, optional): No description. 
+    provided (bool | None, optional): No description. 
+    limit (int | None, optional): No description. 
+    offset (int | None, optional): No description. 
+
+Returns:
+    list[DetailBlok]
+"""
+        variables: dict[str, builtins.object] = {}
+        if search is not UNSET:
+            variables['search'] = search
+        if provided is not UNSET:
+            variables['provided'] = provided
+        if limit is not UNSET:
+            variables['limit'] = limit
+        if offset is not UNSET:
+            variables['offset'] = offset
+        return (await self.aexecute(ListBloksQuery, variables)).bloks
+
+    def list_bloks(self, search: str | None | UnsetType=UNSET, provided: bool | None | UnsetType=UNSET, limit: int | None | UnsetType=UNSET, offset: int | None | UnsetType=UNSET) -> tuple[DetailBlok, ...]:
+        """ListBloks 
+
+List of UI Blok.
+
+Args:
+    search (str | None, optional): No description. 
+    provided (bool | None, optional): No description. 
+    limit (int | None, optional): No description. 
+    offset (int | None, optional): No description. 
+
+Returns:
+    list[DetailBlok]
+"""
+        variables: dict[str, builtins.object] = {}
+        if search is not UNSET:
+            variables['search'] = search
+        if provided is not UNSET:
+            variables['provided'] = provided
+        if limit is not UNSET:
+            variables['limit'] = limit
+        if offset is not UNSET:
+            variables['offset'] = offset
+        return self.execute(ListBloksQuery, variables).bloks
 
     async def aui_catalogs(self) -> tuple[UICatalog, ...]:
         """UiCatalogs 

@@ -13,3 +13,12 @@ query SearchMaterializedBloks($search: String, $values: [ID!], $limit: Int, $off
     value: id
   }
 }
+
+query ListBloks($search: String, $provided: Boolean, $limit: Int, $offset: Int) {
+  bloks(
+    filters: {search: $search, provided: $provided}
+    pagination: {limit: $limit, offset: $offset}
+  ) {
+    ...DetailBlok
+  }
+}

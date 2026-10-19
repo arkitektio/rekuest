@@ -324,6 +324,12 @@ class FinishMediaUploadInput(BaseModel):
     'Default: True'
     model_config = ConfigDict(frozen=True, extra='forbid', populate_by_name=True, use_enum_values=True)
 
+class ForkBlokInput(BaseModel):
+    """Copy a blok an app provides into a custom blok of the caller's organization, to edit it or bind other agents to it."""
+    id: ID = Field(description='The provided blok to fork.')
+    name: str | None = Field(default=None, description="The custom blok's name. Defaults to the provided blok's.")
+    model_config = ConfigDict(frozen=True, extra='forbid', populate_by_name=True, use_enum_values=True)
+
 class ImplementationActionFilter(BaseModel):
     """No documentation"""
     and_: 'ImplementationActionFilter | None' = Field(validation_alias=AliasChoices('and_', 'AND'), serialization_alias='AND', default=None)

@@ -96,6 +96,11 @@ fragment DetailBlok on Blok {
   id
   name
   description
+  provided
+  app {
+    id
+    identifier
+  }
   context
   catalog {
     id
@@ -115,6 +120,10 @@ fragment DetailMaterializedBlok on MaterializedBlok {
   id
   name
   description
+  declaredBy {
+    id
+    declaredName
+  }
   blok {
     ...DetailBlok
   }

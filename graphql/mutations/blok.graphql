@@ -11,6 +11,12 @@ mutation MaterializeBlok($input: MaterializeBlokInput!) {
   }
 }
 
+mutation ForkBlok($input: ForkBlokInput!) {
+  forkBlok(input: $input) {
+    ...DetailBlok
+  }
+}
+
 mutation UpdateBlok($input: UpdateBlokInput!) {
   updateBlok(input: $input) {
     ...DetailBlok
