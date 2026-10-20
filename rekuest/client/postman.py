@@ -5,12 +5,13 @@ from typing import Any
 from collections.abc import AsyncGenerator, AsyncIterator, Sequence
 from rath.scalars import ID
 from rekuest.client.graphql import RekuestGraphQL
-from arkitekt_spec.declare.task import AssignPrompt, HookInput
+from arkitekt_spec.declare.task import AssignPrompt, HookInput, StateRequirement
 from arkitekt_runtime.types import (
     ResolvedDependencyInput,
     TaskEventKind,
     TaskPolicy,
     AssignInput,
+    StateRequirementInput,
 )
 from rekuest.api.schema import Task, TaskChange, TaskChangeEvent, TaskEventChange
 from rekuest.scalars import ActionHash
@@ -223,6 +224,7 @@ class GraphQLPostman(KoiledModel):
         call_key: str | None = None,
         prompt: "AssignPrompt | None" = None,
         policy: "TaskPolicy | None" = None,
+        state_requires: "list[StateRequirement] | None" = None,
     ) -> AsyncGenerator[TaskEventChange, None]:
         """Originate a root task over GraphQL and stream its events.
 
@@ -232,6 +234,8 @@ class GraphQLPostman(KoiledModel):
         ``call_key`` names a child by its parent, so a root has none; it is accepted and
         unused. So is ``prompt``: only a child is held for approval. ``policy`` is the
         root's: whether the work agents ask for under it waits for a person.
+        ``state_requires`` is sent only when given: a server from before them refuses
+        the field.
         """
         self._reject_non_root(parent, dependency, method)
         assign_input = AssignInput(
@@ -248,6 +252,14 @@ class GraphQLPostman(KoiledModel):
             dependencies=tuple(dependencies) if dependencies is not None else None,
             step=step,
             policy=policy,
+            state_requires=(
+                tuple(
+                    StateRequirementInput.model_validate(requirement.model_dump())
+                    for requirement in state_requires
+                )
+                if state_requires
+                else None
+            ),
         )
         # `reference` is always set above, so this is a str for the queue keys below.
         assign_reference: str = assign_input.reference or ""

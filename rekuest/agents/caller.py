@@ -42,7 +42,7 @@ from rath.scalars import ID
 
 from arkitekt_runtime import messages
 from arkitekt_runtime.types import TaskEventKind, TaskPolicy
-from arkitekt_spec.declare.task import AssignPrompt, HookInput
+from arkitekt_spec.declare.task import AssignPrompt, HookInput, StateRequirement
 from arkitekt_runtime.agents.transport.types import MessageSink
 from arkitekt_runtime.postmans.errors import AssignException
 from arkitekt_spec.declare.errors import NonDeterministicWorkflow
@@ -65,7 +65,8 @@ class CallerTaskEvent:
     returns: dict[str, object] | None = None
     message: str | None = None
     value: dict[str, object] | None = None
-    """LOST: what is known (started, last_progress, effects, reason)."""
+    """LOST: what is known (started, last_progress, effects, reason). FAILED: the
+    report's ``code``, when it has one (``STATE_PRECONDITION``)."""
     task: str | None = None
     """The task the event is about (DENIED: the refused child)."""
 
@@ -90,7 +91,12 @@ def _adapt(event: "messages.ExecutionEvent") -> CallerTaskEvent | None:
     if isinstance(event, messages.CompletedEvent):
         return CallerTaskEvent(kind=TaskEventKind.COMPLETED)
     if isinstance(event, messages.FailedEvent):
-        return CallerTaskEvent(kind=TaskEventKind.FAILED, message=event.error)
+        return CallerTaskEvent(
+            kind=TaskEventKind.FAILED,
+            message=event.error,
+            value={"code": event.code} if event.code else None,
+            task=event.task,
+        )
     if isinstance(event, messages.CriticalEvent):
         return CallerTaskEvent(kind=TaskEventKind.CRITICAL, message=event.error)
     if isinstance(event, messages.LostEvent):
@@ -201,6 +207,7 @@ class AgentPostman:
         call_key: str | None = None,
         prompt: "AssignPrompt | None" = None,
         policy: "TaskPolicy | None" = None,
+        state_requires: "list[StateRequirement] | None" = None,
     ) -> AsyncGenerator[CallerTaskEvent, None]:
         """Originate a task over the agent socket and stream its events.
 
@@ -249,6 +256,7 @@ class AgentPostman:
             capture=capture,
             step=step,
             prompt=prompt,
+            state_requires=list(state_requires or ()),
         )
         async for event in self._astream(
             request,

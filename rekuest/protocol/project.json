@@ -158,6 +158,7 @@
                         "ResolvedDependencyInput",
                         "ResumeInput",
                         "DecideInput",
+                        "StateRequirementInput",
                         "TaskEventKind",
                         "TaskPolicy"
                     ],

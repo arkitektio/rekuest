@@ -95,6 +95,7 @@ projects:
               - ResolvedDependencyInput
               - ResumeInput
               - DecideInput
+              - StateRequirementInput
               - TaskEventKind
               - TaskPolicy
         always_resolve_interfaces: true
