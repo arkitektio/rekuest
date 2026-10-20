@@ -28,6 +28,12 @@ mutation resume($input: ResumeInput!) {
   }
 }
 
+mutation decide($input: DecideInput!) {
+  decide(input: $input) {
+    ...Task
+  }
+}
+
 
 mutation collect($input: CollectInput!) {
   collect(input: $input) 

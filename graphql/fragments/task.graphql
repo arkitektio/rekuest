@@ -6,6 +6,7 @@ fragment Task on Task {
   }
   id
   latestEventKind
+  policy
   events(ordering: [{createdAt: ASC}]) {
     id
     returns

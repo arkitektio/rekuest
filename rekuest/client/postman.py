@@ -5,10 +5,11 @@ from typing import Any
 from collections.abc import AsyncGenerator, AsyncIterator, Sequence
 from rath.scalars import ID
 from rekuest.client.graphql import RekuestGraphQL
-from arkitekt_spec.declare.task import HookInput
+from arkitekt_spec.declare.task import AssignPrompt, HookInput
 from arkitekt_runtime.types import (
     ResolvedDependencyInput,
     TaskEventKind,
+    TaskPolicy,
     AssignInput,
 )
 from rekuest.api.schema import Task, TaskChange, TaskChangeEvent, TaskEventChange
@@ -220,6 +221,8 @@ class GraphQLPostman(KoiledModel):
         escalate_to_interrupt: bool = False,
         cancel_timeout: float | None = None,
         call_key: str | None = None,
+        prompt: "AssignPrompt | None" = None,
+        policy: "TaskPolicy | None" = None,
     ) -> AsyncGenerator[TaskEventChange, None]:
         """Originate a root task over GraphQL and stream its events.
 
@@ -227,7 +230,8 @@ class GraphQLPostman(KoiledModel):
         ``dependency`` / ``method`` are accepted only so this postman can reject them
         loudly: the mutation creates a root task and has no way to express a child.
         ``call_key`` names a child by its parent, so a root has none; it is accepted and
-        unused.
+        unused. So is ``prompt``: only a child is held for approval. ``policy`` is the
+        root's: whether the work agents ask for under it waits for a person.
         """
         self._reject_non_root(parent, dependency, method)
         assign_input = AssignInput(
@@ -243,6 +247,7 @@ class GraphQLPostman(KoiledModel):
             capture=capture,
             dependencies=tuple(dependencies) if dependencies is not None else None,
             step=step,
+            policy=policy,
         )
         # `reference` is always set above, so this is a str for the queue keys below.
         assign_reference: str = assign_input.reference or ""

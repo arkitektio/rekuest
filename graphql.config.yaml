@@ -94,7 +94,9 @@ projects:
               - PauseInput
               - ResolvedDependencyInput
               - ResumeInput
+              - DecideInput
               - TaskEventKind
+              - TaskPolicy
         always_resolve_interfaces: true
         exclude_typenames: true
         dump_configuration: true

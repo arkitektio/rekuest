@@ -15,6 +15,8 @@ import uuid
 from typing import Protocol
 
 import pytest
+
+from arkitekt_runtime.types import TaskPolicy
 from dokker import Deployment
 
 from arkitekt_runtime.task import Task
@@ -153,7 +155,7 @@ async def test_a_child_call_is_stored_with_its_parents_step(
 
         reference = f"twice-{uuid.uuid4().hex[:8]}"
         impl = await workflow.amy_implementation_at("twice")
-        assert await workflow.acall(impl, x=3, reference=reference) == 12
+        assert await workflow.acall(impl, x=3, reference=reference, policy=TaskPolicy.AUTO) == 12
 
         parent = await _task_by_reference(workflow, reference)
         # The child runs on the provider; either client may be the one allowed to list it.

@@ -16,7 +16,8 @@ from rekuest.agents.caller import AgentPostman, CallerTaskEvent
 from arkitekt_runtime.types import TaskEventKind
 from arkitekt_runtime.postmans.errors import AssignException
 from arkitekt_runtime.calls import _astream_raw
-from arkitekt_spec.declare.errors import AgentLost, ErrorCallError
+from arkitekt_spec.declare.errors import AgentLost, DeniedError, ErrorCallError
+from arkitekt_spec.declare.task import AssignPrompt
 
 
 def _call(**kwargs: object) -> dict:
@@ -207,6 +208,60 @@ async def test_a_lost_event_raises_agent_lost_with_what_is_known() -> None:
         60,
         "IRREVERSIBLE",
     )
+
+
+@pytest.mark.asyncio
+async def test_a_held_child_carries_its_prompt_and_a_denial_raises_denied_error() -> None:
+    """The prompt rides the request; HELD is surfaced, and DENIED ends the call as DeniedError."""
+    sink = MemoryAgentTransport()
+    pm = AgentPostman(sink)
+    prompt = AssignPrompt(title="Delegate to Segmenter", description="It segments nuclei.")
+
+    async def call() -> None:
+        async for _ in _astream_raw(pm, **_call(parent="p1", prompt=prompt)):
+            pass
+
+    task = asyncio.create_task(call())
+    await _until(lambda: sink.sent)
+    req = _last_request(sink)
+    assert req.prompt == prompt
+
+    pm.handle_assign_response(messages.AssignResponse(request=req.id, reference=req.reference, task="t1"))
+    pm.handle_execution_event(messages.HeldEvent(task="t1", event="e1", seq=1, prompt=prompt))
+    await asyncio.sleep(0.05)
+    assert not task.done(), "a held child keeps its caller waiting"
+
+    pm.handle_execution_event(messages.DeniedEvent(task="t1", event="e2", seq=2, answer="not today"))
+    with pytest.raises(DeniedError, match="not today") as denied:
+        await asyncio.wait_for(task, timeout=1.0)
+    assert (denied.value.answer, denied.value.task) == ("not today", "t1")
+
+
+@pytest.mark.asyncio
+async def test_a_held_event_is_surfaced_to_the_caller() -> None:
+    sink = MemoryAgentTransport()
+    pm = AgentPostman(sink)
+    seen: list[CallerTaskEvent] = []
+
+    async def run() -> None:
+        async for ev in pm.aassign(**_call(parent="p1")):
+            seen.append(ev)
+
+    task = asyncio.create_task(run())
+    await _until(lambda: sink.sent)
+    req = _last_request(sink)
+    assert req.prompt is None
+    pm.handle_assign_response(messages.AssignResponse(request=req.id, reference=req.reference, task="t1"))
+    pm.handle_execution_event(
+        messages.HeldEvent(task="t1", event="e1", seq=1, prompt=AssignPrompt(title="Run it"))
+    )
+    pm.handle_execution_event(messages.CompletedEvent(task="t1", event="e2", seq=2))
+    await asyncio.wait_for(task, timeout=1.0)
+
+    assert [(e.kind, e.message, e.task) for e in seen] == [
+        (TaskEventKind.HELD, "Run it", "t1"),
+        (TaskEventKind.COMPLETED, None, None),
+    ]
 
 
 @pytest.mark.asyncio

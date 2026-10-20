@@ -20,6 +20,7 @@ from typing import (
 from collections.abc import AsyncGenerator, Generator
 from arkitekt_spec.declare.errors import RootOnlyCallError
 from arkitekt_spec.declare.task import HookInput
+from arkitekt_runtime.types import TaskPolicy
 from arkitekt_spec.declare.structures.registry import StructureRegistry
 
 #: What :meth:`Rekuest.aresolve` accepts: a fetched model, an id, or a function this app
@@ -131,9 +132,15 @@ class Rekuest(Composition, RekuestApi):
         capture: bool = False,
         escalate_to_interrupt: bool = False,
         cancel_timeout: float | None = None,
+        policy: "TaskPolicy | None" = None,
         **kwargs: Any,  # noqa: ANN401 -- ditto, by keyword
     ) -> Any:  # noqa: ANN401 -- whatever the action returns
-        """Call an action as a root task, through this client's own postman."""
+        """Call an action as a root task, through this client's own postman.
+
+        ``policy`` says whether the work agents ask for under it waits for a person:
+        ASK (the server's default) holds every child until someone approves it, AUTO
+        (auto-mode) lets them run. Unattended runs -- scripts, tests -- pass AUTO.
+        """
         self._refuse_in_task("acall")
         from arkitekt_runtime.invoke import _acall
 
@@ -147,6 +154,7 @@ class Rekuest(Composition, RekuestApi):
             capture=capture,
             escalate_to_interrupt=escalate_to_interrupt,
             cancel_timeout=cancel_timeout,
+            policy=policy,
             **kwargs,
         )
 
@@ -171,6 +179,7 @@ class Rekuest(Composition, RekuestApi):
         capture: bool = False,
         escalate_to_interrupt: bool = False,
         cancel_timeout: float | None = None,
+        policy: "TaskPolicy | None" = None,
     ) -> Any:  # noqa: ANN401 -- the raw backend payload
         """Call with already-serialized arguments, as a root task."""
         self._refuse_in_task("acall_raw")
@@ -186,6 +195,7 @@ class Rekuest(Composition, RekuestApi):
             capture=capture,
             escalate_to_interrupt=escalate_to_interrupt,
             cancel_timeout=cancel_timeout,
+            policy=policy,
         )
 
     async def aiterate_raw(
@@ -199,6 +209,7 @@ class Rekuest(Composition, RekuestApi):
         capture: bool = False,
         escalate_to_interrupt: bool = False,
         cancel_timeout: float | None = None,
+        policy: "TaskPolicy | None" = None,
     ) -> AsyncGenerator[Any, None]:
         """Stream with already-serialized arguments, as a root task."""
         self._refuse_in_task("aiterate_raw")
@@ -214,6 +225,7 @@ class Rekuest(Composition, RekuestApi):
             capture=capture,
             escalate_to_interrupt=escalate_to_interrupt,
             cancel_timeout=cancel_timeout,
+            policy=policy,
         ):
             yield value
 
@@ -226,6 +238,7 @@ class Rekuest(Composition, RekuestApi):
         capture: bool = False,
         escalate_to_interrupt: bool = False,
         cancel_timeout: float | None = None,
+        policy: "TaskPolicy | None" = None,
         **kwargs: Any,  # noqa: ANN401 -- ditto, by keyword
     ) -> AsyncGenerator[Any, None]:
         """Stream a generator action's yields, as a root task."""
@@ -242,6 +255,7 @@ class Rekuest(Composition, RekuestApi):
             capture=capture,
             escalate_to_interrupt=escalate_to_interrupt,
             cancel_timeout=cancel_timeout,
+            policy=policy,
             **kwargs,
         ):
             yield value

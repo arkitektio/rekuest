@@ -17,6 +17,8 @@ import asyncio
 from typing import Any, Protocol
 
 import pytest
+
+from arkitekt_runtime.types import TaskPolicy
 from dokker import Deployment
 
 from rekuest.agents.caller import AgentPostman
@@ -80,6 +82,7 @@ async def test_actor_internal_dependency_call_uses_agent(
         )
         answer = await workflow_app.acall(
             impl,
+            policy=TaskPolicy.AUTO,
         )
 
         assert answer == "stitched-printer", f"Unexpected workflow result: {answer!r}"

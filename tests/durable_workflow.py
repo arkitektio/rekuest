@@ -135,9 +135,9 @@ def declare_held(app: Any) -> None:  # noqa: ANN401 - a FreshApp
     """``held``: takes the clock, then waits for a person."""
 
     def held(task: Task) -> float:
-        """Take the clock, then wait for a person to resume it."""
+        """Take the clock, then wait for a person to approve it."""
         now = task.now()
-        task.hold("Check the plate, then resume.")
+        task.hold("Check the plate, then approve.")
         return now
 
     app.register_workflow(held)

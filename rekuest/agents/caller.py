@@ -41,8 +41,8 @@ from collections.abc import AsyncGenerator, Awaitable, Callable, Sequence
 from rath.scalars import ID
 
 from arkitekt_runtime import messages
-from arkitekt_runtime.types import TaskEventKind
-from arkitekt_spec.declare.task import HookInput
+from arkitekt_runtime.types import TaskEventKind, TaskPolicy
+from arkitekt_spec.declare.task import AssignPrompt, HookInput
 from arkitekt_runtime.agents.transport.types import MessageSink
 from arkitekt_runtime.postmans.errors import AssignException
 from arkitekt_spec.declare.errors import NonDeterministicWorkflow
@@ -66,6 +66,8 @@ class CallerTaskEvent:
     message: str | None = None
     value: dict[str, object] | None = None
     """LOST: what is known (started, last_progress, effects, reason)."""
+    task: str | None = None
+    """The task the event is about (DENIED: the refused child)."""
 
 
 #: Mirror message types that end a delegated task's stream. Every other mirror
@@ -78,7 +80,8 @@ _TERMINAL_TYPES = messages.TERMINAL_EVENT_MIRRORS
 def _adapt(event: "messages.ExecutionEvent") -> CallerTaskEvent | None:
     """Translate a backend mirror into a ``CallerTaskEvent`` (or ``None`` to skip).
 
-    Only the four kinds ``_astream_raw`` acts on are surfaced. ``Cancelled``/``Interrupted``
+    Only the kinds ``_astream_raw`` acts on are surfaced, and HELD, so a caller can see
+    that its child waits for approval. ``Cancelled``/``Interrupted``
     are surfaced as a ``CRITICAL`` so an in-flight ``acall`` fails loudly rather than hanging
     or silently completing when the work it delegated was killed out from under it.
     """
@@ -101,6 +104,14 @@ def _adapt(event: "messages.ExecutionEvent") -> CallerTaskEvent | None:
                 "reason": event.reason,
             },
         )
+    if isinstance(event, messages.HeldEvent):
+        return CallerTaskEvent(
+            kind=TaskEventKind.HELD,
+            message=event.prompt.title if event.prompt is not None else None,
+            task=event.task,
+        )
+    if isinstance(event, messages.DeniedEvent):
+        return CallerTaskEvent(kind=TaskEventKind.DENIED, message=event.answer, task=event.task)
     if isinstance(event, (messages.CancelledEvent, messages.InterruptedEvent)):
         return CallerTaskEvent(
             kind=TaskEventKind.CRITICAL,
@@ -188,6 +199,8 @@ class AgentPostman:
         escalate_to_interrupt: bool = False,
         cancel_timeout: float | None = None,
         call_key: str | None = None,
+        prompt: "AssignPrompt | None" = None,
+        policy: "TaskPolicy | None" = None,
     ) -> AsyncGenerator[CallerTaskEvent, None]:
         """Originate a task over the agent socket and stream its events.
 
@@ -201,6 +214,9 @@ class AgentPostman:
         arrives. On cancellation a ``CancelRequest`` is sent and the ``CancelledEvent``
         confirmation is awaited (bounded by ``cancel_timeout``); if ``escalate_to_interrupt``
         is set and the cancel is not confirmed in time, an ``InterruptRequest`` follows.
+
+        ``policy`` is accepted and unused: a child takes its parent's, and the server
+        never lets an agent choose one for the work it asks for.
         """
         parent_step = (
             await self.child_step(str(parent))
@@ -232,6 +248,7 @@ class AgentPostman:
             hooks=[h.model_dump(by_alias=True) for h in (hooks or [])],
             capture=capture,
             step=step,
+            prompt=prompt,
         )
         async for event in self._astream(
             request,

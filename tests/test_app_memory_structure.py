@@ -20,6 +20,8 @@ the whole point of these tests.
 import asyncio
 
 import pytest
+
+from arkitekt_runtime.types import TaskPolicy
 from dokker import Deployment
 
 
@@ -232,6 +234,7 @@ async def test_memory_structure_round_trips_through_dependency(
         )
         result = await workflow_app.acall(
             impl,
+            policy=TaskPolicy.AUTO,
             size=7,
         )
         assert result == 7, (

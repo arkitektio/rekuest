@@ -18,7 +18,7 @@ from datetime import UTC, datetime
 import pytest
 from pydantic import PrivateAttr
 
-from arkitekt_runtime.types import AssignInput, TaskEventKind
+from arkitekt_runtime.types import AssignInput, TaskEventKind, TaskPolicy
 from rath.links.testing.direct_succeeding_link import DirectSucceedingLink
 from rekuest.api.schema import Task, TaskChangeEvent, TaskEventChange
 from rekuest.client.postman import GraphQLPostman
@@ -47,8 +47,10 @@ class Backend(GraphQLPostman):
     _reads: list[str] = PrivateAttr(default_factory=lambda: [])
     _reads_fail: bool = PrivateAttr(default=False)
     _task_ids: list[str] = PrivateAttr(default_factory=lambda: ["t1", "t2"])
+    _sent: list[AssignInput] = PrivateAttr(default_factory=lambda: [])
 
     async def _send_assign(self, assign_input: AssignInput) -> Task:
+        self._sent.append(assign_input)
         task_id = self._task_ids.pop(0)
         self._assigned.set()
         await self._answer_assign.wait()
@@ -176,3 +178,24 @@ async def test_a_history_that_cannot_be_read_leaves_the_call_to_the_feed() -> No
 
         assert await asyncio.wait_for(call, timeout=1) == ["e1", "e2"]
         assert backend._reads, "the history was never asked for"
+
+
+@pytest.mark.asyncio
+async def test_a_root_carries_the_policy_it_was_called_with() -> None:
+    """AUTO travels on the assign; without one the server's default (ASK) applies."""
+    backend = _backend()
+    async with backend:
+        for number, policy in enumerate((TaskPolicy.AUTO, None)):
+            call = asyncio.create_task(_drain(backend, policy))
+            await backend._assigned.wait()
+            backend._assigned.clear()
+            backend.reports(_event(number, TaskEventKind.COMPLETED, task=f"t{number + 1}"), on_feed=True)
+            await asyncio.wait_for(call, timeout=1)
+
+    assert [sent.policy for sent in backend._sent] == ["AUTO", None]
+
+
+async def _drain(backend: Backend, policy: TaskPolicy | None) -> None:
+    async for event in backend.aassign(args={}, action="a1", policy=policy):
+        if event.kind in TERMINAL:
+            return

@@ -18,6 +18,8 @@ import time
 from typing import Protocol
 
 import pytest
+
+from arkitekt_runtime.types import TaskPolicy
 from dokker import Deployment
 from koil import check_cancelled
 from koil.errors import ThreadCancelledError
@@ -109,6 +111,7 @@ async def test_workflow_calls_single_dependency(deployment: Deployment) -> None:
 
         answer = await workflow_app.acall(
             impl,
+            policy=TaskPolicy.AUTO,
         )
         assert answer == "stitched-printer", f"Unexpected workflow result: {answer!r}"
 
@@ -193,6 +196,7 @@ async def test_workflow_calls_two_separate_apps(deployment: Deployment) -> None:
 
         answer = await workflow_app.acall(
             impl,
+            policy=TaskPolicy.AUTO,
         )
         assert answer == "stitched-printer|segmented-ptiner", (
             f"Unexpected workflow result: {answer!r}"
@@ -296,6 +300,7 @@ async def test_workflow_cancel_propagates_to_dependency(
         call_task = asyncio.create_task(
             workflow_app.acall(
                 impl,
+                policy=TaskPolicy.AUTO,
             )
         )
 
@@ -415,6 +420,7 @@ async def test_workflow_calls_two_separate_apps_async(deployment: Deployment) ->
 
         answer = await workflow_app.acall(
             impl,
+            policy=TaskPolicy.AUTO,
         )
         assert answer == "stitched-printer|segmented-ptiner", (
             f"Unexpected workflow result: {answer!r}"
@@ -496,7 +502,7 @@ async def test_workflow_calls_a_workflow(deployment: Deployment) -> None:
 
         impl = await workflow_app.amy_implementation_at("nested_workflow")
 
-        answer = await workflow_app.acall(impl)
+        answer = await workflow_app.acall(impl, policy=TaskPolicy.AUTO)
         assert answer == "relayed-stitched-printer", (
             f"Unexpected workflow result: {answer!r}"
         )

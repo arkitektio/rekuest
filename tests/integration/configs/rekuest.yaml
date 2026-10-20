@@ -51,6 +51,16 @@ authentikate:
       client_app: workflow
       client_release: v0.0.1
       client_id: workflow
+    # The same person as workflow_token, from another client: who decides what the
+    # workflow's agent asked for (that agent's own client may never decide it).
+    workflow_decider_token:
+      sub: 4
+      iss: lok
+      active_org: test
+      client_device: workflow_decider_device
+      client_app: workflow_decider
+      client_release: v0.0.1
+      client_id: workflow_decider
     standalone_token:
       sub: 5
       iss: lok
@@ -69,6 +79,16 @@ authentikate:
       client_app: durable
       client_release: v0.0.1
       client_id: durable
+    # The same person as durable_token, from another client: who approves the durable
+    # workflow's hold (an agent's own client may never decide what it asked for).
+    durable_decider_token:
+      sub: 6
+      iss: lok
+      active_org: test
+      client_device: decider_device
+      client_app: decider
+      client_release: v0.0.1
+      client_id: durable_decider
     # A member of the organization without the admin role a static token otherwise
     # carries: what an admin may do that a member may not is tested against it.
     member_token:

@@ -24,6 +24,7 @@ from typing import Any
 import pytest
 from dokker import Deployment
 
+from arkitekt_runtime.types import TaskPolicy
 from arkitekt_spec.declare.errors import AgentLost, CriticalCallError, ErrorCallError
 
 from .conftest import CONNECT_TIMEOUT, build_fresh_rekuest, build_rekuest_at, rekuest_port
@@ -49,7 +50,7 @@ query History($id: ID!) {
   }
 }
 """
-RESUME = "mutation Resume($id: ID!) { resume(input: {task: $id}) { id } }"
+DECIDE = "mutation Decide($id: ID!) { decide(input: {task: $id, approved: true}) { id } }"
 
 
 async def _eventually(probe: Callable[[], Awaitable[Any]], timeout: float, what: str) -> Any:  # noqa: ANN401
@@ -154,8 +155,12 @@ async def kill_and_take_over(
     wait_for_acks: bool = True,
     provide: Callable[[Any, Run], None] | None = None,
     while_down: Callable[[Any], Awaitable[None]] | None = None,
+    policy: TaskPolicy = TaskPolicy.AUTO,
 ) -> Run:
-    """Call ``serve`` on a worker, kill it where it blocks, and let a successor take over."""
+    """Call ``serve`` on a worker, kill it where it blocks, and let a successor take over.
+
+    Unattended, so in auto-mode unless a test is about a person deciding (``policy``).
+    """
     port = rekuest_port(deployment)
     run = Run()
 
@@ -178,7 +183,7 @@ async def kill_and_take_over(
             await worker.start()
             impl = await caller.amy_implementation_at(serve)
             reference = f"{serve}-{uuid.uuid4().hex[:8]}"
-            pending = asyncio.create_task(caller.acall(impl, reference=reference, **call))
+            pending = asyncio.create_task(caller.acall(impl, reference=reference, policy=policy, **call))
             task_id = (await _eventually(lambda: _find(caller, reference), WORKER_TIMEOUT, "the task to exist"))["id"]
             if reached is None:
                 await worker.wait_for(lambda: worker.marker.exists(), "the worker to reach its crash point")
@@ -218,10 +223,10 @@ async def kill_and_take_over(
     return run
 
 
-def _paused(times: int) -> Callable[[Any, str], Awaitable[bool]]:
+def _held(times: int) -> Callable[[Any, str], Awaitable[bool]]:
     async def check(app: Any, task_id: str) -> bool:  # noqa: ANN401
         events = (await _history(app, task_id))["events"]
-        return sum(e["kind"] == "PAUSED" for e in events) >= times
+        return sum(e["kind"] == "HELD" for e in events) >= times
 
     return check
 
@@ -273,21 +278,29 @@ async def test_a_workflow_is_not_resumed_onto_changed_code(deployment: Deploymen
 @pytest.mark.integration
 @pytest.mark.asyncio(loop_scope="session")
 async def test_a_hold_survives_its_agent_dying(deployment: Deployment, tmp_path: Path) -> None:
-    async def resume_once_held_again(app: Any, task_id: str) -> None:  # noqa: ANN401
-        # Nobody had resumed it before the kill, so the resumed run holds again...
-        await _eventually(lambda: _paused(2)(app, task_id), RESUME_TIMEOUT, "the resumed run to hold again")
-        # ...and a person resumes it now.
-        await app.rath.aquery(RESUME, {"id": task_id})
+    async def approve_once_held_again(app: Any, task_id: str) -> None:  # noqa: ANN401
+        # Nobody had decided before the kill, so the resumed run holds again...
+        await _eventually(lambda: _held(2)(app, task_id), RESUME_TIMEOUT, "the resumed run to hold again")
+        # ...and a person approves it now, from their own client: never the agent's.
+        async with build_fresh_rekuest(deployment, token="durable_decider_token") as decider:
+            await decider.rath.aquery(DECIDE, {"id": task_id})
 
     run = await kill_and_take_over(
-        deployment, tmp_path, serve="held", call={}, reached=_paused(1), after_take_over=resume_once_held_again
+        deployment,
+        tmp_path,
+        serve="held",
+        call={},
+        reached=_held(1),
+        after_take_over=approve_once_held_again,
+        policy=TaskPolicy.ASK,
     )
 
     assert run.error is None, (run.error, run.kinds())
     assert run.result == pytest.approx(run.effects("NOW")[0]["value"])
-    held = [e for e in run.events if e["kind"] == "PAUSED"]
-    assert held[0]["message"] == "Check the plate, then resume."
-    assert len(run.effects("HOLD")) == 1, "the resume is recorded once"
+    held = [e for e in run.events if e["kind"] == "HELD"]
+    assert held[0]["message"] == "Check the plate, then approve."
+    assert len(run.effects("HOLD")) == 1, "the decision is recorded once"
+    assert run.effects("HOLD")[0]["value"]["approved"] is True
 
 
 @pytest.mark.integration
@@ -305,7 +318,7 @@ async def test_a_workflow_handles_a_step_whose_agent_died(deployment: Deployment
         loop = asyncio.create_task(orchestrator.aloop())
         try:
             impl = await orchestrator.amy_implementation_at("careful")
-            pending = asyncio.create_task(orchestrator.acall(impl, x=3))
+            pending = asyncio.create_task(orchestrator.acall(impl, x=3, policy=TaskPolicy.AUTO))
             await worker.wait_for(lambda: worker.marker.exists(), "the step to reach its crash point")
             await worker.kill_once_all_is_acknowledged()
 
