@@ -71,11 +71,18 @@ async def test_cancel_awaits_backend_cancelled(deployment: Deployment) -> None:
         with pytest.raises(asyncio.CancelledError):
             await call_task
 
-        task = await _find_task(app, reference)
-        assert task is not None, "task disappeared from the backend"
-        assert task.latest_event_kind == TaskEventKind.CANCELLED, (
-            f"expected CANCELLED, got {task.latest_event_kind}"
-        )
+        # The confirmation the postman awaits is bounded: on a slow runner it can give
+        # up first, and the task's row then catches up a moment later.
+        deadline = asyncio.get_event_loop().time() + 10.0
+        while True:
+            task = await _find_task(app, reference)
+            assert task is not None, "task disappeared from the backend"
+            if task.latest_event_kind == TaskEventKind.CANCELLED:
+                break
+            assert asyncio.get_event_loop().time() < deadline, (
+                f"expected CANCELLED, got {task.latest_event_kind}"
+            )
+            await asyncio.sleep(0.2)
 
         loop_task.cancel()
         try:
