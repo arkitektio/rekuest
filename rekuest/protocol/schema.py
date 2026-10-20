@@ -149,6 +149,7 @@ class AgentFilter(BaseModel):
     available: bool | None = Field(default=None, description="Agents that can receive work now: a webhook agent, or a connected one with a fresh heartbeat (takt's rule).")
     supervisor: str | None = Field(default=None, description="Agents whose self-declared supervisor is this app (e.g. 'plugin_engine').")
     requires: tuple[RequiresInput, ...] | None = Field(default=None, description="Agents meeting a port's descriptor constraints (a picker hands them in as $requires). The only descriptor of @rekuest/agent is @rekuest/supervisor; any other key is refused.")
+    caller_of: ID | None = Field(validation_alias=AliasChoices('caller_of', 'callerOf'), serialization_alias='callerOf', default=None, description="The agents that called this task, nearest first: its ancestors' agents, then the agent of the app its run was started from. Never the task's own agent. How an app finds what its caller offers (with actionDemands) and calls it.")
     ids: tuple[ID, ...] | None = Field(default=None, description='Filter by IDs of the agents')
     has_implementations: tuple[str, ...] | None = Field(validation_alias=AliasChoices('has_implementations', 'hasImplementations'), serialization_alias='hasImplementations', default=None, description='Filter by implementations of the agents')
     has_states: tuple[str, ...] | None = Field(validation_alias=AliasChoices('has_states', 'hasStates'), serialization_alias='hasStates', default=None, description='Filter by states of the agents')
@@ -350,6 +351,7 @@ class ImplementationAgentFilter(BaseModel):
     or_: 'ImplementationAgentFilter | None' = Field(validation_alias=AliasChoices('or_', 'OR'), serialization_alias='OR', default=None)
     not_: 'ImplementationAgentFilter | None' = Field(validation_alias=AliasChoices('not_', 'NOT'), serialization_alias='NOT', default=None)
     distinct: bool | None = Field(validation_alias=AliasChoices('distinct', 'DISTINCT'), serialization_alias='DISTINCT', default=None)
+    caller_of: ID | None = Field(validation_alias=AliasChoices('caller_of', 'callerOf'), serialization_alias='callerOf', default=None, description="Implementations of the agents that called this task, nearest first: its ancestors' agents, then the agent of the app its run was started from. Never the task's own agent. How an app finds what its caller offers (with actionDemand) and calls it.")
     client_id: str | None = Field(validation_alias=AliasChoices('client_id', 'clientId'), serialization_alias='clientId', default=None)
     ids: tuple[ID, ...] | None = None
     has_implementations: tuple[str, ...] | None = Field(validation_alias=AliasChoices('has_implementations', 'hasImplementations'), serialization_alias='hasImplementations', default=None)
