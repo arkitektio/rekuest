@@ -22,3 +22,11 @@ query ListBloks($search: String, $provided: Boolean, $limit: Int, $offset: Int) 
     ...DetailBlok
   }
 }
+
+query BlokRevisions($id: ID!, $limit: Int! = 20, $offset: Int! = 0) {
+  blok(id: $id) {
+    revisions(limit: $limit, offset: $offset) {
+      ...BlokRevision
+    }
+  }
+}

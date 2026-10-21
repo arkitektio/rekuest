@@ -28,3 +28,21 @@ mutation UpdateMaterializedBlok($input: UpdateMaterializedBlokInput!) {
     ...DetailMaterializedBlok
   }
 }
+
+mutation EditBlok($input: EditBlokInput!) {
+  editBlok(input: $input) {
+    ...BlokEdit
+  }
+}
+
+mutation RevertBlok($input: RevertBlokInput!) {
+  revertBlok(input: $input) {
+    ...BlokRevision
+  }
+}
+
+mutation PinMaterializedBlok($input: PinMaterializedBlokInput!) {
+  pinMaterializedBlok(input: $input) {
+    ...DetailMaterializedBlok
+  }
+}

@@ -322,6 +322,21 @@ class CreateThreeDModelInput(BaseModel):
     dependency: AgentDependencyInput | None = Field(default=None, description='The agent this model shows: whose state the transfer function reads.')
     model_config = ConfigDict(frozen=True, extra='forbid', populate_by_name=True, use_enum_values=True)
 
+class EditBlokInput(BaseModel):
+    """Edit the blok a materialization shows, and its bindings there, as one new revision."""
+    materialized_blok: ID = Field(validation_alias=AliasChoices('materialized_blok', 'materializedBlok'), serialization_alias='materializedBlok', description='The materialization the edit is made through. Its bindings are the ones `agent_mappings` changes.')
+    base: ID | None = Field(default=None, description="The revision the edit starts from. It must still be the blok's head, or the edit is refused. Required for a custom blok; a provided blok has no revisions and is forked.")
+    components: tuple[ComponentNodeInput, ...] | None = Field(default=None, description='The full component tree. Kept when omitted.')
+    source: str | None = Field(default=None, description='The full component tree as BSX, which the server parses: send it or `components`, not both.')
+    demo_state: Args | None = Field(validation_alias=AliasChoices('demo_state', 'demoState'), serialization_alias='demoState', default=None, description='The full local state. Kept when omitted.')
+    catalog: str | None = Field(default=None, description="Name of the UI catalog (in the caller's organization) the blok renders against. Kept when omitted.")
+    dependencies: tuple[AgentDependencyInput, ...] | None = Field(default=None, description='The full list of agent dependencies. Kept when omitted; keys not listed are removed.')
+    agent_mappings: tuple[MappedAgentInput, ...] | None = Field(validation_alias=AliasChoices('agent_mappings', 'agentMappings'), serialization_alias='agentMappings', default=None, description='Bindings on this materialization, by dependency key, over the ones it has. Bindings of keys the edit removes go.')
+    message: str | None = Field(default=None, description='What changed and why, in a sentence; kept with the revision.')
+    task: ID | None = Field(default=None, description="The task making the edit (one the caller's agent runs), kept with the revision.")
+    dry_run: bool | None = Field(validation_alias=AliasChoices('dry_run', 'dryRun'), serialization_alias='dryRun', default=None, description='Check everything and return the findings, keeping nothing. Off when omitted.')
+    model_config = ConfigDict(frozen=True, extra='forbid', populate_by_name=True, use_enum_values=True)
+
 class FinishMediaUploadInput(BaseModel):
     """No documentation"""
     store_id: str = Field(validation_alias=AliasChoices('store_id', 'storeId'), serialization_alias='storeId')
@@ -408,6 +423,12 @@ class ParamPair(BaseModel):
     value: str
     model_config = ConfigDict(frozen=True, extra='forbid', populate_by_name=True, use_enum_values=True)
 
+class PinMaterializedBlokInput(BaseModel):
+    """Keep a materialization at one revision of its blok, or let it follow the head."""
+    id: ID = Field(description='The materialization.')
+    revision: ID | None = Field(default=None, description='The revision to stay at; null follows the head again.')
+    model_config = ConfigDict(frozen=True, extra='forbid', populate_by_name=True, use_enum_values=True)
+
 class PlacementInput(BaseModel):
     """The input for creating or updating a placement."""
     role: str | None = Field(default=None, description='The role of the placement. This is used to identify the placement in the system.')
@@ -454,6 +475,15 @@ class RequestMediaUploadInput(BaseModel):
     original_file_name: str = Field(validation_alias=AliasChoices('original_file_name', 'originalFileName'), serialization_alias='originalFileName')
     file_size: int | None = Field(validation_alias=AliasChoices('file_size', 'fileSize'), serialization_alias='fileSize', default=None)
     content_type: str | None = Field(validation_alias=AliasChoices('content_type', 'contentType'), serialization_alias='contentType', default=None)
+    model_config = ConfigDict(frozen=True, extra='forbid', populate_by_name=True, use_enum_values=True)
+
+class RevertBlokInput(BaseModel):
+    """Make an earlier revision's content a blok's head again."""
+    blok: ID = Field(description='The custom blok.')
+    to: ID = Field(description='The revision whose content comes back.')
+    base: ID = Field(description='The revision the caller saw as the head; refused when the head moved since.')
+    message: str | None = Field(default=None, description="Why, in a sentence. Defaults to 'Back to revision <n>'.")
+    task: ID | None = Field(default=None, description="The task making the change (one the caller's agent runs).")
     model_config = ConfigDict(frozen=True, extra='forbid', populate_by_name=True, use_enum_values=True)
 
 class ShelveInMemoryDrawerInput(BaseModel):

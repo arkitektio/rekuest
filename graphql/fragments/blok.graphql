@@ -119,6 +119,22 @@ fragment DetailBlok on Blok {
   dependencies {
     ...BlokDependency
   }
+  head {
+    ...BlokRevision
+  }
+}
+
+fragment BlokRevision on BlokRevision {
+  id
+  number
+  message
+  createdAt
+  author {
+    sub
+  }
+  task {
+    id
+  }
 }
 
 fragment DetailMaterializedBlok on MaterializedBlok {
@@ -139,5 +155,23 @@ fragment DetailMaterializedBlok on MaterializedBlok {
       declaredName
       connected
     }
+  }
+  pinnedRevision {
+    ...BlokRevision
+  }
+  unboundDependencies
+}
+
+fragment BlokEdit on BlokEdit {
+  applied
+  forked
+  revision {
+    ...BlokRevision
+  }
+  materializedBlok {
+    ...DetailMaterializedBlok
+  }
+  diagnostics {
+    ...BlokDiagnostic
   }
 }
