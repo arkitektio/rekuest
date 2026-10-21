@@ -28,3 +28,10 @@ query SearchAgents($search: String, $values: [ID!], $requires: [RequiresInput!],
     value: id
   }
 }
+
+
+query DesignAgents($filters: AgentFilter, $pagination: OffsetPaginationInput) {
+  agents(filters: $filters, pagination: $pagination) {
+    ...DesignAgent
+  }
+}

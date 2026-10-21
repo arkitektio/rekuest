@@ -19,3 +19,37 @@ fragment Agent on Agent {
     id
   }
 }
+
+fragment DesignAgent on Agent {
+  id
+  declaredName
+  connected
+  app {
+    identifier
+  }
+  states {
+    key
+    interface
+    definition {
+      name
+      ports {
+        ...ReturnPort
+      }
+    }
+  }
+  implementations {
+    interface
+    action {
+      id
+      key
+      name
+      description
+      args {
+        ...ArgPort
+      }
+      returns {
+        ...ReturnPort
+      }
+    }
+  }
+}

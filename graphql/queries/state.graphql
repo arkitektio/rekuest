@@ -4,3 +4,27 @@ query GetState($id: ID!) {
   }
 }
 
+
+query CheckoutAgent(
+  $agent: ID!
+  $timestamp: DateTime
+  $forwardPatchCount: Int! = 0
+  $backwardPatchCount: Int! = 0
+) {
+  checkoutAgent(
+    agent: $agent
+    timestamp: $timestamp
+    forwardPatchCount: $forwardPatchCount
+    backwardPatchCount: $backwardPatchCount
+  ) {
+    agentId
+    values
+    globalRevision
+    forwardPatches {
+      ...StatePatch
+    }
+    backwardPatches {
+      ...StatePatch
+    }
+  }
+}

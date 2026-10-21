@@ -8,3 +8,18 @@ fragment State on State {
   }
   interface
 }
+
+fragment StatePatch on Patch {
+  id
+  op
+  path
+  interface
+  timestamp
+  globalFutureRevision
+  task {
+    id
+    action {
+      name
+    }
+  }
+}

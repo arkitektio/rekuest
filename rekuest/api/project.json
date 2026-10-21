@@ -36,7 +36,8 @@
                 "ActionHash": "rekuest.scalars.ActionHash",
                 "Arg": "typing.Any",
                 "Identifier": "rekuest.scalars.Identifier",
-                "SearchQuery": "rekuest.scalars.SearchQuery"
+                "SearchQuery": "rekuest.scalars.SearchQuery",
+                "JSON": "typing.Any"
             },
             "coercible_scalars": {},
             "coercible_inputs": {},

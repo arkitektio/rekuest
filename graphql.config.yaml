@@ -215,6 +215,7 @@ projects:
           Arg: typing.Any
           Identifier: rekuest.scalars.Identifier
           SearchQuery: rekuest.scalars.SearchQuery
+          JSON: typing.Any
         additional_bases:
           Action:
             - rekuest.traits.action.Callable

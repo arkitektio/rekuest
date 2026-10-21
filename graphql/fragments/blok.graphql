@@ -45,6 +45,11 @@ fragment BlokDependency on BlokDependency {
   key
   description
   optional
+  autoResolvable
+  appFilter
+  versionFilter
+  minViableInstances
+  maxViableInstances
   actionDependencies {
     key
     description

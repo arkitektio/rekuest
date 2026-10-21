@@ -22,3 +22,9 @@ mutation UpdateBlok($input: UpdateBlokInput!) {
     ...DetailBlok
   }
 }
+
+mutation UpdateMaterializedBlok($input: UpdateMaterializedBlokInput!) {
+  updateMaterializedBlok(input: $input) {
+    ...DetailMaterializedBlok
+  }
+}
