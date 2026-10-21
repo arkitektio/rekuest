@@ -10,6 +10,15 @@ from rath.scalars import ID
 from rekuest.scalars import ActionHash, Args, Identifier, MediaLike
 from typing import Annotated, Any
 
+class Deprecated:
+    """Marks a field as deprecated, carrying the GraphQL deprecation reason."""
+
+    def __init__(self, reason=None):
+        self.reason = reason
+
+    def __repr__(self):
+        return 'Deprecated(' + repr(self.reason) + ')'
+
 class GraphQLDefault:
     """Records a GraphQL field schema default value. The client omits the field so the server applies its own default; this preserves the value for introspection."""
 
@@ -323,15 +332,16 @@ class CreateThreeDModelInput(BaseModel):
     model_config = ConfigDict(frozen=True, extra='forbid', populate_by_name=True, use_enum_values=True)
 
 class EditBlokInput(BaseModel):
-    """Edit the blok a materialization shows, and its bindings there, as one new revision."""
-    materialized_blok: ID = Field(validation_alias=AliasChoices('materialized_blok', 'materializedBlok'), serialization_alias='materializedBlok', description='The materialization the edit is made through. Its bindings are the ones `agent_mappings` changes.')
+    """Edit a blok, on it or through a materialization of it (and its bindings there), as one new revision."""
+    blok: ID | None = Field(default=None, description='The blok to edit, as an editor of the blok itself does. Send it or `materialized_blok`, not both.')
+    materialized_blok: ID | None = Field(validation_alias=AliasChoices('materialized_blok', 'materializedBlok'), serialization_alias='materializedBlok', default=None, description='The materialization the edit is made through, which also takes `agent_mappings`. Send it or `blok`, not both.')
     base: ID | None = Field(default=None, description="The revision the edit starts from. It must still be the blok's head, or the edit is refused. Required for a custom blok; a provided blok has no revisions and is forked.")
     components: tuple[ComponentNodeInput, ...] | None = Field(default=None, description='The full component tree. Kept when omitted.')
     source: str | None = Field(default=None, description='The full component tree as BSX, which the server parses: send it or `components`, not both.')
     demo_state: Args | None = Field(validation_alias=AliasChoices('demo_state', 'demoState'), serialization_alias='demoState', default=None, description='The full local state. Kept when omitted.')
     catalog: str | None = Field(default=None, description="Name of the UI catalog (in the caller's organization) the blok renders against. Kept when omitted.")
     dependencies: tuple[AgentDependencyInput, ...] | None = Field(default=None, description='The full list of agent dependencies. Kept when omitted; keys not listed are removed.')
-    agent_mappings: tuple[MappedAgentInput, ...] | None = Field(validation_alias=AliasChoices('agent_mappings', 'agentMappings'), serialization_alias='agentMappings', default=None, description='Bindings on this materialization, by dependency key, over the ones it has. Bindings of keys the edit removes go.')
+    agent_mappings: tuple[MappedAgentInput, ...] | None = Field(validation_alias=AliasChoices('agent_mappings', 'agentMappings'), serialization_alias='agentMappings', default=None, description='Bindings on `materialized_blok`, by dependency key, over the ones it has. Bindings of keys the edit removes go. Refused with `blok`: a blok binds no agents, its materializations do.')
     message: str | None = Field(default=None, description='What changed and why, in a sentence; kept with the revision.')
     task: ID | None = Field(default=None, description="The task making the edit (one the caller's agent runs), kept with the revision.")
     dry_run: bool | None = Field(validation_alias=AliasChoices('dry_run', 'dryRun'), serialization_alias='dryRun', default=None, description='Check everything and return the findings, keeping nothing. Off when omitted.')
@@ -566,11 +576,16 @@ class UpdateBlokInput(BaseModel):
     id: ID = Field(description='The ID of the blok to update.')
     name: str | None = Field(default=None, description='The name of the blok, used for identification in the system.')
     description: str | None = Field(default=None, description='The description of the blok and its purpose.')
-    components: tuple[ComponentNodeInput, ...] | None = Field(default=None, description='The full component tree of the blok. Replaces the existing tree when provided.')
-    source: str | None = Field(default=None, description='The blok as BSX, which the server parses into the tree it replaces the existing one with: send it or `components`, not both.')
-    demo_state: Args | None = Field(validation_alias=AliasChoices('demo_state', 'demoState'), serialization_alias='demoState', default=None, description='The demo state used to preview this blok. Replaces the existing demo state when provided.')
-    catalog: str | None = Field(default=None, description="Name of the UI catalog (in the caller's organization) this blok renders against. Created if missing.")
-    dependencies: tuple[AgentDependencyInput, ...] | None = Field(default=None, description='The full list of agent dependencies. When provided it replaces the existing set: keys not listed are deleted and their agent mappings on materialized bloks lose their dependency reference.')
+    components: Annotated[tuple[ComponentNodeInput, ...] | None, Deprecated('Use editBlok: it checks the write is made on the head you read, keeps a message with the revision, and has a dry run. updateBlok keeps name and description.')] = Field(default=None, description='The full component tree of the blok. Replaces the existing tree when provided.')
+    'The full component tree of the blok. Replaces the existing tree when provided.\nDEPRECATED: Use editBlok: it checks the write is made on the head you read, keeps a message with the revision, and has a dry run. updateBlok keeps name and description.'
+    source: Annotated[str | None, Deprecated('Use editBlok: it checks the write is made on the head you read, keeps a message with the revision, and has a dry run. updateBlok keeps name and description.')] = Field(default=None, description='The blok as BSX, which the server parses into the tree it replaces the existing one with: send it or `components`, not both.')
+    'The blok as BSX, which the server parses into the tree it replaces the existing one with: send it or `components`, not both.\nDEPRECATED: Use editBlok: it checks the write is made on the head you read, keeps a message with the revision, and has a dry run. updateBlok keeps name and description.'
+    demo_state: Annotated[Args | None, Deprecated('Use editBlok: it checks the write is made on the head you read, keeps a message with the revision, and has a dry run. updateBlok keeps name and description.')] = Field(validation_alias=AliasChoices('demo_state', 'demoState'), serialization_alias='demoState', default=None, description='The demo state used to preview this blok. Replaces the existing demo state when provided.')
+    'The demo state used to preview this blok. Replaces the existing demo state when provided.\nDEPRECATED: Use editBlok: it checks the write is made on the head you read, keeps a message with the revision, and has a dry run. updateBlok keeps name and description.'
+    catalog: Annotated[str | None, Deprecated('Use editBlok: it checks the write is made on the head you read, keeps a message with the revision, and has a dry run. updateBlok keeps name and description.')] = Field(default=None, description="Name of the UI catalog (in the caller's organization) this blok renders against. Created if missing.")
+    "Name of the UI catalog (in the caller's organization) this blok renders against. Created if missing.\nDEPRECATED: Use editBlok: it checks the write is made on the head you read, keeps a message with the revision, and has a dry run. updateBlok keeps name and description."
+    dependencies: Annotated[tuple[AgentDependencyInput, ...] | None, Deprecated('Use editBlok: it checks the write is made on the head you read, keeps a message with the revision, and has a dry run. updateBlok keeps name and description.')] = Field(default=None, description='The full list of agent dependencies. When provided it replaces the existing set: keys not listed are deleted and their agent mappings on materialized bloks lose their dependency reference.')
+    'The full list of agent dependencies. When provided it replaces the existing set: keys not listed are deleted and their agent mappings on materialized bloks lose their dependency reference.\nDEPRECATED: Use editBlok: it checks the write is made on the head you read, keeps a message with the revision, and has a dry run. updateBlok keeps name and description.'
     model_config = ConfigDict(frozen=True, extra='forbid', populate_by_name=True, use_enum_values=True)
 
 class UpdateMaterializedBlokInput(BaseModel):

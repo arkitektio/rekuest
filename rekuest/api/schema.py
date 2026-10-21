@@ -1164,18 +1164,20 @@ class BlokEdit(BaseModel):
     applied: bool
     'Whether anything was written; false for a dry run.'
     forked: bool
-    'Whether the blok was provided and the edit made a custom copy of it (with a new materialization) to land on.'
+    'Whether the blok was provided and the edit made a custom copy of it to land on: `blok` is the copy, and an edit made through a materialization has a new one of it.'
+    blok: DetailBlok
+    'The blok the edit landed on: the one edited, or the custom copy of a provided one. An editor of the blok follows it here.'
     revision: BlokRevision | None = Field(default=None)
     'The revision the blok is at after the edit; null for a dry run.'
-    materialized_blok: DetailMaterializedBlok = Field(alias='materializedBlok')
-    "The materialization that shows the edit: the one it was made through, or the fork's new one."
+    materialized_blok: DetailMaterializedBlok | None = Field(default=None, alias='materializedBlok')
+    "The materialization that shows the edit: the one it was made through, or the fork's new one. Null for an edit of the blok itself."
     diagnostics: tuple[BlokDiagnostic, ...]
     'Non-fatal findings about the new content, e.g. util calls no catalog provides.'
     model_config = ConfigDict(frozen=True)
 
     class Meta:
         """Meta class for BlokEdit"""
-        document = 'fragment BlokPortMatch on PortMatch {\n  at\n  key\n  kind\n  identifier\n  nullable\n  dimension\n  children {\n    at\n    key\n    kind\n    identifier\n    nullable\n    dimension\n    children {\n      at\n      key\n      kind\n      identifier\n      nullable\n      dimension\n      children {\n        at\n        key\n        kind\n        identifier\n        nullable\n        dimension\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment BlokDependency on BlokDependency {\n  key\n  description\n  optional\n  autoResolvable\n  appFilter\n  versionFilter\n  minViableInstances\n  maxViableInstances\n  actionDependencies {\n    key\n    description\n    optional\n    demand {\n      hash\n      key\n      app\n      version\n      name\n      argMatches {\n        ...BlokPortMatch\n        __typename\n      }\n      returnMatches {\n        ...BlokPortMatch\n        __typename\n      }\n      protocols\n      forceArgLength\n      forceReturnLength\n      pure\n      idempotent\n      stateful\n      __typename\n    }\n    __typename\n  }\n  stateDependencies {\n    key\n    description\n    optional\n    demand {\n      hash\n      key\n      app\n      matches {\n        ...BlokPortMatch\n        __typename\n      }\n      protocols\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment DetailBlok on Blok {\n  id\n  name\n  description\n  provided\n  app {\n    id\n    identifier\n    __typename\n  }\n  context\n  catalog {\n    id\n    name\n    __typename\n  }\n  componentTree\n  demoState\n  diagnostics {\n    ...BlokDiagnostic\n    __typename\n  }\n  dependencies {\n    ...BlokDependency\n    __typename\n  }\n  head {\n    ...BlokRevision\n    __typename\n  }\n  __typename\n}\n\nfragment BlokDiagnostic on Diagnostic {\n  level\n  code\n  message\n  path\n  __typename\n}\n\nfragment BlokRevision on BlokRevision {\n  id\n  number\n  message\n  createdAt\n  author {\n    sub\n    __typename\n  }\n  task {\n    id\n    __typename\n  }\n  __typename\n}\n\nfragment DetailMaterializedBlok on MaterializedBlok {\n  id\n  name\n  description\n  declaredBy {\n    id\n    declaredName\n    __typename\n  }\n  blok {\n    ...DetailBlok\n    __typename\n  }\n  agentMappings {\n    key\n    agent {\n      id\n      declaredName\n      connected\n      __typename\n    }\n    __typename\n  }\n  pinnedRevision {\n    ...BlokRevision\n    __typename\n  }\n  unboundDependencies\n  __typename\n}\n\nfragment BlokEdit on BlokEdit {\n  applied\n  forked\n  revision {\n    ...BlokRevision\n    __typename\n  }\n  materializedBlok {\n    ...DetailMaterializedBlok\n    __typename\n  }\n  diagnostics {\n    ...BlokDiagnostic\n    __typename\n  }\n  __typename\n}'
+        document = 'fragment BlokPortMatch on PortMatch {\n  at\n  key\n  kind\n  identifier\n  nullable\n  dimension\n  children {\n    at\n    key\n    kind\n    identifier\n    nullable\n    dimension\n    children {\n      at\n      key\n      kind\n      identifier\n      nullable\n      dimension\n      children {\n        at\n        key\n        kind\n        identifier\n        nullable\n        dimension\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment BlokDependency on BlokDependency {\n  key\n  description\n  optional\n  autoResolvable\n  appFilter\n  versionFilter\n  minViableInstances\n  maxViableInstances\n  actionDependencies {\n    key\n    description\n    optional\n    demand {\n      hash\n      key\n      app\n      version\n      name\n      argMatches {\n        ...BlokPortMatch\n        __typename\n      }\n      returnMatches {\n        ...BlokPortMatch\n        __typename\n      }\n      protocols\n      forceArgLength\n      forceReturnLength\n      pure\n      idempotent\n      stateful\n      __typename\n    }\n    __typename\n  }\n  stateDependencies {\n    key\n    description\n    optional\n    demand {\n      hash\n      key\n      app\n      matches {\n        ...BlokPortMatch\n        __typename\n      }\n      protocols\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment BlokDiagnostic on Diagnostic {\n  level\n  code\n  message\n  path\n  __typename\n}\n\nfragment BlokRevision on BlokRevision {\n  id\n  number\n  message\n  createdAt\n  author {\n    sub\n    __typename\n  }\n  task {\n    id\n    __typename\n  }\n  __typename\n}\n\nfragment DetailBlok on Blok {\n  id\n  name\n  description\n  provided\n  app {\n    id\n    identifier\n    __typename\n  }\n  context\n  catalog {\n    id\n    name\n    __typename\n  }\n  componentTree\n  demoState\n  diagnostics {\n    ...BlokDiagnostic\n    __typename\n  }\n  dependencies {\n    ...BlokDependency\n    __typename\n  }\n  head {\n    ...BlokRevision\n    __typename\n  }\n  __typename\n}\n\nfragment DetailMaterializedBlok on MaterializedBlok {\n  id\n  name\n  description\n  declaredBy {\n    id\n    declaredName\n    __typename\n  }\n  blok {\n    ...DetailBlok\n    __typename\n  }\n  agentMappings {\n    key\n    agent {\n      id\n      declaredName\n      connected\n      __typename\n    }\n    __typename\n  }\n  pinnedRevision {\n    ...BlokRevision\n    __typename\n  }\n  unboundDependencies\n  __typename\n}\n\nfragment BlokEdit on BlokEdit {\n  applied\n  forked\n  blok {\n    ...DetailBlok\n    __typename\n  }\n  revision {\n    ...BlokRevision\n    __typename\n  }\n  materializedBlok {\n    ...DetailMaterializedBlok\n    __typename\n  }\n  diagnostics {\n    ...BlokDiagnostic\n    __typename\n  }\n  __typename\n}'
         name = 'BlokEdit'
         type = 'BlokEdit'
 
@@ -1925,7 +1927,7 @@ class UpdateMaterializedBlokMutation(BaseModel):
 class EditBlokMutation(BaseModel):
     """No documentation found for this operation."""
     edit_blok: BlokEdit = Field(alias='editBlok')
-    'Edit the blok a materialization shows, and its bindings there, as one new revision on top of the head the editor read. A provided blok is forked first. With dryRun, every check runs and nothing is kept.'
+    'Edit a blok as one new revision on top of the head the editor read: on the blok itself (an editor of the blok), or through a materialization, with its bindings there (an assistant at a dashboard). A provided blok is forked first. With dryRun, every check runs and nothing is kept.'
 
     class Arguments(BaseModel):
         """Arguments for EditBlok """
@@ -1933,7 +1935,7 @@ class EditBlokMutation(BaseModel):
 
     class Meta:
         """Meta class for EditBlok """
-        document = 'fragment BlokPortMatch on PortMatch {\n  at\n  key\n  kind\n  identifier\n  nullable\n  dimension\n  children {\n    at\n    key\n    kind\n    identifier\n    nullable\n    dimension\n    children {\n      at\n      key\n      kind\n      identifier\n      nullable\n      dimension\n      children {\n        at\n        key\n        kind\n        identifier\n        nullable\n        dimension\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment BlokDependency on BlokDependency {\n  key\n  description\n  optional\n  autoResolvable\n  appFilter\n  versionFilter\n  minViableInstances\n  maxViableInstances\n  actionDependencies {\n    key\n    description\n    optional\n    demand {\n      hash\n      key\n      app\n      version\n      name\n      argMatches {\n        ...BlokPortMatch\n        __typename\n      }\n      returnMatches {\n        ...BlokPortMatch\n        __typename\n      }\n      protocols\n      forceArgLength\n      forceReturnLength\n      pure\n      idempotent\n      stateful\n      __typename\n    }\n    __typename\n  }\n  stateDependencies {\n    key\n    description\n    optional\n    demand {\n      hash\n      key\n      app\n      matches {\n        ...BlokPortMatch\n        __typename\n      }\n      protocols\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment DetailBlok on Blok {\n  id\n  name\n  description\n  provided\n  app {\n    id\n    identifier\n    __typename\n  }\n  context\n  catalog {\n    id\n    name\n    __typename\n  }\n  componentTree\n  demoState\n  diagnostics {\n    ...BlokDiagnostic\n    __typename\n  }\n  dependencies {\n    ...BlokDependency\n    __typename\n  }\n  head {\n    ...BlokRevision\n    __typename\n  }\n  __typename\n}\n\nfragment BlokDiagnostic on Diagnostic {\n  level\n  code\n  message\n  path\n  __typename\n}\n\nfragment BlokRevision on BlokRevision {\n  id\n  number\n  message\n  createdAt\n  author {\n    sub\n    __typename\n  }\n  task {\n    id\n    __typename\n  }\n  __typename\n}\n\nfragment DetailMaterializedBlok on MaterializedBlok {\n  id\n  name\n  description\n  declaredBy {\n    id\n    declaredName\n    __typename\n  }\n  blok {\n    ...DetailBlok\n    __typename\n  }\n  agentMappings {\n    key\n    agent {\n      id\n      declaredName\n      connected\n      __typename\n    }\n    __typename\n  }\n  pinnedRevision {\n    ...BlokRevision\n    __typename\n  }\n  unboundDependencies\n  __typename\n}\n\nfragment BlokEdit on BlokEdit {\n  applied\n  forked\n  revision {\n    ...BlokRevision\n    __typename\n  }\n  materializedBlok {\n    ...DetailMaterializedBlok\n    __typename\n  }\n  diagnostics {\n    ...BlokDiagnostic\n    __typename\n  }\n  __typename\n}\n\nmutation EditBlok($input: EditBlokInput!) {\n  editBlok(input: $input) {\n    ...BlokEdit\n    __typename\n  }\n}'
+        document = 'fragment BlokPortMatch on PortMatch {\n  at\n  key\n  kind\n  identifier\n  nullable\n  dimension\n  children {\n    at\n    key\n    kind\n    identifier\n    nullable\n    dimension\n    children {\n      at\n      key\n      kind\n      identifier\n      nullable\n      dimension\n      children {\n        at\n        key\n        kind\n        identifier\n        nullable\n        dimension\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment BlokDependency on BlokDependency {\n  key\n  description\n  optional\n  autoResolvable\n  appFilter\n  versionFilter\n  minViableInstances\n  maxViableInstances\n  actionDependencies {\n    key\n    description\n    optional\n    demand {\n      hash\n      key\n      app\n      version\n      name\n      argMatches {\n        ...BlokPortMatch\n        __typename\n      }\n      returnMatches {\n        ...BlokPortMatch\n        __typename\n      }\n      protocols\n      forceArgLength\n      forceReturnLength\n      pure\n      idempotent\n      stateful\n      __typename\n    }\n    __typename\n  }\n  stateDependencies {\n    key\n    description\n    optional\n    demand {\n      hash\n      key\n      app\n      matches {\n        ...BlokPortMatch\n        __typename\n      }\n      protocols\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment BlokDiagnostic on Diagnostic {\n  level\n  code\n  message\n  path\n  __typename\n}\n\nfragment BlokRevision on BlokRevision {\n  id\n  number\n  message\n  createdAt\n  author {\n    sub\n    __typename\n  }\n  task {\n    id\n    __typename\n  }\n  __typename\n}\n\nfragment DetailBlok on Blok {\n  id\n  name\n  description\n  provided\n  app {\n    id\n    identifier\n    __typename\n  }\n  context\n  catalog {\n    id\n    name\n    __typename\n  }\n  componentTree\n  demoState\n  diagnostics {\n    ...BlokDiagnostic\n    __typename\n  }\n  dependencies {\n    ...BlokDependency\n    __typename\n  }\n  head {\n    ...BlokRevision\n    __typename\n  }\n  __typename\n}\n\nfragment DetailMaterializedBlok on MaterializedBlok {\n  id\n  name\n  description\n  declaredBy {\n    id\n    declaredName\n    __typename\n  }\n  blok {\n    ...DetailBlok\n    __typename\n  }\n  agentMappings {\n    key\n    agent {\n      id\n      declaredName\n      connected\n      __typename\n    }\n    __typename\n  }\n  pinnedRevision {\n    ...BlokRevision\n    __typename\n  }\n  unboundDependencies\n  __typename\n}\n\nfragment BlokEdit on BlokEdit {\n  applied\n  forked\n  blok {\n    ...DetailBlok\n    __typename\n  }\n  revision {\n    ...BlokRevision\n    __typename\n  }\n  materializedBlok {\n    ...DetailMaterializedBlok\n    __typename\n  }\n  diagnostics {\n    ...BlokDiagnostic\n    __typename\n  }\n  __typename\n}\n\nmutation EditBlok($input: EditBlokInput!) {\n  editBlok(input: $input) {\n    ...BlokEdit\n    __typename\n  }\n}'
 
 class RevertBlokMutation(BaseModel):
     """No documentation found for this operation."""
@@ -3473,20 +3475,21 @@ Returns:
         variables['input'] = _input
         return self.execute(UpdateMaterializedBlokMutation, variables).update_materialized_blok
 
-    async def aedit_blok(self, materialized_blok: IDCoercible, base: IDCoercible | None | UnsetType=UNSET, components: Iterable[ComponentNodeInput] | None | UnsetType=UNSET, source: str | None | UnsetType=UNSET, demo_state: Args | None | UnsetType=UNSET, catalog: str | None | UnsetType=UNSET, dependencies: Iterable[AgentDependencyInput] | None | UnsetType=UNSET, agent_mappings: Iterable[MappedAgentInput] | None | UnsetType=UNSET, message: str | None | UnsetType=UNSET, task: IDCoercible | None | UnsetType=UNSET, dry_run: bool | None | UnsetType=UNSET) -> BlokEdit:
+    async def aedit_blok(self, blok: IDCoercible | None | UnsetType=UNSET, materialized_blok: IDCoercible | None | UnsetType=UNSET, base: IDCoercible | None | UnsetType=UNSET, components: Iterable[ComponentNodeInput] | None | UnsetType=UNSET, source: str | None | UnsetType=UNSET, demo_state: Args | None | UnsetType=UNSET, catalog: str | None | UnsetType=UNSET, dependencies: Iterable[AgentDependencyInput] | None | UnsetType=UNSET, agent_mappings: Iterable[MappedAgentInput] | None | UnsetType=UNSET, message: str | None | UnsetType=UNSET, task: IDCoercible | None | UnsetType=UNSET, dry_run: bool | None | UnsetType=UNSET) -> BlokEdit:
         """EditBlok 
 
-Edit the blok a materialization shows, and its bindings there, as one new revision on top of the head the editor read. A provided blok is forked first. With dryRun, every check runs and nothing is kept.
+Edit a blok as one new revision on top of the head the editor read: on the blok itself (an editor of the blok), or through a materialization, with its bindings there (an assistant at a dashboard). A provided blok is forked first. With dryRun, every check runs and nothing is kept.
 
 Args:
-    materialized_blok: The materialization the edit is made through. Its bindings are the ones `agent_mappings` changes.
+    blok: The blok to edit, as an editor of the blok itself does. Send it or `materialized_blok`, not both.
+    materialized_blok: The materialization the edit is made through, which also takes `agent_mappings`. Send it or `blok`, not both.
     base: The revision the edit starts from. It must still be the blok's head, or the edit is refused. Required for a custom blok; a provided blok has no revisions and is forked.
     components: The full component tree. Kept when omitted.
     source: The full component tree as BSX, which the server parses: send it or `components`, not both.
     demo_state: The full local state. Kept when omitted.
     catalog: Name of the UI catalog (in the caller's organization) the blok renders against. Kept when omitted.
     dependencies: The full list of agent dependencies. Kept when omitted; keys not listed are removed.
-    agent_mappings: Bindings on this materialization, by dependency key, over the ones it has. Bindings of keys the edit removes go.
+    agent_mappings: Bindings on `materialized_blok`, by dependency key, over the ones it has. Bindings of keys the edit removes go. Refused with `blok`: a blok binds no agents, its materializations do.
     message: What changed and why, in a sentence; kept with the revision.
     task: The task making the edit (one the caller's agent runs), kept with the revision.
     dry_run: Check everything and return the findings, keeping nothing. Off when omitted.
@@ -3496,7 +3499,10 @@ Returns:
 """
         variables: dict[str, builtins.object] = {}
         _input: dict[str, builtins.object] = {}
-        _input['materializedBlok'] = materialized_blok
+        if blok is not UNSET:
+            _input['blok'] = blok
+        if materialized_blok is not UNSET:
+            _input['materializedBlok'] = materialized_blok
         if base is not UNSET:
             _input['base'] = base
         if components is not UNSET:
@@ -3520,20 +3526,21 @@ Returns:
         variables['input'] = _input
         return (await self.aexecute(EditBlokMutation, variables)).edit_blok
 
-    def edit_blok(self, materialized_blok: IDCoercible, base: IDCoercible | None | UnsetType=UNSET, components: Iterable[ComponentNodeInput] | None | UnsetType=UNSET, source: str | None | UnsetType=UNSET, demo_state: Args | None | UnsetType=UNSET, catalog: str | None | UnsetType=UNSET, dependencies: Iterable[AgentDependencyInput] | None | UnsetType=UNSET, agent_mappings: Iterable[MappedAgentInput] | None | UnsetType=UNSET, message: str | None | UnsetType=UNSET, task: IDCoercible | None | UnsetType=UNSET, dry_run: bool | None | UnsetType=UNSET) -> BlokEdit:
+    def edit_blok(self, blok: IDCoercible | None | UnsetType=UNSET, materialized_blok: IDCoercible | None | UnsetType=UNSET, base: IDCoercible | None | UnsetType=UNSET, components: Iterable[ComponentNodeInput] | None | UnsetType=UNSET, source: str | None | UnsetType=UNSET, demo_state: Args | None | UnsetType=UNSET, catalog: str | None | UnsetType=UNSET, dependencies: Iterable[AgentDependencyInput] | None | UnsetType=UNSET, agent_mappings: Iterable[MappedAgentInput] | None | UnsetType=UNSET, message: str | None | UnsetType=UNSET, task: IDCoercible | None | UnsetType=UNSET, dry_run: bool | None | UnsetType=UNSET) -> BlokEdit:
         """EditBlok 
 
-Edit the blok a materialization shows, and its bindings there, as one new revision on top of the head the editor read. A provided blok is forked first. With dryRun, every check runs and nothing is kept.
+Edit a blok as one new revision on top of the head the editor read: on the blok itself (an editor of the blok), or through a materialization, with its bindings there (an assistant at a dashboard). A provided blok is forked first. With dryRun, every check runs and nothing is kept.
 
 Args:
-    materialized_blok: The materialization the edit is made through. Its bindings are the ones `agent_mappings` changes.
+    blok: The blok to edit, as an editor of the blok itself does. Send it or `materialized_blok`, not both.
+    materialized_blok: The materialization the edit is made through, which also takes `agent_mappings`. Send it or `blok`, not both.
     base: The revision the edit starts from. It must still be the blok's head, or the edit is refused. Required for a custom blok; a provided blok has no revisions and is forked.
     components: The full component tree. Kept when omitted.
     source: The full component tree as BSX, which the server parses: send it or `components`, not both.
     demo_state: The full local state. Kept when omitted.
     catalog: Name of the UI catalog (in the caller's organization) the blok renders against. Kept when omitted.
     dependencies: The full list of agent dependencies. Kept when omitted; keys not listed are removed.
-    agent_mappings: Bindings on this materialization, by dependency key, over the ones it has. Bindings of keys the edit removes go.
+    agent_mappings: Bindings on `materialized_blok`, by dependency key, over the ones it has. Bindings of keys the edit removes go. Refused with `blok`: a blok binds no agents, its materializations do.
     message: What changed and why, in a sentence; kept with the revision.
     task: The task making the edit (one the caller's agent runs), kept with the revision.
     dry_run: Check everything and return the findings, keeping nothing. Off when omitted.
@@ -3543,7 +3550,10 @@ Returns:
 """
         variables: dict[str, builtins.object] = {}
         _input: dict[str, builtins.object] = {}
-        _input['materializedBlok'] = materialized_blok
+        if blok is not UNSET:
+            _input['blok'] = blok
+        if materialized_blok is not UNSET:
+            _input['materializedBlok'] = materialized_blok
         if base is not UNSET:
             _input['base'] = base
         if components is not UNSET:

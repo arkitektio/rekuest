@@ -165,6 +165,9 @@ fragment DetailMaterializedBlok on MaterializedBlok {
 fragment BlokEdit on BlokEdit {
   applied
   forked
+  blok {
+    ...DetailBlok
+  }
   revision {
     ...BlokRevision
   }
