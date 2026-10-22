@@ -149,7 +149,8 @@ def validate_agent_input(
         The non-fatal findings, in blok-then-implementation order.
 
     Raises:
-        ValueError: If any hard catalog rule is broken. Nothing has been uploaded yet.
+        ValueError: If a catalog rule that is never only a warning is broken. Nothing
+            has been uploaded yet.
     """
     from arkitekt_spec.declare.blok.validate import validate_blok_catalog
     from arkitekt_spec.declare.definition.catalogs import validate_definition_against_catalog

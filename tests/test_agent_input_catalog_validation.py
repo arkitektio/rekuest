@@ -53,8 +53,8 @@ def _implementation(expression: str, catalogs: tuple = ()) -> ImplementationInpu
 
 def test_a_blok_is_checked_against_the_catalog_it_names() -> None:
     agent = _agent(bloks=(_blok('<Box><Slidr min="1" /></Box>', catalog="electron"),))
-    with pytest.raises(ValueError, match="is not registered in catalog"):
-        validate_agent_input(agent, {"electron": ELECTRON})
+    [finding] = validate_agent_input(agent, {"electron": ELECTRON})
+    assert finding.code == "unknown_component"
 
 
 def test_a_valid_blok_passes() -> None:
@@ -66,8 +66,8 @@ def test_a_blok_naming_no_catalog_uses_the_default_one() -> None:
     """The server creates a catalog called 'default' for a blok that names none."""
     agent = _agent(bloks=(_blok('<Box><Slidr min="1" /></Box>'),))
     catalogs = {DEFAULT_CATALOG_NAME: ELECTRON}
-    with pytest.raises(ValueError, match="is not registered in catalog"):
-        validate_agent_input(agent, catalogs)
+    [finding] = validate_agent_input(agent, catalogs)
+    assert "is not registered in catalog" in finding.message
 
 
 def test_a_blok_never_warns_about_an_unknown_catalog() -> None:
