@@ -119,6 +119,9 @@ fragment DetailBlok on Blok {
   dependencies {
     ...BlokDependency
   }
+  args {
+    ...ArgPort
+  }
   head {
     ...BlokRevision
   }
