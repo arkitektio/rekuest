@@ -17,7 +17,7 @@ dependencies = [
     # is arkitekt-spec's; executing it is arkitekt-runtime's. rekuest is the
     # distributed runtime on top: the socket agent, its transport, and the client.
     "arkitekt-spec>=3.19.1",
-    "arkitekt-runtime>=4.8",
+    "arkitekt-runtime>=5.2",
     # Media uploads (MediaLike arguments) are put into the datalayer through obstore.
     "obstore>=0.10.0",
 ]
@@ -60,8 +60,9 @@ dev-dependencies =  [
     "dokker>=2.8",
     # Regenerating needs turms >= 2.1.0, for the `external_modules` the api project
     # declares: an older turms refuses the config outright ("does not conform with
-    # turms"), which is loud enough.
-    "turms>=2.1.0",
+    # turms"), which is loud enough. Pinned to the current release so a regen here
+    # runs the same turms as every other client package.
+    "turms>=2.3.0",
     "basedpyright>=1.21",
 ]
 
