@@ -90,8 +90,8 @@ def rekuest(
             UploadLink(datalayer=DataLayer.from_alias(s3)),
             FaktsAuthLink(token_loader=tokens),
             SplitLink(
-                left=AIOHttpLink(endpoint_url=rekuest.to_http_path("graphql"), proxy=rekuest.proxy),
-                right=GraphQLWSLink(ws_endpoint_url=rekuest.to_ws_path("graphql"), proxy=rekuest.proxy),
+                left=AIOHttpLink(endpoint_url=rekuest.to_http_path("graphql"), proxy=rekuest.proxy, ssl_context=rekuest.ssl_context()),
+                right=GraphQLWSLink(ws_endpoint_url=rekuest.to_ws_path("graphql"), proxy=rekuest.proxy, ssl_context=rekuest.ssl_context()),
                 split=lambda o: o.node.operation != OperationType.SUBSCRIPTION,
             ),
         )
@@ -112,7 +112,7 @@ def _asset_upload(
         client = RekuestRath(
             link=compose(
                 FaktsAuthLink(token_loader=tokens),
-                AIOHttpLink(endpoint_url=rekuest.to_http_path("graphql"), proxy=rekuest.proxy),
+                AIOHttpLink(endpoint_url=rekuest.to_http_path("graphql"), proxy=rekuest.proxy, ssl_context=rekuest.ssl_context()),
             )
         )
         async with client:
@@ -155,6 +155,7 @@ def rekuest_agent(
         transport=WebsocketAgentTransport(
             endpoint_url=rekuest.to_ws_path("agi"),
             proxy=rekuest.proxy,
+            ssl_context=rekuest.ssl_context(),
             token_loader=tokens.aget_token,
         ),
         name=f"{manifest.identifier}:{manifest.version}",
