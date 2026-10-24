@@ -625,6 +625,24 @@ wheels = [
 ]
 
 [[package]]
+name = "kulisse"
+version = "1.0.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/c9/e8/65560bf4684f398ed5a5c58602f80419c2fd66bd78e6a9da00a70670e3d0/kulisse-1.0.1.tar.gz", hash = "sha256:68a199c7204ce3e2f4eb76ebd8ad11032faa197f8f12413a2a0698000e1afe9f", size = 16214, upload-time = "2026-10-24T18:43:02.031Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/23/46/ece9b8915b86c58d87a8571d99599482eac408a957ce28eaa58b17059956/kulisse-1.0.1-py3-none-any.whl", hash = "sha256:16d308a47c048cfe47ba15c2806f81a1ff13b29c5ad24fdc90469c845d544b4f", size = 18072, upload-time = "2026-10-24T18:43:01Z" },
+]
+
+[package.optional-dependencies]
+urdf = [
+    { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
+    { name = "numpy", version = "2.5.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
+    { name = "pycollada" },
+    { name = "trimesh" },
+    { name = "xacro" },
+]
+
+[[package]]
 name = "markdown-it-py"
 version = "3.0.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1482,11 +1500,7 @@ dependencies = [
 
 [package.optional-dependencies]
 kulisse = [
-    { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
-    { name = "numpy", version = "2.5.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
-    { name = "pycollada" },
-    { name = "trimesh" },
-    { name = "xacro" },
+    { name = "kulisse", extra = ["urdf"] },
 ]
 types = [
     { name = "annotated-types" },
@@ -1518,14 +1532,11 @@ requires-dist = [
     { name = "fakts", specifier = ">=6.1" },
     { name = "kanne", marker = "extra == 'units'", specifier = ">=2.2" },
     { name = "koil", specifier = ">=3.3.6" },
-    { name = "numpy", marker = "extra == 'kulisse'", specifier = ">=1.26" },
+    { name = "kulisse", extras = ["urdf"], marker = "extra == 'kulisse'", specifier = ">=1" },
     { name = "obstore", specifier = ">=0.10.0" },
-    { name = "pycollada", marker = "extra == 'kulisse'", specifier = ">=0.8" },
     { name = "pydantic", specifier = ">=2" },
     { name = "rath", specifier = ">=4.1.1" },
-    { name = "trimesh", marker = "extra == 'kulisse'", specifier = ">=4" },
     { name = "websockets", specifier = ">=15.0" },
-    { name = "xacro", marker = "extra == 'kulisse'", specifier = ">=2" },
 ]
 provides-extras = ["kulisse", "types", "units"]
 
