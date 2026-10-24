@@ -40,7 +40,7 @@ units = [
 kulisse = [
     # Authoring device models (URDF import, the model rules, the kulisse command) is the
     # standalone kulisse package's.
-    "kulisse[urdf]>=1",
+    "kulisse[urdf]>=1.0.2",
 ]
 
 [tool.uv]
