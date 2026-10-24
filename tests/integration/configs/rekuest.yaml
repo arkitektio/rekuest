@@ -118,6 +118,9 @@ datalayer:
   allow_unscoped_fallback: true
   media:
     bucket: media
+  # Models (MODEL_3D assets): one self-contained .glb per kulisse store.
+  kulisse:
+    bucket: kulisse
 postgres:
   db_name: rekuest
   engine: django.db.backends.postgresql
