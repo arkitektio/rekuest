@@ -1,5 +1,0 @@
-mutation CreateThreedDModel($input: CreateThreeDModelInput!) {
-  createThreedModel(input: $input) {
-    id 
-  }
-}

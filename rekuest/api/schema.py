@@ -6,7 +6,7 @@ from arkitekt_spec.actions import ActionDemandInput, ActionKind, AgentDependency
 from datetime import datetime
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 from rath.scalars import ID, IDCoercible
-from rekuest.protocol.schema import ActionFilter, ActionOrder, AgentFilter, AgentInput, AgentKind, AssignWidgetKind, BlokAgentMappingInput, CatalogComponentInput, CatalogOperationInput, CatalogValueKind, CollectInput, ComponentContext, CreateAssetInput, CreateBlokInput, CreateDashboardInput, CreateHigherOrderImplementationInput, CreateShortcutInput, CreateSpaceInput, CreateTestCaseInput, CreateTestResultInput, CreateThreeDModelInput, DiagnosticLevel, EditBlokInput, FinishMediaUploadInput, ForkBlokInput, ImplementationFilter, InterruptInput, LogLevel, MaterializeBlokInput, OffsetPaginationInput, PinMaterializedBlokInput, PlacementInput, RegisterUiCatalogInput, RequestAssetUploadInput, RequestMediaAccessInput, RequestMediaUploadInput, ReturnWidgetKind, RevertBlokInput, ShelveInMemoryDrawerInput, ShortcutFilter, ShortcutOrder, TaskInstructKind, ToolboxFilter, ToolboxOrder, UnshelveMemoryDrawerInput, UpdateBlokInput, UpdateMaterializedBlokInput, WidgetDefaultInput
+from rekuest.protocol.schema import ActionFilter, ActionOrder, AgentFilter, AgentInput, AgentKind, AssignWidgetKind, BlokAgentMappingInput, BlokServiceInput, CatalogComponentInput, CatalogOperationInput, CatalogValueKind, CollectInput, ComponentContext, CreateAssetInput, CreateBlokInput, CreateDashboardInput, CreateHigherOrderImplementationInput, CreateShortcutInput, CreateSpaceInput, CreateTestCaseInput, CreateTestResultInput, DiagnosticLevel, EditBlokInput, FinishMediaUploadInput, ForkBlokInput, ImplementationFilter, InterruptInput, LogLevel, MaterializationScope, MaterializeBlokInput, OffsetPaginationInput, PinMaterializedBlokInput, PlacementInput, RegisterUiCatalogInput, RequestAssetUploadInput, RequestMediaAccessInput, RequestMediaUploadInput, ReturnWidgetKind, RevertBlokInput, ShelveInMemoryDrawerInput, ShortcutFilter, ShortcutOrder, TaskInstructKind, ToolboxFilter, ToolboxOrder, UnshelveMemoryDrawerInput, UpdateBlokInput, UpdateMaterializedBlokInput, WidgetDefaultInput
 from rekuest.scalars import ActionHash, Args, Identifier, JSONSerializable, MediaLike, Props
 from rekuest.traits.action import Callable
 from typing import Annotated, Any, AsyncIterator, Iterable, Iterator, Literal
@@ -288,7 +288,7 @@ class Dashboard(BaseModel):
         type = 'Dashboard'
 
 class MediaUploadGrant(BaseModel):
-    """A presigned PUT grant for uploading a media object."""
+    """Temporary S3 credentials for uploading a media object."""
     typename: Literal['MediaUploadGrant'] = Field(alias='__typename', default='MediaUploadGrant', exclude=True)
     access_key: str = Field(alias='accessKey')
     secret_key: str = Field(alias='secretKey')
@@ -338,6 +338,26 @@ class MediaStore(BaseModel):
         document = 'fragment MediaStore on MediaStore {\n  path\n  key\n  bucket\n  __typename\n}'
         name = 'MediaStore'
         type = 'MediaStore'
+
+class AssetUploadGrant(BaseModel):
+    """Temporary S3 credentials for uploading one asset: to a kulisse store for a 3D model, to a media store for an image. Write the file to `key`, then call `createAsset` with `store`."""
+    typename: Literal['AssetUploadGrant'] = Field(alias='__typename', default='AssetUploadGrant', exclude=True)
+    access_key: str = Field(alias='accessKey')
+    secret_key: str = Field(alias='secretKey')
+    session_token: str = Field(alias='sessionToken')
+    path: str
+    key: str
+    bucket: str
+    expires_in: int = Field(alias='expiresIn')
+    max_bytes: int = Field(alias='maxBytes')
+    store: str
+    model_config = ConfigDict(frozen=True)
+
+    class Meta:
+        """Meta class for AssetUploadGrant"""
+        document = 'fragment AssetUploadGrant on AssetUploadGrant {\n  accessKey\n  secretKey\n  sessionToken\n  path\n  key\n  bucket\n  expiresIn\n  maxBytes\n  store\n  __typename\n}'
+        name = 'AssetUploadGrant'
+        type = 'AssetUploadGrant'
 
 class ActionArgumentLeafUtilCall(BaseModel):
     """Defines a utility call that can be invoked within the system."""
@@ -1827,7 +1847,7 @@ class ImplementAgentMutation(BaseModel):
 
 class RequestAssetUploadMutation(BaseModel):
     """No documentation found for this operation."""
-    request_asset_upload: MediaUploadGrant = Field(alias='requestAssetUpload')
+    request_asset_upload: AssetUploadGrant = Field(alias='requestAssetUpload')
     "A media upload grant for one asset. Issued for a file the caller's own agent declares (it registered with it), or, to an admin, for a file an agent of the organization names a source for; and only if its size passes the policy."
 
     class Arguments(BaseModel):
@@ -1836,7 +1856,7 @@ class RequestAssetUploadMutation(BaseModel):
 
     class Meta:
         """Meta class for RequestAssetUpload """
-        document = 'fragment MediaUploadGrant on MediaUploadGrant {\n  accessKey\n  secretKey\n  sessionToken\n  path\n  key\n  bucket\n  expiresIn\n  maxBytes\n  store\n  __typename\n}\n\nmutation RequestAssetUpload($input: RequestAssetUploadInput!) {\n  requestAssetUpload(input: $input) {\n    ...MediaUploadGrant\n    __typename\n  }\n}'
+        document = 'fragment AssetUploadGrant on AssetUploadGrant {\n  accessKey\n  secretKey\n  sessionToken\n  path\n  key\n  bucket\n  expiresIn\n  maxBytes\n  store\n  __typename\n}\n\nmutation RequestAssetUpload($input: RequestAssetUploadInput!) {\n  requestAssetUpload(input: $input) {\n    ...AssetUploadGrant\n    __typename\n  }\n}'
 
 class CreateAssetMutationCreateAsset(BaseModel):
     """A verified file the organization holds, stored once by its content."""
@@ -2224,25 +2244,6 @@ class Create_testresultMutation(BaseModel):
         """Meta class for create_testresult """
         document = 'fragment TestResult on TestResult {\n  id\n  case {\n    id\n    __typename\n  }\n  passed\n  __typename\n}\n\nmutation create_testresult($input: CreateTestResultInput!) {\n  createTestResult(input: $input) {\n    ...TestResult\n    __typename\n  }\n}'
 
-class CreateThreedDModelMutationCreateThreedModel(BaseModel):
-    """A 3D model file."""
-    typename: Literal['ThreeDModel'] = Field(alias='__typename', default='ThreeDModel', exclude=True)
-    id: ID
-    model_config = ConfigDict(frozen=True)
-
-class CreateThreedDModelMutation(BaseModel):
-    """No documentation found for this operation."""
-    create_threed_model: CreateThreedDModelMutationCreateThreedModel = Field(alias='createThreedModel')
-    'Create a new 3D model.'
-
-    class Arguments(BaseModel):
-        """Arguments for CreateThreedDModel """
-        input: CreateThreeDModelInput
-
-    class Meta:
-        """Meta class for CreateThreedDModel """
-        document = 'mutation CreateThreedDModel($input: CreateThreeDModelInput!) {\n  createThreedModel(input: $input) {\n    id\n    __typename\n  }\n}'
-
 class GetAgentQuery(BaseModel):
     """No documentation found for this operation."""
     agent: Agent
@@ -2371,7 +2372,7 @@ class SearchMaterializedBloksQueryOptions(BaseModel):
 class SearchMaterializedBloksQuery(BaseModel):
     """No documentation found for this operation."""
     options: tuple[SearchMaterializedBloksQueryOptions, ...]
-    'List of UI Blok.'
+    'List of UI Blok. Leaves out the materializations made for a message: each is shown in its message and reached by its id.'
 
     class Arguments(BaseModel):
         """Arguments for SearchMaterializedBloks """
@@ -2387,7 +2388,7 @@ class SearchMaterializedBloksQuery(BaseModel):
 class ListBloksQuery(BaseModel):
     """No documentation found for this operation."""
     bloks: tuple[DetailBlok, ...]
-    'List of UI Blok.'
+    'List of UI Blok. Leaves out the bloks a task made from its BSX to show: each goes with its task.'
 
     class Arguments(BaseModel):
         """Arguments for ListBloks """
@@ -2449,7 +2450,7 @@ class UiCatalogQuery(BaseModel):
         document = 'fragment CatalogArgument on CatalogArgument {\n  key\n  kind\n  required\n  description\n  __typename\n}\n\nfragment CatalogProp on CatalogProp {\n  key\n  kind\n  required\n  description\n  __typename\n}\n\nfragment CatalogComponent on CatalogComponent {\n  name\n  description\n  acceptsChildren\n  props {\n    ...CatalogProp\n    __typename\n  }\n  __typename\n}\n\nfragment CatalogOperation on CatalogOperation {\n  name\n  description\n  returns\n  arguments {\n    ...CatalogArgument\n    __typename\n  }\n  __typename\n}\n\nfragment UICatalog on UICatalog {\n  id\n  name\n  description\n  isRegistered\n  components {\n    ...CatalogComponent\n    __typename\n  }\n  operations {\n    ...CatalogOperation\n    __typename\n  }\n  __typename\n}\n\nquery UiCatalog($id: ID!) {\n  uiCatalog(id: $id) {\n    ...UICatalog\n    __typename\n  }\n}'
 
 class BaseCatalogQueryBaseCatalog(BaseModel):
-    """The built-in base catalog: the pure operations every UI implements, applied to every definition and blok before any registered UI catalog. Virtual: shipped with the server, not registered, identical in every organization."""
+    """The built-in base catalog: the pure operations and control-flow components every UI implements, applied to every definition and blok before any registered UI catalog. Virtual: shipped with the server, not registered, identical in every organization."""
     typename: Literal['BaseCatalog'] = Field(alias='__typename', default='BaseCatalog', exclude=True)
     name: str
     "Always 'base'."
@@ -3085,7 +3086,7 @@ Returns:
         variables['input'] = _input
         return self.execute(ImplementAgentMutation, variables).implement_agent
 
-    async def arequest_asset_upload(self, ref: str, size: int | None | UnsetType=UNSET) -> MediaUploadGrant:
+    async def arequest_asset_upload(self, ref: str, size: int | None | UnsetType=UNSET) -> AssetUploadGrant:
         """RequestAssetUpload 
 
 A media upload grant for one asset. Issued for a file the caller's own agent declares (it registered with it), or, to an admin, for a file an agent of the organization names a source for; and only if its size passes the policy.
@@ -3095,7 +3096,7 @@ Args:
     size: The size of the fetched file in bytes, for an asset declared without one. Ignored when the declaration has a size.
 
 Returns:
-    MediaUploadGrant
+    AssetUploadGrant
 """
         variables: dict[str, builtins.object] = {}
         _input: dict[str, builtins.object] = {}
@@ -3105,7 +3106,7 @@ Returns:
         variables['input'] = _input
         return (await self.aexecute(RequestAssetUploadMutation, variables)).request_asset_upload
 
-    def request_asset_upload(self, ref: str, size: int | None | UnsetType=UNSET) -> MediaUploadGrant:
+    def request_asset_upload(self, ref: str, size: int | None | UnsetType=UNSET) -> AssetUploadGrant:
         """RequestAssetUpload 
 
 A media upload grant for one asset. Issued for a file the caller's own agent declares (it registered with it), or, to an admin, for a file an agent of the organization names a source for; and only if its size passes the policy.
@@ -3115,7 +3116,7 @@ Args:
     size: The size of the fetched file in bytes, for an asset declared without one. Ignored when the declaration has a size.
 
 Returns:
-    MediaUploadGrant
+    AssetUploadGrant
 """
         variables: dict[str, builtins.object] = {}
         _input: dict[str, builtins.object] = {}
@@ -3163,7 +3164,7 @@ Returns:
         variables['input'] = _input
         return self.execute(CreateAssetMutation, variables).create_asset
 
-    async def acreate_blok(self, name: str, dependencies: Iterable[AgentDependencyInput] | None | UnsetType=UNSET, description: str | None | UnsetType=UNSET, catalog: str | None | UnsetType=UNSET, components: Iterable[ComponentNodeInput] | None | UnsetType=UNSET, source: str | None | UnsetType=UNSET, demo_state: Args | None | UnsetType=UNSET, context: ComponentContext | None | UnsetType=UNSET, for_model: str | None | UnsetType=UNSET, for_node: str | None | UnsetType=UNSET, origin: str | None | UnsetType=UNSET, origin_hash: str | None | UnsetType=UNSET) -> Blok:
+    async def acreate_blok(self, name: str, dependencies: Iterable[AgentDependencyInput] | None | UnsetType=UNSET, description: str | None | UnsetType=UNSET, catalog: str | None | UnsetType=UNSET, components: Iterable[ComponentNodeInput] | None | UnsetType=UNSET, source: str | None | UnsetType=UNSET, services: Iterable[BlokServiceInput] | None | UnsetType=UNSET, demo_state: Args | None | UnsetType=UNSET, context: ComponentContext | None | UnsetType=UNSET, for_model: str | None | UnsetType=UNSET, for_node: str | None | UnsetType=UNSET, origin: str | None | UnsetType=UNSET, origin_hash: str | None | UnsetType=UNSET) -> Blok:
         """CreateBlok 
 
 Create a user interface panel.
@@ -3175,6 +3176,7 @@ Args:
     catalog: The universal id
     components: The schema of the blok. This can be used to validate the blok input and output.
     source: The blok as BSX, which the server parses into `components`: send one of the two.
+    services: The backend services the blok's queries read from, each frozen at the version it was written against. Every `query`'s `schema` must name one.
     demo_state: The initial state of the blok. This is used to set the initial state of the blok when it is materialized.
     context: The renderer for the blok's root: HTML, or SCENE for a full 3D view.
     for_model: The model ('sha256:...') this blok decorates. HTML bloks only.
@@ -3198,6 +3200,8 @@ Returns:
             _input['components'] = components
         if source is not UNSET:
             _input['source'] = source
+        if services is not UNSET:
+            _input['services'] = services
         if demo_state is not UNSET:
             _input['demoState'] = demo_state
         if context is not UNSET:
@@ -3213,7 +3217,7 @@ Returns:
         variables['input'] = _input
         return (await self.aexecute(CreateBlokMutation, variables)).create_blok
 
-    def create_blok(self, name: str, dependencies: Iterable[AgentDependencyInput] | None | UnsetType=UNSET, description: str | None | UnsetType=UNSET, catalog: str | None | UnsetType=UNSET, components: Iterable[ComponentNodeInput] | None | UnsetType=UNSET, source: str | None | UnsetType=UNSET, demo_state: Args | None | UnsetType=UNSET, context: ComponentContext | None | UnsetType=UNSET, for_model: str | None | UnsetType=UNSET, for_node: str | None | UnsetType=UNSET, origin: str | None | UnsetType=UNSET, origin_hash: str | None | UnsetType=UNSET) -> Blok:
+    def create_blok(self, name: str, dependencies: Iterable[AgentDependencyInput] | None | UnsetType=UNSET, description: str | None | UnsetType=UNSET, catalog: str | None | UnsetType=UNSET, components: Iterable[ComponentNodeInput] | None | UnsetType=UNSET, source: str | None | UnsetType=UNSET, services: Iterable[BlokServiceInput] | None | UnsetType=UNSET, demo_state: Args | None | UnsetType=UNSET, context: ComponentContext | None | UnsetType=UNSET, for_model: str | None | UnsetType=UNSET, for_node: str | None | UnsetType=UNSET, origin: str | None | UnsetType=UNSET, origin_hash: str | None | UnsetType=UNSET) -> Blok:
         """CreateBlok 
 
 Create a user interface panel.
@@ -3225,6 +3229,7 @@ Args:
     catalog: The universal id
     components: The schema of the blok. This can be used to validate the blok input and output.
     source: The blok as BSX, which the server parses into `components`: send one of the two.
+    services: The backend services the blok's queries read from, each frozen at the version it was written against. Every `query`'s `schema` must name one.
     demo_state: The initial state of the blok. This is used to set the initial state of the blok when it is materialized.
     context: The renderer for the blok's root: HTML, or SCENE for a full 3D view.
     for_model: The model ('sha256:...') this blok decorates. HTML bloks only.
@@ -3248,6 +3253,8 @@ Returns:
             _input['components'] = components
         if source is not UNSET:
             _input['source'] = source
+        if services is not UNSET:
+            _input['services'] = services
         if demo_state is not UNSET:
             _input['demoState'] = demo_state
         if context is not UNSET:
@@ -3263,7 +3270,7 @@ Returns:
         variables['input'] = _input
         return self.execute(CreateBlokMutation, variables).create_blok
 
-    async def amaterialize_blok(self, blok: IDCoercible, dashboard: IDCoercible | None | UnsetType=UNSET, agent_mappings: Iterable[BlokAgentMappingInput] | None | UnsetType=UNSET, name: str | None | UnsetType=UNSET, description: str | None | UnsetType=UNSET) -> MaterializedBlok:
+    async def amaterialize_blok(self, blok: IDCoercible, scope: MaterializationScope, dashboard: IDCoercible | None | UnsetType=UNSET, agent_mappings: Iterable[BlokAgentMappingInput] | None | UnsetType=UNSET, name: str | None | UnsetType=UNSET, description: str | None | UnsetType=UNSET) -> MaterializedBlok:
         """MaterializeBlok 
 
 Materialize a UI blok into a concrete instance on a dashboard.
@@ -3274,6 +3281,7 @@ Args:
     agent_mappings: The agent mappings for the blok. This is used to map the blok dependencies to agents in the system.
     name: Display name of this materialization. Defaults to the blok's name.
     description: Description of this materialization. Defaults to the blok's description.
+    scope: MESSAGE: made for one chat message, to show inline in it. It is never listed, takes no dashboard, and may materialize a blok an app provides (bound to any agents).
 
 Returns:
     MaterializedBlok
@@ -3289,10 +3297,11 @@ Returns:
             _input['name'] = name
         if description is not UNSET:
             _input['description'] = description
+        _input['scope'] = scope
         variables['input'] = _input
         return (await self.aexecute(MaterializeBlokMutation, variables)).materialize_blok
 
-    def materialize_blok(self, blok: IDCoercible, dashboard: IDCoercible | None | UnsetType=UNSET, agent_mappings: Iterable[BlokAgentMappingInput] | None | UnsetType=UNSET, name: str | None | UnsetType=UNSET, description: str | None | UnsetType=UNSET) -> MaterializedBlok:
+    def materialize_blok(self, blok: IDCoercible, scope: MaterializationScope, dashboard: IDCoercible | None | UnsetType=UNSET, agent_mappings: Iterable[BlokAgentMappingInput] | None | UnsetType=UNSET, name: str | None | UnsetType=UNSET, description: str | None | UnsetType=UNSET) -> MaterializedBlok:
         """MaterializeBlok 
 
 Materialize a UI blok into a concrete instance on a dashboard.
@@ -3303,6 +3312,7 @@ Args:
     agent_mappings: The agent mappings for the blok. This is used to map the blok dependencies to agents in the system.
     name: Display name of this materialization. Defaults to the blok's name.
     description: Description of this materialization. Defaults to the blok's description.
+    scope: MESSAGE: made for one chat message, to show inline in it. It is never listed, takes no dashboard, and may materialize a blok an app provides (bound to any agents).
 
 Returns:
     MaterializedBlok
@@ -3318,6 +3328,7 @@ Returns:
             _input['name'] = name
         if description is not UNSET:
             _input['description'] = description
+        _input['scope'] = scope
         variables['input'] = _input
         return self.execute(MaterializeBlokMutation, variables).materialize_blok
 
@@ -3477,7 +3488,7 @@ Returns:
         variables['input'] = _input
         return self.execute(UpdateMaterializedBlokMutation, variables).update_materialized_blok
 
-    async def aedit_blok(self, blok: IDCoercible | None | UnsetType=UNSET, materialized_blok: IDCoercible | None | UnsetType=UNSET, base: IDCoercible | None | UnsetType=UNSET, components: Iterable[ComponentNodeInput] | None | UnsetType=UNSET, source: str | None | UnsetType=UNSET, demo_state: Args | None | UnsetType=UNSET, catalog: str | None | UnsetType=UNSET, dependencies: Iterable[AgentDependencyInput] | None | UnsetType=UNSET, args: Iterable[ArgPortInput] | None | UnsetType=UNSET, agent_mappings: Iterable[MappedAgentInput] | None | UnsetType=UNSET, message: str | None | UnsetType=UNSET, task: IDCoercible | None | UnsetType=UNSET, dry_run: bool | None | UnsetType=UNSET) -> BlokEdit:
+    async def aedit_blok(self, blok: IDCoercible | None | UnsetType=UNSET, materialized_blok: IDCoercible | None | UnsetType=UNSET, base: IDCoercible | None | UnsetType=UNSET, components: Iterable[ComponentNodeInput] | None | UnsetType=UNSET, source: str | None | UnsetType=UNSET, demo_state: Args | None | UnsetType=UNSET, catalog: str | None | UnsetType=UNSET, dependencies: Iterable[AgentDependencyInput] | None | UnsetType=UNSET, args: Iterable[ArgPortInput] | None | UnsetType=UNSET, services: Iterable[BlokServiceInput] | None | UnsetType=UNSET, agent_mappings: Iterable[MappedAgentInput] | None | UnsetType=UNSET, message: str | None | UnsetType=UNSET, task: IDCoercible | None | UnsetType=UNSET, dry_run: bool | None | UnsetType=UNSET) -> BlokEdit:
         """EditBlok 
 
 Edit a blok as one new revision on top of the head the editor read: on the blok itself (an editor of the blok), or through a materialization, with its bindings there (an assistant at a dashboard). A provided blok is forked first. With dryRun, every check runs and nothing is kept.
@@ -3492,6 +3503,7 @@ Args:
     catalog: Name of the UI catalog (in the caller's organization) the blok renders against. Kept when omitted.
     dependencies: The full list of agent dependencies. Kept when omitted; keys not listed are removed.
     args: The full list of the items the blok is opened for, read under `@args.<key>` (html bloks only). Kept when omitted; an empty list removes them.
+    services: The full list of the backend services the blok's queries read from, each frozen at its version. Kept when omitted; an empty list removes them.
     agent_mappings: Bindings on `materialized_blok`, by dependency key, over the ones it has. Bindings of keys the edit removes go. Refused with `blok`: a blok binds no agents, its materializations do.
     message: What changed and why, in a sentence; kept with the revision.
     task: The task making the edit (one the caller's agent runs), kept with the revision.
@@ -3520,6 +3532,8 @@ Returns:
             _input['dependencies'] = dependencies
         if args is not UNSET:
             _input['args'] = args
+        if services is not UNSET:
+            _input['services'] = services
         if agent_mappings is not UNSET:
             _input['agentMappings'] = agent_mappings
         if message is not UNSET:
@@ -3531,7 +3545,7 @@ Returns:
         variables['input'] = _input
         return (await self.aexecute(EditBlokMutation, variables)).edit_blok
 
-    def edit_blok(self, blok: IDCoercible | None | UnsetType=UNSET, materialized_blok: IDCoercible | None | UnsetType=UNSET, base: IDCoercible | None | UnsetType=UNSET, components: Iterable[ComponentNodeInput] | None | UnsetType=UNSET, source: str | None | UnsetType=UNSET, demo_state: Args | None | UnsetType=UNSET, catalog: str | None | UnsetType=UNSET, dependencies: Iterable[AgentDependencyInput] | None | UnsetType=UNSET, args: Iterable[ArgPortInput] | None | UnsetType=UNSET, agent_mappings: Iterable[MappedAgentInput] | None | UnsetType=UNSET, message: str | None | UnsetType=UNSET, task: IDCoercible | None | UnsetType=UNSET, dry_run: bool | None | UnsetType=UNSET) -> BlokEdit:
+    def edit_blok(self, blok: IDCoercible | None | UnsetType=UNSET, materialized_blok: IDCoercible | None | UnsetType=UNSET, base: IDCoercible | None | UnsetType=UNSET, components: Iterable[ComponentNodeInput] | None | UnsetType=UNSET, source: str | None | UnsetType=UNSET, demo_state: Args | None | UnsetType=UNSET, catalog: str | None | UnsetType=UNSET, dependencies: Iterable[AgentDependencyInput] | None | UnsetType=UNSET, args: Iterable[ArgPortInput] | None | UnsetType=UNSET, services: Iterable[BlokServiceInput] | None | UnsetType=UNSET, agent_mappings: Iterable[MappedAgentInput] | None | UnsetType=UNSET, message: str | None | UnsetType=UNSET, task: IDCoercible | None | UnsetType=UNSET, dry_run: bool | None | UnsetType=UNSET) -> BlokEdit:
         """EditBlok 
 
 Edit a blok as one new revision on top of the head the editor read: on the blok itself (an editor of the blok), or through a materialization, with its bindings there (an assistant at a dashboard). A provided blok is forked first. With dryRun, every check runs and nothing is kept.
@@ -3546,6 +3560,7 @@ Args:
     catalog: Name of the UI catalog (in the caller's organization) the blok renders against. Kept when omitted.
     dependencies: The full list of agent dependencies. Kept when omitted; keys not listed are removed.
     args: The full list of the items the blok is opened for, read under `@args.<key>` (html bloks only). Kept when omitted; an empty list removes them.
+    services: The full list of the backend services the blok's queries read from, each frozen at its version. Kept when omitted; an empty list removes them.
     agent_mappings: Bindings on `materialized_blok`, by dependency key, over the ones it has. Bindings of keys the edit removes go. Refused with `blok`: a blok binds no agents, its materializations do.
     message: What changed and why, in a sentence; kept with the revision.
     task: The task making the edit (one the caller's agent runs), kept with the revision.
@@ -3574,6 +3589,8 @@ Returns:
             _input['dependencies'] = dependencies
         if args is not UNSET:
             _input['args'] = args
+        if services is not UNSET:
+            _input['services'] = services
         if agent_mappings is not UNSET:
             _input['agentMappings'] = agent_mappings
         if message is not UNSET:
@@ -3776,7 +3793,7 @@ Upload media and return a URL for access
 
 Args:
     original_file_name: The `String` scalar type represents textual data, represented as UTF-8 character sequences. The String type is most often used by GraphQL to represent free-form human-readable text. (required)
-    file_size: The `Int` scalar type represents non-fractional signed whole numeric values. Int can represent values between -(2^31) and 2^31 - 1.
+    file_size: A number of bytes. 64-bit, unlike Int: serialized as a JSON number, and accepted as a number or a numeric string.
     content_type: The `String` scalar type represents textual data, represented as UTF-8 character sequences. The String type is most often used by GraphQL to represent free-form human-readable text.
 
 Returns:
@@ -3799,7 +3816,7 @@ Upload media and return a URL for access
 
 Args:
     original_file_name: The `String` scalar type represents textual data, represented as UTF-8 character sequences. The String type is most often used by GraphQL to represent free-form human-readable text. (required)
-    file_size: The `Int` scalar type represents non-fractional signed whole numeric values. Int can represent values between -(2^31) and 2^31 - 1.
+    file_size: A number of bytes. 64-bit, unlike Int: serialized as a JSON number, and accepted as a number or a numeric string.
     content_type: The `String` scalar type represents textual data, represented as UTF-8 character sequences. The String type is most often used by GraphQL to represent free-form human-readable text.
 
 Returns:
@@ -4335,7 +4352,7 @@ Returns:
         variables['input'] = _input
         return self.execute(ResumeMutation, variables).resume
 
-    async def adecide(self, task: IDCoercible, approved: bool, answer: str | None | UnsetType=UNSET) -> Task:
+    async def adecide(self, task: IDCoercible, approved: bool, answer: str | None | UnsetType=UNSET, values: Args | None | UnsetType=UNSET) -> Task:
         """decide 
 
 Answer a held task. A child an agent asked for runs once approved, or ends DENIED without running; a task that holds itself carries on with the decision. Only the user the task runs for may decide, and never from the client of the agent that asked.
@@ -4344,6 +4361,7 @@ Args:
     task: The held task: a child an agent asked for, or a task that holds itself
     approved: Approve (the child runs; a task's own hold carries on approved) or deny (the child ends DENIED without running; a task's own hold carries on denied)
     answer: What the person says with the decision. A child gets it as its Assign's message; a task's own hold gets it back.
+    values: The answer through the blok a task asks with (a hold on a blok), by the blok's returns, and checked against them. Only an approved ask takes them.
 
 Returns:
     Task
@@ -4354,10 +4372,12 @@ Returns:
         _input['approved'] = approved
         if answer is not UNSET:
             _input['answer'] = answer
+        if values is not UNSET:
+            _input['values'] = values
         variables['input'] = _input
         return (await self.aexecute(DecideMutation, variables)).decide
 
-    def decide(self, task: IDCoercible, approved: bool, answer: str | None | UnsetType=UNSET) -> Task:
+    def decide(self, task: IDCoercible, approved: bool, answer: str | None | UnsetType=UNSET, values: Args | None | UnsetType=UNSET) -> Task:
         """decide 
 
 Answer a held task. A child an agent asked for runs once approved, or ends DENIED without running; a task that holds itself carries on with the decision. Only the user the task runs for may decide, and never from the client of the agent that asked.
@@ -4366,6 +4386,7 @@ Args:
     task: The held task: a child an agent asked for, or a task that holds itself
     approved: Approve (the child runs; a task's own hold carries on approved) or deny (the child ends DENIED without running; a task's own hold carries on denied)
     answer: What the person says with the decision. A child gets it as its Assign's message; a task's own hold gets it back.
+    values: The answer through the blok a task asks with (a hold on a blok), by the blok's returns, and checked against them. Only an approved ask takes them.
 
 Returns:
     Task
@@ -4376,6 +4397,8 @@ Returns:
         _input['approved'] = approved
         if answer is not UNSET:
             _input['answer'] = answer
+        if values is not UNSET:
+            _input['values'] = values
         variables['input'] = _input
         return self.execute(DecideMutation, variables).decide
 
@@ -4572,62 +4595,6 @@ Returns:
             _input['result'] = result
         variables['input'] = _input
         return self.execute(Create_testresultMutation, variables).create_test_result
-
-    async def acreate_threed_d_model(self, name: str, media: MediaLike, description: str | None | UnsetType=UNSET, transfer_function: str | None | UnsetType=UNSET, dependency: AgentDependencyInput | None | UnsetType=UNSET) -> CreateThreedDModelMutationCreateThreedModel:
-        """CreateThreedDModel 
-
-Create a new 3D model.
-
-Args:
-    name: The name of the 3D model.
-    description: A description of the 3D model.
-    media: The media store file for the 3D model.
-    transfer_function: How the agent's state maps onto the model's properties.
-    dependency: The agent this model shows: whose state the transfer function reads.
-
-Returns:
-    CreateThreedDModelMutationCreateThreedModel
-"""
-        variables: dict[str, builtins.object] = {}
-        _input: dict[str, builtins.object] = {}
-        _input['name'] = name
-        if description is not UNSET:
-            _input['description'] = description
-        _input['media'] = media
-        if transfer_function is not UNSET:
-            _input['transferFunction'] = transfer_function
-        if dependency is not UNSET:
-            _input['dependency'] = dependency
-        variables['input'] = _input
-        return (await self.aexecute(CreateThreedDModelMutation, variables)).create_threed_model
-
-    def create_threed_d_model(self, name: str, media: MediaLike, description: str | None | UnsetType=UNSET, transfer_function: str | None | UnsetType=UNSET, dependency: AgentDependencyInput | None | UnsetType=UNSET) -> CreateThreedDModelMutationCreateThreedModel:
-        """CreateThreedDModel 
-
-Create a new 3D model.
-
-Args:
-    name: The name of the 3D model.
-    description: A description of the 3D model.
-    media: The media store file for the 3D model.
-    transfer_function: How the agent's state maps onto the model's properties.
-    dependency: The agent this model shows: whose state the transfer function reads.
-
-Returns:
-    CreateThreedDModelMutationCreateThreedModel
-"""
-        variables: dict[str, builtins.object] = {}
-        _input: dict[str, builtins.object] = {}
-        _input['name'] = name
-        if description is not UNSET:
-            _input['description'] = description
-        _input['media'] = media
-        if transfer_function is not UNSET:
-            _input['transferFunction'] = transfer_function
-        if dependency is not UNSET:
-            _input['dependency'] = dependency
-        variables['input'] = _input
-        return self.execute(CreateThreedDModelMutation, variables).create_threed_model
 
     async def aget_agent(self, id: IDCoercible) -> Agent:
         """GetAgent 
@@ -4896,7 +4863,7 @@ Returns:
     async def asearch_materialized_bloks(self, search: str | None | UnsetType=UNSET, values: list[IDCoercible] | None | UnsetType=UNSET, limit: int | None | UnsetType=UNSET, offset: int | None | UnsetType=UNSET) -> tuple[SearchMaterializedBloksQueryOptions, ...]:
         """SearchMaterializedBloks 
 
-List of UI Blok.
+List of UI Blok. Leaves out the materializations made for a message: each is shown in its message and reached by its id.
 
 Args:
     search (str | None, optional): No description. 
@@ -4921,7 +4888,7 @@ Returns:
     def search_materialized_bloks(self, search: str | None | UnsetType=UNSET, values: list[IDCoercible] | None | UnsetType=UNSET, limit: int | None | UnsetType=UNSET, offset: int | None | UnsetType=UNSET) -> tuple[SearchMaterializedBloksQueryOptions, ...]:
         """SearchMaterializedBloks 
 
-List of UI Blok.
+List of UI Blok. Leaves out the materializations made for a message: each is shown in its message and reached by its id.
 
 Args:
     search (str | None, optional): No description. 
@@ -4946,7 +4913,7 @@ Returns:
     async def alist_bloks(self, search: str | None | UnsetType=UNSET, provided: bool | None | UnsetType=UNSET, limit: int | None | UnsetType=UNSET, offset: int | None | UnsetType=UNSET) -> tuple[DetailBlok, ...]:
         """ListBloks 
 
-List of UI Blok.
+List of UI Blok. Leaves out the bloks a task made from its BSX to show: each goes with its task.
 
 Args:
     search (str | None, optional): No description. 
@@ -4971,7 +4938,7 @@ Returns:
     def list_bloks(self, search: str | None | UnsetType=UNSET, provided: bool | None | UnsetType=UNSET, limit: int | None | UnsetType=UNSET, offset: int | None | UnsetType=UNSET) -> tuple[DetailBlok, ...]:
         """ListBloks 
 
-List of UI Blok.
+List of UI Blok. Leaves out the bloks a task made from its BSX to show: each goes with its task.
 
 Args:
     search (str | None, optional): No description. 

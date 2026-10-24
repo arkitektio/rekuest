@@ -26,9 +26,6 @@ dependencies = [
 Homepage = "https://arkitekt.live"
 Repository = "https://github.com/arkitektio/rekuest"
 
-[project.scripts]
-# Authoring device models; needs the kulisse extra.
-kulisse = "rekuest.kulisse.cli:main"
 
 [project.optional-dependencies]
 types = [
@@ -41,10 +38,9 @@ units = [
     "kanne>=2.2",
 ]
 kulisse = [
-    "numpy>=1.26",
-    "pycollada>=0.8",
-    "trimesh>=4",
-    "xacro>=2",
+    # Authoring device models (URDF import, the model rules, the kulisse command) is the
+    # standalone kulisse package's.
+    "kulisse[urdf]>=1",
 ]
 
 [tool.uv]

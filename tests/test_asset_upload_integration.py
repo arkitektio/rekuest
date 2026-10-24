@@ -13,7 +13,7 @@ import pytest
 from dokker import Deployment
 
 from arkitekt_spec.declare.app import AppRegistry
-from rekuest import kulisse
+import kulisse
 from rekuest.api.schema import CreateAssetMutation
 from rekuest.client.upload.assets import aupload_assets
 from rekuest.client.upload.media import astore_media_file
@@ -21,7 +21,7 @@ from rekuest.datalayer import DataLayer
 from rekuest.scalars import MediaLike
 
 from .conftest import CONNECT_TIMEOUT, build_fresh_rekuest
-from .kulisse.test_kulisse import ARM
+from .test_asset_upload_integration_arm import ARM
 
 pytest.importorskip("trimesh", reason="authoring the model needs the kulisse extra")
 

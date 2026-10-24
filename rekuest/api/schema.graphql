@@ -708,7 +708,6 @@ input AgentFilter {
   search: String
   dependency: ID
   blokDependency: ID
-  threeDModel: ID
   distinct: Boolean
   actionDemands: [ActionDemandInput!]
   stateDemands: [StateDemandInput!]
@@ -943,11 +942,20 @@ type Asset {
 
   """What the file is."""
   kind: AssetKind!
-  file: MediaStore!
 
   """The size of the file in bytes, measured by the server."""
   size: Int!
   createdAt: DateTime!
+
+  """
+  The stored file: a kulisse store for a 3D model, a media store for an image.
+  """
+  file: AssetFile!
+
+  """
+  A 3D model's joint table (name, node, type, axis, limit, mimic). Empty for other kinds.
+  """
+  joints: JSON!
 
   """
   A 3D model's node names: what blok bindings can address. Empty for other kinds.
@@ -965,6 +973,11 @@ type Asset {
   """An image's height in pixels. Null for other kinds."""
   height: Int
 }
+
+"""
+Where an asset's bytes are: a kulisse store for a 3D model, a media store for an image.
+"""
+union AssetFile = KulisseStore | MediaStore
 
 """
 A file an agent brings with it: the name its bloks call it by, and what the bytes are.
@@ -1004,6 +1017,26 @@ enum AssetKind {
 type AssetPolicy {
   model: ModelPolicy!
   image: ImagePolicy!
+}
+
+"""
+Temporary S3 credentials for uploading one asset: to a kulisse store for a 3D model, to a media store for an image. Write the file to `key`, then call `createAsset` with `store`.
+"""
+type AssetUploadGrant {
+  status: String!
+  accessKey: String!
+  secretKey: String!
+  sessionToken: String!
+  region: String!
+  bucket: String!
+  key: String!
+  path: String!
+  expiresIn: Int!
+  store: String!
+  maxBytes: ByteCount!
+  originalFileName: String
+  uploadFileName: String!
+  uploadContentType: String
 }
 
 """
@@ -1195,7 +1228,7 @@ input AutoResolveInput {
 }
 
 """
-The built-in base catalog: the pure operations every UI implements, applied to every definition and blok before any registered UI catalog. Virtual: shipped with the server, not registered, identical in every organization.
+The built-in base catalog: the pure operations and control-flow components every UI implements, applied to every definition and blok before any registered UI catalog. Virtual: shipped with the server, not registered, identical in every organization.
 """
 type BaseCatalog {
   """Always 'base'."""
@@ -1209,6 +1242,11 @@ type BaseCatalog {
 
   """The base operations, argument order being positional order."""
   operations: [CatalogOperation!]!
+
+  """
+  The base components: control flow (foreach, if, match, …), named in lowercase. A UI catalog may not redefine them.
+  """
+  components: [CatalogComponent!]!
 }
 
 """The input for bouncing an agent."""
@@ -1232,7 +1270,9 @@ type Blok {
   """
   app: App
 
-  """Materialized bloks that are instances of this blok."""
+  """
+  Materialized bloks that are instances of this blok, but the ones made for a message.
+  """
   materializedBloks(filters: MaterializedBlokFilter, ordering: [MaterializedBlokOrder!]! = [], pagination: OffsetPaginationInput): [MaterializedBlok!]!
 
   """Dependencies that need to be resolved for this blok."""
@@ -1276,6 +1316,16 @@ type Blok {
   The items this blok is opened for, declared like an action's args and read under `@args.<key>`; empty for a blok that is opened on its own.
   """
   args: [ArgPort!]!
+
+  """
+  What a person answers through this blok when a task asks with it, declared like an action's returns: the values `blok.answer` hands back. Empty for a blok that answers nothing.
+  """
+  returns: [ReturnPort!]!
+
+  """
+  The backend services this blok reads from (its `query` components name them), each frozen at the version it was written against. A client warns when the live service differs.
+  """
+  services: [BlokService!]!
 
   """
   The whole component tree as one JSON value, in the wire spelling (snake_case keys). Unlike `components` it has no depth limit, which a selection set always has.
@@ -1494,6 +1544,11 @@ input BlokImplementationInput {
   The items this Blok is opened for, declared like an action's args and read under `@args.<key>`. A UI offers the Blok on any item its args accept (`MaterializedBlokFilter.demands`). HTML bloks only.
   """
   args: [ArgPortInput!]! = []
+
+  """
+  The backend services this Blok reads from (its `query` components name them), each frozen at the version it was written against.
+  """
+  services: [BlokServiceInput!]! = []
 }
 
 """
@@ -1548,11 +1603,47 @@ type BlokRevision {
   dependencies: [RevisionDependency!]!
 }
 
+"""
+A backend service a blok reads from, frozen at the version it was written against.
+"""
+type BlokService {
+  key: String!
+  service: String
+  version: String
+  schemaHash: String
+}
+
+"""
+A backend service a blok reads from, frozen at the version it was written against.
+"""
+input BlokServiceInput {
+  """The service's key, as a `query`'s `schema` names it: 'mikro'."""
+  key: String!
+
+  """The service type, in reverse-domain form: 'live.arkitekt.mikro'."""
+  service: String = null
+
+  """
+  The server version the blok was written against, as the service declaration names it ('8').
+  """
+  version: String = null
+
+  """
+  'sha256:<hex>' of the canonical GraphQL schema the blok's queries were checked against.
+  """
+  schemaHash: String = null
+}
+
 """The input for bouncing an agent."""
 input BounceInput {
   """The agent ID to bounce."""
   agent: ID!
 }
+
+"""
+A number of bytes. 64-bit, unlike Int: serialized as a JSON number, and accepted as a number or a numeric string.
+"""
+scalar ByteCount
 
 """The (client, user, organization) identity that requests work."""
 type Caller {
@@ -1965,6 +2056,11 @@ input CreateBlokInput {
   source: String = null
 
   """
+  The backend services the blok's queries read from, each frozen at the version it was written against. Every `query`'s `schema` must name one.
+  """
+  services: [BlokServiceInput!] = null
+
+  """
   The initial state of the blok. This is used to set the initial state of the blok when it is materialized.
   """
   demoState: Args = null
@@ -2037,11 +2133,6 @@ input CreatePlacementInput {
   The affine matrix for the placement. This is used to identify the placement in the system.
   """
   affineMatrix: [[Float!]!] = null
-
-  """
-  The 3D model ID for the placement. This is used to identify the 3D model in the system.
-  """
-  model: ID = null
 
   """
   The agent ID for the placement. This is used to identify the agent in the system.
@@ -2147,6 +2238,23 @@ input CreateSpaceInput {
   placements: [PlacementInput!] = null
 }
 
+"""Place a 3D blok in a space at an affine transform."""
+input CreateSpacePlacementInput {
+  """The space to place the blok in."""
+  space: ID!
+
+  """The materialized 3D blok to place."""
+  blok: ID!
+
+  """What the placement is called in its space."""
+  name: String = null
+
+  """
+  Where the blok sits: a 4x4 affine matrix, row-major, from the blok's frame into the space's. Omitted is the identity.
+  """
+  affineMatrix: [[Float!]!] = null
+}
+
 """Declare that one action tests another."""
 input CreateTestCaseInput {
   """The action under test."""
@@ -2174,24 +2282,6 @@ input CreateTestResultInput {
 
   """What the test produced, as JSON."""
   result: AnyDefault = null
-}
-
-"""The input for creating a 3D model."""
-input CreateThreeDModelInput {
-  """The name of the 3D model."""
-  name: String!
-
-  """A description of the 3D model."""
-  description: String = null
-
-  """The media store file for the 3D model."""
-  media: MediaLike!
-
-  """How the agent's state maps onto the model's properties."""
-  transferFunction: String = null
-
-  """The agent this model shows: whose state the transfer function reads."""
-  dependency: AgentDependencyInput = null
 }
 
 """
@@ -2354,6 +2444,11 @@ input DecideInput {
   What the person says with the decision. A child gets it as its Assign's message; a task's own hold gets it back.
   """
   answer: String = null
+
+  """
+  The answer through the blok a task asks with (a hold on a blok), by the blok's returns, and checked against them. Only an approved ask takes them.
+  """
+  values: Args = null
 }
 
 "A definition\n\n    Definitions are the building implementation for Actions and provide the\n    information needed to create a action. They are primarly composed of a name,\n    a description, and a list of ports.\n\n    Definitions provide a protocol of input and output, and do not contain\n    any information about the actual implementation of the action ( this is handled\n    by a implementation that implements a action).\n\n    "
@@ -2501,9 +2596,9 @@ input DeleteSpaceInput {
   id: ID!
 }
 
-"""The input for deleting a 3D model."""
-input DeleteThreeDModelInput {
-  """The ID of the 3D model to delete."""
+"""Remove a placed 3D blok from its space."""
+input DeleteSpacePlacementInput {
+  """The blok placement to remove."""
   id: ID!
 }
 
@@ -2715,6 +2810,11 @@ input EditBlokInput {
   The full list of the items the blok is opened for, read under `@args.<key>` (html bloks only). Kept when omitted; an empty list removes them.
   """
   args: [ArgPortInput!] = null
+
+  """
+  The full list of the backend services the blok's queries read from, each frozen at its version. Kept when omitted; an empty list removes them.
+  """
+  services: [BlokServiceInput!] = null
 
   """
   Bindings on `materialized_blok`, by dependency key, over the ones it has. Bindings of keys the edit removes go. Refused with `blok`: a blok binds no agents, its materializations do.
@@ -3389,6 +3489,85 @@ input KickInput {
   reason: String = null
 }
 
+"""Temporary S3 credentials for reading a kulisse model."""
+type KulisseAccessGrant {
+  status: String!
+  accessKey: String!
+  secretKey: String!
+  sessionToken: String!
+  region: String!
+  bucket: String!
+  key: String!
+  path: String!
+  expiresIn: Int!
+  store: String
+}
+
+"""What a kulisse model contains, counted from its JSON."""
+type KulisseStats {
+  nodes: Int!
+  triangles: Int!
+  textures: Int!
+  animations: Int!
+}
+
+"""
+A kulisse model: a device or scene model stored as one self-contained binary glTF. Everything here is read from the file when its upload is finished, never declared by a caller.
+"""
+type KulisseStore @key(fields: "id", resolvable: true) {
+  id: ID!
+  path: String!
+  bucket: String!
+  key: String!
+
+  """
+  The byte budget the upload grant advertised for this store. Advertised, not enforced: a session policy bounds what a credential may write, never how much, so a store may exceed this
+  """
+  maxBytes: ByteCount
+
+  """
+  How many bytes the model holds, measured when its upload was finished. Null while unfinished
+  """
+  sizeBytes: ByteCount
+  originalFileName: String
+
+  """
+  `sha256:` and the hex digest of the model's exact bytes: what a blok decorating it names as `forModel`
+  """
+  ref: String
+
+  """The glTF version the model declares"""
+  specVersion: String
+
+  """The tool that wrote the model, as it says"""
+  generator: String
+
+  """
+  The box the default scene occupies, `{min: [x, y, z], max: [x, y, z]}` in the model's own coordinates. Null when nothing declares a box
+  """
+  bounds: JSON
+
+  """The named nodes a blok can address"""
+  nodes: [String!]
+
+  """
+  The joint table (`extras.arkitekt.joints`): name, node, type, axis, limit, mimic. Empty for a rigid model
+  """
+  joints: JSON
+
+  """The glTF extensions the model uses"""
+  extensionsUsed: [String!]
+
+  """What the reader noticed but did not refuse"""
+  warnings: [String!]
+
+  """What the model contains, counted from its JSON."""
+  stats: KulisseStats
+
+  """Get temporary S3 read credentials for the model."""
+  accessGrant: KulisseAccessGrant!
+}
+
 """
 The task an implementation last ran as, with what its record is made of. The first message of `latestTask`, and again whenever a newer task takes its place.
 """
@@ -3481,6 +3660,15 @@ input MappedAgentInput {
   dependencies: [ResolvedDependencyInput!] = null
 }
 
+"""
+Where a materialization lives: DASHBOARD ones are listed and placed on dashboards; a MESSAGE one belongs to the message it was made for, a TASK one to the task that showed it (to ask or to inform). Neither is listed; each is reached by its id.
+"""
+enum MaterializationScope {
+  DASHBOARD
+  MESSAGE
+  TASK
+}
+
 """The input for creating a blok."""
 input MaterializeBlokInput {
   blok: ID!
@@ -3502,6 +3690,11 @@ input MaterializeBlokInput {
   Description of this materialization. Defaults to the blok's description.
   """
   description: String = null
+
+  """
+  MESSAGE: made for one chat message, to show inline in it. It is never listed, takes no dashboard, and may materialize a blok an app provides (bound to any agents).
+  """
+  scope: MaterializationScope! = DASHBOARD
 }
 
 """
@@ -3534,10 +3727,28 @@ type MaterializedBlok {
   """Placements of this materialized blok."""
   placements(filters: PlacementFilter, ordering: [PlacementOrder!]! = [], pagination: OffsetPaginationInput): [Placement!]!
 
+  """Where this 3D blok is placed in spaces, each at its affine transform."""
+  spacePlacements(filters: SpacePlacementFilter, ordering: [SpacePlacementOrder!]! = [], pagination: OffsetPaginationInput): [SpacePlacement!]!
+
   """
   The revision this materialization stays at; null when it follows its blok's head.
   """
   pinnedRevision: BlokRevision
+
+  """
+  Where it lives: DASHBOARD, MESSAGE when it was made for one chat message to show inline, or TASK when a task showed it.
+  """
+  scope: MaterializationScope!
+
+  """
+  Why its task showed it (scope TASK): ASK holds the task until a person answers through it, INFORM shows it while the task carries on. Null for any other.
+  """
+  taskRole: TaskBlokRole
+
+  """
+  What it is opened on, by arg key (read under `@args.<key>`): set by the task that showed it. Empty when whoever shows it chooses.
+  """
+  args: Args!
 
   """
   The revision this materialization shows: the pinned one, else its blok's head. Null for a provided blok, which has none.
@@ -3600,9 +3811,7 @@ type MediaAccessGrant {
   store: String
 }
 
-"""
-A type representing a media store reference, which can be either a string ID or a more complex object.
-"""
+"""A reference to a media store: the id its finished upload returned."""
 scalar MediaLike
 
 type MediaStore @key(fields: "id", resolvable: true) {
@@ -3610,17 +3819,24 @@ type MediaStore @key(fields: "id", resolvable: true) {
   path: String!
   bucket: String!
   key: String!
+
+  """
+  The byte budget the upload grant advertised for this store. Advertised, not enforced: a session policy bounds what a credential may write, never how much, so a store may exceed this
+  """
+  maxBytes: ByteCount
+
+  """
+  How many bytes this store actually holds, measured when its upload was finished. Null while unfinished, or for stores written before this was recorded
+  """
+  sizeBytes: ByteCount
   originalFileName: String
   contentType: String
 
   """Get temporary S3 read credentials for the media object."""
-  accessGrant(host: String = null): MediaAccessGrant!
-
-  """Compatibility field returning the canonical S3 object path."""
-  presignedUrl(host: String = null): String!
+  accessGrant: MediaAccessGrant!
 }
 
-"""A presigned PUT grant for uploading a media object."""
+"""Temporary S3 credentials for uploading a media object."""
 type MediaUploadGrant {
   status: String!
   accessKey: String!
@@ -3632,11 +3848,10 @@ type MediaUploadGrant {
   path: String!
   expiresIn: Int!
   store: String!
-  maxBytes: Int!
+  maxBytes: ByteCount!
   originalFileName: String
   uploadFileName: String!
   uploadContentType: String
-  uploadFormField: String!
 }
 
 type MemoryDrawer {
@@ -3966,21 +4181,12 @@ type Mutation {
   """
   A media upload grant for one asset. Issued for a file the caller's own agent declares (it registered with it), or, to an admin, for a file an agent of the organization names a source for; and only if its size passes the policy.
   """
-  requestAssetUpload(input: RequestAssetUploadInput!): MediaUploadGrant! @auth
+  requestAssetUpload(input: RequestAssetUploadInput!): AssetUploadGrant! @auth
 
   """
   Verify an asset uploaded with a grant from `requestAssetUpload` (its hash and the rules of its kind) and record it. Returns the existing asset if the hash is stored already; a refusal carries its code in `extensions.code` and deletes the upload.
   """
   createAsset(input: CreateAssetInput!): Asset! @auth
-
-  """Create a new 3D model."""
-  createThreedModel(input: CreateThreeDModelInput!): ThreeDModel! @auth
-
-  """Update an existing 3D model."""
-  updateThreedModel(input: UpdateThreeDModelInput!): ThreeDModel! @auth
-
-  """Delete a 3D model."""
-  deleteThreedModel(input: DeleteThreeDModelInput!): ID! @auth
 
   """Create a new space."""
   createSpace(input: CreateSpaceInput!): Space! @auth
@@ -3999,6 +4205,17 @@ type Mutation {
 
   """Delete a placement."""
   deletePlacement(input: DeletePlacementInput!): ID! @auth
+
+  """
+  Place a 3D blok (a Model or Robot over a kulisse asset) in a space at an affine transform.
+  """
+  createSpacePlacement(input: CreateSpacePlacementInput!): SpacePlacement! @auth
+
+  """Move or rename a placed 3D blok."""
+  updateSpacePlacement(input: UpdateSpacePlacementInput!): SpacePlacement! @auth
+
+  """Remove a placed 3D blok from its space."""
+  deleteSpacePlacement(input: DeleteSpacePlacementInput!): ID! @auth
 }
 
 input OffsetPaginationInput {
@@ -4120,7 +4337,6 @@ type Placement {
   blok: MaterializedBlok
   role: String!
   affineMatrix: Args
-  model: ThreeDModel
 
   """Get the agent associated with this placement."""
   name: String!
@@ -4157,11 +4373,6 @@ input PlacementInput {
   The affine matrix for the placement. This is used to identify the placement in the system.
   """
   affineMatrix: [[Float!]!] = null
-
-  """
-  The 3D model ID for the placement. This is used to identify the 3D model in the system.
-  """
-  model: ID = null
 
   """
   The agent ID for the placement. This is used to identify the agent in the system.
@@ -4564,13 +4775,17 @@ type Query {
   """All dashboards."""
   dashboards: [Dashboard!]! @auth
 
-  """List of UI Blok."""
+  """
+  List of UI Blok. Leaves out the bloks a task made from its BSX to show: each goes with its task.
+  """
   bloks(filters: BlokFilter, pagination: OffsetPaginationInput): [Blok!]! @auth
 
   """All resolutions."""
   resolutions(filters: ResolutionFilter, pagination: OffsetPaginationInput): [Resolution!]! @auth
 
-  """List of UI Blok."""
+  """
+  List of UI Blok. Leaves out the materializations made for a message: each is shown in its message and reached by its id.
+  """
   materializedBloks(filters: MaterializedBlokFilter, ordering: [MaterializedBlokOrder!]! = [], pagination: OffsetPaginationInput): [MaterializedBlok!]! @auth
 
   """
@@ -4631,11 +4846,11 @@ type Query {
   """Fetch a specific placement by ID."""
   placement(id: ID!): Placement! @auth
 
-  """List all 3D models."""
-  threedModels(filters: ThreeDModelFilter, ordering: [ThreeDModelOrder!]! = [], pagination: OffsetPaginationInput): [ThreeDModel!]! @auth
+  """List the 3D bloks placed in spaces."""
+  spacePlacements(filters: SpacePlacementFilter, ordering: [SpacePlacementOrder!]! = [], pagination: OffsetPaginationInput): [SpacePlacement!]! @auth
 
-  """Fetch a specific 3D model by ID."""
-  threedModel(id: ID!): ThreeDModel! @auth
+  """Fetch one placed 3D blok by ID."""
+  spacePlacement(id: ID!): SpacePlacement! @auth
 
   """List all sessions."""
   sessions(filters: SessionFilter, ordering: [SessionOrder!]! = [], pagination: OffsetPaginationInput): [Session!]! @auth
@@ -4912,7 +5127,7 @@ input RequestMediaAccessInput {
 
 input RequestMediaUploadInput {
   originalFileName: String!
-  fileSize: Int = null
+  fileSize: ByteCount = null
   contentType: String = null
 }
 
@@ -5787,6 +6002,9 @@ type Space {
   createdAt: DateTime!
   updatedAt: DateTime!
   placements(filters: PlacementFilter, ordering: [PlacementOrder!]! = [], pagination: OffsetPaginationInput): [Placement!]!
+
+  """The 3D bloks placed in this space, each at its affine transform."""
+  blokPlacements(filters: SpacePlacementFilter, ordering: [SpacePlacementOrder!]! = [], pagination: OffsetPaginationInput): [SpacePlacement!]!
 }
 
 """A way to filter spaces"""
@@ -5806,6 +6024,42 @@ input SpaceFilter {
 input SpaceOrder @oneOf {
   createdAt: Ordering
   updatedAt: Ordering
+  name: Ordering
+}
+
+"""
+A 3D blok placed in a space at an affine transform: a Model or Robot blok over a kulisse asset, with no agent of its own.
+"""
+type SpacePlacement {
+  id: ID!
+  space: Space!
+  blok: MaterializedBlok!
+  name: String
+
+  """
+  Where the blok sits: a 4x4 affine matrix, row-major, from the blok's frame into the space's. Null is the identity.
+  """
+  affineMatrix: Args
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+"""A way to filter blok placements in spaces"""
+input SpacePlacementFilter {
+  AND: SpacePlacementFilter
+  OR: SpacePlacementFilter
+  NOT: SpacePlacementFilter
+  DISTINCT: Boolean
+
+  """Filter by IDs"""
+  ids: [ID!]
+
+  """Filter by space"""
+  space: ID
+}
+
+input SpacePlacementOrder @oneOf {
+  createdAt: Ordering
   name: Ordering
 }
 
@@ -6470,6 +6724,11 @@ type Task {
   """The method of the dependency that caused this task, if applicable."""
   dependencyMethod: String
 
+  """
+  The bloks this task showed a person, oldest first: asks it holds on (or held on) and informs.
+  """
+  bloks: [TaskBlok!]!
+
   """List of recent instructions for this task."""
   instructs: [TaskInstruct!]!
 
@@ -6478,6 +6737,53 @@ type Task {
 
   """The resolved dependencies for this task."""
   resolvedDependencies: [ResolvedAgentDependency!]!
+}
+
+"""
+A blok a task showed a person: to ask (the task holds until they answer through it) or to inform.
+"""
+type TaskBlok {
+  """What it shows: a materialization of scope TASK, opened on its args."""
+  materializedBlok: MaterializedBlok!
+
+  """ASK or INFORM."""
+  role: TaskBlokRole!
+
+  """
+  Where it stands: an ask WAITING, ANSWERED, DISMISSED or GONE (the task ended first); an inform SHOWN.
+  """
+  status: TaskBlokStatus!
+
+  """What the task said with it."""
+  message: String
+
+  """The answer to an ask, by the blok's returns."""
+  values: Args
+
+  """The user (sub) who answered or dismissed an ask."""
+  decidedBy: String
+
+  """When the task showed it."""
+  createdAt: DateTime!
+}
+
+"""
+Why a task showed a blok: ASK holds the task until a person answers through it, INFORM shows it while the task carries on.
+"""
+enum TaskBlokRole {
+  ASK
+  INFORM
+}
+
+"""
+Where a blok a task showed stands. WAITING: an ask nobody answered yet. ANSWERED / DISMISSED: a person answered it, or turned it down. GONE: the task ended before anyone did. SHOWN: an inform.
+"""
+enum TaskBlokStatus {
+  WAITING
+  ANSWERED
+  DISMISSED
+  GONE
+  SHOWN
 }
 
 type TaskBoundary {
@@ -6628,6 +6934,7 @@ enum TaskEventKind {
   RESUMED
   HELD
   DECIDED
+  INFORM
   DENIED
   FAILED
   CRITICAL
@@ -6878,42 +7185,6 @@ input TestTargetInput {
 
   """Restrict a key target to one specific version."""
   version: String = null
-}
-
-"""A 3D model file."""
-type ThreeDModel {
-  id: ID!
-  name: String!
-  description: String
-  transferFunction: String
-
-  """
-  The agent this model shows (an agent-dependency declaration), as stored.
-  """
-  dependency: AnyDefault
-  file: MediaStore!
-  createdAt: DateTime!
-  updatedAt: DateTime!
-}
-
-"""A way to filter 3D models"""
-input ThreeDModelFilter {
-  AND: ThreeDModelFilter
-  OR: ThreeDModelFilter
-  NOT: ThreeDModelFilter
-  DISTINCT: Boolean
-
-  """Filter by IDs"""
-  ids: [ID!]
-
-  """Search by name"""
-  search: String
-}
-
-input ThreeDModelOrder @oneOf {
-  createdAt: Ordering
-  updatedAt: Ordering
-  name: Ordering
 }
 
 type TimeBucket {
@@ -7277,11 +7548,6 @@ input UpdatePlacementInput {
   """
   affineMatrix: [[Float!]!] = null
 
-  """
-  The 3D model ID for the placement. This is used to identify the 3D model in the system.
-  """
-  model: ID = null
-
   """The ID of the placement to update."""
   id: ID!
 }
@@ -7325,25 +7591,16 @@ input UpdateSpaceInput {
   description: String = null
 }
 
-"""The input for updating a 3D model."""
-input UpdateThreeDModelInput {
-  """The ID of the 3D model to update."""
+"""Move or rename a placed 3D blok."""
+input UpdateSpacePlacementInput {
+  """The blok placement to change."""
   id: ID!
 
-  """The new name of the 3D model."""
+  """A new name."""
   name: String = null
 
-  """The new description of the 3D model."""
-  description: String = null
-
-  """The new media store file ID for the 3D model."""
-  media: ID = null
-
-  """How the agent's state maps onto the model's properties."""
-  transferFunction: String = null
-
-  """The agent this model shows."""
-  dependency: AgentDependencyInput = null
+  """A new 4x4 affine matrix, row-major."""
+  affineMatrix: [[Float!]!] = null
 }
 
 """

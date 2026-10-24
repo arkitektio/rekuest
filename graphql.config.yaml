@@ -121,6 +121,7 @@ projects:
         processors:
           - type: turms.processors.disclaimer.DisclaimerProcessor
         scalar_definitions:
+          ByteCount: int
           uuid: str
           Callback: str
           Any: typing.Any
@@ -199,6 +200,7 @@ projects:
         processors:
           - type: turms.processors.disclaimer.DisclaimerProcessor
         scalar_definitions:
+          ByteCount: int
           uuid: str
           Callback: str
           Any: typing.Any

@@ -29,3 +29,16 @@ fragment MediaStore on MediaStore {
   key
   bucket
 }
+
+
+fragment AssetUploadGrant on AssetUploadGrant {
+  accessKey
+  secretKey
+  sessionToken
+  path
+  key
+  bucket
+  expiresIn
+  maxBytes
+  store
+}

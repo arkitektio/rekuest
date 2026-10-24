@@ -11,11 +11,11 @@ from rekuest.scalars import MediaLike
 
 
 if TYPE_CHECKING:
-    from rekuest.api.schema import MediaUploadGrant
+    from rekuest.api.schema import AssetUploadGrant, MediaUploadGrant
 
 
 def create_s3_store(
-    endpoint_url: str, credentials: "MediaUploadGrant", proxy: str | None = None
+    endpoint_url: str, credentials: "MediaUploadGrant | AssetUploadGrant", proxy: str | None = None
 ) -> S3Store:
     """An S3 store for the bucket a grant writes into.
 
@@ -45,7 +45,7 @@ def create_s3_store(
 
 async def astore_media_file(
     file: MediaLike,
-    credentials: "MediaUploadGrant",
+    credentials: "MediaUploadGrant | AssetUploadGrant",
     datalayer: DataLayer,
 ) -> str:
     """Put a media file at the key its grant names, and return the grant's store."""

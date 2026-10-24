@@ -21,6 +21,7 @@
             "always_resolve_interfaces": true,
             "exclude_typenames": true,
             "scalar_definitions": {
+                "ByteCount": "int",
                 "uuid": "str",
                 "Callback": "str",
                 "Any": "typing.Any",

@@ -86,6 +86,13 @@ class LogLevel(str, Enum):
     CRITICAL = 'CRITICAL'
     __str__ = str.__str__
 
+class MaterializationScope(str, Enum):
+    """Where a materialization lives: DASHBOARD ones are listed and placed on dashboards; a MESSAGE one belongs to the message it was made for, a TASK one to the task that showed it (to ask or to inform). Neither is listed; each is reached by its id."""
+    DASHBOARD = 'DASHBOARD'
+    MESSAGE = 'MESSAGE'
+    TASK = 'TASK'
+    __str__ = str.__str__
+
 class Ordering(str, Enum):
     """No documentation"""
     ASC = 'ASC'
@@ -168,7 +175,6 @@ class AgentFilter(BaseModel):
     search: str | None = Field(default=None, description='Filter by name of the agents')
     dependency: ID | None = None
     blok_dependency: ID | None = Field(validation_alias=AliasChoices('blok_dependency', 'blokDependency'), serialization_alias='blokDependency', default=None)
-    three_d_model: ID | None = Field(validation_alias=AliasChoices('three_d_model', 'threeDModel'), serialization_alias='threeDModel', default=None)
     distinct: bool | None = None
     action_demands: tuple[ActionDemandInput, ...] | None = Field(validation_alias=AliasChoices('action_demands', 'actionDemands'), serialization_alias='actionDemands', default=None)
     state_demands: tuple[StateDemandInput, ...] | None = Field(validation_alias=AliasChoices('state_demands', 'stateDemands'), serialization_alias='stateDemands', default=None)
@@ -191,6 +197,14 @@ class BlokAgentMappingInput(BaseModel):
     """The input for updating a blok."""
     agent: ID
     key: str
+    model_config = ConfigDict(frozen=True, extra='forbid', populate_by_name=True, use_enum_values=True)
+
+class BlokServiceInput(BaseModel):
+    """A backend service a blok reads from, frozen at the version it was written against."""
+    key: str = Field(description="The service's key, as a `query`'s `schema` names it: 'mikro'.")
+    service: str | None = Field(default=None, description="The service type, in reverse-domain form: 'live.arkitekt.mikro'.")
+    version: str | None = Field(default=None, description="The server version the blok was written against, as the service declaration names it ('8').")
+    schema_hash: str | None = Field(validation_alias=AliasChoices('schema_hash', 'schemaHash'), serialization_alias='schemaHash', default=None, description="'sha256:<hex>' of the canonical GraphQL schema the blok's queries were checked against.")
     model_config = ConfigDict(frozen=True, extra='forbid', populate_by_name=True, use_enum_values=True)
 
 class CatalogArgumentInput(BaseModel):
@@ -258,6 +272,7 @@ class CreateBlokInput(CreateBlokInputTrait, BaseModel):
     catalog: str | None = Field(default=None, description='The universal id')
     components: tuple[ComponentNodeInput, ...] | None = Field(default=None, description='The schema of the blok. This can be used to validate the blok input and output.')
     source: str | None = Field(default=None, description='The blok as BSX, which the server parses into `components`: send one of the two.')
+    services: tuple[BlokServiceInput, ...] | None = Field(default=None, description="The backend services the blok's queries read from, each frozen at the version it was written against. Every `query`'s `schema` must name one.")
     demo_state: Args | None = Field(validation_alias=AliasChoices('demo_state', 'demoState'), serialization_alias='demoState', default=None, description='The initial state of the blok. This is used to set the initial state of the blok when it is materialized.')
     context: Annotated[ComponentContext | None, GraphQLDefault('HTML')] = Field(default=None, description="The renderer for the blok's root: HTML, or SCENE for a full 3D view.")
     "The renderer for the blok's root: HTML, or SCENE for a full 3D view.\nDefault: HTML"
@@ -322,15 +337,6 @@ class CreateTestResultInput(BaseModel):
     result: Any | None = Field(default=None, description='What the test produced, as JSON.')
     model_config = ConfigDict(frozen=True, extra='forbid', populate_by_name=True, use_enum_values=True)
 
-class CreateThreeDModelInput(BaseModel):
-    """The input for creating a 3D model."""
-    name: str = Field(description='The name of the 3D model.')
-    description: str | None = Field(default=None, description='A description of the 3D model.')
-    media: MediaLike = Field(description='The media store file for the 3D model.')
-    transfer_function: str | None = Field(validation_alias=AliasChoices('transfer_function', 'transferFunction'), serialization_alias='transferFunction', default=None, description="How the agent's state maps onto the model's properties.")
-    dependency: AgentDependencyInput | None = Field(default=None, description='The agent this model shows: whose state the transfer function reads.')
-    model_config = ConfigDict(frozen=True, extra='forbid', populate_by_name=True, use_enum_values=True)
-
 class EditBlokInput(BaseModel):
     """Edit a blok, on it or through a materialization of it (and its bindings there), as one new revision."""
     blok: ID | None = Field(default=None, description='The blok to edit, as an editor of the blok itself does. Send it or `materialized_blok`, not both.')
@@ -342,6 +348,7 @@ class EditBlokInput(BaseModel):
     catalog: str | None = Field(default=None, description="Name of the UI catalog (in the caller's organization) the blok renders against. Kept when omitted.")
     dependencies: tuple[AgentDependencyInput, ...] | None = Field(default=None, description='The full list of agent dependencies. Kept when omitted; keys not listed are removed.')
     args: tuple[ArgPortInput, ...] | None = Field(default=None, description='The full list of the items the blok is opened for, read under `@args.<key>` (html bloks only). Kept when omitted; an empty list removes them.')
+    services: tuple[BlokServiceInput, ...] | None = Field(default=None, description="The full list of the backend services the blok's queries read from, each frozen at its version. Kept when omitted; an empty list removes them.")
     agent_mappings: tuple[MappedAgentInput, ...] | None = Field(validation_alias=AliasChoices('agent_mappings', 'agentMappings'), serialization_alias='agentMappings', default=None, description='Bindings on `materialized_blok`, by dependency key, over the ones it has. Bindings of keys the edit removes go. Refused with `blok`: a blok binds no agents, its materializations do.')
     message: str | None = Field(default=None, description='What changed and why, in a sentence; kept with the revision.')
     task: ID | None = Field(default=None, description="The task making the edit (one the caller's agent runs), kept with the revision.")
@@ -419,6 +426,8 @@ class MaterializeBlokInput(BaseModel):
     agent_mappings: tuple[BlokAgentMappingInput, ...] | None = Field(validation_alias=AliasChoices('agent_mappings', 'agentMappings'), serialization_alias='agentMappings', default=None, description='The agent mappings for the blok. This is used to map the blok dependencies to agents in the system.')
     name: str | None = Field(default=None, description="Display name of this materialization. Defaults to the blok's name.")
     description: str | None = Field(default=None, description="Description of this materialization. Defaults to the blok's description.")
+    scope: Annotated[MaterializationScope | None, GraphQLDefault('DASHBOARD')] = Field(default=None, description='MESSAGE: made for one chat message, to show inline in it. It is never listed, takes no dashboard, and may materialize a blok an app provides (bound to any agents).')
+    'MESSAGE: made for one chat message, to show inline in it. It is never listed, takes no dashboard, and may materialize a blok an app provides (bound to any agents).\nDefault: DASHBOARD'
     model_config = ConfigDict(frozen=True, extra='forbid', populate_by_name=True, use_enum_values=True)
 
 class OffsetPaginationInput(BaseModel):
@@ -444,7 +453,6 @@ class PlacementInput(BaseModel):
     """The input for creating or updating a placement."""
     role: str | None = Field(default=None, description='The role of the placement. This is used to identify the placement in the system.')
     affine_matrix: tuple[tuple[float, ...], ...] | None = Field(validation_alias=AliasChoices('affine_matrix', 'affineMatrix'), serialization_alias='affineMatrix', default=None, description='The affine matrix for the placement. This is used to identify the placement in the system.')
-    model: ID | None = Field(default=None, description='The 3D model ID for the placement. This is used to identify the 3D model in the system.')
     agent: ID | None = Field(default=None, description='The agent ID for the placement. This is used to identify the agent in the system.')
     blok: ID | None = Field(default=None, description='A specific blok that should be used to visualize the state of the placement.')
     model_config = ConfigDict(frozen=True, extra='forbid', populate_by_name=True, use_enum_values=True)
