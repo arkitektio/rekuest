@@ -201,11 +201,12 @@ def _bypass_definition(structure_registry, validator: ValidatorInput):  # noqa: 
 @pytest.mark.integration
 @pytest.mark.asyncio(loop_scope="session")
 @pytest.mark.parametrize(
-    "validator, message",
+    "validator, refusal, finding",
     [
         (
             ValidatorInput.model_construct(call=parse_util_call("gt(value, ghost)"), dependencies=()),
             "via value_path",
+            None,
         ),
         (
             ValidatorInput.model_construct(
@@ -216,6 +217,7 @@ def _bypass_definition(structure_registry, validator: ValidatorInput):  # noqa: 
                 dependencies=(),
             ),
             "every entry must carry a key",
+            None,
         ),
         (
             ValidatorInput.model_construct(
@@ -225,7 +227,8 @@ def _bypass_definition(structure_registry, validator: ValidatorInput):  # noqa: 
                 ),
                 dependencies=(),
             ),
-            "requires arguments \\['b'\\]",
+            None,
+            "requires arguments ['b']",
         ),
         (
             ValidatorInput.model_construct(
@@ -238,18 +241,28 @@ def _bypass_definition(structure_registry, validator: ValidatorInput):  # noqa: 
                 ),
                 dependencies=(),
             ),
-            "does not accept arguments \\['a', 'b'\\]",
+            None,
+            "does not accept arguments ['a', 'b']",
         ),
         (
             ValidatorInput.model_construct(call=parse_util_call("gt(value, b)"), dependencies=("b",)),
+            None,
             None,
         ),
     ],
 )
 async def test_server_enforces_call_rules_independently(
-    deployment: Deployment, simple_registry, validator: ValidatorInput, message: str | None  # noqa: ANN001
+    deployment: Deployment,
+    simple_registry,  # noqa: ANN001
+    validator: ValidatorInput,
+    refusal: str | None,
+    finding: str | None,
 ) -> None:
-    """The server rejects what the client would have rejected, even when the client is bypassed."""
+    """The server checks what the client would have, even when the client is bypassed.
+
+    A malformed call is refused. Arguments that do not match the catalog's operation are a
+    catalog mismatch: the implementation registers, with the mismatch stored as its diagnostic.
+    """
     app = build_fresh_rekuest(deployment, token="btest_token")
 
     async def body(app):  # noqa: ANN001, ANN202
@@ -259,11 +272,17 @@ async def test_server_enforces_call_rules_independently(
             implementations=[ImplementationInput(definition=definition, interface="bypass")],
             hash="bypass",
         )
-        if message is None:
-            await coro
-        else:
-            with pytest.raises(Exception, match=message):
+        if refusal is not None:
+            with pytest.raises(Exception, match=refusal):
                 await coro
+            return
+        await coro
+        impl = await app.amy_implementation_at("bypass")
+        if finding is None:
+            assert impl.diagnostics == ()
+        else:
+            assert {d.code for d in impl.diagnostics} == {"operation_arguments"}
+            assert any(finding in d.message for d in impl.diagnostics)
 
     await _run(app, body)
 
