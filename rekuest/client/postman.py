@@ -277,8 +277,26 @@ class GraphQLPostman(KoiledModel):
         # A task assigned while the feed is known to be subscribed misses nothing.
         feed_was_live = self._feed_live
 
+        timeout = cancel_timeout if cancel_timeout is not None else self.cancel_timeout
+
+        # Shielded: the server holds the task before its answer is back, so a call
+        # cancelled in between still learns the task's id, and cancels it.
+        assigning = asyncio.ensure_future(self._send_assign(assign_input))
         try:
-            task = await self._send_assign(assign_input)
+            task = await asyncio.shield(assigning)
+        except asyncio.CancelledError:
+            task = await self._assigned_despite_cancel(assigning, timeout)
+            if task is None:
+                self._cleanup_reference(assign_reference)
+                raise
+            self._bind(task.id, assign_reference)
+            try:
+                await self._confirm_cancellation(
+                    task.id, queue, escalate_to_interrupt, timeout
+                )
+            finally:
+                self._cleanup_reference(assign_reference)
+            raise
         except BaseException as e:
             # No task was bound to this reference, so nothing else will drop its queue.
             self._cleanup_reference(assign_reference)
@@ -291,15 +309,15 @@ class GraphQLPostman(KoiledModel):
         # ahead of this http response.
         self._bind(task.id, assign_reference)
 
-        if not feed_was_live:
-            # Before the first event is handed on: this is what puts them in order.
-            await self._acatch_up_safely(task.id)
-            if not self._feed_live:
-                self._catch_up_tasks[assign_reference] = asyncio.create_task(
-                    self._acatch_up_until_live(task.id)
-                )
-
         try:
+            if not feed_was_live:
+                # Before the first event is handed on: this is what puts them in order.
+                await self._acatch_up_safely(task.id)
+                if not self._feed_live:
+                    self._catch_up_tasks[assign_reference] = asyncio.create_task(
+                        self._acatch_up_until_live(task.id)
+                    )
+
             while True:
                 signal = await queue.get()
                 if isinstance(signal, _FeedLost):
@@ -317,12 +335,7 @@ class GraphQLPostman(KoiledModel):
             # exchange is bounded by `cancel_timeout`, so cancelling can never hang.
             try:
                 await self._confirm_cancellation(
-                    task.id,
-                    queue,
-                    escalate_to_interrupt,
-                    cancel_timeout
-                    if cancel_timeout is not None
-                    else self.cancel_timeout,
+                    task.id, queue, escalate_to_interrupt, timeout
                 )
             finally:
                 self._cleanup_reference(assign_reference)
@@ -347,6 +360,26 @@ class GraphQLPostman(KoiledModel):
     async def _send_assign(self, assign_input: AssignInput) -> Task:
         """Create the task on the backend."""
         return await RekuestGraphQL(self.rath).aassign(**assign_input.model_dump())
+
+    async def _assigned_despite_cancel(
+        self, assigning: "asyncio.Future[Task]", timeout: float
+    ) -> Task | None:
+        """The task an assign in flight made, for a call cancelled before its answer.
+
+        Waits up to ``timeout`` for the answer. ``None`` when the assign failed or did
+        not answer in time: then no task is known to cancel.
+        """
+        try:
+            return await asyncio.wait_for(asyncio.shield(assigning), timeout=timeout)
+        except TimeoutError:
+            assigning.cancel()
+            logger.warning(
+                "Cancelled before the assign answered; no task to cancel after %ss",
+                timeout,
+            )
+            return None
+        except Exception:
+            return None
 
     def _feed(self) -> AsyncIterator[TaskChangeEvent]:
         """The change feed of this client's tasks."""

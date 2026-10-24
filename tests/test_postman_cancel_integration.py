@@ -47,7 +47,9 @@ async def test_cancel_awaits_backend_cancelled(deployment: Deployment) -> None:
         impl = await app.amy_implementation_at("sleeper")
 
         reference = f"cancel-smoke-{uuid.uuid4().hex[:8]}"
-        call_task = asyncio.create_task(app.acall(impl, seconds=30, reference=reference))
+        call_task = asyncio.create_task(
+            app.acall(impl, seconds=30, reference=reference)
+        )
 
         # Wait until the backend has registered the task and recorded an event for it.
         #
@@ -83,6 +85,67 @@ async def test_cancel_awaits_backend_cancelled(deployment: Deployment) -> None:
                 f"expected CANCELLED, got {task.latest_event_kind}"
             )
             await asyncio.sleep(0.2)
+
+        loop_task.cancel()
+        try:
+            await loop_task
+        except asyncio.CancelledError:
+            pass
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio(loop_scope="session")
+@pytest.mark.parametrize("step", ["_send_assign", "_acatch_up_safely"])
+async def test_a_call_cancelled_before_its_events_stream_cancels_its_task(
+    deployment: Deployment, step: str
+) -> None:
+    """The server holds the task before the call reads its events: a cancel then still reaches it.
+
+    ``step`` is held up after it is done -- the assign's answer on its way back, or the
+    first read of the task's events -- so the cancel lands exactly there.
+    """
+    app = build_fresh_rekuest(deployment, token="standalone_token")
+
+    async def sleeper(seconds: int) -> int:
+        """Sleep for a while, then return — long enough to be cancelled mid-flight."""
+        await asyncio.sleep(seconds)
+        return seconds
+
+    app.register(sleeper)
+
+    async with app as app:
+        await app.aconnect(timeout=CONNECT_TIMEOUT)
+        loop_task = asyncio.create_task(app.aloop())
+        impl = await app.amy_implementation_at("sleeper")
+
+        done = getattr(app.postman, step)
+
+        async def held_up(*args, **kwargs):  # noqa: ANN002, ANN003, ANN202
+            result = await done(*args, **kwargs)
+            await asyncio.sleep(3)
+            return result
+
+        object.__setattr__(app.postman, step, held_up)
+
+        reference = f"cancel-early-{uuid.uuid4().hex[:8]}"
+        call_task = asyncio.create_task(
+            app.acall(impl, seconds=30, reference=reference)
+        )
+
+        deadline = asyncio.get_event_loop().time() + 10.0
+        while (task := await _find_task(app, reference)) is None or not task.events:
+            assert asyncio.get_event_loop().time() < deadline, (
+                "task never reached the backend"
+            )
+            await asyncio.sleep(0.05)
+
+        call_task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await call_task
+
+        task = await _find_task(app, reference)
+        assert task is not None
+        assert task.latest_event_kind == TaskEventKind.CANCELLED
 
         loop_task.cancel()
         try:
