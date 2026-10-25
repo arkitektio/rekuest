@@ -22,3 +22,21 @@ query TaskEvents($id: ID!) {
     }
   }
 }
+
+# What a client needs to show a run with its action's bloks: the bloks, the agent bound to
+# each dependency key, and the space the run was started in.
+query TaskRunView($id: ID!) {
+  task(id: $id) {
+    id
+    space {
+      id
+      name
+    }
+    actionBloks {
+      ...ActionBlok
+    }
+    dependencyAgents {
+      ...TaskDependencyAgent
+    }
+  }
+}

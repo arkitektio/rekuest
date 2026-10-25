@@ -59,3 +59,12 @@ fragment TaskChangeEvent on TaskChangeEvent {
     ...TaskEventChange
   }
 }
+
+# An agent a run got for one of its action's dependencies (the top level of its frozen tree).
+fragment TaskDependencyAgent on TaskDependencyAgent {
+  key
+  agent {
+    id
+    name
+  }
+}

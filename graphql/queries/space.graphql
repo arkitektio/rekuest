@@ -1,0 +1,11 @@
+# The spaces that place any of these agents, those placing the most first: where to run a
+# workflow over them (e.g. the agents a dependencyTree dry run binds).
+query SpacesForAgents($agents: [ID!]!) {
+  spacesForAgents(agents: $agents) {
+    placed
+    space {
+      id
+      name
+    }
+  }
+}

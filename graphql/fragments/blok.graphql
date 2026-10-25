@@ -102,6 +102,7 @@ fragment DetailBlok on Blok {
   name
   description
   provided
+  heldByAction
   app {
     id
     identifier
@@ -190,5 +191,15 @@ fragment BlokEdit on BlokEdit {
   }
   diagnostics {
     ...BlokDiagnostic
+  }
+}
+
+# An action's own blok for one context: how a client shows a run of it. It names devices
+# only by the action's dependency keys, bound per run by Task.dependencyAgents.
+fragment ActionBlok on ActionBlok {
+  id
+  context
+  blok {
+    ...DetailBlok
   }
 }

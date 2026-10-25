@@ -85,6 +85,7 @@
                     "names": {},
                     "include": [
                         "ActionArgumentInput",
+                        "ActionBlokInput",
                         "ActionDemandInput",
                         "ActionDependencyInput",
                         "ActionKind",

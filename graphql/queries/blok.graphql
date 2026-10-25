@@ -30,3 +30,13 @@ query BlokRevisions($id: ID!, $limit: Int! = 20, $offset: Int! = 0) {
     }
   }
 }
+
+# An action's own bloks, one per context.
+query ActionBloks($action: ID!) {
+  action(id: $action) {
+    id
+    bloks {
+      ...ActionBlok
+    }
+  }
+}

@@ -29,6 +29,7 @@ projects:
             kinds: [enum, input]
             include: &action_language
               - ActionArgumentInput
+              - ActionBlokInput
               - ActionDemandInput
               - ActionDependencyInput
               - ActionKind

@@ -59,11 +59,12 @@ class CatalogValueKind(str, Enum):
     __str__ = str.__str__
 
 class ComponentContext(str, Enum):
-    """The renderer a catalog component lives in. A component may only be placed where its context is in force."""
+    """The renderer a catalog component lives in. A component may only be placed where its context is in force. ACTION_LOGO and OVERLAY are blok contexts only: an OVERLAY blok is an action's own, drawn into the space that hosts its run."""
     HTML = 'HTML'
     SCENE = 'SCENE'
     LOGO = 'LOGO'
     ACTION_LOGO = 'ACTION_LOGO'
+    OVERLAY = 'OVERLAY'
     __str__ = str.__str__
 
 class DemandKind(str, Enum):
