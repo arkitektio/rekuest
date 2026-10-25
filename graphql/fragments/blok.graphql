@@ -122,9 +122,17 @@ fragment DetailBlok on Blok {
   args {
     ...ArgPort
   }
+  persist {
+    ...BlokPersist
+  }
   head {
     ...BlokRevision
   }
+}
+
+fragment BlokPersist on BlokPersist {
+  key
+  description
 }
 
 fragment BlokRevision on BlokRevision {
@@ -137,6 +145,9 @@ fragment BlokRevision on BlokRevision {
   }
   task {
     id
+  }
+  persist {
+    ...BlokPersist
   }
 }
 

@@ -199,6 +199,12 @@ class BlokAgentMappingInput(BaseModel):
     key: str
     model_config = ConfigDict(frozen=True, extra='forbid', populate_by_name=True, use_enum_values=True)
 
+class BlokPersistInput(BaseModel):
+    """A local a renderer may keep between openings, on the device: its demo value is the default."""
+    key: str = Field(description='The local: a top-level `demo_state` key that is neither a dependency nor a reserved root.')
+    description: str | None = Field(default=None, description='What the kept value is, for whoever resets it.')
+    model_config = ConfigDict(frozen=True, extra='forbid', populate_by_name=True, use_enum_values=True)
+
 class BlokServiceInput(BaseModel):
     """A backend service a blok reads from, frozen at the version it was written against."""
     key: str = Field(description="The service's key, as a `query`'s `schema` names it: 'mikro'.")
@@ -273,6 +279,7 @@ class CreateBlokInput(CreateBlokInputTrait, BaseModel):
     components: tuple[ComponentNodeInput, ...] | None = Field(default=None, description='The schema of the blok. This can be used to validate the blok input and output.')
     source: str | None = Field(default=None, description='The blok as BSX, which the server parses into `components`: send one of the two.')
     services: tuple[BlokServiceInput, ...] | None = Field(default=None, description="The backend services the blok's queries read from, each frozen at the version it was written against. Every `query`'s `schema` must name one.")
+    persist: tuple[BlokPersistInput, ...] | None = Field(default=None, description='The locals a renderer may keep between openings, on the device: each a top-level `demo_state` key. Kept when omitted (a blok created again keeps its own); an empty list removes them.')
     demo_state: Args | None = Field(validation_alias=AliasChoices('demo_state', 'demoState'), serialization_alias='demoState', default=None, description='The initial state of the blok. This is used to set the initial state of the blok when it is materialized.')
     context: Annotated[ComponentContext | None, GraphQLDefault('HTML')] = Field(default=None, description="The renderer for the blok's root: HTML, or SCENE for a full 3D view.")
     "The renderer for the blok's root: HTML, or SCENE for a full 3D view.\nDefault: HTML"
@@ -349,6 +356,7 @@ class EditBlokInput(BaseModel):
     dependencies: tuple[AgentDependencyInput, ...] | None = Field(default=None, description='The full list of agent dependencies. Kept when omitted; keys not listed are removed.')
     args: tuple[ArgPortInput, ...] | None = Field(default=None, description='The full list of the items the blok is opened for, read under `@args.<key>` (html bloks only). Kept when omitted; an empty list removes them.')
     services: tuple[BlokServiceInput, ...] | None = Field(default=None, description="The full list of the backend services the blok's queries read from, each frozen at its version. Kept when omitted; an empty list removes them.")
+    persist: tuple[BlokPersistInput, ...] | None = Field(default=None, description='The full list of the locals a renderer may keep between openings, on the device: each a top-level `demo_state` key. Kept when omitted; an empty list removes them.')
     agent_mappings: tuple[MappedAgentInput, ...] | None = Field(validation_alias=AliasChoices('agent_mappings', 'agentMappings'), serialization_alias='agentMappings', default=None, description='Bindings on `materialized_blok`, by dependency key, over the ones it has. Bindings of keys the edit removes go. Refused with `blok`: a blok binds no agents, its materializations do.')
     message: str | None = Field(default=None, description='What changed and why, in a sentence; kept with the revision.')
     task: ID | None = Field(default=None, description="The task making the edit (one the caller's agent runs), kept with the revision.")
