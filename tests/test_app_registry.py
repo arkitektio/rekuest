@@ -245,38 +245,3 @@ def test_validate_catches_a_port_naming_a_structure_the_registry_lost() -> None:
         app.validate()
 
     assert "uses_it" in str(raised.value) and "thing" in str(raised.value)
-
-
-def test_validate_walks_blok_dependencies_on_another_apps_actions() -> None:
-    """The likeliest ports to drift: types this app does not implement itself.
-
-    They are built against this registry at `register_blok`, so a structure that
-    disappears from it afterwards leaves them naming nothing.
-    """
-    from typing import Protocol
-
-    app = AppRegistry()
-    app.register_memory_structure(ShelvedThing)
-
-    @app.declare(app="other")
-    class Remote(Protocol):
-        def make(self, n: int) -> ShelvedThing:
-            """Make a thing on another app."""
-            ...
-
-    @app.register
-    def local(n: int) -> int:
-        """Local."""
-        return n
-
-    app.register_blok(
-        name="b",
-        component="<div />",
-        dependencies={"dep": Remote},
-    )
-    app.validate()
-
-    app.structure_registry.identifier_memory_structure_map.clear()
-
-    with pytest.raises(StructureRegistryError, match="blok 'b'"):
-        app.validate()

@@ -16,8 +16,8 @@ dependencies = [
     # The declaration an app is (the action language, AppRegistry, services, hooks)
     # is arkitekt-spec's; executing it is arkitekt-runtime's. rekuest is the
     # distributed runtime on top: the socket agent, its transport, and the client.
-    "arkitekt-spec>=3.19.1",
-    "arkitekt-runtime>=5.2",
+    "arkitekt-spec>=4.0.0",
+    "arkitekt-runtime>=6.0",
     # Media uploads (MediaLike arguments) are put into the datalayer through obstore.
     "obstore>=0.10.0",
 ]

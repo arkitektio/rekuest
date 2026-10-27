@@ -40,7 +40,7 @@ async def test_registered_assets_are_stored_after_the_app_registered(deployment:
     registry.root = tmp_path
     registry.register_asset("arm", "arm.glb")
     registry.register_asset("logo", "logo.png")
-    registry.register_blok("arm_view", '<Scene><Model src="@self.assets.arm" /></Scene>', context="scene")
+    registry.register_blok("arm_view", '<Scene><Model src="@self.assets.arm" /></Scene>')
     refs = {name: asset.ref for name, asset in registry.registered_assets.items()}
     datalayer = DataLayer(endpoint_url=f"http://localhost:{integration_ports['rustfs']}")
     uploads = 0
@@ -86,7 +86,7 @@ async def test_a_file_an_app_names_a_source_for_is_added_by_an_admin(deployment:
 
     app = build_fresh_rekuest(deployment, token="btest_token")
     app.registry.register_asset("arm", source="https://vendor.example/models/arm.glb", ref=ref)
-    app.registry.register_blok("arm_view", '<Scene><Model src="@self.assets.arm" /></Scene>', context="scene")
+    app.registry.register_blok("arm_view", '<Scene><Model src="@self.assets.arm" /></Scene>')
     assert app.agent.after_registration is None
 
     admin = build_fresh_rekuest(deployment, token="atest_token")

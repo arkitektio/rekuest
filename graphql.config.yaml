@@ -39,7 +39,11 @@ projects:
               - AssetInput
               - AssetKind
               - AssignWidgetInput
+              - BlokDemoInput
               - BlokImplementationInput
+              - BlokLocalInput
+              - BlokQueryInput
+              - BlokSubscriptionInput
               - ChoiceAssignWidgetInput
               - ChoiceInput
               - ChoiceReturnWidgetInput

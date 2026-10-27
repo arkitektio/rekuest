@@ -8,11 +8,11 @@ from rekuest.protocol.schema import DiagnosticLevel
 def test_diagnostic_levels_are_members_of_the_generated_enum() -> None:
     """The rules use plain strings so the loader imports nothing; this ties them back.
 
-    There is exactly one level: a hard finding is raised rather than recorded, so a
-    second level appearing on the server means the split has changed.
+    The client records only warnings: a hard finding is raised rather than recorded. The
+    server's ERROR is the blok vocabulary's, stored only on a blok a migration rewrote.
     """
     levels = {level.value for level in DiagnosticLevel}
-    assert levels == {WARNING}
+    assert levels == {WARNING, "ERROR"}
     assert Diagnostic(level=WARNING, code="x", message="m").level in levels
 
 

@@ -14,27 +14,46 @@ fragment CatalogOperation on CatalogOperation {
   }
 }
 
+fragment CatalogEventField on CatalogEventField {
+  key
+  kind
+  description
+}
+
 fragment CatalogProp on CatalogProp {
   key
   kind
   required
   description
+  event {
+    ...CatalogEventField
+  }
 }
 
 fragment CatalogComponent on CatalogComponent {
   name
   description
   acceptsChildren
+  context
+  childrenContext
+  inheritsContext
+  downstreamOf
+  notDownstreamOf
+  textProp
+  catalog
   props {
     ...CatalogProp
   }
 }
 
-fragment UICatalog on UICatalog {
+# Modules: what a UI app renders beyond the spec's catalogs (components) and evaluates
+# (operations), with the standard catalogs it implements in full (catalogs).
+fragment Module on Module {
   id
   name
   description
   isRegistered
+  catalogs
   components {
     ...CatalogComponent
   }

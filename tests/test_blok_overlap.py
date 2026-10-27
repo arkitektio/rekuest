@@ -1,21 +1,13 @@
-import pytest
-from pydantic import ValidationError
 
 from arkitekt_spec.actions import (
-    AgentDependencyInput,
     ArgPortInput,
-    BlokImplementationInput,
     ImplementationInput,
     PortKind,
-    ReturnPortInput,
-    StateDemandInput,
-    StateDependencyInput,
     StateImplementationInput,
 )
-from rekuest.protocol.schema import CreateBlokInput
-from arkitekt_spec.declare.blok.registry import (
-    _create_action_dependency,
-    _create_state_dependency,
+from arkitekt_spec.declare.definition.dependencies import (
+    build_action_dependency_input,
+    build_state_dependency_input,
 )
 from arkitekt_spec.declare.declare import DeclaredAgentAction, DeclaredAgentState
 from arkitekt_spec.declare.definition.define import prepare_definition
@@ -78,7 +70,12 @@ def test_declared_action_and_blok_registry_build_same_action_dependency(
     )
 
     declared_dependency = declared.to_dependency_input()
-    blok_dependency = _create_action_dependency("run", definition_registry)
+    # What a blok reading ``self.run`` demands (arkitekt_spec.declare.blok.registry).
+    blok_dependency = build_action_dependency_input(
+        key="run",
+        definition=definition_registry.implementations["run"].definition,
+        action_key="run",
+    )
 
     assert declared_dependency.model_dump() == blok_dependency.model_dump()
 
@@ -102,120 +99,11 @@ def test_declared_state_and_blok_registry_build_same_state_dependency(
     )
 
     declared_dependency = declared.to_dependency_input()
-    blok_dependency = _create_state_dependency("status", state_registry)
+    # What a blok reading ``self.status`` demands (arkitekt_spec.declare.blok.registry).
+    blok_dependency = build_state_dependency_input(
+        key="status",
+        state_key="status",
+        definition=state_registry.states["status"].definition,
+    )
 
     assert declared_dependency.model_dump() == blok_dependency.model_dump()
-
-
-@pytest.mark.parametrize(
-    ("model_cls", "base_kwargs"),
-    [
-        (CreateBlokInput, {"name": "demo"}),
-        (
-            BlokImplementationInput,
-            {
-                "key": "demo",
-                "components": (),
-            },
-        ),
-    ],
-)
-def test_blok_models_reject_missing_demo_state_keys(model_cls, base_kwargs) -> None:
-    dependency = AgentDependencyInput(
-        key="service",
-        optional=False,
-        auto_resolvable=False,
-        state_dependencies=(
-            StateDependencyInput(
-                key="status",
-                optional=False,
-            ),
-        ),
-    )
-
-    with pytest.raises(ValidationError, match="missing key 'status'"):
-        model_cls(
-            **base_kwargs,
-            dependencies=(dependency,),
-            demo_state={"service": {}},
-        )
-
-
-@pytest.mark.parametrize(
-    ("model_cls", "base_kwargs"),
-    [
-        (CreateBlokInput, {"name": "demo"}),
-        (
-            BlokImplementationInput,
-            {
-                "key": "demo",
-                "components": (),
-            },
-        ),
-    ],
-)
-def test_blok_models_reject_extra_demo_state_keys(model_cls, base_kwargs) -> None:
-    dependency = AgentDependencyInput(
-        key="service",
-        optional=False,
-        auto_resolvable=False,
-        state_dependencies=(
-            StateDependencyInput(
-                key="status",
-                optional=False,
-            ),
-        ),
-    )
-
-    with pytest.raises(ValidationError, match="extra keys not referenced in blok"):
-        model_cls(
-            **base_kwargs,
-            dependencies=(dependency,),
-            demo_state={"service": {"status": "ready", "other": "nope"}},
-        )
-
-
-@pytest.mark.parametrize(
-    ("model_cls", "base_kwargs"),
-    [
-        (CreateBlokInput, {"name": "demo"}),
-        (
-            BlokImplementationInput,
-            {
-                "key": "demo",
-                "components": (),
-            },
-        ),
-    ],
-)
-def test_blok_models_accept_matching_demo_state(model_cls, base_kwargs) -> None:
-    dependency = AgentDependencyInput(
-        key="service",
-        optional=False,
-        auto_resolvable=False,
-        state_dependencies=(
-            StateDependencyInput(
-                key="status",
-                optional=False,
-                demand=StateDemandInput(
-                    matches=build_port_matches(
-                        (
-                            ReturnPortInput(
-                                key="item",
-                                kind=PortKind.STRING,
-                                nullable=False,
-                            ),
-                        )
-                    ),
-                ),
-            ),
-        ),
-    )
-
-    model = model_cls(
-        **base_kwargs,
-        dependencies=(dependency,),
-        demo_state={"service": {"status": {"item": "ready"}}},
-    )
-
-    assert model.demo_state == {"service": {"status": {"item": "ready"}}}

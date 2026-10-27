@@ -318,7 +318,7 @@ async def test_an_agent_is_a_structure_described_by_its_supervisor() -> None:
                 "active": True,
                 "client": {"id": "3", "clientId": "lok-client"},
                 "user": {"sub": "1"},
-                "organization": {"slug": "lab"},
+                "organization": {"identifier": "lok#lab"},
                 "memoryShelve": {"id": "9"},
             }
         )

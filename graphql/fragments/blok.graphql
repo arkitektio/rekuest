@@ -108,12 +108,28 @@ fragment DetailBlok on Blok {
     identifier
   }
   context
-  catalog {
+  module {
     id
     name
   }
   componentTree
-  demoState
+  vocab
+  catalogs
+  locals {
+    ...BlokLocal
+  }
+  resolvedLocals {
+    ...ResolvedBlokLocal
+  }
+  demo {
+    ...BlokDemo
+  }
+  queries {
+    ...BlokQuery
+  }
+  subscriptions {
+    ...BlokSubscription
+  }
   diagnostics {
     ...BlokDiagnostic
   }
@@ -123,17 +139,85 @@ fragment DetailBlok on Blok {
   args {
     ...ArgPort
   }
-  persist {
-    ...BlokPersist
-  }
   head {
     ...BlokRevision
   }
 }
 
-fragment BlokPersist on BlokPersist {
+fragment BlokLocal on BlokLocal {
   key
+  label
+  kind
   description
+  identifier
+  nullable
+  default
+  persist
+  referenceUnit
+  proposedUnits
+  dimension
+  children {
+    ...ArgChildPort
+  }
+  choices {
+    value
+    label
+    description
+  }
+}
+
+# A local as the blok's tree resolves it: its kind always set (inferred when the blok left it
+# out). What a renderer types the locals with; `locals` keeps them as written.
+fragment ResolvedBlokLocal on ResolvedBlokLocal {
+  key
+  label
+  kind
+  description
+  identifier
+  nullable
+  default
+  persist
+  referenceUnit
+  proposedUnits
+  dimension
+  children {
+    ...ArgChildPort
+  }
+  choices {
+    value
+    label
+    description
+  }
+}
+
+fragment BlokDemo on BlokDemo {
+  deps
+  args
+  task
+  queries
+  subscriptions
+}
+
+fragment BlokQuery on BlokQuery {
+  key
+  service
+  document
+  variables {
+    ...ActionArgument
+  }
+  poll
+  more
+}
+
+fragment BlokSubscription on BlokSubscription {
+  key
+  service
+  document
+  variables {
+    ...ActionArgument
+  }
+  keep
+  history
 }
 
 fragment BlokRevision on BlokRevision {
@@ -147,8 +231,13 @@ fragment BlokRevision on BlokRevision {
   task {
     id
   }
-  persist {
-    ...BlokPersist
+  vocab
+  catalogs
+  locals {
+    ...BlokLocal
+  }
+  resolvedLocals {
+    ...ResolvedBlokLocal
   }
 }
 
@@ -191,6 +280,9 @@ fragment BlokEdit on BlokEdit {
   }
   diagnostics {
     ...BlokDiagnostic
+  }
+  resolvedLocals {
+    ...ResolvedBlokLocal
   }
 }
 

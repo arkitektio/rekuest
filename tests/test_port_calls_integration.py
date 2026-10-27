@@ -299,17 +299,19 @@ async def test_catalog_validation_at_registration(deployment: Deployment) -> Non
         assert [a.key for a in next(op for op in base.operations if op.name == "gt").arguments] == ["a", "b"]
 
         with pytest.raises(Exception, match="cannot redefine base operations"):
-            await app.aregister_ui_catalog(
+            await app.aregister_module(
                 name="port-call-tests",
                 components=[],
-                widget_defaults=[],
+            catalogs=[],
+            widget_defaults=[],
                 operations=[CatalogOperationInput(name="gt", returns=CatalogValueKind.BOOL, arguments=[])],
             )
 
-        catalog = await app.aregister_ui_catalog(
+        catalog = await app.aregister_module(
             name="port-call-tests",
             components=[],
-                widget_defaults=[],
+            catalogs=[],
+            widget_defaults=[],
             operations=[
                 CatalogOperationInput(
                     name="clamp",
@@ -387,10 +389,11 @@ async def test_catalog_validation_at_registration(deployment: Deployment) -> Non
 
     await _run(
         build_fresh_rekuest(deployment, token="atest_token"),
-        lambda app: app.aregister_ui_catalog(
+        lambda app: app.aregister_module(
             name="port-call-tests-2",
             components=[],
-                widget_defaults=[],
+            catalogs=[],
+            widget_defaults=[],
             operations=[
                 CatalogOperationInput(
                     name="fmt",
