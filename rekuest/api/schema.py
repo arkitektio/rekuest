@@ -6501,3 +6501,4 @@ Returns:
         variables: dict[str, builtins.object] = {}
         for event in self.subscribe(WatchMyTasksSubscription, variables):
             yield event.mytasks
+SCOPES: list[str] = ['rekuest_agent', 'rekuest_call', 'rekuest_read', 'rekuest_write']

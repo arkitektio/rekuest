@@ -21,6 +21,7 @@ from rath.links.split import SplitLink
 
 from rekuest.agents.agent import RekuestAgent
 from rekuest.api.schema import (
+    SCOPES,
     Action,
     Agent,
     DetailMaterializedBlok,
@@ -62,6 +63,9 @@ registry = AppRegistry()
     # The server this release of the client is written against: what a hub made for
     # an app's tests runs. Moves with the server's major, not with this package's.
     image="jhnnsrs/rekuest:11",
+    # What the client's operations need at rekuest, as turms gathered it from the schema: every
+    # app using rekuest asks for it.
+    scopes=SCOPES,
 )
 def rekuest(
     rekuest: Annotated[
