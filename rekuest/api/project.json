@@ -188,7 +188,7 @@
                 ]
             },
             "additional_config": {},
-            "directive_class_vars": [],
+            "class_fields": [],
             "force_plugin_order": true,
             "omitted_document_rules": [],
             "parsers": [],
@@ -202,6 +202,18 @@
                 {
                     "type": "turms.plugins.client.ClientPlugin",
                     "client_class": "RekuestApi",
+                    "client_fields": [
+                        {
+                            "name": "__scopes__",
+                            "kind": "tuple[str, ...]",
+                            "collector": {
+                                "type": "root_field_directive",
+                                "directive": "auth",
+                                "argument": "required_scopes"
+                            },
+                            "combine": "union"
+                        }
+                    ],
                     "reserved_from": [
                         "rekuest.client.client.Rekuest"
                     ],
@@ -212,9 +224,6 @@
                     "expand_input_types": [
                         "input"
                     ]
-                },
-                {
-                    "type": "turms.plugins.scopes.ScopesPlugin"
                 }
             ],
             "processors": [

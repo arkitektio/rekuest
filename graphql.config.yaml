@@ -194,6 +194,17 @@ projects:
             # execute/aexecute/subscribe/asubscribe of self, which those two
             # clients implement over their rath.
             client_class: RekuestApi
+            # What the operations need at rekuest, read off the schema's
+            # `@auth(required_scopes: ...)` on every root field they select: every
+            # app using rekuest asks for it (arkitekt-spec reads it off the client).
+            client_fields:
+              - name: __scopes__
+                kind: tuple[str, ...]
+                collector:
+                  type: root_field_directive
+                  directive: auth
+                  argument: required_scopes
+                combine: union
             # Everything Rekuest defines itself (fields, call helpers, register...).
             reserved_from:
               - rekuest.client.client.Rekuest
@@ -202,9 +213,6 @@ projects:
               ID: rath.scalars.IDCoercible
             expand_input_types:
               - input
-          # SCOPES: what the operations above need at rekuest, read off the schema's
-          # `@auth(required_scopes: ...)`. The service hands it to every app's manifest.
-          - type: turms.plugins.scopes.ScopesPlugin
         processors:
           - type: turms.processors.disclaimer.DisclaimerProcessor
         scalar_definitions:

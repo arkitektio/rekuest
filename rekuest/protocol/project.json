@@ -177,7 +177,7 @@
                 ]
             },
             "additional_config": {},
-            "directive_class_vars": [],
+            "class_fields": [],
             "force_plugin_order": true,
             "omitted_document_rules": [],
             "parsers": [],
