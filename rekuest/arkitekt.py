@@ -44,7 +44,7 @@ from rekuest.client.upload.assets import aupload_assets
 from rekuest.client.upload.link import UploadLink
 from rekuest.client.postman import GraphQLPostman
 from rekuest.client.rath import RekuestRath
-from rekuest.client.client import Rekuest
+from rekuest.client.client import Rekuest, RekuestCaller
 from arkitekt_spec.declare.widgets import SearchWidget
 
 def build_relative_path(*path: str) -> str:
@@ -77,15 +77,23 @@ def rekuest(
     tokens: TokenLoader,
     registry: AppRegistry,
 ) -> Rekuest:
-    """Rekuest: call other apps' actions, and offer this app's through :func:`rekuest_agent`.
+    """Rekuest: find other apps' actions, and offer this app's through :func:`rekuest_agent`.
 
-    Takes the run's ``registry`` because that is what its calls (de)serialize
-    with. It builds no agent: the provider beside it does, and the run owns that
-    agent. Anything that needs this API -- listing the deployment's actions,
-    finding one, calling raw -- takes this client by annotation; the agent never
-    does.
+    Takes the run's ``registry`` because that is what its results expand with. It
+    builds no agent: the provider beside it does, and the run owns that agent.
+    Anything that needs this API -- listing the deployment's actions, finding one,
+    the structure expanders -- takes this client by annotation; the agent never
+    does. It starts no task: that is :func:`rekuest_caller`'s.
     """
-    rath = RekuestRath(
+    return Rekuest(
+        rath=_rath(rekuest, s3, tokens),
+        structure_registry=registry.structure_registry,
+    )
+
+
+def _rath(rekuest: Alias, s3: Alias, tokens: TokenLoader) -> RekuestRath:
+    """The connection both clients talk over: uploads, the run's token, http and ws."""
+    return RekuestRath(
         link=compose(
             UploadLink(datalayer=DataLayer.from_alias(s3)),
             FaktsAuthLink(token_loader=tokens),
@@ -95,11 +103,6 @@ def rekuest(
                 split=lambda o: o.node.operation != OperationType.SUBSCRIPTION,
             ),
         )
-    )
-    return Rekuest(
-        rath=rath,
-        postman=GraphQLPostman(rath=rath),
-        structure_registry=registry.structure_registry,
     )
 
 
@@ -255,10 +258,50 @@ async def expand_task_event(id: str, rekuest: Rekuest) -> TaskEvent:
     return await rekuest.aget_event(id)
 
 
-# The service is named after its function ("rekuest": what the app's clients are
+caller_registry = AppRegistry()
+"""What an app that starts tasks of its own takes in: the caller service, and all of rekuest."""
+caller_registry.merge(registry)
+
+
+@caller_registry.service(
+    schema=build_relative_path("api", "schema.graphql"),
+    turms=build_relative_path("api", "project.json"),
+    image="jhnnsrs/rekuest:11",
+)
+def rekuest_caller(
+    rekuest: Annotated[
+        Alias,
+        Require(
+            "live.arkitekt.rekuest", "Where this app's actions are offered and assigned"
+        ),
+    ],
+    s3: Annotated[
+        Alias,
+        Require("live.arkitekt.s3", "Where this app's uploads are stored"),
+    ],
+    tokens: TokenLoader,
+    registry: AppRegistry,
+) -> RekuestCaller:
+    """Rekuest, starting tasks: call other apps' actions as tasks of their own
+    (``rekuest.call(...)``), and cancel, pause, resume, interrupt or decide them.
+
+    Only an app that takes it in (``App(services=[rekuest_caller_service])``) has it,
+    and asks for ``rekuest_root_call`` at login for it. Inside a running task its calls
+    refuse: the task calls (``task.call``), as its child.
+    """
+    rath = _rath(rekuest, s3, tokens)
+    return RekuestCaller(
+        rath=rath,
+        postman=GraphQLPostman(rath=rath),
+        structure_registry=registry.structure_registry,
+    )
+
+
+# The services are named after their functions ("rekuest": what the app's clients are
 # keyed by and what its structure expanders are bound to); these are the names the
 # package exports them under, for `App(services=[rekuest_service])` and the run.
 rekuest_service = rekuest
+rekuest_caller_service = rekuest_caller
 rekuest_provider = rekuest_agent
 
-__all__ = ["registry", "rekuest_service", "rekuest_provider"]
+__all__ = ["caller_registry", "registry", "rekuest_caller_service", "rekuest_service", "rekuest_provider"]

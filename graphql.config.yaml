@@ -37,6 +37,7 @@ projects:
               - AgentProbeInput
               - ArgPortInput
               - AssetInput
+              - AskBlokInput
               - AssetKind
               - AssignWidgetInput
               - BlokDemoInput
@@ -61,6 +62,7 @@ projects:
               - EffectKind
               - ImplementAgentInput
               - ImplementationInput
+              - InformBlokInput
               - LockDefinitionInput
               - LockImplementationInput
               - OptimisticInput
@@ -156,6 +158,10 @@ projects:
       turms:
         out_dir: rekuest/api
         dump_schema: true
+        # The caller's methods are generated from its documents and the fragments
+        # alone, most of which those few operations do not spread.
+        omitted_document_rules:
+          - no_unused_fragments
         external_modules:
           # The action language from arkitekt-spec, everything else from the
           # protocol module (a module with `include` claims its names first).
@@ -194,6 +200,9 @@ projects:
             # execute/aexecute/subscribe/asubscribe of self, which those two
             # clients implement over their rath.
             client_class: RekuestApi
+            # Everything but what starts or steers a task (graphql/caller/), whose
+            # scope (rekuest_root_call) an app asks for only by taking in the caller.
+            documents: graphql/[!c]*/**/*.graphql
             # What the operations need at rekuest, read off the schema's
             # `@auth(required_scopes: ...)` on every root field they select: every
             # app using rekuest asks for it (arkitekt-spec reads it off the client).
@@ -208,6 +217,26 @@ projects:
             # Everything Rekuest defines itself (fields, call helpers, register...).
             reserved_from:
               - rekuest.client.client.Rekuest
+            coercible_scalars:
+              SearchQuery: rekuest.scalars.SearchQueryCoercible
+              ID: rath.scalars.IDCoercible
+            expand_input_types:
+              - input
+          - type: turms.plugins.client.ClientPlugin
+            # What starts or steers a task at the top level: assign, cancel, pause,
+            # resume, interrupt, decide. RekuestCaller mixes it in, and only an app
+            # taking in the caller service asks for its scope (rekuest_root_call).
+            # The fragments come along for the operations to parse.
+            client_class: RekuestCallerApi
+            documents: graphql/[cf]*/**/*.graphql
+            client_fields:
+              - name: __scopes__
+                kind: tuple[str, ...]
+                collector:
+                  type: root_field_directive
+                  directive: auth
+                  argument: required_scopes
+                combine: union
             coercible_scalars:
               SearchQuery: rekuest.scalars.SearchQueryCoercible
               ID: rath.scalars.IDCoercible

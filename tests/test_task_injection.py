@@ -89,7 +89,6 @@ async def test_a_call_inside_a_task_goes_through_the_task(
     # `rekuest: Rekuest` is a client of this registry because a service on it returns one.
     with_client(agent.app_registry, Rekuest, "rekuest")
     rekuest = Rekuest.model_construct(
-        postman="graphql-postman",
         structure_registry=agent.app_registry.structure_registry,
     )
     app.services["rekuest"] = rekuest
@@ -106,8 +105,9 @@ async def test_a_call_inside_a_task_goes_through_the_task(
         await task.aprogress(10)
         return await task.acall(ACTION, x, reference="r")
 
-    # Calling a child is what only a workflow may do.
-    agent.app_registry.register_workflow(parent)
+    # Calling an action it found at run time (not a dependency) is what only a workflow
+    # declaring dynamic calls may do.
+    agent.app_registry.register_workflow(parent, dynamic_calls=True)
     agent.collect_from_registry()
 
     assert await run_assignment(agent, assign("parent", x=1)) == {"return0": "child-result"}
@@ -125,20 +125,20 @@ async def test_the_client_refuses_to_make_a_root_call_inside_a_task(
     """A call through the client is a root, so inside a task it would be the task's
     sibling rather than its child. It refuses, and points at the task.
     """
-    from rekuest.client.client import Rekuest
+    from rekuest.client.client import RekuestCaller
     from arkitekt_spec.declare.errors import RootOnlyCallError
 
     app = FakeApp("A")
     agent = build_agent(app)
-    with_client(agent.app_registry, Rekuest, "rekuest")
-    rekuest = Rekuest.model_construct(
+    with_client(agent.app_registry, RekuestCaller, "rekuest")
+    rekuest = RekuestCaller.model_construct(
         postman="graphql-postman",
         structure_registry=agent.app_registry.structure_registry,
     )
     app.services["rekuest"] = rekuest
     seen: dict[str, Any] = {}
 
-    async def parent(rekuest: Rekuest, task: Task) -> str:
+    async def parent(rekuest: RekuestCaller, task: Task) -> str:
         try:
             await rekuest.acall(ACTION)
         except RootOnlyCallError as error:
@@ -168,7 +168,6 @@ async def test_a_lookup_inside_a_task_is_not_refused(
     agent = build_agent(app)
     with_client(agent.app_registry, Rekuest, "rekuest")
     rekuest = Rekuest.model_construct(
-        postman="graphql-postman",
         structure_registry=agent.app_registry.structure_registry,
     )
     app.services["rekuest"] = rekuest
@@ -190,10 +189,10 @@ async def test_a_lookup_inside_a_task_is_not_refused(
 async def test_outside_a_task_the_rekuest_client_calls_over_its_own_postman(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from rekuest.client.client import Rekuest
+    from rekuest.client.client import RekuestCaller
 
     agent = build_agent(FakeApp("A"))
-    rekuest = Rekuest.model_construct(
+    rekuest = RekuestCaller.model_construct(
         postman="graphql-postman",
         structure_registry=agent.app_registry.structure_registry,
     )

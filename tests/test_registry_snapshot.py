@@ -246,14 +246,14 @@ def test_snapshot_repoints_what_was_merged_in_from_a_package() -> None:
 
     # The agent builds actors against the registry it serves: the snapshot's.
     builder = actor_builder_for(snapshot, "owner")
-    assert builder.keywords["structure_registry"] is snapshot.structure_registry
+    assert builder.builder.keywords["structure_registry"] is snapshot.structure_registry
     assert all(
         schema is snapshot.structure_registry
         for schema in snapshot.state_registry_schemas.values()
     )
     # Merging reads the package; building from the package itself uses the package's.
     assert (
-        actor_builder_for(package, "owner").keywords["structure_registry"]
+        actor_builder_for(package, "owner").builder.keywords["structure_registry"]
         is package.structure_registry
     )
 

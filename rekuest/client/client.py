@@ -3,7 +3,7 @@
 from typing import TypeVar
 from arkitekt_spec.declare.protocol.types import AnyFunction
 from rekuest.client.rath import RekuestRath
-from rekuest.api.schema import Action, Implementation, RekuestApi
+from rekuest.api.schema import Action, AssignMutation, Implementation, RekuestApi, RekuestCallerApi
 from arkitekt_runtime.postmans.types import Postman
 from arkitekt_spec.declare.register import WrappedFunction
 from rath.scalars import ID
@@ -16,6 +16,7 @@ from pydantic import Field
 
 from typing import (
     Any,
+    ClassVar,
 )
 from collections.abc import AsyncGenerator, Generator
 from arkitekt_spec.declare.errors import RootOnlyCallError
@@ -33,22 +34,18 @@ T = TypeVar("T", bound=AnyFunction)
 
 
 class Rekuest(Composition, RekuestApi):
-    """The rekuest client: every rekuest operation is a method of it, and it calls
-    actions (``rekuest.call(...)``).
+    """The rekuest client: every rekuest operation but those that start or steer a task is
+    a method of it -- lookups, queries, blok and asset mutations.
 
     A service builds it; it knows nothing about any agent. An action asks for it by
-    annotation (``rekuest: Rekuest``) and is handed this one shared instance.
-
-    **Its calls are roots.** A call through this client goes over its own postman with no
-    parent, so inside a running task it refuses -- a call made then is that task's child,
-    and the task is what knows the socket and the assignment to make it one. Look the
-    action up here (:meth:`aresolve`, :meth:`afind`) and call it through the task:
-    ``await task.acall(await rekuest.aresolve(target), ...)``. Only the six call methods
-    refuse; every lookup, query and mutation works inside a task as before.
+    annotation (``rekuest: Rekuest``) and is handed this one shared instance. It starts
+    no task: an action calls through its declared dependencies, or (``dynamic_calls``)
+    through its task, ``await task.acall(await rekuest.aresolve(target), ...)``. An app
+    that starts tasks of its own takes in :class:`RekuestCaller` instead
+    (``rekuest_caller_service``), whose scope it then asks for.
     """
 
     rath: RekuestRath
-    postman: Postman
     structure_registry: StructureRegistry = Field(exclude=True)
     """The registry of the run this client belongs to: what its calls (de)serialize with."""
 
@@ -84,6 +81,49 @@ class Rekuest(Composition, RekuestApi):
             )
 
 
+    async def aresolve(self, target: "CallTarget") -> Action | Implementation:
+        """What to call: an action, an implementation, an action id, or a function
+        registered on this client's app (its implementation there)."""
+        if isinstance(target, (Action, Implementation)):
+            return target
+        if isinstance(target, WrappedFunction):
+            return await self.amy_implementation_at(target.interface)
+        if isinstance(target, (ID, str)):
+            return await self.afind(target)
+        raise ValueError(
+            "A call target is an Action, an Implementation, an action id, or a "
+            f"function registered on this app; got {type(target).__name__}"
+        )
+
+
+class RekuestCaller(Rekuest, RekuestCallerApi):
+    """The rekuest client that also starts and steers tasks at the top level: calls
+    actions (``rekuest.call(...)``), assigns, cancels, pauses, resumes, interrupts and
+    decides.
+
+    An app has it only by taking in ``rekuest_caller_service``, and so asks for
+    ``rekuest_root_call`` at login: an app that does not take it in can start no task of
+    its own, only call what its actions declare.
+
+    **Its calls are roots.** A call through this client goes over its own postman with no
+    parent, so inside a running task it refuses -- a call made then is that task's child,
+    and the task is what knows the socket and the assignment to make it one. Look the
+    action up here (:meth:`aresolve`, :meth:`afind`) and call it through the task:
+    ``await task.acall(await rekuest.aresolve(target), ...)``. Only the call methods and
+    ``assign`` refuse; every lookup, query and other mutation works inside a task as before.
+    """
+
+    postman: Postman
+
+    __scopes__: ClassVar[tuple[str, ...]] = tuple(sorted({*RekuestApi.__scopes__, *RekuestCallerApi.__scopes__}))
+    """What its operations need: the plain client's, and starting tasks at the top level."""
+
+    async def aexecute(self, operation: type[TOperation], variables: dict[str, Any]) -> TOperation:
+        """Executes a query or mutation in a non-blocking way; an assign refuses inside a task."""
+        if operation is AssignMutation:
+            self._refuse_in_task("aassign")
+        return await super().aexecute(operation, variables)
+
     def _refuse_in_task(self, method: str) -> None:
         """Refuse a root call while a task is running.
 
@@ -108,20 +148,6 @@ class Rekuest(Composition, RekuestApi):
             f"{getattr(task, 'id', '?')!r} is running, so a call made now is its child. "
             f"Call it through the task -- task.{method}(action) -- resolving the target "
             f"here first if you have an id or a function: await rekuest.aresolve(target)."
-        )
-
-    async def aresolve(self, target: "CallTarget") -> Action | Implementation:
-        """What to call: an action, an implementation, an action id, or a function
-        registered on this client's app (its implementation there)."""
-        if isinstance(target, (Action, Implementation)):
-            return target
-        if isinstance(target, WrappedFunction):
-            return await self.amy_implementation_at(target.interface)
-        if isinstance(target, (ID, str)):
-            return await self.afind(target)
-        raise ValueError(
-            "A call target is an Action, an Implementation, an action id, or a "
-            f"function registered on this app; got {type(target).__name__}"
         )
 
     async def acall(

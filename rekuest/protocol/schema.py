@@ -165,6 +165,7 @@ class ActionFilter(BaseModel):
     search: str | None = Field(default=None, description="Search by name: a case-insensitive substring, or semantic similarity of the query to the action's name and description. Substring matches rank first, then by similarity; an explicit `ordering` replaces that ranking.")
     ids: tuple[ID, ...] | None = None
     demands: tuple['PortDemandInput', ...] | None = None
+    any_demands: tuple[tuple['PortDemandInput', ...], ...] | None = Field(validation_alias=AliasChoices('any_demands', 'anyDemands'), serialization_alias='anyDemands', default=None, description='Any of these demand sets: the rows that satisfy every demand of at least one set (each set as `demands`). One statement, so prefer it to `OR`-ing `demands`, which tests every row of the organization. An empty list is ignored; an empty set is an error.')
     object_demands: tuple['PortDemandInput', ...] | None = Field(validation_alias=AliasChoices('object_demands', 'objectDemands'), serialization_alias='objectDemands', default=None)
     protocols: tuple[str, ...] | None = None
     kind: ActionKind | None = None
@@ -356,6 +357,7 @@ class CreateShortcutInput(BaseModel):
     'Whether when running the short the returns should be used further. Allows to create mini pipelines\nDefault: False'
     bind_number: int | None = Field(validation_alias=AliasChoices('bind_number', 'bindNumber'), serialization_alias='bindNumber', default=None, description='The bind number of the shortcut. This is used to identify the shortcut in the system.')
     toolbox: ID | None = Field(default=None, description='The toolbox ID to create the shortcut in. If not provided, the shortcut will be created in the default toolbox.')
+    bindings: 'ShortcutBindingsInput | None' = Field(default=None, description='Pin the new shortcut for whoever these match (admins only).')
     model_config = ConfigDict(frozen=True, extra='forbid', populate_by_name=True, use_enum_values=True)
 
 class CreateSpaceInput(BaseModel):
@@ -428,6 +430,7 @@ class ImplementationActionFilter(BaseModel):
     name: str | None = None
     ids: tuple[ID, ...] | None = None
     demands: tuple['PortDemandInput', ...] | None = None
+    any_demands: tuple[tuple['PortDemandInput', ...], ...] | None = Field(validation_alias=AliasChoices('any_demands', 'anyDemands'), serialization_alias='anyDemands', default=None, description='Any of these demand sets: the rows that satisfy every demand of at least one set (each set as `demands`). One statement, so prefer it to `OR`-ing `demands`, which tests every row of the organization. An empty list is ignored; an empty set is an error.')
     kind: ActionKind | None = None
     protocols: tuple[str, ...] | None = None
     model_config = ConfigDict(frozen=True, extra='forbid', populate_by_name=True, use_enum_values=True)
@@ -565,6 +568,14 @@ class ShelveInMemoryDrawerInput(BaseModel):
     description: str | None = Field(default=None, description='The description of the drawer. This is used to identify the drawer in the system.')
     model_config = ConfigDict(frozen=True, extra='forbid', populate_by_name=True, use_enum_values=True)
 
+class ShortcutBindingsInput(BaseModel):
+    """Who to pin a shortcut for, and where: each field that is given must be the caller's; nothing given pins it for the whole organization."""
+    users: tuple[ID, ...] | None = Field(default=None, description='The users (their `sub`) to pin the shortcut for, one binding each; every user when not given.')
+    app: str | None = Field(default=None, description='The identifier of the app to pin it in; every app when not given.')
+    client: str | None = Field(default=None, description='The `client_id` of the client to pin it in; every client when not given.')
+    device: str | None = Field(default=None, description='The `device_id` of the device to pin it on; every device when not given.')
+    model_config = ConfigDict(frozen=True, extra='forbid', populate_by_name=True, use_enum_values=True)
+
 class ShortcutFilter(BaseModel):
     """No documentation"""
     and_: 'ShortcutFilter | None' = Field(validation_alias=AliasChoices('and_', 'AND'), serialization_alias='AND', default=None)
@@ -574,8 +585,10 @@ class ShortcutFilter(BaseModel):
     search: str | None = None
     ids: tuple[ID, ...] | None = None
     demands: tuple[PortDemandInput, ...] | None = None
+    any_demands: tuple[tuple[PortDemandInput, ...], ...] | None = Field(validation_alias=AliasChoices('any_demands', 'anyDemands'), serialization_alias='anyDemands', default=None, description='Any of these demand sets: the rows that satisfy every demand of at least one set (each set as `demands`). One statement, so prefer it to `OR`-ing `demands`, which tests every row of the organization. An empty list is ignored; an empty set is an error.')
     assignable: bool | None = Field(default=None, description="Whether an agent that can take the shortcut's action is connected now (`Action.assignable`).")
     toolbox: ID | None = None
+    pinned: bool | None = Field(default=None, description="Whether an admin pinned the shortcut for the caller: a binding whose user, app, client and device are each the caller's or left open.")
     model_config = ConfigDict(frozen=True, extra='forbid', populate_by_name=True, use_enum_values=True)
 
 class ShortcutOrderName(BaseModel):
@@ -587,7 +600,12 @@ class ShortcutOrderAssignable(BaseModel):
     """Runnable first (DESC) or last (ASC) by the shortcut's `Action.assignable`; the order the filters set is the tie-break."""
     assignable: Ordering = Field(description="Runnable first (DESC) or last (ASC) by the shortcut's `Action.assignable`; the order the filters set is the tie-break.")
     model_config = ConfigDict(frozen=True, extra='forbid', populate_by_name=True, use_enum_values=True)
-ShortcutOrder = ShortcutOrderName | ShortcutOrderAssignable
+
+class ShortcutOrderPinned(BaseModel):
+    """Pinned for the caller (an admin bound it to them, or to where they call from) first (DESC) or last (ASC). Put it before `assignable`, which adds the tie-break."""
+    pinned: Ordering = Field(description='Pinned for the caller (an admin bound it to them, or to where they call from) first (DESC) or last (ASC). Put it before `assignable`, which adds the tie-break.')
+    model_config = ConfigDict(frozen=True, extra='forbid', populate_by_name=True, use_enum_values=True)
+ShortcutOrder = ShortcutOrderName | ShortcutOrderAssignable | ShortcutOrderPinned
 
 class StrFilterLookup(BaseModel):
     """No documentation"""
@@ -663,6 +681,7 @@ class WidgetDefaultInput(BaseModel):
 ActionFilter.model_rebuild()
 AgentFilter.model_rebuild()
 CatalogComponentInput.model_rebuild()
+CreateShortcutInput.model_rebuild()
 CreateSpaceInput.model_rebuild()
 ImplementationActionFilter.model_rebuild()
 ImplementationAgentFilter.model_rebuild()

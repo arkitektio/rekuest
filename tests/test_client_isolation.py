@@ -9,7 +9,7 @@ the arkitekt side, where a real app can be built.
 from arkitekt_spec.declare.app import AppRegistry
 from rekuest.client.postman import GraphQLPostman
 from rekuest.client.rath import RekuestRath
-from rekuest.client.client import Rekuest
+from rekuest.client.client import Rekuest, RekuestCaller
 from arkitekt_spec.declare.structures.registry import StructureRegistry
 
 from .conftest import DirectSucceedingLink
@@ -17,7 +17,7 @@ from .conftest import DirectSucceedingLink
 
 def build_client(registry: AppRegistry) -> Rekuest:
     rath = RekuestRath(link=DirectSucceedingLink())
-    return Rekuest(
+    return RekuestCaller(
         rath=rath,
         postman=GraphQLPostman(rath=rath),
         structure_registry=registry.structure_registry,

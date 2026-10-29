@@ -10,7 +10,7 @@ from uuid import uuid4
 import pytest
 from arkitekt_spec.declare.app import AppRegistry
 from arkitekt_spec.declare.structures.registry import StructureRegistry
-from rekuest.client.client import Rekuest, RekuestRath
+from rekuest.client.client import Rekuest, RekuestCaller, RekuestRath
 from rath.links.testing.direct_succeeding_link import DirectSucceedingLink
 from rekuest.agents.agent import RekuestAgent
 from rekuest.agents.retention import default_journal_path
@@ -161,7 +161,7 @@ def mock_agent() -> RekuestAgent:
 def mock_rekuest(mock_agent: RekuestAgent) -> Rekuest:
     """A client of the same registry as ``mock_agent``, knowing nothing of the agent."""
     rath = RekuestRath(link=DirectSucceedingLink())
-    return Rekuest(
+    return RekuestCaller(
         rath=rath,
         postman=GraphQLPostman(rath=rath),
         structure_registry=mock_agent.app_registry.structure_registry,
@@ -348,7 +348,7 @@ def deployed_app(integration_ports: dict[str, int]) -> Generator[DeployedRekuest
         )
 
         rekuest = FreshApp(
-            client=Rekuest(
+            client=RekuestCaller(
                 rath=rath,
                 postman=GraphQLPostman(rath=rath),
                 structure_registry=agent.app_registry.structure_registry,
@@ -551,7 +551,7 @@ def build_rekuest_at(
     )
 
     return FreshApp(
-        client=Rekuest(
+        client=RekuestCaller(
             rath=rath,
             postman=GraphQLPostman(rath=rath),
             structure_registry=agent.app_registry.structure_registry,

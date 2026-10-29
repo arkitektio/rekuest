@@ -6,7 +6,7 @@ from arkitekt_spec.actions import ActionDemandInput, ActionKind, AgentDependency
 from datetime import datetime
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 from rath.scalars import ID, IDCoercible
-from rekuest.protocol.schema import ActionFilter, ActionOrder, AgentFilter, AgentInput, AgentKind, AssignWidgetKind, BlokAgentMappingInput, CatalogComponentInput, CatalogOperationInput, CatalogValueKind, CollectInput, ComponentContext, CreateAssetInput, CreateBlokInput, CreateDashboardInput, CreateHigherOrderImplementationInput, CreateShortcutInput, CreateSpaceInput, CreateTestCaseInput, CreateTestResultInput, DiagnosticLevel, EditBlokInput, FinishMediaUploadInput, ForkBlokInput, ImplementationFilter, InterruptInput, LocalKind, LogLevel, MaterializationScope, MaterializeBlokInput, OffsetPaginationInput, PinMaterializedBlokInput, PlacementInput, RegisterModuleInput, RequestAssetUploadInput, RequestMediaAccessInput, RequestMediaUploadInput, ReturnWidgetKind, RevertBlokInput, ShelveInMemoryDrawerInput, ShortcutFilter, ShortcutOrder, TaskInstructKind, ToolboxFilter, ToolboxOrder, UnshelveMemoryDrawerInput, UpdateBlokInput, UpdateMaterializedBlokInput, WidgetDefaultInput
+from rekuest.protocol.schema import ActionFilter, ActionOrder, AgentFilter, AgentInput, AgentKind, AssignWidgetKind, BlokAgentMappingInput, CatalogComponentInput, CatalogOperationInput, CatalogValueKind, CollectInput, ComponentContext, CreateAssetInput, CreateBlokInput, CreateDashboardInput, CreateHigherOrderImplementationInput, CreateShortcutInput, CreateSpaceInput, CreateTestCaseInput, CreateTestResultInput, DiagnosticLevel, EditBlokInput, FinishMediaUploadInput, ForkBlokInput, ImplementationFilter, InterruptInput, LocalKind, LogLevel, MaterializationScope, MaterializeBlokInput, OffsetPaginationInput, PinMaterializedBlokInput, PlacementInput, RegisterModuleInput, RequestAssetUploadInput, RequestMediaAccessInput, RequestMediaUploadInput, ReturnWidgetKind, RevertBlokInput, ShelveInMemoryDrawerInput, ShortcutBindingsInput, ShortcutFilter, ShortcutOrder, TaskInstructKind, ToolboxFilter, ToolboxOrder, UnshelveMemoryDrawerInput, UpdateBlokInput, UpdateMaterializedBlokInput, WidgetDefaultInput
 from rekuest.scalars import ActionHash, Args, Identifier, JSONSerializable, MediaLike
 from rekuest.traits.action import Callable
 from typing import Annotated, Any, AsyncIterator, ClassVar, Iterable, Iterator, Literal
@@ -2022,6 +2022,84 @@ class Implementation(BaseModel):
         name = 'Implementation'
         type = 'Implementation'
 
+class AssignMutation(BaseModel):
+    """No documentation found for this operation."""
+    assign: Task
+    'Assign a task to an agent.'
+
+    class Arguments(BaseModel):
+        """Arguments for assign """
+        input: AssignInput
+
+    class Meta:
+        """Meta class for assign """
+        document = 'fragment Task on Task {\n  args\n  id\n  parent {\n    id\n    __typename\n  }\n  id\n  latestEventKind\n  policy\n  events(ordering: [{createdAt: ASC}]) {\n    id\n    returns\n    level\n    __typename\n  }\n  instructs {\n    id\n    __typename\n  }\n  reference\n  updatedAt\n  __typename\n}\n\nmutation assign($input: AssignInput!) {\n  assign(input: $input) {\n    ...Task\n    __typename\n  }\n}'
+
+class CancelMutation(BaseModel):
+    """No documentation found for this operation."""
+    cancel: Task
+    'Cancel an active task.'
+
+    class Arguments(BaseModel):
+        """Arguments for cancel """
+        input: CancelInput
+
+    class Meta:
+        """Meta class for cancel """
+        document = 'fragment Task on Task {\n  args\n  id\n  parent {\n    id\n    __typename\n  }\n  id\n  latestEventKind\n  policy\n  events(ordering: [{createdAt: ASC}]) {\n    id\n    returns\n    level\n    __typename\n  }\n  instructs {\n    id\n    __typename\n  }\n  reference\n  updatedAt\n  __typename\n}\n\nmutation cancel($input: CancelInput!) {\n  cancel(input: $input) {\n    ...Task\n    __typename\n  }\n}'
+
+class InterruptMutation(BaseModel):
+    """No documentation found for this operation."""
+    interrupt: Task
+    'Interrupt the execution of a task.'
+
+    class Arguments(BaseModel):
+        """Arguments for interrupt """
+        input: InterruptInput
+
+    class Meta:
+        """Meta class for interrupt """
+        document = 'fragment Task on Task {\n  args\n  id\n  parent {\n    id\n    __typename\n  }\n  id\n  latestEventKind\n  policy\n  events(ordering: [{createdAt: ASC}]) {\n    id\n    returns\n    level\n    __typename\n  }\n  instructs {\n    id\n    __typename\n  }\n  reference\n  updatedAt\n  __typename\n}\n\nmutation interrupt($input: InterruptInput!) {\n  interrupt(input: $input) {\n    ...Task\n    __typename\n  }\n}'
+
+class PauseMutation(BaseModel):
+    """No documentation found for this operation."""
+    pause: Task
+    'Pause an ongoing task.'
+
+    class Arguments(BaseModel):
+        """Arguments for pause """
+        input: PauseInput
+
+    class Meta:
+        """Meta class for pause """
+        document = 'fragment Task on Task {\n  args\n  id\n  parent {\n    id\n    __typename\n  }\n  id\n  latestEventKind\n  policy\n  events(ordering: [{createdAt: ASC}]) {\n    id\n    returns\n    level\n    __typename\n  }\n  instructs {\n    id\n    __typename\n  }\n  reference\n  updatedAt\n  __typename\n}\n\nmutation pause($input: PauseInput!) {\n  pause(input: $input) {\n    ...Task\n    __typename\n  }\n}'
+
+class ResumeMutation(BaseModel):
+    """No documentation found for this operation."""
+    resume: Task
+    'Resume a paused task.'
+
+    class Arguments(BaseModel):
+        """Arguments for resume """
+        input: ResumeInput
+
+    class Meta:
+        """Meta class for resume """
+        document = 'fragment Task on Task {\n  args\n  id\n  parent {\n    id\n    __typename\n  }\n  id\n  latestEventKind\n  policy\n  events(ordering: [{createdAt: ASC}]) {\n    id\n    returns\n    level\n    __typename\n  }\n  instructs {\n    id\n    __typename\n  }\n  reference\n  updatedAt\n  __typename\n}\n\nmutation resume($input: ResumeInput!) {\n  resume(input: $input) {\n    ...Task\n    __typename\n  }\n}'
+
+class DecideMutation(BaseModel):
+    """No documentation found for this operation."""
+    decide: Task
+    'Answer a held task. A child an agent asked for runs once approved, or ends DENIED without running; a task that holds itself carries on with the decision. Only the user the task runs for may decide, and never from the client of the agent that asked.'
+
+    class Arguments(BaseModel):
+        """Arguments for decide """
+        input: DecideInput
+
+    class Meta:
+        """Meta class for decide """
+        document = 'fragment Task on Task {\n  args\n  id\n  parent {\n    id\n    __typename\n  }\n  id\n  latestEventKind\n  policy\n  events(ordering: [{createdAt: ASC}]) {\n    id\n    returns\n    level\n    __typename\n  }\n  instructs {\n    id\n    __typename\n  }\n  reference\n  updatedAt\n  __typename\n}\n\nmutation decide($input: DecideInput!) {\n  decide(input: $input) {\n    ...Task\n    __typename\n  }\n}'
+
 class EnsureAgentMutation(BaseModel):
     """No documentation found for this operation."""
     ensure_agent: Agent = Field(alias='ensureAgent')
@@ -2316,84 +2394,6 @@ class CreateSpaceMutation(BaseModel):
     class Meta:
         """Meta class for CreateSpace """
         document = 'mutation CreateSpace($input: CreateSpaceInput!) {\n  createSpace(input: $input) {\n    id\n    __typename\n  }\n}'
-
-class AssignMutation(BaseModel):
-    """No documentation found for this operation."""
-    assign: Task
-    'Assign a task to an agent.'
-
-    class Arguments(BaseModel):
-        """Arguments for assign """
-        input: AssignInput
-
-    class Meta:
-        """Meta class for assign """
-        document = 'fragment Task on Task {\n  args\n  id\n  parent {\n    id\n    __typename\n  }\n  id\n  latestEventKind\n  policy\n  events(ordering: [{createdAt: ASC}]) {\n    id\n    returns\n    level\n    __typename\n  }\n  instructs {\n    id\n    __typename\n  }\n  reference\n  updatedAt\n  __typename\n}\n\nmutation assign($input: AssignInput!) {\n  assign(input: $input) {\n    ...Task\n    __typename\n  }\n}'
-
-class CancelMutation(BaseModel):
-    """No documentation found for this operation."""
-    cancel: Task
-    'Cancel an active task.'
-
-    class Arguments(BaseModel):
-        """Arguments for cancel """
-        input: CancelInput
-
-    class Meta:
-        """Meta class for cancel """
-        document = 'fragment Task on Task {\n  args\n  id\n  parent {\n    id\n    __typename\n  }\n  id\n  latestEventKind\n  policy\n  events(ordering: [{createdAt: ASC}]) {\n    id\n    returns\n    level\n    __typename\n  }\n  instructs {\n    id\n    __typename\n  }\n  reference\n  updatedAt\n  __typename\n}\n\nmutation cancel($input: CancelInput!) {\n  cancel(input: $input) {\n    ...Task\n    __typename\n  }\n}'
-
-class InterruptMutation(BaseModel):
-    """No documentation found for this operation."""
-    interrupt: Task
-    'Interrupt the execution of a task.'
-
-    class Arguments(BaseModel):
-        """Arguments for interrupt """
-        input: InterruptInput
-
-    class Meta:
-        """Meta class for interrupt """
-        document = 'fragment Task on Task {\n  args\n  id\n  parent {\n    id\n    __typename\n  }\n  id\n  latestEventKind\n  policy\n  events(ordering: [{createdAt: ASC}]) {\n    id\n    returns\n    level\n    __typename\n  }\n  instructs {\n    id\n    __typename\n  }\n  reference\n  updatedAt\n  __typename\n}\n\nmutation interrupt($input: InterruptInput!) {\n  interrupt(input: $input) {\n    ...Task\n    __typename\n  }\n}'
-
-class PauseMutation(BaseModel):
-    """No documentation found for this operation."""
-    pause: Task
-    'Pause an ongoing task.'
-
-    class Arguments(BaseModel):
-        """Arguments for pause """
-        input: PauseInput
-
-    class Meta:
-        """Meta class for pause """
-        document = 'fragment Task on Task {\n  args\n  id\n  parent {\n    id\n    __typename\n  }\n  id\n  latestEventKind\n  policy\n  events(ordering: [{createdAt: ASC}]) {\n    id\n    returns\n    level\n    __typename\n  }\n  instructs {\n    id\n    __typename\n  }\n  reference\n  updatedAt\n  __typename\n}\n\nmutation pause($input: PauseInput!) {\n  pause(input: $input) {\n    ...Task\n    __typename\n  }\n}'
-
-class ResumeMutation(BaseModel):
-    """No documentation found for this operation."""
-    resume: Task
-    'Resume a paused task.'
-
-    class Arguments(BaseModel):
-        """Arguments for resume """
-        input: ResumeInput
-
-    class Meta:
-        """Meta class for resume """
-        document = 'fragment Task on Task {\n  args\n  id\n  parent {\n    id\n    __typename\n  }\n  id\n  latestEventKind\n  policy\n  events(ordering: [{createdAt: ASC}]) {\n    id\n    returns\n    level\n    __typename\n  }\n  instructs {\n    id\n    __typename\n  }\n  reference\n  updatedAt\n  __typename\n}\n\nmutation resume($input: ResumeInput!) {\n  resume(input: $input) {\n    ...Task\n    __typename\n  }\n}'
-
-class DecideMutation(BaseModel):
-    """No documentation found for this operation."""
-    decide: Task
-    'Answer a held task. A child an agent asked for runs once approved, or ends DENIED without running; a task that holds itself carries on with the decision. Only the user the task runs for may decide, and never from the client of the agent that asked.'
-
-    class Arguments(BaseModel):
-        """Arguments for decide """
-        input: DecideInput
-
-    class Meta:
-        """Meta class for decide """
-        document = 'fragment Task on Task {\n  args\n  id\n  parent {\n    id\n    __typename\n  }\n  id\n  latestEventKind\n  policy\n  events(ordering: [{createdAt: ASC}]) {\n    id\n    returns\n    level\n    __typename\n  }\n  instructs {\n    id\n    __typename\n  }\n  reference\n  updatedAt\n  __typename\n}\n\nmutation decide($input: DecideInput!) {\n  decide(input: $input) {\n    ...Task\n    __typename\n  }\n}'
 
 class CollectMutation(BaseModel):
     """No documentation found for this operation."""
@@ -3235,7 +3235,7 @@ class RekuestApi:
     """Every operation of this API as a method. Generated by turms.
 
 Each method hands its operation to ``execute``, ``aexecute``, ``subscribe``, ``asubscribe`` of ``self``, which the class this one is mixed into (or a base of it) provides."""
-    __scopes__: ClassVar[tuple[str, ...]] = ('rekuest_agent', 'rekuest_call', 'rekuest_read', 'rekuest_write')
+    __scopes__: ClassVar[tuple[str, ...]] = ('rekuest_agent', 'rekuest_read', 'rekuest_write')
 
     async def aensure_agent(self, name: str | None | UnsetType=UNSET, description: str | None | UnsetType=UNSET, kind: AgentKind | None | UnsetType=UNSET, hook_url: str | None | UnsetType=UNSET, hook_url_secret: str | None | UnsetType=UNSET) -> Agent:
         """EnsureAgent 
@@ -3581,7 +3581,7 @@ Returns:
         variables['input'] = _input
         return self.execute(CreateBlokMutation, variables).create_blok
 
-    async def amaterialize_blok(self, blok: IDCoercible, scope: MaterializationScope, dashboard: IDCoercible | None | UnsetType=UNSET, agent_mappings: Iterable[BlokAgentMappingInput] | None | UnsetType=UNSET, name: str | None | UnsetType=UNSET, description: str | None | UnsetType=UNSET) -> MaterializedBlok:
+    async def amaterialize_blok(self, blok: IDCoercible, dashboard: IDCoercible | None | UnsetType=UNSET, agent_mappings: Iterable[BlokAgentMappingInput] | None | UnsetType=UNSET, name: str | None | UnsetType=UNSET, description: str | None | UnsetType=UNSET, scope: MaterializationScope | UnsetType=UNSET) -> MaterializedBlok:
         """MaterializeBlok 
 
 Materialize a UI blok into a concrete instance on a dashboard.
@@ -3608,11 +3608,12 @@ Returns:
             _input['name'] = name
         if description is not UNSET:
             _input['description'] = description
-        _input['scope'] = scope
+        if scope is not UNSET:
+            _input['scope'] = scope
         variables['input'] = _input
         return (await self.aexecute(MaterializeBlokMutation, variables)).materialize_blok
 
-    def materialize_blok(self, blok: IDCoercible, scope: MaterializationScope, dashboard: IDCoercible | None | UnsetType=UNSET, agent_mappings: Iterable[BlokAgentMappingInput] | None | UnsetType=UNSET, name: str | None | UnsetType=UNSET, description: str | None | UnsetType=UNSET) -> MaterializedBlok:
+    def materialize_blok(self, blok: IDCoercible, dashboard: IDCoercible | None | UnsetType=UNSET, agent_mappings: Iterable[BlokAgentMappingInput] | None | UnsetType=UNSET, name: str | None | UnsetType=UNSET, description: str | None | UnsetType=UNSET, scope: MaterializationScope | UnsetType=UNSET) -> MaterializedBlok:
         """MaterializeBlok 
 
 Materialize a UI blok into a concrete instance on a dashboard.
@@ -3639,7 +3640,8 @@ Returns:
             _input['name'] = name
         if description is not UNSET:
             _input['description'] = description
-        _input['scope'] = scope
+        if scope is not UNSET:
+            _input['scope'] = scope
         variables['input'] = _input
         return self.execute(MaterializeBlokMutation, variables).materialize_blok
 
@@ -4025,7 +4027,7 @@ Returns:
         variables['input'] = _input
         return self.execute(PinMaterializedBlokMutation, variables).pin_materialized_blok
 
-    async def aregister_module(self, name: str, components: Iterable[CatalogComponentInput], operations: Iterable[CatalogOperationInput], catalogs: Iterable[str], widget_defaults: Iterable[WidgetDefaultInput], description: str | None | UnsetType=UNSET) -> Module:
+    async def aregister_module(self, name: str, description: str | None | UnsetType=UNSET, components: Iterable[CatalogComponentInput] | UnsetType=UNSET, operations: Iterable[CatalogOperationInput] | UnsetType=UNSET, catalogs: Iterable[str] | UnsetType=UNSET, widget_defaults: Iterable[WidgetDefaultInput] | UnsetType=UNSET) -> Module:
         """RegisterModule 
 
 Register a module: the components and operations a UI app can render and evaluate beyond the spec's catalogs, and the catalogs it implements whole (upsert by name in the caller's organization). Bloks (`module`) and definitions (`catalogs`) that name it are validated against it.
@@ -4046,14 +4048,18 @@ Returns:
         _input['name'] = name
         if description is not UNSET:
             _input['description'] = description
-        _input['components'] = components
-        _input['operations'] = operations
-        _input['catalogs'] = catalogs
-        _input['widgetDefaults'] = widget_defaults
+        if components is not UNSET:
+            _input['components'] = components
+        if operations is not UNSET:
+            _input['operations'] = operations
+        if catalogs is not UNSET:
+            _input['catalogs'] = catalogs
+        if widget_defaults is not UNSET:
+            _input['widgetDefaults'] = widget_defaults
         variables['input'] = _input
         return (await self.aexecute(RegisterModuleMutation, variables)).register_module
 
-    def register_module(self, name: str, components: Iterable[CatalogComponentInput], operations: Iterable[CatalogOperationInput], catalogs: Iterable[str], widget_defaults: Iterable[WidgetDefaultInput], description: str | None | UnsetType=UNSET) -> Module:
+    def register_module(self, name: str, description: str | None | UnsetType=UNSET, components: Iterable[CatalogComponentInput] | UnsetType=UNSET, operations: Iterable[CatalogOperationInput] | UnsetType=UNSET, catalogs: Iterable[str] | UnsetType=UNSET, widget_defaults: Iterable[WidgetDefaultInput] | UnsetType=UNSET) -> Module:
         """RegisterModule 
 
 Register a module: the components and operations a UI app can render and evaluate beyond the spec's catalogs, and the catalogs it implements whole (upsert by name in the caller's organization). Bloks (`module`) and definitions (`catalogs`) that name it are validated against it.
@@ -4074,14 +4080,18 @@ Returns:
         _input['name'] = name
         if description is not UNSET:
             _input['description'] = description
-        _input['components'] = components
-        _input['operations'] = operations
-        _input['catalogs'] = catalogs
-        _input['widgetDefaults'] = widget_defaults
+        if components is not UNSET:
+            _input['components'] = components
+        if operations is not UNSET:
+            _input['operations'] = operations
+        if catalogs is not UNSET:
+            _input['catalogs'] = catalogs
+        if widget_defaults is not UNSET:
+            _input['widgetDefaults'] = widget_defaults
         variables['input'] = _input
         return self.execute(RegisterModuleMutation, variables).register_module
 
-    async def acreate_dashboard(self, name: str, bloks: Iterable[str]) -> Dashboard:
+    async def acreate_dashboard(self, name: str, bloks: Iterable[str] | UnsetType=UNSET) -> Dashboard:
         """CreateDashboard 
 
 Create a dashboard layout.
@@ -4096,11 +4106,12 @@ Returns:
         variables: dict[str, builtins.object] = {}
         _input: dict[str, builtins.object] = {}
         _input['name'] = name
-        _input['bloks'] = bloks
+        if bloks is not UNSET:
+            _input['bloks'] = bloks
         variables['input'] = _input
         return (await self.aexecute(CreateDashboardMutation, variables)).create_dashboard
 
-    def create_dashboard(self, name: str, bloks: Iterable[str]) -> Dashboard:
+    def create_dashboard(self, name: str, bloks: Iterable[str] | UnsetType=UNSET) -> Dashboard:
         """CreateDashboard 
 
 Create a dashboard layout.
@@ -4115,7 +4126,8 @@ Returns:
         variables: dict[str, builtins.object] = {}
         _input: dict[str, builtins.object] = {}
         _input['name'] = name
-        _input['bloks'] = bloks
+        if bloks is not UNSET:
+            _input['bloks'] = bloks
         variables['input'] = _input
         return self.execute(CreateDashboardMutation, variables).create_dashboard
 
@@ -4163,7 +4175,7 @@ Returns:
         variables['input'] = _input
         return self.execute(RequestMediaUploadMutation, variables).request_media_upload
 
-    async def afinish_media_upload(self, store_id: str, valid: bool) -> MediaStore:
+    async def afinish_media_upload(self, store_id: str, valid: bool | UnsetType=UNSET) -> MediaStore:
         """FinishMediaUpload 
 
 Finalize a media upload after the client has written the object
@@ -4178,11 +4190,12 @@ Returns:
         variables: dict[str, builtins.object] = {}
         _input: dict[str, builtins.object] = {}
         _input['storeId'] = store_id
-        _input['valid'] = valid
+        if valid is not UNSET:
+            _input['valid'] = valid
         variables['input'] = _input
         return (await self.aexecute(FinishMediaUploadMutation, variables)).finish_media_upload
 
-    def finish_media_upload(self, store_id: str, valid: bool) -> MediaStore:
+    def finish_media_upload(self, store_id: str, valid: bool | UnsetType=UNSET) -> MediaStore:
         """FinishMediaUpload 
 
 Finalize a media upload after the client has written the object
@@ -4197,7 +4210,8 @@ Returns:
         variables: dict[str, builtins.object] = {}
         _input: dict[str, builtins.object] = {}
         _input['storeId'] = store_id
-        _input['valid'] = valid
+        if valid is not UNSET:
+            _input['valid'] = valid
         variables['input'] = _input
         return self.execute(FinishMediaUploadMutation, variables).finish_media_upload
 
@@ -4319,7 +4333,7 @@ Returns:
         variables['input'] = _input
         return self.execute(UnshelveMutation, variables).unshelve_memory_drawer
 
-    async def acreate_shortcut(self, name: str, action: IDCoercible, args: Args, allow_quick: bool, use_returns: bool, description: str | None | UnsetType=UNSET, bind_number: int | None | UnsetType=UNSET, toolbox: IDCoercible | None | UnsetType=UNSET) -> Shortcut:
+    async def acreate_shortcut(self, name: str, action: IDCoercible, args: Args, description: str | None | UnsetType=UNSET, allow_quick: bool | UnsetType=UNSET, use_returns: bool | UnsetType=UNSET, bind_number: int | None | UnsetType=UNSET, toolbox: IDCoercible | None | UnsetType=UNSET, bindings: ShortcutBindingsInput | None | UnsetType=UNSET) -> Shortcut:
         """CreateShortcut 
 
 Create a shortcut to an action.
@@ -4333,6 +4347,7 @@ Args:
     use_returns: Whether when running the short the returns should be used further. Allows to create mini pipelines
     bind_number: The bind number of the shortcut. This is used to identify the shortcut in the system.
     toolbox: The toolbox ID to create the shortcut in. If not provided, the shortcut will be created in the default toolbox.
+    bindings: Pin the new shortcut for whoever these match (admins only).
 
 Returns:
     Shortcut
@@ -4344,16 +4359,20 @@ Returns:
             _input['description'] = description
         _input['action'] = action
         _input['args'] = args
-        _input['allowQuick'] = allow_quick
-        _input['useReturns'] = use_returns
+        if allow_quick is not UNSET:
+            _input['allowQuick'] = allow_quick
+        if use_returns is not UNSET:
+            _input['useReturns'] = use_returns
         if bind_number is not UNSET:
             _input['bindNumber'] = bind_number
         if toolbox is not UNSET:
             _input['toolbox'] = toolbox
+        if bindings is not UNSET:
+            _input['bindings'] = bindings
         variables['input'] = _input
         return (await self.aexecute(CreateShortcutMutation, variables)).create_shortcut
 
-    def create_shortcut(self, name: str, action: IDCoercible, args: Args, allow_quick: bool, use_returns: bool, description: str | None | UnsetType=UNSET, bind_number: int | None | UnsetType=UNSET, toolbox: IDCoercible | None | UnsetType=UNSET) -> Shortcut:
+    def create_shortcut(self, name: str, action: IDCoercible, args: Args, description: str | None | UnsetType=UNSET, allow_quick: bool | UnsetType=UNSET, use_returns: bool | UnsetType=UNSET, bind_number: int | None | UnsetType=UNSET, toolbox: IDCoercible | None | UnsetType=UNSET, bindings: ShortcutBindingsInput | None | UnsetType=UNSET) -> Shortcut:
         """CreateShortcut 
 
 Create a shortcut to an action.
@@ -4367,6 +4386,7 @@ Args:
     use_returns: Whether when running the short the returns should be used further. Allows to create mini pipelines
     bind_number: The bind number of the shortcut. This is used to identify the shortcut in the system.
     toolbox: The toolbox ID to create the shortcut in. If not provided, the shortcut will be created in the default toolbox.
+    bindings: Pin the new shortcut for whoever these match (admins only).
 
 Returns:
     Shortcut
@@ -4378,12 +4398,16 @@ Returns:
             _input['description'] = description
         _input['action'] = action
         _input['args'] = args
-        _input['allowQuick'] = allow_quick
-        _input['useReturns'] = use_returns
+        if allow_quick is not UNSET:
+            _input['allowQuick'] = allow_quick
+        if use_returns is not UNSET:
+            _input['useReturns'] = use_returns
         if bind_number is not UNSET:
             _input['bindNumber'] = bind_number
         if toolbox is not UNSET:
             _input['toolbox'] = toolbox
+        if bindings is not UNSET:
+            _input['bindings'] = bindings
         variables['input'] = _input
         return self.execute(CreateShortcutMutation, variables).create_shortcut
 
@@ -4426,318 +4450,6 @@ Returns:
             _input['placements'] = placements
         variables['input'] = _input
         return self.execute(CreateSpaceMutation, variables).create_space
-
-    async def aassign(self, args: Args, capture: bool, action: IDCoercible | None | UnsetType=UNSET, resolution: IDCoercible | None | UnsetType=UNSET, implementation: IDCoercible | None | UnsetType=UNSET, agent: IDCoercible | None | UnsetType=UNSET, action_hash: ActionHash | None | UnsetType=UNSET, interface: str | None | UnsetType=UNSET, hooks: Iterable[HookInput] | None | UnsetType=UNSET, reference: str | None | UnsetType=UNSET, dependencies: Iterable[ResolvedDependencyInput] | None | UnsetType=UNSET, step: bool | None | UnsetType=UNSET, not_before: datetime | None | UnsetType=UNSET, policy: TaskPolicy | None | UnsetType=UNSET, state_requires: Iterable[StateRequirementInput] | None | UnsetType=UNSET, space: IDCoercible | None | UnsetType=UNSET) -> Task:
-        """assign 
-
-Assign a task to an agent.
-
-Args:
-    action: The action ID to assign to
-    resolution: The resolution ID to assign to when assining to a implementation with dependencies
-    implementation: The implementation ID to assign to when directly assingint to a implementation
-    agent: The agent ID to assign to when directly assingint to a implementation
-    action_hash: The hash of the action. This is used to identify the action in the system.
-    interface: The interface of the implementation. Only ussable if you also set agent
-    hooks: The hooks of the task. This is used to identify the task in the system.
-    args: The args of the task. Its a dictionary of ports and values
-    reference: The reference of the task. This is used to identify the task in the system.
-    capture: Whether to capture the task.
-    dependencies: The dependencies of the task. This maps dependency keys to implementation IDs.
-    step: Whether the task should step. Ie. go to the next breakpoint
-    not_before: Hold the task back until then: it is persisted now but only dispatched once due. A time in the past (or none) dispatches immediately.
-    policy: Whether the work the agents ask for under this task waits for a person: ASK (the default) holds every child an agent assigns until someone approves it, AUTO runs it without asking (auto-mode). Honoured on a root only: a child always takes its parent's.
-    state_requires: What the agent's state must hold for the task to run. Refused unless the agent says it tests them, and for a state or path its declaration does not have.
-    space: The space (in the caller's organization) the run is started in: where a client draws the action's overlay over the placed agents (`Task.space`). Only a UI reads it; nothing runs differently. Honoured on a root only.
-
-Returns:
-    Task
-"""
-        variables: dict[str, builtins.object] = {}
-        _input: dict[str, builtins.object] = {}
-        if action is not UNSET:
-            _input['action'] = action
-        if resolution is not UNSET:
-            _input['resolution'] = resolution
-        if implementation is not UNSET:
-            _input['implementation'] = implementation
-        if agent is not UNSET:
-            _input['agent'] = agent
-        if action_hash is not UNSET:
-            _input['actionHash'] = action_hash
-        if interface is not UNSET:
-            _input['interface'] = interface
-        if hooks is not UNSET:
-            _input['hooks'] = hooks
-        _input['args'] = args
-        if reference is not UNSET:
-            _input['reference'] = reference
-        _input['capture'] = capture
-        if dependencies is not UNSET:
-            _input['dependencies'] = dependencies
-        if step is not UNSET:
-            _input['step'] = step
-        if not_before is not UNSET:
-            _input['notBefore'] = not_before
-        if policy is not UNSET:
-            _input['policy'] = policy
-        if state_requires is not UNSET:
-            _input['stateRequires'] = state_requires
-        if space is not UNSET:
-            _input['space'] = space
-        variables['input'] = _input
-        return (await self.aexecute(AssignMutation, variables)).assign
-
-    def assign(self, args: Args, capture: bool, action: IDCoercible | None | UnsetType=UNSET, resolution: IDCoercible | None | UnsetType=UNSET, implementation: IDCoercible | None | UnsetType=UNSET, agent: IDCoercible | None | UnsetType=UNSET, action_hash: ActionHash | None | UnsetType=UNSET, interface: str | None | UnsetType=UNSET, hooks: Iterable[HookInput] | None | UnsetType=UNSET, reference: str | None | UnsetType=UNSET, dependencies: Iterable[ResolvedDependencyInput] | None | UnsetType=UNSET, step: bool | None | UnsetType=UNSET, not_before: datetime | None | UnsetType=UNSET, policy: TaskPolicy | None | UnsetType=UNSET, state_requires: Iterable[StateRequirementInput] | None | UnsetType=UNSET, space: IDCoercible | None | UnsetType=UNSET) -> Task:
-        """assign 
-
-Assign a task to an agent.
-
-Args:
-    action: The action ID to assign to
-    resolution: The resolution ID to assign to when assining to a implementation with dependencies
-    implementation: The implementation ID to assign to when directly assingint to a implementation
-    agent: The agent ID to assign to when directly assingint to a implementation
-    action_hash: The hash of the action. This is used to identify the action in the system.
-    interface: The interface of the implementation. Only ussable if you also set agent
-    hooks: The hooks of the task. This is used to identify the task in the system.
-    args: The args of the task. Its a dictionary of ports and values
-    reference: The reference of the task. This is used to identify the task in the system.
-    capture: Whether to capture the task.
-    dependencies: The dependencies of the task. This maps dependency keys to implementation IDs.
-    step: Whether the task should step. Ie. go to the next breakpoint
-    not_before: Hold the task back until then: it is persisted now but only dispatched once due. A time in the past (or none) dispatches immediately.
-    policy: Whether the work the agents ask for under this task waits for a person: ASK (the default) holds every child an agent assigns until someone approves it, AUTO runs it without asking (auto-mode). Honoured on a root only: a child always takes its parent's.
-    state_requires: What the agent's state must hold for the task to run. Refused unless the agent says it tests them, and for a state or path its declaration does not have.
-    space: The space (in the caller's organization) the run is started in: where a client draws the action's overlay over the placed agents (`Task.space`). Only a UI reads it; nothing runs differently. Honoured on a root only.
-
-Returns:
-    Task
-"""
-        variables: dict[str, builtins.object] = {}
-        _input: dict[str, builtins.object] = {}
-        if action is not UNSET:
-            _input['action'] = action
-        if resolution is not UNSET:
-            _input['resolution'] = resolution
-        if implementation is not UNSET:
-            _input['implementation'] = implementation
-        if agent is not UNSET:
-            _input['agent'] = agent
-        if action_hash is not UNSET:
-            _input['actionHash'] = action_hash
-        if interface is not UNSET:
-            _input['interface'] = interface
-        if hooks is not UNSET:
-            _input['hooks'] = hooks
-        _input['args'] = args
-        if reference is not UNSET:
-            _input['reference'] = reference
-        _input['capture'] = capture
-        if dependencies is not UNSET:
-            _input['dependencies'] = dependencies
-        if step is not UNSET:
-            _input['step'] = step
-        if not_before is not UNSET:
-            _input['notBefore'] = not_before
-        if policy is not UNSET:
-            _input['policy'] = policy
-        if state_requires is not UNSET:
-            _input['stateRequires'] = state_requires
-        if space is not UNSET:
-            _input['space'] = space
-        variables['input'] = _input
-        return self.execute(AssignMutation, variables).assign
-
-    async def acancel(self, task: IDCoercible) -> Task:
-        """cancel 
-
-Cancel an active task.
-
-Args:
-    task: The task ID to cancel
-
-Returns:
-    Task
-"""
-        variables: dict[str, builtins.object] = {}
-        _input: dict[str, builtins.object] = {}
-        _input['task'] = task
-        variables['input'] = _input
-        return (await self.aexecute(CancelMutation, variables)).cancel
-
-    def cancel(self, task: IDCoercible) -> Task:
-        """cancel 
-
-Cancel an active task.
-
-Args:
-    task: The task ID to cancel
-
-Returns:
-    Task
-"""
-        variables: dict[str, builtins.object] = {}
-        _input: dict[str, builtins.object] = {}
-        _input['task'] = task
-        variables['input'] = _input
-        return self.execute(CancelMutation, variables).cancel
-
-    async def ainterrupt(self, task: IDCoercible) -> Task:
-        """interrupt 
-
-Interrupt the execution of a task.
-
-Args:
-    task: The task ID to interrupt
-
-Returns:
-    Task
-"""
-        variables: dict[str, builtins.object] = {}
-        _input: dict[str, builtins.object] = {}
-        _input['task'] = task
-        variables['input'] = _input
-        return (await self.aexecute(InterruptMutation, variables)).interrupt
-
-    def interrupt(self, task: IDCoercible) -> Task:
-        """interrupt 
-
-Interrupt the execution of a task.
-
-Args:
-    task: The task ID to interrupt
-
-Returns:
-    Task
-"""
-        variables: dict[str, builtins.object] = {}
-        _input: dict[str, builtins.object] = {}
-        _input['task'] = task
-        variables['input'] = _input
-        return self.execute(InterruptMutation, variables).interrupt
-
-    async def apause(self, task: IDCoercible) -> Task:
-        """pause 
-
-Pause an ongoing task.
-
-Args:
-    task: The task ID to pause
-
-Returns:
-    Task
-"""
-        variables: dict[str, builtins.object] = {}
-        _input: dict[str, builtins.object] = {}
-        _input['task'] = task
-        variables['input'] = _input
-        return (await self.aexecute(PauseMutation, variables)).pause
-
-    def pause(self, task: IDCoercible) -> Task:
-        """pause 
-
-Pause an ongoing task.
-
-Args:
-    task: The task ID to pause
-
-Returns:
-    Task
-"""
-        variables: dict[str, builtins.object] = {}
-        _input: dict[str, builtins.object] = {}
-        _input['task'] = task
-        variables['input'] = _input
-        return self.execute(PauseMutation, variables).pause
-
-    async def aresume(self, task: IDCoercible, step: bool) -> Task:
-        """resume 
-
-Resume a paused task.
-
-Args:
-    task: The task ID to resume
-    step: Resume only until the next breakpoint instead of running on freely.
-
-Returns:
-    Task
-"""
-        variables: dict[str, builtins.object] = {}
-        _input: dict[str, builtins.object] = {}
-        _input['task'] = task
-        _input['step'] = step
-        variables['input'] = _input
-        return (await self.aexecute(ResumeMutation, variables)).resume
-
-    def resume(self, task: IDCoercible, step: bool) -> Task:
-        """resume 
-
-Resume a paused task.
-
-Args:
-    task: The task ID to resume
-    step: Resume only until the next breakpoint instead of running on freely.
-
-Returns:
-    Task
-"""
-        variables: dict[str, builtins.object] = {}
-        _input: dict[str, builtins.object] = {}
-        _input['task'] = task
-        _input['step'] = step
-        variables['input'] = _input
-        return self.execute(ResumeMutation, variables).resume
-
-    async def adecide(self, task: IDCoercible, approved: bool, answer: str | None | UnsetType=UNSET, values: Args | None | UnsetType=UNSET) -> Task:
-        """decide 
-
-Answer a held task. A child an agent asked for runs once approved, or ends DENIED without running; a task that holds itself carries on with the decision. Only the user the task runs for may decide, and never from the client of the agent that asked.
-
-Args:
-    task: The held task: a child an agent asked for, or a task that holds itself
-    approved: Approve (the child runs; a task's own hold carries on approved) or deny (the child ends DENIED without running; a task's own hold carries on denied)
-    answer: What the person says with the decision. A child gets it as its Assign's message; a task's own hold gets it back.
-    values: The answer through the blok a task asks with (a hold on a blok), by the blok's returns, and checked against them. Only an approved ask takes them.
-
-Returns:
-    Task
-"""
-        variables: dict[str, builtins.object] = {}
-        _input: dict[str, builtins.object] = {}
-        _input['task'] = task
-        _input['approved'] = approved
-        if answer is not UNSET:
-            _input['answer'] = answer
-        if values is not UNSET:
-            _input['values'] = values
-        variables['input'] = _input
-        return (await self.aexecute(DecideMutation, variables)).decide
-
-    def decide(self, task: IDCoercible, approved: bool, answer: str | None | UnsetType=UNSET, values: Args | None | UnsetType=UNSET) -> Task:
-        """decide 
-
-Answer a held task. A child an agent asked for runs once approved, or ends DENIED without running; a task that holds itself carries on with the decision. Only the user the task runs for may decide, and never from the client of the agent that asked.
-
-Args:
-    task: The held task: a child an agent asked for, or a task that holds itself
-    approved: Approve (the child runs; a task's own hold carries on approved) or deny (the child ends DENIED without running; a task's own hold carries on denied)
-    answer: What the person says with the decision. A child gets it as its Assign's message; a task's own hold gets it back.
-    values: The answer through the blok a task asks with (a hold on a blok), by the blok's returns, and checked against them. Only an approved ask takes them.
-
-Returns:
-    Task
-"""
-        variables: dict[str, builtins.object] = {}
-        _input: dict[str, builtins.object] = {}
-        _input['task'] = task
-        _input['approved'] = approved
-        if answer is not UNSET:
-            _input['answer'] = answer
-        if values is not UNSET:
-            _input['values'] = values
-        variables['input'] = _input
-        return self.execute(DecideMutation, variables).decide
 
     async def acollect(self, drawers: Iterable[IDCoercible]) -> tuple[str, ...]:
         """collect 
@@ -4827,7 +4539,7 @@ Returns:
         variables['input'] = _input
         return self.execute(CreateHigherOrderImplementationMutation, variables).create_higher_order_implementation
 
-    async def acreate_testcase(self, action: IDCoercible, tester: IDCoercible, is_benchmark: bool, description: str | None | UnsetType=UNSET, name: str | None | UnsetType=UNSET) -> TestCase:
+    async def acreate_testcase(self, action: IDCoercible, tester: IDCoercible, description: str | None | UnsetType=UNSET, name: str | None | UnsetType=UNSET, is_benchmark: bool | UnsetType=UNSET) -> TestCase:
         """create_testcase 
 
 Create a new test case.
@@ -4850,11 +4562,12 @@ Returns:
             _input['description'] = description
         if name is not UNSET:
             _input['name'] = name
-        _input['isBenchmark'] = is_benchmark
+        if is_benchmark is not UNSET:
+            _input['isBenchmark'] = is_benchmark
         variables['input'] = _input
         return (await self.aexecute(Create_testcaseMutation, variables)).create_test_case
 
-    def create_testcase(self, action: IDCoercible, tester: IDCoercible, is_benchmark: bool, description: str | None | UnsetType=UNSET, name: str | None | UnsetType=UNSET) -> TestCase:
+    def create_testcase(self, action: IDCoercible, tester: IDCoercible, description: str | None | UnsetType=UNSET, name: str | None | UnsetType=UNSET, is_benchmark: bool | UnsetType=UNSET) -> TestCase:
         """create_testcase 
 
 Create a new test case.
@@ -4877,7 +4590,8 @@ Returns:
             _input['description'] = description
         if name is not UNSET:
             _input['name'] = name
-        _input['isBenchmark'] = is_benchmark
+        if is_benchmark is not UNSET:
+            _input['isBenchmark'] = is_benchmark
         variables['input'] = _input
         return self.execute(Create_testcaseMutation, variables).create_test_case
 
@@ -6502,3 +6216,323 @@ Returns:
         variables: dict[str, builtins.object] = {}
         for event in self.subscribe(WatchMyTasksSubscription, variables):
             yield event.mytasks
+
+class RekuestCallerApi:
+    """Every operation of this API as a method. Generated by turms.
+
+Each method hands its operation to ``execute``, ``aexecute``, ``subscribe``, ``asubscribe`` of ``self``, which the class this one is mixed into (or a base of it) provides."""
+    __scopes__: ClassVar[tuple[str, ...]] = ('rekuest_root_call',)
+
+    async def aassign(self, args: Args, capture: bool, action: IDCoercible | None | UnsetType=UNSET, resolution: IDCoercible | None | UnsetType=UNSET, implementation: IDCoercible | None | UnsetType=UNSET, agent: IDCoercible | None | UnsetType=UNSET, action_hash: ActionHash | None | UnsetType=UNSET, interface: str | None | UnsetType=UNSET, hooks: Iterable[HookInput] | None | UnsetType=UNSET, reference: str | None | UnsetType=UNSET, dependencies: Iterable[ResolvedDependencyInput] | None | UnsetType=UNSET, step: bool | None | UnsetType=UNSET, not_before: datetime | None | UnsetType=UNSET, policy: TaskPolicy | None | UnsetType=UNSET, state_requires: Iterable[StateRequirementInput] | None | UnsetType=UNSET, space: IDCoercible | None | UnsetType=UNSET) -> Task:
+        """assign 
+
+Assign a task to an agent.
+
+Args:
+    action: The action ID to assign to
+    resolution: The resolution ID to assign to when assining to a implementation with dependencies
+    implementation: The implementation ID to assign to when directly assingint to a implementation
+    agent: The agent ID to assign to when directly assingint to a implementation
+    action_hash: The hash of the action. This is used to identify the action in the system.
+    interface: The interface of the implementation. Only ussable if you also set agent
+    hooks: The hooks of the task. This is used to identify the task in the system.
+    args: The args of the task. Its a dictionary of ports and values
+    reference: The reference of the task. This is used to identify the task in the system.
+    capture: Whether to capture the task.
+    dependencies: The dependencies of the task. This maps dependency keys to implementation IDs.
+    step: Whether the task should step. Ie. go to the next breakpoint
+    not_before: Hold the task back until then: it is persisted now but only dispatched once due. A time in the past (or none) dispatches immediately.
+    policy: Whether the work the agents ask for under this task waits for a person: ASK (the default) holds every child an agent assigns until someone approves it, AUTO runs it without asking (auto-mode). Honoured on a root only: a child always takes its parent's.
+    state_requires: What the agent's state must hold for the task to run. Refused unless the agent says it tests them, and for a state or path its declaration does not have.
+    space: The space (in the caller's organization) the run is started in: where a client draws the action's overlay over the placed agents (`Task.space`). Only a UI reads it; nothing runs differently. Honoured on a root only.
+
+Returns:
+    Task
+"""
+        variables: dict[str, builtins.object] = {}
+        _input: dict[str, builtins.object] = {}
+        if action is not UNSET:
+            _input['action'] = action
+        if resolution is not UNSET:
+            _input['resolution'] = resolution
+        if implementation is not UNSET:
+            _input['implementation'] = implementation
+        if agent is not UNSET:
+            _input['agent'] = agent
+        if action_hash is not UNSET:
+            _input['actionHash'] = action_hash
+        if interface is not UNSET:
+            _input['interface'] = interface
+        if hooks is not UNSET:
+            _input['hooks'] = hooks
+        _input['args'] = args
+        if reference is not UNSET:
+            _input['reference'] = reference
+        _input['capture'] = capture
+        if dependencies is not UNSET:
+            _input['dependencies'] = dependencies
+        if step is not UNSET:
+            _input['step'] = step
+        if not_before is not UNSET:
+            _input['notBefore'] = not_before
+        if policy is not UNSET:
+            _input['policy'] = policy
+        if state_requires is not UNSET:
+            _input['stateRequires'] = state_requires
+        if space is not UNSET:
+            _input['space'] = space
+        variables['input'] = _input
+        return (await self.aexecute(AssignMutation, variables)).assign
+
+    def assign(self, args: Args, capture: bool, action: IDCoercible | None | UnsetType=UNSET, resolution: IDCoercible | None | UnsetType=UNSET, implementation: IDCoercible | None | UnsetType=UNSET, agent: IDCoercible | None | UnsetType=UNSET, action_hash: ActionHash | None | UnsetType=UNSET, interface: str | None | UnsetType=UNSET, hooks: Iterable[HookInput] | None | UnsetType=UNSET, reference: str | None | UnsetType=UNSET, dependencies: Iterable[ResolvedDependencyInput] | None | UnsetType=UNSET, step: bool | None | UnsetType=UNSET, not_before: datetime | None | UnsetType=UNSET, policy: TaskPolicy | None | UnsetType=UNSET, state_requires: Iterable[StateRequirementInput] | None | UnsetType=UNSET, space: IDCoercible | None | UnsetType=UNSET) -> Task:
+        """assign 
+
+Assign a task to an agent.
+
+Args:
+    action: The action ID to assign to
+    resolution: The resolution ID to assign to when assining to a implementation with dependencies
+    implementation: The implementation ID to assign to when directly assingint to a implementation
+    agent: The agent ID to assign to when directly assingint to a implementation
+    action_hash: The hash of the action. This is used to identify the action in the system.
+    interface: The interface of the implementation. Only ussable if you also set agent
+    hooks: The hooks of the task. This is used to identify the task in the system.
+    args: The args of the task. Its a dictionary of ports and values
+    reference: The reference of the task. This is used to identify the task in the system.
+    capture: Whether to capture the task.
+    dependencies: The dependencies of the task. This maps dependency keys to implementation IDs.
+    step: Whether the task should step. Ie. go to the next breakpoint
+    not_before: Hold the task back until then: it is persisted now but only dispatched once due. A time in the past (or none) dispatches immediately.
+    policy: Whether the work the agents ask for under this task waits for a person: ASK (the default) holds every child an agent assigns until someone approves it, AUTO runs it without asking (auto-mode). Honoured on a root only: a child always takes its parent's.
+    state_requires: What the agent's state must hold for the task to run. Refused unless the agent says it tests them, and for a state or path its declaration does not have.
+    space: The space (in the caller's organization) the run is started in: where a client draws the action's overlay over the placed agents (`Task.space`). Only a UI reads it; nothing runs differently. Honoured on a root only.
+
+Returns:
+    Task
+"""
+        variables: dict[str, builtins.object] = {}
+        _input: dict[str, builtins.object] = {}
+        if action is not UNSET:
+            _input['action'] = action
+        if resolution is not UNSET:
+            _input['resolution'] = resolution
+        if implementation is not UNSET:
+            _input['implementation'] = implementation
+        if agent is not UNSET:
+            _input['agent'] = agent
+        if action_hash is not UNSET:
+            _input['actionHash'] = action_hash
+        if interface is not UNSET:
+            _input['interface'] = interface
+        if hooks is not UNSET:
+            _input['hooks'] = hooks
+        _input['args'] = args
+        if reference is not UNSET:
+            _input['reference'] = reference
+        _input['capture'] = capture
+        if dependencies is not UNSET:
+            _input['dependencies'] = dependencies
+        if step is not UNSET:
+            _input['step'] = step
+        if not_before is not UNSET:
+            _input['notBefore'] = not_before
+        if policy is not UNSET:
+            _input['policy'] = policy
+        if state_requires is not UNSET:
+            _input['stateRequires'] = state_requires
+        if space is not UNSET:
+            _input['space'] = space
+        variables['input'] = _input
+        return self.execute(AssignMutation, variables).assign
+
+    async def acancel(self, task: IDCoercible) -> Task:
+        """cancel 
+
+Cancel an active task.
+
+Args:
+    task: The task ID to cancel
+
+Returns:
+    Task
+"""
+        variables: dict[str, builtins.object] = {}
+        _input: dict[str, builtins.object] = {}
+        _input['task'] = task
+        variables['input'] = _input
+        return (await self.aexecute(CancelMutation, variables)).cancel
+
+    def cancel(self, task: IDCoercible) -> Task:
+        """cancel 
+
+Cancel an active task.
+
+Args:
+    task: The task ID to cancel
+
+Returns:
+    Task
+"""
+        variables: dict[str, builtins.object] = {}
+        _input: dict[str, builtins.object] = {}
+        _input['task'] = task
+        variables['input'] = _input
+        return self.execute(CancelMutation, variables).cancel
+
+    async def ainterrupt(self, task: IDCoercible) -> Task:
+        """interrupt 
+
+Interrupt the execution of a task.
+
+Args:
+    task: The task ID to interrupt
+
+Returns:
+    Task
+"""
+        variables: dict[str, builtins.object] = {}
+        _input: dict[str, builtins.object] = {}
+        _input['task'] = task
+        variables['input'] = _input
+        return (await self.aexecute(InterruptMutation, variables)).interrupt
+
+    def interrupt(self, task: IDCoercible) -> Task:
+        """interrupt 
+
+Interrupt the execution of a task.
+
+Args:
+    task: The task ID to interrupt
+
+Returns:
+    Task
+"""
+        variables: dict[str, builtins.object] = {}
+        _input: dict[str, builtins.object] = {}
+        _input['task'] = task
+        variables['input'] = _input
+        return self.execute(InterruptMutation, variables).interrupt
+
+    async def apause(self, task: IDCoercible) -> Task:
+        """pause 
+
+Pause an ongoing task.
+
+Args:
+    task: The task ID to pause
+
+Returns:
+    Task
+"""
+        variables: dict[str, builtins.object] = {}
+        _input: dict[str, builtins.object] = {}
+        _input['task'] = task
+        variables['input'] = _input
+        return (await self.aexecute(PauseMutation, variables)).pause
+
+    def pause(self, task: IDCoercible) -> Task:
+        """pause 
+
+Pause an ongoing task.
+
+Args:
+    task: The task ID to pause
+
+Returns:
+    Task
+"""
+        variables: dict[str, builtins.object] = {}
+        _input: dict[str, builtins.object] = {}
+        _input['task'] = task
+        variables['input'] = _input
+        return self.execute(PauseMutation, variables).pause
+
+    async def aresume(self, task: IDCoercible, step: bool | UnsetType=UNSET) -> Task:
+        """resume 
+
+Resume a paused task.
+
+Args:
+    task: The task ID to resume
+    step: Resume only until the next breakpoint instead of running on freely.
+
+Returns:
+    Task
+"""
+        variables: dict[str, builtins.object] = {}
+        _input: dict[str, builtins.object] = {}
+        _input['task'] = task
+        if step is not UNSET:
+            _input['step'] = step
+        variables['input'] = _input
+        return (await self.aexecute(ResumeMutation, variables)).resume
+
+    def resume(self, task: IDCoercible, step: bool | UnsetType=UNSET) -> Task:
+        """resume 
+
+Resume a paused task.
+
+Args:
+    task: The task ID to resume
+    step: Resume only until the next breakpoint instead of running on freely.
+
+Returns:
+    Task
+"""
+        variables: dict[str, builtins.object] = {}
+        _input: dict[str, builtins.object] = {}
+        _input['task'] = task
+        if step is not UNSET:
+            _input['step'] = step
+        variables['input'] = _input
+        return self.execute(ResumeMutation, variables).resume
+
+    async def adecide(self, task: IDCoercible, approved: bool, answer: str | None | UnsetType=UNSET, values: Args | None | UnsetType=UNSET) -> Task:
+        """decide 
+
+Answer a held task. A child an agent asked for runs once approved, or ends DENIED without running; a task that holds itself carries on with the decision. Only the user the task runs for may decide, and never from the client of the agent that asked.
+
+Args:
+    task: The held task: a child an agent asked for, or a task that holds itself
+    approved: Approve (the child runs; a task's own hold carries on approved) or deny (the child ends DENIED without running; a task's own hold carries on denied)
+    answer: What the person says with the decision. A child gets it as its Assign's message; a task's own hold gets it back.
+    values: The answer through the blok a task asks with (a hold on a blok), by the blok's returns, and checked against them. Only an approved ask takes them.
+
+Returns:
+    Task
+"""
+        variables: dict[str, builtins.object] = {}
+        _input: dict[str, builtins.object] = {}
+        _input['task'] = task
+        _input['approved'] = approved
+        if answer is not UNSET:
+            _input['answer'] = answer
+        if values is not UNSET:
+            _input['values'] = values
+        variables['input'] = _input
+        return (await self.aexecute(DecideMutation, variables)).decide
+
+    def decide(self, task: IDCoercible, approved: bool, answer: str | None | UnsetType=UNSET, values: Args | None | UnsetType=UNSET) -> Task:
+        """decide 
+
+Answer a held task. A child an agent asked for runs once approved, or ends DENIED without running; a task that holds itself carries on with the decision. Only the user the task runs for may decide, and never from the client of the agent that asked.
+
+Args:
+    task: The held task: a child an agent asked for, or a task that holds itself
+    approved: Approve (the child runs; a task's own hold carries on approved) or deny (the child ends DENIED without running; a task's own hold carries on denied)
+    answer: What the person says with the decision. A child gets it as its Assign's message; a task's own hold gets it back.
+    values: The answer through the blok a task asks with (a hold on a blok), by the blok's returns, and checked against them. Only an approved ask takes them.
+
+Returns:
+    Task
+"""
+        variables: dict[str, builtins.object] = {}
+        _input: dict[str, builtins.object] = {}
+        _input['task'] = task
+        _input['approved'] = approved
+        if answer is not UNSET:
+            _input['answer'] = answer
+        if values is not UNSET:
+            _input['values'] = values
+        variables['input'] = _input
+        return self.execute(DecideMutation, variables).decide

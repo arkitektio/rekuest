@@ -94,6 +94,7 @@
                         "AgentProbeInput",
                         "ArgPortInput",
                         "AssetInput",
+                        "AskBlokInput",
                         "AssetKind",
                         "AssignWidgetInput",
                         "BlokDemoInput",
@@ -118,6 +119,7 @@
                         "EffectKind",
                         "ImplementAgentInput",
                         "ImplementationInput",
+                        "InformBlokInput",
                         "LockDefinitionInput",
                         "LockImplementationInput",
                         "OptimisticInput",
@@ -190,7 +192,9 @@
             "additional_config": {},
             "class_fields": [],
             "force_plugin_order": true,
-            "omitted_document_rules": [],
+            "omitted_document_rules": [
+                "no_unused_fragments"
+            ],
             "parsers": [],
             "plugins": [
                 {
@@ -202,6 +206,7 @@
                 {
                     "type": "turms.plugins.client.ClientPlugin",
                     "client_class": "RekuestApi",
+                    "documents": "graphql/[!c]*/**/*.graphql",
                     "client_fields": [
                         {
                             "name": "__scopes__",
@@ -216,6 +221,30 @@
                     ],
                     "reserved_from": [
                         "rekuest.client.client.Rekuest"
+                    ],
+                    "coercible_scalars": {
+                        "SearchQuery": "rekuest.scalars.SearchQueryCoercible",
+                        "ID": "rath.scalars.IDCoercible"
+                    },
+                    "expand_input_types": [
+                        "input"
+                    ]
+                },
+                {
+                    "type": "turms.plugins.client.ClientPlugin",
+                    "client_class": "RekuestCallerApi",
+                    "documents": "graphql/[cf]*/**/*.graphql",
+                    "client_fields": [
+                        {
+                            "name": "__scopes__",
+                            "kind": "tuple[str, ...]",
+                            "collector": {
+                                "type": "root_field_directive",
+                                "directive": "auth",
+                                "argument": "required_scopes"
+                            },
+                            "combine": "union"
+                        }
                     ],
                     "coercible_scalars": {
                         "SearchQuery": "rekuest.scalars.SearchQueryCoercible",
