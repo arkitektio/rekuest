@@ -27,6 +27,8 @@ authentikate:
       client_app: test
       client_release: v0.0.1
       client_id: test
+      scope: openid profile email rekuest_all
+      roles: [rekuest_admin]
     atest_token:
       sub: 2
       iss: lok
@@ -35,6 +37,8 @@ authentikate:
       client_app: atest
       client_release: v0.0.1
       client_id: atest
+      scope: openid profile email rekuest_all
+      roles: [rekuest_admin]
     btest_token:
       sub: 3
       iss: lok
@@ -43,6 +47,8 @@ authentikate:
       client_app: btest
       client_release: v0.0.1
       client_id: btest
+      scope: openid profile email rekuest_all
+      roles: [rekuest_admin]
     workflow_token:
       sub: 4
       iss: lok
@@ -51,6 +57,8 @@ authentikate:
       client_app: workflow
       client_release: v0.0.1
       client_id: workflow
+      scope: openid profile email rekuest_all
+      roles: [rekuest_admin]
     # The same person as workflow_token, from another client: who decides what the
     # workflow's agent asked for (that agent's own client may never decide it).
     workflow_decider_token:
@@ -61,6 +69,8 @@ authentikate:
       client_app: workflow_decider
       client_release: v0.0.1
       client_id: workflow_decider
+      scope: openid profile email rekuest_all
+      roles: [rekuest_admin]
     standalone_token:
       sub: 5
       iss: lok
@@ -69,6 +79,8 @@ authentikate:
       client_app: standalone
       client_release: v0.0.1
       client_id: standalone
+      scope: openid profile email rekuest_all
+      roles: [rekuest_admin]
     # The durable workflow test's agent, killed and restarted mid-task. Its own app so
     # that no other test's agent competes for its lease.
     durable_token:
@@ -79,6 +91,8 @@ authentikate:
       client_app: durable
       client_release: v0.0.1
       client_id: durable
+      scope: openid profile email rekuest_all
+      roles: [rekuest_admin]
     # The same person as durable_token, from another client: who approves the durable
     # workflow's hold (an agent's own client may never decide what it asked for).
     durable_decider_token:
@@ -89,17 +103,21 @@ authentikate:
       client_app: decider
       client_release: v0.0.1
       client_id: durable_decider
+      scope: openid profile email rekuest_all
+      roles: [rekuest_admin]
     # A member of the organization without the admin role a static token otherwise
-    # carries: what an admin may do that a member may not is tested against it.
+    # carries (an editor, as a member writing anything is): what an admin may do that a
+    # member may not is tested against it.
     member_token:
       sub: 7
       iss: lok
       active_org: test
-      roles: []
+      roles: [rekuest_editor]
       client_device: member_device
       client_app: member
       client_release: v0.0.1
       client_id: member
+      scope: openid profile email rekuest_all
 lok:
   issuer: lok
   key_type: RS256
@@ -151,7 +169,7 @@ instance:
     -----END PRIVATE KEY-----
 scopes:
   rekuest_agent: Act as an agent
-  rekuest_call: Call other apps with rekuest
+  rekuest_root_call: Start other apps' actions with rekuest
 
 # What the hub's services host. A port may only constrain a descriptor key some
 # service declares (takt refuses the registration otherwise), so the keys the tests

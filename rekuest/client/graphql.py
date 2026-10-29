@@ -15,12 +15,13 @@ from koil import unkoil, unkoil_gen
 from rath.origin import origin_context
 from rath.turms.funcs import TOperation
 
-from rekuest.api.schema import RekuestApi
+from rekuest.api.schema import RekuestApi, RekuestCallerApi
 from rekuest.client.rath import RekuestRath
 
 
-class RekuestGraphQL(RekuestApi):
-    """``RekuestApi`` over a given rath."""
+class RekuestGraphQL(RekuestApi, RekuestCallerApi):
+    """``RekuestApi`` over a given rath, with the root-call operations the postman sends
+    (``RekuestCallerApi``): it serves only a caller client's postman."""
 
     def __init__(self, rath: RekuestRath) -> None:
         self.rath = rath

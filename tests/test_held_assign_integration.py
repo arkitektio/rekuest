@@ -190,7 +190,8 @@ async def test_the_prompt_the_agent_writes_is_shown_on_the_held_child(deployment
             target[0], printer="p", prompt=AssignPrompt(title="Stitch it", description="The room asked for a poster.")
         )
 
-    workflow_app.register_workflow(explains)
+    # It calls the provider's action by name (found at run time), not through a dependency.
+    workflow_app.register_workflow(explains, dynamic_calls=True)
     async with provider as provider, workflow_app as workflow_app, decider as decider:
         await provider.aconnect(timeout=CONNECT_TIMEOUT)
         loops = [asyncio.create_task(provider.aloop())]
