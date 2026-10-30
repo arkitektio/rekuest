@@ -2,12 +2,10 @@
 
 Registration itself is the transport handshake; what the control plane owns is the
 bookkeeping ``Init`` carries. Shelving is the agent's own (numbered frames nothing
-answers); an older server's replies to it are ignored.
+answers).
 """
 
-import logging
 
-import pytest
 
 from arkitekt_runtime import messages
 from rekuest.agents.control import SocketControlPlane
@@ -23,12 +21,3 @@ def test_handle_init_records_the_agent_and_its_hash() -> None:
 
     assert plane.acknowledged
     assert plane.agent_id == "agent-1" and plane.server_hash == "h1"
-
-
-def test_an_older_servers_shelve_replies_are_ignored(caplog: pytest.LogCaptureFixture) -> None:
-    sink = MemoryAgentTransport()
-    plane = SocketControlPlane(sink)
-    with caplog.at_level(logging.WARNING):
-        plane.handle_shelve_reply(messages.Shelved(ref="r", drawer="d"))
-        plane.handle_shelve_reply(messages.Unshelved(ref="r", error="unknown drawer"))
-    assert not sink.sent and not caplog.records

@@ -7,18 +7,14 @@ definition hash the backend assigned, which is what
 :class:`~rekuest.agents.backend.SocketAgentBackend` reports.
 
 Shelving is not here any more: the agent mints its drawers' ids itself and records them
-as numbered ``SHELVE``/``UNSHELVE`` frames, which nothing answers (``JOURNAL_ACK`` covers
-them). An older server's ``Shelved``/``Unshelved`` replies are ignored.
+as ``SHELVE``/``UNSHELVE`` frames, which nothing answers (``JOURNAL_ACK`` covers them).
 """
 
 from __future__ import annotations
 
-import logging
 
 from arkitekt_runtime import messages
 from arkitekt_runtime.agents.transport.types import MessageSink
-
-logger = logging.getLogger(__name__)
 
 
 class SocketControlPlane:
@@ -38,11 +34,6 @@ class SocketControlPlane:
         self.agent_id = message.agent
         self.server_hash = message.hash
         self.acknowledged = True
-
-    def handle_shelve_reply(self, message: messages.Shelved | messages.Unshelved) -> None:
-        """An older server's answer to a ``Shelve``/``Unshelve``: nothing waits on it."""
-        if message.error:
-            logger.debug("The server answered a shelving frame with an error: %s", message.error)
 
 
 __all__ = ["SocketControlPlane"]

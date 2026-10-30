@@ -63,7 +63,7 @@ async def test_init_releases_connect_and_resends_unacked_reports(
 
     The backend re-sends Init on every connection, so this is also the only notice the
     agent gets that a dropped connection was recovered. A numbered report is retained
-    until a JOURNAL_ACK covers it: an EVENT_ACK retires nothing.
+    until a JOURNAL_ACK covers it.
     """
     await agent._adispatch(messages.SessionInit(session_id="s", states={}))
     agent.journal.begin_task("task-1")
@@ -79,10 +79,6 @@ async def test_init_releases_connect_and_resends_unacked_reports(
     resent = transport.of_type(messages.Completed)
     assert len(resent) == 2, "the unacked report must be resent on the new connection"
     assert resent[1] == resent[0], "the resend is the frame as it was (seq, pos, step)"
-
-    transport.feed(messages.EventAck(event=completed[0].id))
-    await _pump(agent, 1)
-    assert agent.retained, "only a JOURNAL_ACK retires a numbered frame"
 
     transport.feed(messages.JournalAck(journal_session="s", pos=2))
     await _pump(agent, 1)

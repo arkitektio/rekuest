@@ -117,8 +117,7 @@ async def test_every_numbered_frame_is_retained_until_a_journal_ack_and_resent_i
     assert [m.pos for m in transport.sent] == [2, 3, 4]  # type: ignore[union-attr]
     assert transport.sent == [first_sent[p] for p in (2, 3, 4)]
 
-    # The terminal report too retires on the JOURNAL_ACK alone.
-    await _process(agent, messages.EventAck(event=first_sent[4].id))
+    # The terminal report too retires on the JOURNAL_ACK.
     assert [m.pos for m in agent.retained] == [2, 3, 4]  # type: ignore[union-attr]
     await _process(agent, messages.JournalAck(journal_session="s", pos=4))
     assert not agent.retained

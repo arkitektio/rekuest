@@ -128,7 +128,7 @@ for the distributed agent (`rekuest.agents.agent.RekuestAgent`):
   `ASSIGN_REQUEST {parent: task, parent_step: step}` (the `reference` stays the caller's own;
   the server stores the step as the child's `parent_step`, idempotent on `(parent, parent_step)`). A probe's (`p-…`) reports are never numbered.
 - Every numbered frame is retained until a cumulative `JOURNAL_ACK` covers it (terminal
-  reports too; `EVENT_ACK` is ignored), in a SQLite file (`$REKUEST_JOURNAL_PATH`, else
+  reports too), in a SQLite file (`$REKUEST_JOURNAL_PATH`, else
   `.arkitekt/rekuest_journal.db`) so it survives a restart. A new session never drops an
   earlier one's frames.
 - Nothing is sent between `REGISTER` and `INIT`. After `INIT` the retained frames go out

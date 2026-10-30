@@ -391,19 +391,14 @@ class RekuestAgent(BaseAgent):
     # ------------------------------------------------------------------ inbound
 
     async def _aprocess_runtime_message(self, message: messages.ToAgentMessage) -> None:
-        """The socket protocol: acks, caller answers, older servers' shelve replies."""
+        """The socket protocol: acks and caller answers."""
         if isinstance(message, messages.JournalAck):
             self._journal_ack(message.journal_session, message.pos)
-        elif isinstance(message, messages.EventAck):
-            # Legacy: numbered frames retire on JOURNAL_ACK alone.
-            logger.debug("Ignoring %s", message)
         elif isinstance(
             message,
             (messages.AssignResponse, messages.ProbeResponse, messages.StateRevisionResponse, messages.ExecutionEvent),
         ):
             self._process_caller_message(message)
-        elif isinstance(message, (messages.Shelved, messages.Unshelved)):
-            self.control_plane.handle_shelve_reply(message)
         elif isinstance(message, messages.ControlResponse):
             # Acknowledgement of a fire-and-forget cancel/interrupt request; the
             # outcome is observed through the task's own event mirrors instead.

@@ -177,8 +177,6 @@ async def test_put_on_shelve_is_one_frame_and_waits_for_no_reply() -> None:
     assert sent.identifier == "@test/thing" and sent.label == str(value)
     assert agent.shelve[resource_id] is value
 
-    # An older server's reply changes nothing.
-    transport.feed(messages.Shelved(ref=sent.ref, drawer="drawer-1"))
     transport.feed(messages.Collect(drawers=[resource_id]))
     await _until(lambda: transport.of_type(messages.Unshelve))
     assert "drawer-1" not in agent.shelve and resource_id not in agent.shelve
@@ -197,8 +195,6 @@ async def test_collect_drops_the_drawer_and_sends_unshelve() -> None:
     (sent,) = transport.of_type(messages.Unshelve)
     assert sent.drawer == "drawer-1" and "drawer-1" not in agent.shelve
 
-    # An error on the answer is logged; the loop keeps serving.
-    transport.feed(messages.Unshelved(ref=sent.ref, error="unknown drawer"))
     transport.feed(messages.Collect(drawers=["drawer-2"]))
     await _until(lambda: len(transport.of_type(messages.Unshelve)) == 2)
     assert "drawer-2" not in agent.shelve
