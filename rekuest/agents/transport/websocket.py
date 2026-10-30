@@ -429,6 +429,7 @@ class WebsocketAgentTransport(AgentTransport):
                                 session_id=handshake.session_id,
                                 supervisor=handshake.supervisor,
                                 features=handshake.features,
+                                hardware=handshake.hardware,
                                 **declaration,
                             ).model_dump_json()
                         )
