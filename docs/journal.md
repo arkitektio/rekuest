@@ -146,3 +146,12 @@ successor under the same agent name and journal path adds it before the task run
 (`RekuestAgent._complete_resume`): the task's unsent `EFFECT` frames join the replay, and their
 steps count, so no step is numbered twice. The frames are resent after `INIT` as usual; the server
 keeps one value per effect key, so the resend changes nothing.
+
+## Persisted states are not the journal
+
+Acked frames are deleted, so the journal on disk does not hold the last state. A state declared `@app.state(persist=...)` is kept apart, in `rekuest_state.db` beside the journal: one row per state (`rekuest/agents/persisted_state.py`), and no file at all when no state opts in. A startup hook of the next run takes it as `old: SomeState | None`; taking a state without `persist` is refused when the hook is declared.
+
+- `persist="synchronous"` writes and fsyncs every change on the event loop. `persist=<seconds>` writes at most once per period, off the loop, and a clean exit writes the last value.
+- It is `None` on a first run, after a version bump (rows are scoped by agent name, which carries the version), when the state's ports changed, and when a structure in it cannot be fetched any more.
+- It is the last value the agent persisted, not what the hardware did.
+- The journal file itself runs `synchronous=NORMAL`: its frames survive a killed process, but a power cut can roll back recent commits. After an outage, the resent frames and an old state can therefore be at different points.

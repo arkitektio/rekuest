@@ -17,6 +17,8 @@ means something against a Rekuest server over its websocket:
 """
 
 import asyncio
+import contextlib
+import json
 import logging
 import time
 from collections.abc import Awaitable, Callable, Sequence
@@ -33,6 +35,12 @@ from arkitekt_spec.declare.agents.types import AppContext
 from rekuest.agents.backend import SocketAgentBackend
 from rekuest.agents.caller import AgentPostman
 from rekuest.agents.control import SocketControlPlane
+from rekuest.agents.persisted_state import (
+    PersistedStates,
+    StoredState,
+    schema_hash,
+    state_store_path,
+)
 from rekuest.agents.retention import RetainedFrames, default_journal_path
 
 logger = logging.getLogger(__name__)
@@ -74,6 +82,16 @@ class RekuestAgent(BaseAgent):
     _session_created: dict[str, float] = PrivateAttr(default_factory=dict)
     """When each session with retained frames was created (orders the resend)."""
     _store: RetainedFrames | None = PrivateAttr(default=None)
+    _state_store: PersistedStates | None = PrivateAttr(default=None)
+    """Only when a state opts in with ``persist=``."""
+    _state_policies: dict[str, Any] = PrivateAttr(default_factory=dict)
+    """Each persisted state's ``persist``, by state."""
+    _state_hashes: dict[str, str] = PrivateAttr(default_factory=dict)
+    _previous_states: dict[str, Any] = PrivateAttr(default_factory=dict)
+    """What earlier runs persisted, read before this run can overwrite it."""
+    _dirty_states: set[str] = PrivateAttr(default_factory=set)
+    _state_flushers: list["asyncio.Task[None]"] = PrivateAttr(default_factory=list)
+    _state_flush_stop: asyncio.Event | None = PrivateAttr(default=None)
     _after_registration_task: "asyncio.Task[None] | None" = PrivateAttr(default=None)
 
     @property
@@ -188,6 +206,7 @@ class RekuestAgent(BaseAgent):
         await super().astart(app_context)
         self._open_store()
         self._know_session(self.current_session)
+        self._open_state_store()
 
     def _retain_emitted(
         self, message: messages.FromAgentMessage, entry: JournalEntry | None
@@ -201,6 +220,7 @@ class RekuestAgent(BaseAgent):
             self._open_store().add(entry.session_id, entry.pos, message.model_dump_json())
         except Exception:  # noqa: BLE001 — memory still has it; report the loss of durability
             logger.error("Could not persist frame %s/%s", entry.session_id, entry.pos, exc_info=True)
+        self._note_state_change(message)
 
     def _journal_ack(self, session: str, pos: int) -> None:
         """Everything of ``session`` up to ``pos`` is projected by the server."""
@@ -243,6 +263,130 @@ class RekuestAgent(BaseAgent):
         for report in reports:
             await self.transport.asend(report)
         return True
+
+    # ------------------------------------------------------- persisted states
+
+    def _open_state_store(self) -> None:
+        """Read what earlier runs persisted, if a state opted in, and start its flushing."""
+        if self._state_store is not None:
+            return
+        registry = self.app_registry
+        policies = {
+            interface: registry.structure_registry.state_for(cls).persist
+            for interface, cls in registry.state_interface_classes.items()
+        }
+        policies = {interface: policy for interface, policy in policies.items() if policy is not None}
+        if not policies:
+            return
+        if self.journal_path in (None, ":memory:"):
+            logger.error(
+                "The states %s are declared persist=, but this agent keeps no journal file "
+                "to put them beside: they are not persisted",
+                sorted(policies),
+            )
+            return
+        try:
+            store = PersistedStates(state_store_path(self.journal_path), agent=self.name or "")
+            stored = store.load()
+        except Exception:  # noqa: BLE001 — an unwritable path must not stop the agent
+            logger.error("Could not open the persisted states; they are not persisted", exc_info=True)
+            return
+
+        self._state_store = store
+        self._state_policies = policies
+        self._state_hashes = {
+            interface: schema_hash(self._collected_state_schemas[interface]) for interface in policies
+        }
+        self._previous_states = {}
+        for interface, state in stored.items():
+            if interface not in policies:
+                continue
+            if state.schema_hash != self._state_hashes[interface]:
+                logger.warning(
+                    "The persisted state %s has other ports than the state now; starting without it",
+                    interface,
+                )
+                continue
+            self._previous_states[interface] = json.loads(state.value)
+
+        self._state_flush_stop = asyncio.Event()
+        self._state_flushers = [
+            asyncio.create_task(self._aflush_state_loop(interface, policy, self._state_flush_stop))
+            for interface, policy in policies.items()
+            if not isinstance(policy, str)
+        ]
+
+    async def aload_previous_states(self) -> dict[str, Any]:
+        """What earlier runs persisted, shrunk, of the states whose ports are unchanged."""
+        return self._previous_states
+
+    def _note_state_change(self, message: messages.FromAgentMessage) -> None:
+        """A persisted state changed: write it (``"synchronous"``), or leave it to its flusher."""
+        if self._state_store is None:
+            return
+        if isinstance(message, messages.StatePatch):
+            changed = [message.state_name]
+        elif isinstance(message, messages.SessionInit):
+            changed = list(self._state_policies)
+        else:
+            # A snapshot says nothing a patch did not.
+            return
+        for interface in changed:
+            policy = self._state_policies.get(interface)
+            if policy is None:
+                continue
+            self._dirty_states.add(interface)
+            if policy == "synchronous":
+                state = self._take_dirty_state(interface)
+                if state is not None:
+                    self._write_state(state)
+
+    def _take_dirty_state(self, interface: str) -> StoredState | None:
+        """A state's value to write, if it changed. Serialized here, on the loop, where
+        the agent changes it."""
+        if interface not in self._dirty_states:
+            return None
+        self._dirty_states.discard(interface)
+        shrunk = self._current_shrunk_states.get(interface)
+        if shrunk is None:
+            return None
+        return StoredState(
+            state_name=interface,
+            schema_hash=self._state_hashes[interface],
+            session_id=self.current_session,
+            global_rev=self.global_revision,
+            value=json.dumps(shrunk),
+        )
+
+    def _write_state(self, state: StoredState) -> None:
+        store = self._state_store
+        if store is None:
+            return
+        try:
+            store.put(state)
+        except Exception:  # noqa: BLE001 — the agent runs on; report the loss of durability
+            logger.error("Could not persist the state %s", state.state_name, exc_info=True)
+
+    async def _aflush_state_loop(self, interface: str, period: float, stop: asyncio.Event) -> None:
+        """Write a state at most once per ``period``. Ends on ``stop``, after a last write,
+        and is not cancelled: a write under way is not abandoned, to land after a newer one."""
+        while not stop.is_set():
+            with contextlib.suppress(TimeoutError):
+                await asyncio.wait_for(stop.wait(), timeout=period)
+            state = self._take_dirty_state(interface)
+            if state is not None:
+                await asyncio.to_thread(self._write_state, state)
+
+    async def _aclose_state_store(self) -> None:
+        """A clean exit keeps the exact last value."""
+        if self._state_flush_stop is not None:
+            self._state_flush_stop.set()
+        flushers, self._state_flushers = self._state_flushers, []
+        if flushers:
+            await asyncio.gather(*flushers, return_exceptions=True)
+        store, self._state_store = self._state_store, None
+        if store is not None:
+            store.close()
 
     # ------------------------------------------------------------------ inbound
 
@@ -372,6 +516,7 @@ class RekuestAgent(BaseAgent):
         try:
             await super().atear_down()
         finally:
+            await self._aclose_state_store()
             store, self._store = self._store, None
             if store is not None:
                 store.close()
