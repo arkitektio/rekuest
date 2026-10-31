@@ -85,11 +85,8 @@ projects:
               - StateImplementationInput
               - StringAssignWidgetInput
               - TestTargetInput
-              - TrackInput
               - UtilCallInput
               - ValidatorInput
-              - WindowFunction
-              - WindowInput
           - module: arkitekt_runtime.types
             kinds: [enum, input]
             include: &runtime_protocol

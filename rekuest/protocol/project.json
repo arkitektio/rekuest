@@ -141,11 +141,8 @@
                         "StateImplementationInput",
                         "StringAssignWidgetInput",
                         "TestTargetInput",
-                        "TrackInput",
                         "UtilCallInput",
-                        "ValidatorInput",
-                        "WindowFunction",
-                        "WindowInput"
+                        "ValidatorInput"
                     ],
                     "from_project": null
                 },
