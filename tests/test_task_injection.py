@@ -250,7 +250,7 @@ def test_actor_kwargs_carry_every_derived_field() -> None:
 
     details = derive_implementation_details(f, RegisterConfig())
     # Not actor state: they describe the registration, not the running actor.
-    registration_only = {"tracks", "manipulates"}
+    registration_only = {"manipulates"}
     fields = {f.name for f in dataclasses.fields(ImplementationDetails)}
     assert set(details.actor_kwargs()) == fields - registration_only
     assert details.actor_kwargs()["injected_variables"].task_variables == ["task"]
