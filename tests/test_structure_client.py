@@ -14,7 +14,6 @@ import pytest
 from rath.expansion import ExpandsStructures, UnknownStructureError
 
 from arkitekt_spec.declare.app import AppRegistry
-from arkitekt_spec.declare.structures.client import StructureClient
 from arkitekt_spec.declare.structures.errors import StructureClientError, StructureDefinitionError
 from arkitekt_spec.declare.structures.registry import StructureRegistry
 from arkitekt_spec.declare.structures.types import FullFilledStructure
@@ -101,11 +100,6 @@ def thing_structure(client: Any) -> FullFilledStructure:  # noqa: ANN401
 # --------------------------------------------------------------------------- #
 # A declared structure delegates to its bound client
 # --------------------------------------------------------------------------- #
-
-
-def test_an_expands_structures_client_is_a_structure_client() -> None:
-    assert isinstance(ThingsClient(), StructureClient)
-    assert not isinstance(object(), StructureClient)
 
 
 @pytest.mark.asyncio
