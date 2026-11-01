@@ -327,5 +327,5 @@ async def test_register_carries_the_supervisor_outside_the_declaration() -> None
     assert plain_handshake.declaration is not None and handshake.declaration is not None
     assert plain_handshake.declaration.hash == handshake.declaration.hash
 
-    frame = messages.Register(token="t", supervisor="plugin_engine").model_dump()
+    frame = messages.Register(token="t", spec_version="8.0.0", supervisor="plugin_engine").model_dump()
     assert frame["supervisor"] == "plugin_engine"

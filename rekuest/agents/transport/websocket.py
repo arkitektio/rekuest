@@ -425,6 +425,7 @@ class WebsocketAgentTransport(AgentTransport):
                         await client.send(
                             messages.Register(
                                 token=token,
+                                spec_version=handshake.spec_version,
                                 force=bool(handshake.force),
                                 session_id=handshake.session_id,
                                 supervisor=handshake.supervisor,
