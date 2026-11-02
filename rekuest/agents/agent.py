@@ -22,7 +22,7 @@ import json
 import logging
 import time
 from collections.abc import Awaitable, Callable, Sequence
-from typing import Annotated, Any, ClassVar, Optional
+from typing import Annotated, Any, ClassVar
 
 from pydantic import Field, PrivateAttr, TypeAdapter
 from rath.task import task_scope
@@ -76,7 +76,7 @@ class RekuestAgent(BaseAgent):
     """Tells the transport to send nothing between ``Register`` and ``Init``: after
     ``Init`` the agent first re-sends what the server may be missing."""
 
-    _control_plane: Optional["SocketControlPlane"] = PrivateAttr(default=None)
+    _control_plane: "SocketControlPlane | None" = PrivateAttr(default=None)
     _retained: dict[RetainedKey, messages.FromAgentMessage] = PrivateAttr(default_factory=dict)
     """Numbered frames no ``JournalAck`` covered yet, every session's."""
     _session_created: dict[str, float] = PrivateAttr(default_factory=dict)
