@@ -344,7 +344,7 @@ class AgentPostman:
         self._pending_responses[request.id] = response_future
 
         task: str | None = None
-        queue: "asyncio.Queue[messages.ExecutionEvent]" | None = None
+        queue: "asyncio.Queue[messages.ExecutionEvent] | None" = None
         try:
             await self.sink.asend(request)
             response = await response_future
