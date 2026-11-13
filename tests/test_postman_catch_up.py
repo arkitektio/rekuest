@@ -166,6 +166,71 @@ async def test_a_call_made_once_the_feed_is_subscribed_reads_nothing() -> None:
 
 
 @pytest.mark.asyncio
+async def test_an_event_a_subscribed_feed_dropped_is_read_once_the_feed_is_quiet() -> None:
+    """The feed delivers at most once: the end of a task it dropped is in the task's history."""
+    backend = _backend()
+    backend.quiet_interval = 0.02
+    async with backend:
+        first = asyncio.create_task(_call(backend))
+        await backend._assigned.wait()
+        backend.reports(_event(1, TaskEventKind.COMPLETED), on_feed=True)
+        await asyncio.wait_for(first, timeout=1)
+        backend._reads.clear()
+
+        second = asyncio.create_task(_call(backend))
+        await asyncio.sleep(0)
+        backend.reports(_event(2, task="t2"), on_feed=True)
+        backend.reports(_event(3, task="t2"), on_feed=False)
+        backend.reports(_event(4, TaskEventKind.COMPLETED, task="t2"), on_feed=False)
+
+        assert await asyncio.wait_for(second, timeout=1) == ["e2", "e3", "e4"]
+        assert backend._reads == ["t2"], "one read once the feed went quiet"
+
+
+@pytest.mark.asyncio
+async def test_a_result_the_feed_dropped_is_handed_on_before_the_end_of_its_run() -> None:
+    """A run that ends on the feed without a result is looked up: it may have had one."""
+    backend = _backend()
+    async with backend:
+        first = asyncio.create_task(_call(backend))
+        await backend._assigned.wait()
+        backend.reports(_event(1), on_feed=True)
+        backend.reports(_event(2, TaskEventKind.COMPLETED), on_feed=True)
+        await asyncio.wait_for(first, timeout=1)
+        backend._reads.clear()
+
+        second = asyncio.create_task(_call(backend))
+        await asyncio.sleep(0)
+        backend.reports(_event(3, TaskEventKind.PROGRESS, task="t2"), on_feed=True)
+        backend.reports(_event(4, task="t2"), on_feed=False)
+        backend.reports(_event(5, TaskEventKind.COMPLETED, task="t2"), on_feed=True)
+
+        assert await asyncio.wait_for(second, timeout=1) == ["e3", "e4", "e5"]
+        assert backend._reads == ["t2"]
+
+
+@pytest.mark.asyncio
+async def test_a_quiet_task_is_read_ever_less_often_and_nothing_twice() -> None:
+    backend = _backend()
+    backend.quiet_interval = 0.01
+    async with backend:
+        first = asyncio.create_task(_call(backend))
+        await backend._assigned.wait()
+        backend.reports(_event(1, TaskEventKind.COMPLETED), on_feed=True)
+        await asyncio.wait_for(first, timeout=1)
+        backend._reads.clear()
+
+        second = asyncio.create_task(_call(backend))
+        await asyncio.sleep(0)
+        backend.reports(_event(2, task="t2"), on_feed=True)
+        await asyncio.sleep(0.2)  # quiet: 0.01 + 0.02 + 0.04 + 0.08 fit, a fixed 0.01 would be twenty
+        assert 2 <= len(backend._reads) <= 5
+        backend.reports(_event(3, TaskEventKind.COMPLETED, task="t2"), on_feed=True)
+
+        assert await asyncio.wait_for(second, timeout=1) == ["e2", "e3"]
+
+
+@pytest.mark.asyncio
 async def test_a_history_that_cannot_be_read_leaves_the_call_to_the_feed() -> None:
     backend = _backend()
     backend._reads_fail = True

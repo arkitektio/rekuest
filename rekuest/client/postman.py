@@ -55,6 +55,11 @@ class GraphQLPostman(KoiledModel):
         description="Seconds until a call reads its task's events again while the change feed has delivered nothing yet (so is not known to be subscribed). Doubles with every read, up to ten times this.",
     )
 
+    quiet_interval: float = Field(
+        default=5.0,
+        description="Seconds a call waits on a subscribed change feed that brings it nothing before it reads its task's events itself. The feed delivers at most once: an event it dropped is only ever found in the task's history. Doubles with every read that finds nothing, up to twelve times this, and starts over with the next event.",
+    )
+
     _ass_update_queues: dict[str, asyncio.Queue[TaskEventChange | _FeedLost]] = PrivateAttr(
         default_factory=lambda: {}
     )
@@ -157,6 +162,26 @@ class GraphQLPostman(KoiledModel):
         for item in waiting:
             if isinstance(item, _FeedLost) or item.id not in read:
                 queue.put_nowait(item)
+
+    async def _amissed_before(
+        self, task_id: str, event: TaskEventChange, handed: set[str]
+    ) -> list[TaskEventChange]:
+        """What a task reported before ``event`` that its call was never handed, oldest first.
+
+        Nothing when the history cannot be read: the call then ends as the feed had it.
+        """
+        try:
+            history = await self._aread_events(task_id)
+        except Exception:
+            logger.warning("Could not read the events of task %s", task_id, exc_info=True)
+            return []
+        missed: list[TaskEventChange] = []
+        for reported in history:
+            if reported.id == event.id:
+                break
+            if reported.id not in handed:
+                missed.append(reported)
+        return missed
 
     async def _acatch_up_safely(self, task_id: str) -> None:
         """Catch up, and leave the call to the feed alone if that fails."""
@@ -318,14 +343,35 @@ class GraphQLPostman(KoiledModel):
                         self._acatch_up_until_live(task.id)
                     )
 
+            quiet = self.quiet_interval
+            handed: set[str] = set()
+            yielded = False
             while True:
-                signal = await queue.get()
+                try:
+                    signal = await asyncio.wait_for(queue.get(), timeout=quiet)
+                except TimeoutError:
+                    # Nothing for a while. The task may be quiet, or the feed dropped
+                    # what it reported (it delivers at most once): its history tells.
+                    await self._acatch_up_safely(task.id)
+                    quiet = min(quiet * 2, self.quiet_interval * 12)
+                    continue
+                quiet = self.quiet_interval
+                if isinstance(signal, TaskEventChange) and signal.id in handed:
+                    continue  # already handed on from the task's history
                 if isinstance(signal, _FeedLost):
                     # The change feed this call depends on is gone: no further event
                     # can ever arrive on this queue. Fail instead of waiting forever.
                     raise PostmanException(
                         f"Lost the task event feed while waiting for task {task.id}: {signal.reason}"
                     )
+                if signal.kind == TaskEventKind.COMPLETED and not yielded:
+                    # A run that ends without a result: either it has none, or the
+                    # feed dropped it. Its history tells, before the call is over.
+                    for missed in await self._amissed_before(task.id, signal, handed):
+                        handed.add(missed.id)
+                        yield missed
+                yielded = yielded or signal.kind == TaskEventKind.YIELD
+                handed.add(signal.id)
                 yield signal
                 queue.task_done()
 
