@@ -1,5 +1,17 @@
-mutation CreateSpace($input: CreateSpaceInput!) {
-  createSpace(input: $input) {
-     id
+# Keep where an agent stands in a room (a space found by a blok's `room`), for everyone; the
+# first pose kept makes the space.
+mutation SavePlacement($input: SavePlacementInput!) {
+  savePlacement(input: $input) {
+    id
+    role
+    affineMatrix
+    agent {
+      id
+    }
   }
+}
+
+# Forget where an agent was left in a room, so the blok that places it decides again.
+mutation ResetPlacement($input: ResetPlacementInput!) {
+  resetPlacement(input: $input)
 }

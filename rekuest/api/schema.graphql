@@ -84,7 +84,7 @@ type Action {
   logo: Blok
 
   """
-  The action's own bloks, at most one per context (HTML for a task panel, OVERLAY drawn into the space that hosts a run): declared with the action, the latest registration's. Not part of its hash.
+  The action's own bloks, at most one per context (HTML for a task panel, SCENE a 3D view, as a `Space` placing the run's dependencies): declared with the action, the latest registration's. Not part of its hash.
   """
   bloks: [ActionBlok!]!
 
@@ -112,6 +112,16 @@ type Action {
 
   """The triggers that run this action."""
   triggers(filters: TriggerFilter, ordering: [TriggerOrder!]! = [], pagination: OffsetPaginationInput): [Trigger!]!
+
+  """
+  The estimate in seconds for the object named in the `estimatedRuntime` filter: its fastest live implementation that fits. Null without that filter, or when it cannot be computed for this object.
+  """
+  estimatedRuntimeSeconds: Float
+
+  """
+  Whether any implementation states a `Fits`, so which agent takes a task can matter.
+  """
+  hasFits: Boolean!
 
   """
   This action's stored vector, as `<model id>:<floats>`. Null until it has been indexed.
@@ -195,7 +205,7 @@ type ActionBlok {
   blok: Blok!
 
   """
-  Where a client shows a run with it: HTML in a task panel, SCENE as a 3D view of its own, OVERLAY drawn into the space that hosts the run, over the agents placed there.
+  Where a client shows a run with it: HTML in a task panel, SCENE as a 3D view (a `Space` places the run's dependencies in a room whose layout is shared).
   """
   context: ComponentContext!
 }
@@ -205,7 +215,7 @@ An action's own blok (blok language v2): how a client shows a run of it in one c
 """
 input ActionBlokInput {
   """
-  Where a client shows the run with it: HTML in a task panel, SCENE as a 3D view of its own, OVERLAY drawn into the space that hosts the run (its root an `Overlay`).
+  Where a client shows the run with it: HTML in a task panel, SCENE as a 3D view (its root a `Scene`, or a `Space` placing the run's dependencies in a room whose layout is shared).
   """
   context: ComponentContext! = HTML
 
@@ -411,6 +421,11 @@ input ActionFilter {
   Any of these demand sets: the rows that satisfy every demand of at least one set (each set as `demands`). One statement, so prefer it to `OR`-ing `demands`, which tests every row of the organization. An empty list is ignored; an empty set is an error.
   """
   anyDemands: [[PortDemandInput!]!]
+
+  """
+  The estimate for one object, for `ActionOrder.estimatedRuntime` and `Action.estimatedRuntimeSeconds`. With `lte`, leaves out actions known to take longer: one with no estimate for this object stays.
+  """
+  estimatedRuntime: EstimatedRuntimeFilterInput
   objectDemands: [PortDemandInput!]
   protocols: [String!]
   kind: ActionKind
@@ -426,6 +441,30 @@ input ActionFilter {
 
   """Filter using app identifier"""
   appIdentifier: String
+
+  """
+  Whether any of its implementations may ask a person (a declared ask, or `dynamicAsks`). False: none ever asks.
+  """
+  asks: Boolean
+
+  """
+  Whether any of its implementations may show a person a blok (a declared inform, or `dynamicInforms`). False: none ever informs.
+  """
+  informs: Boolean
+
+  """
+  Whether any of its implementations may call other actions (a declared dependency, or `dynamicCalls`). False: none ever calls.
+  """
+  calls: Boolean
+
+  """Whether any of its implementations declares `dynamicAsks`."""
+  dynamicAsks: Boolean
+
+  """Whether any of its implementations declares `dynamicInforms`."""
+  dynamicInforms: Boolean
+
+  """Whether any of its implementations declares `dynamicCalls`."""
+  dynamicCalls: Boolean
 }
 
 """
@@ -442,6 +481,11 @@ enum ActionKind {
 input ActionOrder @oneOf {
   definedAt: Ordering
   usedAt: Ordering
+
+  """
+  Runnable first, then by the estimate for the object named in the `estimatedRuntime` filter, with no estimate last. Does nothing without that filter.
+  """
+  estimatedRuntime: Ordering
 
   """
   Runnable first (DESC) or last (ASC) by `Action.assignable`. The order the filters set (a `search`'s ranking) is kept as the tie-break, so `search` with this ordering lists runnable matches first, each group still ranked by relevance.
@@ -535,6 +579,11 @@ type Agent {
   """
   supervisor: String
 
+  """
+  The arkitekt-spec this agent said on its last registration it runs (e.g. '8.0.0'). Null for an agent that sends no REGISTER, such as a hook agent. What may be sent to it is decided by its features, not by this.
+  """
+  specVersion: String
+
   """Current and historical states associated with the agent."""
   states: [State!]!
 
@@ -578,6 +627,11 @@ type Agent {
   Agent name: the one a user gave it (updateAgent), else the one it declares.
   """
   name: String!
+
+  """
+  What this agent's machine has, as stated on its last registration; null for an agent that never said.
+  """
+  hardware: AgentHardware
 
   """Fetch a specific implementation by interface."""
   implementation(interface: String!): Implementation
@@ -795,6 +849,27 @@ input AgentFilter {
 
   """Filter based on device"""
   deviceId: ID
+}
+
+"""One GPU of an agent's machine."""
+type AgentGpu {
+  """The GPU's name."""
+  name: String!
+
+  """Its memory in MiB, if known."""
+  memoryMib: Int
+}
+
+"""What an agent's machine has. Self-declared; unknown is null."""
+type AgentHardware {
+  """The CPUs its process may use: a container's limit counts."""
+  cpuCount: Int
+
+  """The memory its process may use, in MiB: a container's limit counts."""
+  memoryMib: Int
+
+  """Its GPUs."""
+  gpus: [AgentGpu!]!
 }
 
 input AgentInput {
@@ -1300,6 +1375,11 @@ input AssignWidgetInput {
   (CUSTOM) Props of the component. value_paths may only reference `value` and `dependencies`; agent calls are not allowed.
   """
   props: [ComponentPropInput!] = null
+
+  """
+  (CUSTOM) The component's children: a tree of blok nodes under the same rules as its props. Left out of the definition's hash when empty, so a widget without any keeps the hash it has.
+  """
+  children: [ComponentNodeInput!] = null
 
   """
   (CUSTOM) Widget to render when the UI has no such component in its catalog.
@@ -2367,14 +2447,13 @@ type Collection {
 }
 
 """
-The renderer a catalog component lives in. A component may only be placed where its context is in force. ACTION_LOGO and OVERLAY are blok contexts only: an OVERLAY blok is an action's own, drawn into the space that hosts its run.
+The renderer a catalog component lives in. A component may only be placed where its context is in force. ACTION_LOGO is a blok context only.
 """
 enum ComponentContext {
   HTML
   SCENE
   LOGO
   ACTION_LOGO
-  OVERLAY
 }
 
 """
@@ -2563,32 +2642,6 @@ input CreateHigherOrderImplementationInput {
   dependencies: [AgentDependencyInput!] = null
 }
 
-"""The input for creating a placement."""
-input CreatePlacementInput {
-  """
-  The role of the placement. This is used to identify the placement in the system.
-  """
-  role: String = null
-
-  """
-  The affine matrix for the placement. This is used to identify the placement in the system.
-  """
-  affineMatrix: [[Float!]!] = null
-
-  """
-  The agent ID for the placement. This is used to identify the agent in the system.
-  """
-  agent: ID = null
-
-  """The ID of the space to create the placement in."""
-  space: String!
-
-  """
-  A specific blok that should be used to visualize the state of the placement.
-  """
-  materializedBlok: ID = null
-}
-
 """
 Create a schedule. Give exactly one of intervalSeconds or cron; pin an agent with agent + interface, or leave both empty to resolve one per run.
 """
@@ -2669,36 +2722,6 @@ input CreateShortcutInput {
   bindings: ShortcutBindingsInput = null
 }
 
-"""The input for creating a space."""
-input CreateSpaceInput {
-  """
-  The name of the space. This is used to identify the space in the system.
-  """
-  name: String!
-
-  """
-  The placements to create in the space. This is used to identify the placements in the system.
-  """
-  placements: [PlacementInput!] = null
-}
-
-"""Place a 3D blok in a space at an affine transform."""
-input CreateSpacePlacementInput {
-  """The space to place the blok in."""
-  space: ID!
-
-  """The materialized 3D blok to place."""
-  blok: ID!
-
-  """What the placement is called in its space."""
-  name: String = null
-
-  """
-  Where the blok sits: a 4x4 affine matrix, row-major, from the blok's frame into the space's. Omitted is the identity.
-  """
-  affineMatrix: [[Float!]!] = null
-}
-
 """Declare that one action tests another."""
 input CreateTestCaseInput {
   """The action under test."""
@@ -2767,6 +2790,7 @@ type CustomAssignWidget implements AssignWidget {
   followValue: String
   component: String!
   props: [ComponentProp!]
+  children: AnyDefault
   dependencies: [String!]
   fallback: AssignWidget
 }
@@ -2788,6 +2812,11 @@ input CustomAssignWidgetInput @unionElementOf(union: "AssignWidgetInput", discri
   Props of the component. value_paths may only reference `value` and `dependencies`; agent calls are not allowed.
   """
   props: [ComponentPropInput!] = null
+
+  """
+  The component's children: a tree of blok nodes under the same rules as its props. Left out of the definition's hash when empty, so a widget without any keeps the hash it has.
+  """
+  children: [ComponentNodeInput!] = null
 
   """
   The other ports (port paths, `..` traverses children) whose values the props may reference.
@@ -2953,7 +2982,7 @@ input DefinitionInput {
   protocols: [String!]! = []
 
   """
-  The action's own bloks, at most one per context: how a client shows a run of it (HTML in a task panel, OVERLAY drawn into the space that hosts the run). They name devices only by the action's dependency keys. Not part of the action's hash.
+  The action's own bloks, at most one per context: how a client shows a run of it (HTML in a task panel, SCENE a 3D view, as a `Space` placing the run's dependencies). They name devices only by the action's dependency keys. Not part of the action's hash.
   """
   bloks: [ActionBlokInput!]! = []
 
@@ -3025,29 +3054,11 @@ input DeleteMaterializedBlokInput {
   id: ID!
 }
 
-"""The input for deleting a placement."""
-input DeletePlacementInput {
-  """The ID of the placement to delete."""
-  id: ID!
-}
-
 """The input for deleting a shortcut."""
 input DeleteShortcutInput {
   """
   The shortcut ID to delete. This is used to identify the shortcut in the system.
   """
-  id: ID!
-}
-
-"""The input for deleting a space."""
-input DeleteSpaceInput {
-  """The ID of the space to delete."""
-  id: ID!
-}
-
-"""Remove a placed 3D blok from its space."""
-input DeleteSpacePlacementInput {
-  """The blok placement to remove."""
   id: ID!
 }
 
@@ -3370,6 +3381,62 @@ A stored vector, as `<model id>:<comma-separated floats>` -- e.g. `potion-base-8
 scalar Embedding
 
 """
+A formula for how long an implementation runs, in seconds. The action query filters and sorts by it.
+"""
+type EstimatedRuntime {
+  """
+  The pure blok call: arithmetic over args/<port>/<descriptor key> of one structure argument and agent/<hardware>.
+  """
+  callJson: JSONSerializable!
+
+  """The formula as its author wrote it."""
+  source: String
+
+  """
+  A richer call for the form, which only the frontend evaluates: any pure function, over args/<port>, args/<port>/<descriptor key> and agent/<hardware>.
+  """
+  uiCallJson: JSONSerializable
+
+  """That formula as its author wrote it."""
+  uiSource: String
+}
+
+"""One object an action's estimate is computed for."""
+input EstimatedRuntimeFilterInput {
+  """The object's structure."""
+  identifier: String!
+
+  """What the object says of itself, as for `objectDemands`."""
+  descriptors: [DescriptorInput!]!
+
+  """Leave out actions known to take longer than this many seconds."""
+  lte: Float = null
+}
+
+"""
+A formula for how long an implementation runs, in seconds, that the action query filters and sorts by.
+"""
+input EstimatedRuntimeInput {
+  """
+  The pure blok UtilCall giving seconds, which the server compiles and the frontend evaluates: arithmetic over args/<port>/<descriptor key> of one structure argument and agent/<hardware>.
+  """
+  call: UtilCallInput!
+
+  """
+  The formula as its author wrote it (informational; never parsed or evaluated by the server).
+  """
+  source: String = null
+
+  """
+  A richer formula for the form, which only the frontend evaluates: any pure function, over args/<port>, args/<port>/<descriptor key> and agent/<hardware>.
+  """
+  uiCall: UtilCallInput = null
+
+  """That formula as its author wrote it (informational)."""
+  uiSource: String = null
+}
+
+"""
 How an implementation runs: a WORKFLOW may call other actions and is resumed from its journal when its agent dies; a PLAIN one's task ends LOST.
 """
 enum Execution {
@@ -3461,6 +3528,20 @@ enum FiringOutcome {
   FIRED
   REJECTED
   FAILED
+}
+
+"""What an implementation can handle of one structure argument."""
+input FitsInput {
+  """The key of the structure argument it is about."""
+  port: String!
+
+  """
+  The pure blok UtilCall: a comparison of numbers, or several joined by logic.all/any. Its value_paths read value/<descriptor key> and agent/<hardware>.
+  """
+  call: UtilCallInput!
+
+  """The formula as its author wrote it (informational)."""
+  source: String = null
 }
 
 """
@@ -3717,6 +3798,36 @@ type Implementation {
   """
   logo: Blok
 
+  """
+  The bloks it declared to ask a person through or show them, asks and informs both. A task shows only these unless the implementation declares `dynamicAsks` / `dynamicInforms`.
+  """
+  interactions: [ImplementationInteraction!]!
+
+  """
+  Whether a task may also ask through a blok made at ask time, or any blok of the organization. Needs the agent's `rekuest_dynamic_ask` scope too.
+  """
+  dynamicAsks: Boolean!
+
+  """
+  Whether a task may also call actions it found at run time, not only its declared dependencies. Needs the agent's `rekuest_dynamic_call` scope too.
+  """
+  dynamicCalls: Boolean!
+
+  """
+  Whether a task may also show a blok made at inform time, or any blok of the organization. Needs the agent's `rekuest_dynamic_inform` scope too.
+  """
+  dynamicInforms: Boolean!
+
+  """
+  A formula for how long it runs, in seconds. The frontend evaluates it against the form, the descriptors of the structures picked there and the agent; null when none was declared.
+  """
+  estimatedRuntime: EstimatedRuntime
+
+  """
+  What it can handle, per argument: an action is not offered for an object no live implementation fits, and the agent refuses one that reaches it anyway.
+  """
+  fits: [ImplementationFit!]!
+
   """Constructed name for display, combining interface and agent name."""
   name: String!
 
@@ -3788,6 +3899,55 @@ input ImplementationFilter {
   resolvableFor: ID
   search: String
   actionDemand: ActionDemandInput
+
+  """
+  Whether its tasks may ask a person (hold until answered): it declares an ask, or `dynamicAsks`. False: never asks.
+  """
+  asks: Boolean
+
+  """
+  Whether its tasks may show a person a blok while they go on: it declares an inform, or `dynamicInforms`. False: never informs.
+  """
+  informs: Boolean
+
+  """
+  Whether its tasks may call other actions: it declares a dependency, or `dynamicCalls`. False: never calls.
+  """
+  calls: Boolean
+
+  """
+  Whether it declares `dynamicAsks`: its tasks may ask through a blok made at run time.
+  """
+  dynamicAsks: Boolean
+
+  """
+  Whether it declares `dynamicInforms`: its tasks may show a blok made at run time.
+  """
+  dynamicInforms: Boolean
+
+  """
+  Whether it declares `dynamicCalls`: its tasks may call actions found at run time.
+  """
+  dynamicCalls: Boolean
+}
+
+"""What an implementation can handle of one structure argument."""
+type ImplementationFit {
+  """The key of the argument."""
+  port: String!
+
+  """
+  The pure blok call: a comparison over value/<descriptor key> and agent/<hardware>.
+  """
+  callJson: JSONSerializable!
+
+  """The formula as its author wrote it."""
+  source: String
+
+  """
+  The formula as the Postgres jsonpath the server tests. A picker hands it to the service that filters the objects.
+  """
+  compiledPath: String!
 }
 
 """
@@ -3805,7 +3965,7 @@ input ImplementationInput {
   """
   The interface of the implementation. This is used to group implementations together in the UI
   """
-  interface: String
+  interface: String!
 
   """
   The params of the implementation. This is used to pass parameters to the implementation
@@ -3884,6 +4044,41 @@ input ImplementationInput {
   Whether a task may show a blok made at inform time, or any blok of the organization. Refused otherwise, and without the `rekuest_dynamic_inform` scope.
   """
   dynamicInforms: Boolean = null
+
+  """
+  How long this implementation runs, in seconds, given its arguments, the descriptors of the structures picked for them and the agent. The frontend evaluates it to show an estimate; the server only stores it.
+  """
+  estimatedRuntime: EstimatedRuntimeInput = null
+
+  """
+  What this implementation can handle, per argument. An action is not offered for an object no live implementation fits.
+  """
+  fits: [FitsInput!] = null
+}
+
+"""
+A blok an implementation declared with it (an `@ask` or `@inform` method of an interactions protocol): what its tasks hold on until a person answers (ASK) or show while they go on (INFORM). A task names it by `key`.
+"""
+type ImplementationInteraction {
+  id: ID!
+
+  """
+  What a task names it by: `<parameter>.<method>` of the action's interactions protocol.
+  """
+  key: String!
+
+  """What it asks or shows, in a sentence: the message it is listed with."""
+  description: String
+
+  """
+  What it shows: a blok held by implementations only (`heldByAction`), its args and returns ports declared.
+  """
+  blok: Blok!
+
+  """
+  ASK: a task holds on it until a person answers through it. INFORM: a task shows it and goes on.
+  """
+  role: TaskBlokRole!
 }
 
 type ImplementationMapping {
@@ -4333,12 +4528,6 @@ type MaterializedBlok {
 
   """Placements of this materialized blok on dashboards."""
   dashboardPlacements(filters: DashboardPlacementFilter, ordering: [DashboardPlacementOrder!]! = [], pagination: OffsetPaginationInput): [DashboardPlacement!]!
-
-  """Placements of this materialized blok."""
-  placements(filters: PlacementFilter, ordering: [PlacementOrder!]! = [], pagination: OffsetPaginationInput): [Placement!]!
-
-  """Where this 3D blok is placed in spaces, each at its affine transform."""
-  spacePlacements(filters: SpacePlacementFilter, ordering: [SpacePlacementOrder!]! = [], pagination: OffsetPaginationInput): [SpacePlacement!]!
 
   """
   The revision this materialization stays at; null when it follows its blok's head.
@@ -4853,34 +5042,15 @@ type Mutation {
   """
   createAsset(input: CreateAssetInput!): Asset! @auth(required_scopes: ["rekuest_agent"], any_role_of: ["rekuest_editor"])
 
-  """Create a new space."""
-  createSpace(input: CreateSpaceInput!): Space! @auth(required_scopes: ["rekuest_write"], any_role_of: ["rekuest_editor"])
-
-  """Update an existing space."""
-  updateSpace(input: UpdateSpaceInput!): Space! @auth(required_scopes: ["rekuest_write"], any_role_of: ["rekuest_editor"])
-
-  """Delete a space."""
-  deleteSpace(input: DeleteSpaceInput!): ID! @auth(required_scopes: ["rekuest_write"], any_role_of: ["rekuest_editor"])
-
-  """Create a new placement for an agent in a space."""
-  createPlacement(input: CreatePlacementInput!): Placement! @auth(required_scopes: ["rekuest_write"], any_role_of: ["rekuest_editor"])
-
-  """Update an existing placement."""
-  updatePlacement(input: UpdatePlacementInput!): Placement! @auth(required_scopes: ["rekuest_write"], any_role_of: ["rekuest_editor"])
-
-  """Delete a placement."""
-  deletePlacement(input: DeletePlacementInput!): ID! @auth(required_scopes: ["rekuest_write"], any_role_of: ["rekuest_editor"])
+  """
+  Keep where an agent stands in a space (a room), for everyone: the space a blok's `room` names, made when none has it yet.
+  """
+  savePlacement(input: SavePlacementInput!): Placement! @auth(required_scopes: ["rekuest_write"], any_role_of: ["rekuest_editor"])
 
   """
-  Place a 3D blok (a Model or Robot over a kulisse asset) in a space at an affine transform.
+  Forget where an agent was left in a space, so the blok that places it decides again.
   """
-  createSpacePlacement(input: CreateSpacePlacementInput!): SpacePlacement! @auth(required_scopes: ["rekuest_write"], any_role_of: ["rekuest_editor"])
-
-  """Move or rename a placed 3D blok."""
-  updateSpacePlacement(input: UpdateSpacePlacementInput!): SpacePlacement! @auth(required_scopes: ["rekuest_write"], any_role_of: ["rekuest_editor"])
-
-  """Remove a placed 3D blok from its space."""
-  deleteSpacePlacement(input: DeleteSpacePlacementInput!): ID! @auth(required_scopes: ["rekuest_write"], any_role_of: ["rekuest_editor"])
+  resetPlacement(input: ResetPlacementInput!): ID @auth(required_scopes: ["rekuest_write"], any_role_of: ["rekuest_editor"])
 }
 
 input OffsetPaginationInput {
@@ -4997,14 +5167,22 @@ input PinMaterializedBlokInput {
   revision: ID = null
 }
 
-"""A placement of an agent in a space."""
+"""
+Where someone left an agent in a space: its pose, the same for every viewer.
+"""
 type Placement {
   id: ID!
   space: Space!
   agent: Agent!
-  blok: MaterializedBlok
+
+  """The dependency key the agent was placed under when its pose was kept."""
   role: String!
+
+  """
+  Where the agent stands: a 4x4 affine matrix, row-major, in meters with Y up.
+  """
   affineMatrix: Args
+  updatedAt: DateTime!
 
   """Get the agent associated with this placement."""
   name: String!
@@ -5026,31 +5204,8 @@ input PlacementFilter {
   """Filter by agent"""
   agent: ID
 
-  """Search by name"""
+  """Search by the agent's name"""
   search: String
-}
-
-"""The input for creating or updating a placement."""
-input PlacementInput {
-  """
-  The role of the placement. This is used to identify the placement in the system.
-  """
-  role: String = null
-
-  """
-  The affine matrix for the placement. This is used to identify the placement in the system.
-  """
-  affineMatrix: [[Float!]!] = null
-
-  """
-  The agent ID for the placement. This is used to identify the agent in the system.
-  """
-  agent: ID = null
-
-  """
-  A specific blok that should be used to visualize the state of the placement.
-  """
-  blok: ID = null
 }
 
 input PlacementOrder @oneOf {
@@ -5511,12 +5666,6 @@ type Query {
   """Fetch a specific placement by ID."""
   placement(id: ID!): Placement! @auth(required_scopes: ["rekuest_read"])
 
-  """List the 3D bloks placed in spaces."""
-  spacePlacements(filters: SpacePlacementFilter, ordering: [SpacePlacementOrder!]! = [], pagination: OffsetPaginationInput): [SpacePlacement!]! @auth(required_scopes: ["rekuest_read"])
-
-  """Fetch one placed 3D blok by ID."""
-  spacePlacement(id: ID!): SpacePlacement! @auth(required_scopes: ["rekuest_read"])
-
   """List all sessions."""
   sessions(filters: SessionFilter, ordering: [SessionOrder!]! = [], pagination: OffsetPaginationInput): [Session!]! @auth(required_scopes: ["rekuest_read"])
 
@@ -5617,9 +5766,9 @@ type Query {
   dependencyTree(input: DependencyTreeInput!): DependencyTree! @auth(required_scopes: ["rekuest_read"])
 
   """
-  The spaces that place any of these agents (e.g. the ones a dependencyTree dry run binds), those placing the most first, then the most recently changed: where to run a workflow over them.
+  The space a blok's `room` names: where someone left each agent in it. Null until someone kept a pose there.
   """
-  spacesForAgents(agents: [ID!]!): [SpaceForAgents!]! @auth(required_scopes: ["rekuest_read"])
+  spaceByReference(room: String!): Space @auth(required_scopes: ["rekuest_read"])
 
   """
   The stored asset of this reference ('sha256:...') in the caller's organization, or null if no agent has uploaded it.
@@ -5829,6 +5978,17 @@ input RequiresInput {
   The value of the requirement. This can be any JSON serializable value; IN/NOT_IN take a list, LTE/GTE a number, EXISTS none
   """
   value: Arg = null
+}
+
+"""
+Forget where an agent was left in a space, so the blok that places it decides again.
+"""
+input ResetPlacementInput {
+  """The space's reference."""
+  room: String!
+
+  """The agent whose kept pose is forgotten."""
+  agent: ID!
 }
 
 """Represents a resolution for a blok."""
@@ -6138,6 +6298,25 @@ type RuleChangeEvent {
   create: RuleChange
   update: RuleChange
   delete: ID
+}
+
+"""Keep where an agent stands in a space, for everyone."""
+input SavePlacementInput {
+  """
+  The space's reference: a blok's `room` (a URI such as `room:helsinki-lab`, or `app/<identifier>/<key>`). The space is made when none has it yet.
+  """
+  room: String!
+
+  """The agent whose pose is kept."""
+  agent: ID!
+
+  """The dependency key it was placed under (`robot`)."""
+  role: String!
+
+  """
+  Where it stands: a 4x4 affine matrix, row-major, in meters with Y up, from the agent's model into the space.
+  """
+  affineMatrix: [[Float!]!]!
 }
 
 """
@@ -6772,18 +6951,22 @@ type Snapshot {
   sessionId: String
 }
 
-"""A space where agents can interact."""
+"""
+A room: where the organization keeps its devices. What a 3D view shows is the action's `<Space room=...>` blok; where each device stands is kept here, the same for everyone.
+"""
 type Space {
   id: ID!
   name: String!
+
+  """What finds the room again: a blok's `room`."""
+  reference: String
   description: String
   creator: User!
   createdAt: DateTime!
   updatedAt: DateTime!
-  placements(filters: PlacementFilter, ordering: [PlacementOrder!]! = [], pagination: OffsetPaginationInput): [Placement!]!
 
-  """The 3D bloks placed in this space, each at its affine transform."""
-  blokPlacements(filters: SpacePlacementFilter, ordering: [SpacePlacementOrder!]! = [], pagination: OffsetPaginationInput): [SpacePlacement!]!
+  """Where someone left each agent in this room."""
+  placements(filters: PlacementFilter, ordering: [PlacementOrder!]! = [], pagination: OffsetPaginationInput): [Placement!]!
 }
 
 """A way to filter spaces"""
@@ -6798,56 +6981,14 @@ input SpaceFilter {
 
   """Search by name"""
   search: String
-}
 
-"""A space and how many of the agents asked about it places."""
-type SpaceForAgents {
-  """The space."""
-  space: Space!
-
-  """How many of the agents asked about this space places."""
-  placed: Int!
+  """Filter by reference (a blok's `room`)"""
+  reference: String
 }
 
 input SpaceOrder @oneOf {
   createdAt: Ordering
   updatedAt: Ordering
-  name: Ordering
-}
-
-"""
-A 3D blok placed in a space at an affine transform: a Model or Robot blok over a kulisse asset, with no agent of its own.
-"""
-type SpacePlacement {
-  id: ID!
-  space: Space!
-  blok: MaterializedBlok!
-  name: String
-
-  """
-  Where the blok sits: a 4x4 affine matrix, row-major, from the blok's frame into the space's. Null is the identity.
-  """
-  affineMatrix: Args
-  createdAt: DateTime!
-  updatedAt: DateTime!
-}
-
-"""A way to filter blok placements in spaces"""
-input SpacePlacementFilter {
-  AND: SpacePlacementFilter
-  OR: SpacePlacementFilter
-  NOT: SpacePlacementFilter
-  DISTINCT: Boolean
-
-  """Filter by IDs"""
-  ids: [ID!]
-
-  """Filter by space"""
-  space: ID
-}
-
-input SpacePlacementOrder @oneOf {
-  createdAt: Ordering
   name: Ordering
 }
 
@@ -8290,22 +8431,6 @@ input UpdateMaterializedBlokInput {
   agentMappings: [MappedAgentInput!] = null
 }
 
-"""The input for updating a placement."""
-input UpdatePlacementInput {
-  """
-  The role of the placement. This is used to identify the placement in the system.
-  """
-  role: String = null
-
-  """
-  The affine matrix for the placement. This is used to identify the placement in the system.
-  """
-  affineMatrix: [[Float!]!] = null
-
-  """The ID of the placement to update."""
-  id: ID!
-}
-
 """
 Change a schedule. Giving intervalSeconds clears cron and vice versa. Give `agent: null` (with `interface: null`) to unpin it; give `endsAt` or `maxRuns` as null to lift it. A waiting run is re-planned; an executing one finishes first.
 """
@@ -8331,30 +8456,6 @@ input UpdateScheduleInput {
   The policy of every run it creates: ASK (the default) holds a child an agent asks for until a person approves it; AUTO runs it unattended. A waiting run is re-planned with it.
   """
   policy: TaskPolicy = null
-}
-
-"""The input for updating a space."""
-input UpdateSpaceInput {
-  """The ID of the space to update."""
-  id: ID!
-
-  """The new name of the space."""
-  name: String = null
-
-  """The new description of the space."""
-  description: String = null
-}
-
-"""Move or rename a placed 3D blok."""
-input UpdateSpacePlacementInput {
-  """The blok placement to change."""
-  id: ID!
-
-  """A new name."""
-  name: String = null
-
-  """A new 4x4 affine matrix, row-major."""
-  affineMatrix: [[Float!]!] = null
 }
 
 """

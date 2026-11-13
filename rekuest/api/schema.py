@@ -6,7 +6,7 @@ from arkitekt_spec.actions import ActionDemandInput, ActionKind, AgentDependency
 from datetime import datetime
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 from rath.scalars import ID, IDCoercible
-from rekuest.protocol.schema import ActionFilter, ActionOrder, AgentFilter, AgentInput, AgentKind, AssignWidgetKind, BlokAgentMappingInput, CatalogComponentInput, CatalogOperationInput, CatalogValueKind, CollectInput, ComponentContext, CreateAssetInput, CreateBlokInput, CreateDashboardInput, CreateHigherOrderImplementationInput, CreateShortcutInput, CreateSpaceInput, CreateTestCaseInput, CreateTestResultInput, DiagnosticLevel, EditBlokInput, FinishMediaUploadInput, ForkBlokInput, ImplementationFilter, InterruptInput, LocalKind, LogLevel, MaterializationScope, MaterializeBlokInput, OffsetPaginationInput, PinMaterializedBlokInput, PlacementInput, RegisterModuleInput, RequestAssetUploadInput, RequestMediaAccessInput, RequestMediaUploadInput, ReturnWidgetKind, RevertBlokInput, ShelveInMemoryDrawerInput, ShortcutBindingsInput, ShortcutFilter, ShortcutOrder, TaskInstructKind, ToolboxFilter, ToolboxOrder, UnshelveMemoryDrawerInput, UpdateBlokInput, UpdateMaterializedBlokInput, WidgetDefaultInput
+from rekuest.protocol.schema import ActionFilter, ActionOrder, AgentFilter, AgentInput, AgentKind, AssignWidgetKind, BlokAgentMappingInput, CatalogComponentInput, CatalogOperationInput, CatalogValueKind, CollectInput, ComponentContext, CreateAssetInput, CreateBlokInput, CreateDashboardInput, CreateHigherOrderImplementationInput, CreateShortcutInput, CreateTestCaseInput, CreateTestResultInput, DiagnosticLevel, EditBlokInput, FinishMediaUploadInput, ForkBlokInput, ImplementationFilter, InterruptInput, LocalKind, LogLevel, MaterializationScope, MaterializeBlokInput, OffsetPaginationInput, PinMaterializedBlokInput, RegisterModuleInput, RequestAssetUploadInput, RequestMediaAccessInput, RequestMediaUploadInput, ResetPlacementInput, ReturnWidgetKind, RevertBlokInput, SavePlacementInput, ShelveInMemoryDrawerInput, ShortcutBindingsInput, ShortcutFilter, ShortcutOrder, TaskInstructKind, ToolboxFilter, ToolboxOrder, UnshelveMemoryDrawerInput, UpdateBlokInput, UpdateMaterializedBlokInput, WidgetDefaultInput
 from rekuest.scalars import ActionHash, Args, Identifier, JSONSerializable, MediaLike
 from rekuest.traits.action import Callable
 from typing import Annotated, Any, AsyncIterator, ClassVar, Iterable, Iterator, Literal
@@ -1880,7 +1880,7 @@ class ActionBlok(BaseModel):
     typename: Literal['ActionBlok'] = Field(alias='__typename', default='ActionBlok', exclude=True)
     id: ID
     context: ComponentContext
-    'Where a client shows a run with it: HTML in a task panel, SCENE as a 3D view of its own, OVERLAY drawn into the space that hosts the run, over the agents placed there.'
+    "Where a client shows a run with it: HTML in a task panel, SCENE as a 3D view (a `Space` places the run's dependencies in a room whose layout is shared)."
     blok: DetailBlok
     'What it draws: a blok held by its actions only (`heldByAction`), shared by every action of the app declaring the same.'
     model_config = ConfigDict(frozen=True)
@@ -2376,24 +2376,50 @@ class CreateShortcutMutation(BaseModel):
         """Meta class for CreateShortcut """
         document = 'fragment ActionArgumentLeaf on ActionArgument {\n  key\n  valueLiteral\n  valuePath\n  utilCall {\n    operation\n    __typename\n  }\n  __typename\n}\n\nfragment ActionArgumentNested on ActionArgument {\n  key\n  valueLiteral\n  valuePath\n  utilCall {\n    operation\n    arguments {\n      ...ActionArgumentLeaf\n      __typename\n    }\n    __typename\n  }\n  valueList {\n    ...ActionArgumentLeaf\n    __typename\n  }\n  valueDict {\n    ...ActionArgumentLeaf\n    __typename\n  }\n  __typename\n}\n\nfragment ComponentProp on ComponentProp {\n  key\n  staticValue\n  dynamicValue {\n    literal\n    path\n    __typename\n  }\n  declaresValue\n  utilCall {\n    ...UtilCall\n    __typename\n  }\n  __typename\n}\n\nfragment ActionArgument on ActionArgument {\n  key\n  valueLiteral\n  valuePath\n  utilCall {\n    operation\n    arguments {\n      ...ActionArgumentNested\n      __typename\n    }\n    __typename\n  }\n  valueList {\n    ...ActionArgumentNested\n    __typename\n  }\n  valueDict {\n    ...ActionArgumentNested\n    __typename\n  }\n  __typename\n}\n\nfragment ArgChildPortNested on ArgPort {\n  key\n  kind\n  children {\n    key\n    identifier\n    nullable\n    kind\n    referenceUnit\n    proposedUnits\n    dimension\n    __typename\n  }\n  choices {\n    value\n    label\n    description\n    __typename\n  }\n  identifier\n  nullable\n  default\n  referenceUnit\n  proposedUnits\n  dimension\n  __typename\n}\n\nfragment ChoiceAssignWidget on ChoiceAssignWidget {\n  __typename\n  kind\n  placeholder\n}\n\nfragment ChoiceReturnWidget on ChoiceReturnWidget {\n  __typename\n  kind\n}\n\nfragment CustomAssignWidget on CustomAssignWidget {\n  __typename\n  kind\n  component\n  props {\n    ...ComponentProp\n    __typename\n  }\n  dependencies\n}\n\nfragment CustomEffect on CustomEffect {\n  __typename\n  kind\n}\n\nfragment CustomReturnWidget on CustomReturnWidget {\n  __typename\n  kind\n  component\n  props {\n    ...ComponentProp\n    __typename\n  }\n}\n\nfragment MessageEffect on MessageEffect {\n  __typename\n  kind\n  message\n}\n\nfragment ReturnChildPortNested on ReturnPort {\n  key\n  kind\n  children {\n    key\n    identifier\n    nullable\n    kind\n    referenceUnit\n    proposedUnits\n    dimension\n    __typename\n  }\n  choices {\n    value\n    label\n    description\n    __typename\n  }\n  identifier\n  nullable\n  referenceUnit\n  proposedUnits\n  dimension\n  __typename\n}\n\nfragment SearchAssignWidget on SearchAssignWidget {\n  __typename\n  kind\n  query\n  ward\n  dependencies\n}\n\nfragment SliderAssignWidget on SliderAssignWidget {\n  __typename\n  kind\n  min\n  max\n  step\n}\n\nfragment StringAssignWidget on StringAssignWidget {\n  __typename\n  kind\n  placeholder\n  asParagraph\n}\n\nfragment ArgChildPort on ArgPort {\n  key\n  kind\n  identifier\n  children {\n    ...ArgChildPortNested\n    __typename\n  }\n  choices {\n    value\n    label\n    description\n    __typename\n  }\n  nullable\n  default\n  referenceUnit\n  proposedUnits\n  dimension\n  __typename\n}\n\nfragment Definition on Action {\n  args {\n    ...ArgPort\n    __typename\n  }\n  returns {\n    ...ReturnPort\n    __typename\n  }\n  kind\n  name\n  description\n  collections {\n    name\n    __typename\n  }\n  isDev\n  isTestFor {\n    id\n    __typename\n  }\n  portGroups {\n    key\n    __typename\n  }\n  stateful\n  __typename\n}\n\nfragment PortAssignWidget on AssignWidget {\n  __typename\n  kind\n  ...StringAssignWidget\n  ...SearchAssignWidget\n  ...SliderAssignWidget\n  ...ChoiceAssignWidget\n  ...CustomAssignWidget\n}\n\nfragment PortEffect on Effect {\n  __typename\n  kind\n  dependencies\n  call {\n    ...UtilCall\n    __typename\n  }\n  callJson\n  source\n  ...CustomEffect\n  ...MessageEffect\n}\n\nfragment ReturnChildPort on ReturnPort {\n  key\n  kind\n  identifier\n  children {\n    ...ReturnChildPortNested\n    __typename\n  }\n  choices {\n    value\n    label\n    description\n    __typename\n  }\n  nullable\n  referenceUnit\n  proposedUnits\n  dimension\n  __typename\n}\n\nfragment ReturnWidget on ReturnWidget {\n  __typename\n  kind\n  ...CustomReturnWidget\n  ...ChoiceReturnWidget\n}\n\nfragment UtilCall on UtilCall {\n  operation\n  arguments {\n    ...ActionArgument\n    __typename\n  }\n  __typename\n}\n\nfragment Action on Action {\n  hash\n  id\n  ...Definition\n  __typename\n}\n\nfragment ArgPort on ArgPort {\n  __typename\n  key\n  label\n  nullable\n  description\n  default\n  kind\n  identifier\n  referenceUnit\n  proposedUnits\n  dimension\n  children {\n    ...ArgChildPort\n    __typename\n  }\n  widget {\n    ...PortAssignWidget\n    __typename\n  }\n  choices {\n    value\n    label\n    description\n    __typename\n  }\n  validators {\n    call {\n      ...UtilCall\n      __typename\n    }\n    callJson\n    source\n    errorMessage\n    dependencies\n    label\n    __typename\n  }\n  effects {\n    ...PortEffect\n    __typename\n  }\n}\n\nfragment ReturnPort on ReturnPort {\n  __typename\n  key\n  label\n  nullable\n  description\n  kind\n  identifier\n  referenceUnit\n  proposedUnits\n  dimension\n  children {\n    ...ReturnChildPort\n    __typename\n  }\n  widget {\n    ...ReturnWidget\n    __typename\n  }\n  choices {\n    value\n    label\n    description\n    __typename\n  }\n  effects {\n    ...PortEffect\n    __typename\n  }\n}\n\nfragment Shortcut on Shortcut {\n  id\n  name\n  description\n  action {\n    ...Action\n    __typename\n  }\n  savedArgs\n  args {\n    ...ArgPort\n    __typename\n  }\n  returns {\n    ...ReturnPort\n    __typename\n  }\n  useReturns\n  __typename\n}\n\nmutation CreateShortcut($input: CreateShortcutInput!) {\n  createShortcut(input: $input) {\n    ...Shortcut\n    __typename\n  }\n}'
 
-class CreateSpaceMutationCreateSpace(BaseModel):
-    """A space where agents can interact."""
-    typename: Literal['Space'] = Field(alias='__typename', default='Space', exclude=True)
+class SavePlacementMutationSavePlacementAgent(BaseModel):
+    """Represents a compute agent that can execute implementations."""
+    typename: Literal['Agent'] = Field(alias='__typename', default='Agent', exclude=True)
     id: ID
+    'Unique ID of the agent.'
     model_config = ConfigDict(frozen=True)
 
-class CreateSpaceMutation(BaseModel):
-    """No documentation found for this operation."""
-    create_space: CreateSpaceMutationCreateSpace = Field(alias='createSpace')
-    'Create a new space.'
+class SavePlacementMutationSavePlacement(BaseModel):
+    """Where someone left an agent in a space: its pose, the same for every viewer."""
+    typename: Literal['Placement'] = Field(alias='__typename', default='Placement', exclude=True)
+    id: ID
+    role: str
+    'The dependency key the agent was placed under when its pose was kept.'
+    affine_matrix: Args | None = Field(default=None, alias='affineMatrix')
+    'Where the agent stands: a 4x4 affine matrix, row-major, in meters with Y up.'
+    agent: SavePlacementMutationSavePlacementAgent
+    model_config = ConfigDict(frozen=True)
+
+class SavePlacementMutation(BaseModel):
+    """ Keep where an agent stands in a room (a space found by a blok's `room`), for everyone; the
+ first pose kept makes the space."""
+    save_placement: SavePlacementMutationSavePlacement = Field(alias='savePlacement')
+    "Keep where an agent stands in a space (a room), for everyone: the space a blok's `room` names, made when none has it yet."
 
     class Arguments(BaseModel):
-        """Arguments for CreateSpace """
-        input: CreateSpaceInput
+        """Arguments for SavePlacement """
+        input: SavePlacementInput
 
     class Meta:
-        """Meta class for CreateSpace """
-        document = 'mutation CreateSpace($input: CreateSpaceInput!) {\n  createSpace(input: $input) {\n    id\n    __typename\n  }\n}'
+        """Meta class for SavePlacement """
+        document = 'mutation SavePlacement($input: SavePlacementInput!) {\n  savePlacement(input: $input) {\n    id\n    role\n    affineMatrix\n    agent {\n      id\n      __typename\n    }\n    __typename\n  }\n}'
+
+class ResetPlacementMutation(BaseModel):
+    """ Forget where an agent was left in a room, so the blok that places it decides again."""
+    reset_placement: ID | None = Field(default=None, alias='resetPlacement')
+    'Forget where an agent was left in a space, so the blok that places it decides again.'
+
+    class Arguments(BaseModel):
+        """Arguments for ResetPlacement """
+        input: ResetPlacementInput
+
+    class Meta:
+        """Meta class for ResetPlacement """
+        document = 'mutation ResetPlacement($input: ResetPlacementInput!) {\n  resetPlacement(input: $input)\n}'
 
 class CollectMutation(BaseModel):
     """No documentation found for this operation."""
@@ -2632,7 +2658,7 @@ class ActionBloksQueryAction(Callable, BaseModel):
     id: ID
     'Unique ID of the action.'
     bloks: tuple[ActionBlok, ...]
-    "The action's own bloks, at most one per context (HTML for a task panel, OVERLAY drawn into the space that hosts a run): declared with the action, the latest registration's. Not part of its hash."
+    "The action's own bloks, at most one per context (HTML for a task panel, SCENE a 3D view, as a `Space` placing the run's dependencies): declared with the action, the latest registration's. Not part of its hash."
     model_config = ConfigDict(frozen=True)
 
 class ActionBloksQuery(BaseModel):
@@ -2912,34 +2938,45 @@ class SearchShortcutsQuery(BaseModel):
         """Meta class for SearchShortcuts """
         document = 'query SearchShortcuts($search: String, $values: [ID!], $limit: Int, $offset: Int) {\n  options: shortcuts(\n    filters: {search: $search, ids: $values}\n    pagination: {limit: $limit, offset: $offset}\n  ) {\n    label: name\n    value: id\n    __typename\n  }\n}'
 
-class SpacesForAgentsQuerySpacesForAgentsSpace(BaseModel):
-    """A space where agents can interact."""
+class SpaceByReferenceQuerySpaceByReferencePlacementsAgent(BaseModel):
+    """Represents a compute agent that can execute implementations."""
+    typename: Literal['Agent'] = Field(alias='__typename', default='Agent', exclude=True)
+    id: ID
+    'Unique ID of the agent.'
+    model_config = ConfigDict(frozen=True)
+
+class SpaceByReferenceQuerySpaceByReferencePlacements(BaseModel):
+    """Where someone left an agent in a space: its pose, the same for every viewer."""
+    typename: Literal['Placement'] = Field(alias='__typename', default='Placement', exclude=True)
+    role: str
+    'The dependency key the agent was placed under when its pose was kept.'
+    affine_matrix: Args | None = Field(default=None, alias='affineMatrix')
+    'Where the agent stands: a 4x4 affine matrix, row-major, in meters with Y up.'
+    agent: SpaceByReferenceQuerySpaceByReferencePlacementsAgent
+    model_config = ConfigDict(frozen=True)
+
+class SpaceByReferenceQuerySpaceByReference(BaseModel):
+    """A room: where the organization keeps its devices. What a 3D view shows is the action's `<Space room=...>` blok; where each device stands is kept here, the same for everyone."""
     typename: Literal['Space'] = Field(alias='__typename', default='Space', exclude=True)
     id: ID
-    name: str
+    reference: str | None = Field(default=None)
+    "What finds the room again: a blok's `room`."
+    placements: tuple[SpaceByReferenceQuerySpaceByReferencePlacements, ...]
+    'Where someone left each agent in this room.'
     model_config = ConfigDict(frozen=True)
 
-class SpacesForAgentsQuerySpacesForAgents(BaseModel):
-    """A space and how many of the agents asked about it places."""
-    typename: Literal['SpaceForAgents'] = Field(alias='__typename', default='SpaceForAgents', exclude=True)
-    placed: int
-    'How many of the agents asked about this space places.'
-    space: SpacesForAgentsQuerySpacesForAgentsSpace
-    'The space.'
-    model_config = ConfigDict(frozen=True)
-
-class SpacesForAgentsQuery(BaseModel):
-    """ workflow over them (e.g. the agents a dependencyTree dry run binds)."""
-    spaces_for_agents: tuple[SpacesForAgentsQuerySpacesForAgents, ...] = Field(alias='spacesForAgents')
-    'The spaces that place any of these agents (e.g. the ones a dependencyTree dry run binds), those placing the most first, then the most recently changed: where to run a workflow over them.'
+class SpaceByReferenceQuery(BaseModel):
+    """ Where people left each agent in a room: null until someone kept a pose in it."""
+    space_by_reference: SpaceByReferenceQuerySpaceByReference | None = Field(default=None, alias='spaceByReference')
+    "The space a blok's `room` names: where someone left each agent in it. Null until someone kept a pose there."
 
     class Arguments(BaseModel):
-        """Arguments for SpacesForAgents """
-        agents: list[ID]
+        """Arguments for SpaceByReference """
+        room: str
 
     class Meta:
-        """Meta class for SpacesForAgents """
-        document = 'query SpacesForAgents($agents: [ID!]!) {\n  spacesForAgents(agents: $agents) {\n    placed\n    space {\n      id\n      name\n      __typename\n    }\n    __typename\n  }\n}'
+        """Meta class for SpaceByReference """
+        document = 'query SpaceByReference($room: String!) {\n  spaceByReference(room: $room) {\n    id\n    reference\n    placements {\n      role\n      affineMatrix\n      agent {\n        id\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n}'
 
 class GetStateQuery(BaseModel):
     """No documentation found for this operation."""
@@ -3035,7 +3072,7 @@ class TaskEventsQuery(BaseModel):
         document = 'fragment TaskEvent on TaskEvent {\n  id\n  kind\n  returns\n  reference\n  message\n  progress\n  value\n  createdAt\n  __typename\n}\n\nquery TaskEvents($id: ID!) {\n  task(id: $id) {\n    id\n    events(ordering: [{createdAt: ASC}]) {\n      ...TaskEvent\n      __typename\n    }\n    __typename\n  }\n}'
 
 class TaskRunViewQueryTaskSpace(BaseModel):
-    """A space where agents can interact."""
+    """A room: where the organization keeps its devices. What a 3D view shows is the action's `<Space room=...>` blok; where each device stands is kept here, the same for everyone."""
     typename: Literal['Space'] = Field(alias='__typename', default='Space', exclude=True)
     id: ID
     name: str
@@ -4411,45 +4448,87 @@ Returns:
         variables['input'] = _input
         return self.execute(CreateShortcutMutation, variables).create_shortcut
 
-    async def acreate_space(self, name: str, placements: Iterable[PlacementInput] | None | UnsetType=UNSET) -> CreateSpaceMutationCreateSpace:
-        """CreateSpace 
-
-Create a new space.
+    async def asave_placement(self, room: str, agent: IDCoercible, role: str, affine_matrix: Iterable[Iterable[float]]) -> SavePlacementMutationSavePlacement:
+        """SavePlacement 
+ Keep where an agent stands in a room (a space found by a blok's `room`), for everyone; the
+ first pose kept makes the space.
 
 Args:
-    name: The name of the space. This is used to identify the space in the system.
-    placements: The placements to create in the space. This is used to identify the placements in the system.
+    room: The space's reference: a blok's `room` (a URI such as `room:helsinki-lab`, or `app/<identifier>/<key>`). The space is made when none has it yet.
+    agent: The agent whose pose is kept.
+    role: The dependency key it was placed under (`robot`).
+    affine_matrix: Where it stands: a 4x4 affine matrix, row-major, in meters with Y up, from the agent's model into the space.
 
 Returns:
-    CreateSpaceMutationCreateSpace
+    SavePlacementMutationSavePlacement
 """
         variables: dict[str, builtins.object] = {}
         _input: dict[str, builtins.object] = {}
-        _input['name'] = name
-        if placements is not UNSET:
-            _input['placements'] = placements
+        _input['room'] = room
+        _input['agent'] = agent
+        _input['role'] = role
+        _input['affineMatrix'] = affine_matrix
         variables['input'] = _input
-        return (await self.aexecute(CreateSpaceMutation, variables)).create_space
+        return (await self.aexecute(SavePlacementMutation, variables)).save_placement
 
-    def create_space(self, name: str, placements: Iterable[PlacementInput] | None | UnsetType=UNSET) -> CreateSpaceMutationCreateSpace:
-        """CreateSpace 
-
-Create a new space.
+    def save_placement(self, room: str, agent: IDCoercible, role: str, affine_matrix: Iterable[Iterable[float]]) -> SavePlacementMutationSavePlacement:
+        """SavePlacement 
+ Keep where an agent stands in a room (a space found by a blok's `room`), for everyone; the
+ first pose kept makes the space.
 
 Args:
-    name: The name of the space. This is used to identify the space in the system.
-    placements: The placements to create in the space. This is used to identify the placements in the system.
+    room: The space's reference: a blok's `room` (a URI such as `room:helsinki-lab`, or `app/<identifier>/<key>`). The space is made when none has it yet.
+    agent: The agent whose pose is kept.
+    role: The dependency key it was placed under (`robot`).
+    affine_matrix: Where it stands: a 4x4 affine matrix, row-major, in meters with Y up, from the agent's model into the space.
 
 Returns:
-    CreateSpaceMutationCreateSpace
+    SavePlacementMutationSavePlacement
 """
         variables: dict[str, builtins.object] = {}
         _input: dict[str, builtins.object] = {}
-        _input['name'] = name
-        if placements is not UNSET:
-            _input['placements'] = placements
+        _input['room'] = room
+        _input['agent'] = agent
+        _input['role'] = role
+        _input['affineMatrix'] = affine_matrix
         variables['input'] = _input
-        return self.execute(CreateSpaceMutation, variables).create_space
+        return self.execute(SavePlacementMutation, variables).save_placement
+
+    async def areset_placement(self, room: str, agent: IDCoercible) -> ID | None:
+        """ResetPlacement 
+ Forget where an agent was left in a room, so the blok that places it decides again.
+
+Args:
+    room: The space's reference.
+    agent: The agent whose kept pose is forgotten.
+
+Returns:
+    ID | None
+"""
+        variables: dict[str, builtins.object] = {}
+        _input: dict[str, builtins.object] = {}
+        _input['room'] = room
+        _input['agent'] = agent
+        variables['input'] = _input
+        return (await self.aexecute(ResetPlacementMutation, variables)).reset_placement
+
+    def reset_placement(self, room: str, agent: IDCoercible) -> ID | None:
+        """ResetPlacement 
+ Forget where an agent was left in a room, so the blok that places it decides again.
+
+Args:
+    room: The space's reference.
+    agent: The agent whose kept pose is forgotten.
+
+Returns:
+    ID | None
+"""
+        variables: dict[str, builtins.object] = {}
+        _input: dict[str, builtins.object] = {}
+        _input['room'] = room
+        _input['agent'] = agent
+        variables['input'] = _input
+        return self.execute(ResetPlacementMutation, variables).reset_placement
 
     async def acollect(self, drawers: Iterable[IDCoercible]) -> tuple[str, ...]:
         """collect 
@@ -5651,33 +5730,33 @@ Returns:
             variables['offset'] = offset
         return self.execute(SearchShortcutsQuery, variables).options
 
-    async def aspaces_for_agents(self, agents: list[IDCoercible]) -> tuple[SpacesForAgentsQuerySpacesForAgents, ...]:
-        """SpacesForAgents 
- workflow over them (e.g. the agents a dependencyTree dry run binds).
+    async def aspace_by_reference(self, room: str) -> SpaceByReferenceQuerySpaceByReference | None:
+        """SpaceByReference 
+ Where people left each agent in a room: null until someone kept a pose in it.
 
 Args:
-    agents (list[ID]): No description
+    room (str): No description
 
 Returns:
-    list[SpacesForAgentsQuerySpacesForAgents]
+    SpaceByReferenceQuerySpaceByReference | None
 """
         variables: dict[str, builtins.object] = {}
-        variables['agents'] = agents
-        return (await self.aexecute(SpacesForAgentsQuery, variables)).spaces_for_agents
+        variables['room'] = room
+        return (await self.aexecute(SpaceByReferenceQuery, variables)).space_by_reference
 
-    def spaces_for_agents(self, agents: list[IDCoercible]) -> tuple[SpacesForAgentsQuerySpacesForAgents, ...]:
-        """SpacesForAgents 
- workflow over them (e.g. the agents a dependencyTree dry run binds).
+    def space_by_reference(self, room: str) -> SpaceByReferenceQuerySpaceByReference | None:
+        """SpaceByReference 
+ Where people left each agent in a room: null until someone kept a pose in it.
 
 Args:
-    agents (list[ID]): No description
+    room (str): No description
 
 Returns:
-    list[SpacesForAgentsQuerySpacesForAgents]
+    SpaceByReferenceQuerySpaceByReference | None
 """
         variables: dict[str, builtins.object] = {}
-        variables['agents'] = agents
-        return self.execute(SpacesForAgentsQuery, variables).spaces_for_agents
+        variables['room'] = room
+        return self.execute(SpaceByReferenceQuery, variables).space_by_reference
 
     async def aget_state(self, id: IDCoercible) -> State:
         """GetState 
