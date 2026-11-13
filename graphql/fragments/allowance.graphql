@@ -1,0 +1,17 @@
+# An entry of a user's auto list: an action that runs under their runs without asking
+# them. It names the action (and the action that may ask for it) by app and key, so every
+# version of it; `asker` is null for whoever asks.
+fragment ActionAllowance on ActionAllowance {
+  id
+  key
+  askerKey
+  createdAt
+  action {
+    id
+    name
+  }
+  asker {
+    id
+    name
+  }
+}

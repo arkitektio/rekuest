@@ -1,0 +1,11 @@
+# The auto list is changed by who may start and steer tasks (rekuest_root_call), like
+# `decide`: an app only has these by taking in the caller.
+mutation allowAction($input: AllowActionInput!) {
+  allowAction(input: $input) {
+    ...ActionAllowance
+  }
+}
+
+mutation revokeAllowance($input: RevokeAllowanceInput!) {
+  revokeAllowance(input: $input)
+}

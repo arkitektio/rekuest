@@ -31,11 +31,15 @@ query BlokRevisions($id: ID!, $limit: Int! = 20, $offset: Int! = 0) {
   }
 }
 
-# An action's own bloks, one per context.
+# An action's own bloks, one per context: `bloks` show a run of it, `assignBloks` are
+# shown before there is one, to start it.
 query ActionBloks($action: ID!) {
   action(id: $action) {
     id
     bloks {
+      ...ActionBlok
+    }
+    assignBloks {
       ...ActionBlok
     }
   }

@@ -1,0 +1,7 @@
+# Your auto list in this organization, newest first; with `action`, its entries only.
+# An allowance of a single run is not listed.
+query MyAllowances($action: ID) {
+  myAllowances(action: $action) {
+    ...ActionAllowance
+  }
+}

@@ -84,11 +84,6 @@ type Action {
   logo: Blok
 
   """
-  The action's own bloks, at most one per context (HTML for a task panel, SCENE a 3D view, as a `Space` placing the run's dependencies): declared with the action, the latest registration's. Not part of its hash.
-  """
-  bloks: [ActionBlok!]!
-
-  """
   How many of its implementations sit on an agent that can take work now (connected, or a webhook agent) — one per agent. Kept by the database as agents connect and leave, a moment behind (takt recomputes it on commit); a crashed agent counts until takt's stale sweep notices (seconds).
   """
   liveImplementations: Int!
@@ -112,6 +107,16 @@ type Action {
 
   """The triggers that run this action."""
   triggers(filters: TriggerFilter, ordering: [TriggerOrder!]! = [], pagination: OffsetPaginationInput): [Trigger!]!
+
+  """
+  The action's own bloks, at most one per context (HTML for a task panel, SCENE a 3D view, as a `Space` placing the run's dependencies): declared with the action, the latest registration's. Not part of its hash.
+  """
+  bloks: [ActionBlok!]!
+
+  """
+  The action's own bloks for starting a run of it, at most one per context (phase ASSIGN): shown before there is a task, with the arguments being filled in as `args` and the agents a run would get as `deps`.
+  """
+  assignBloks: [ActionBlok!]!
 
   """
   The estimate in seconds for the object named in the `estimatedRuntime` filter: its fastest live implementation that fits. Null without that filter, or when it cannot be computed for this object.
@@ -147,6 +152,42 @@ type Action {
 
   """Port groups used in the action for organizing ports."""
   portGroups: [PortGroup!]!
+}
+
+"""
+An entry of a user's auto list: an action that runs under their runs without asking them. It names the action by app and key, so every version of it; optionally the action that may ask for it; and optionally the one run it holds under.
+"""
+type ActionAllowance {
+  """Allowance ID."""
+  id: ID!
+
+  """The app of the action that runs without asking."""
+  app: App!
+
+  """The key of the action that runs without asking, in its app."""
+  key: String!
+
+  """The app of the action that may ask for it; null for whoever asks."""
+  askerApp: App
+
+  """The key of the action that may ask for it; null for whoever asks."""
+  askerKey: String
+
+  """When it was allowed."""
+  createdAt: DateTime!
+
+  """The root task it holds under; null for every run of the user."""
+  run: Task
+
+  """
+  The action that runs without asking: its newest version. Null once no version of it is registered.
+  """
+  action: Action
+
+  """
+  The action that may ask for it: its newest version. Null for whoever asks.
+  """
+  asker: Action
 }
 
 """A JSON-serializable argument entry for a multi-agent action trigger."""
@@ -208,6 +249,11 @@ type ActionBlok {
   Where a client shows a run with it: HTML in a task panel, SCENE as a 3D view (a `Space` places the run's dependencies in a room whose layout is shared).
   """
   context: ComponentContext!
+
+  """
+  When a client shows it: RUN for a run of the action, ASSIGN before one, to start it.
+  """
+  phase: ActionBlokPhase!
 }
 
 """
@@ -218,6 +264,11 @@ input ActionBlokInput {
   Where a client shows the run with it: HTML in a task panel, SCENE as a 3D view (its root a `Scene`, or a `Space` placing the run's dependencies in a room whose layout is shared).
   """
   context: ComponentContext! = HTML
+
+  """
+  When a client shows it: RUN for a run of the action, ASSIGN before one, to start it. One blok per context and phase.
+  """
+  phase: ActionBlokPhase! = RUN
 
   """The UI component tree, unless the blok is sent as its `source`."""
   components: [ComponentNodeInput!] = null
@@ -252,6 +303,14 @@ input ActionBlokInput {
 
   """Its declared streams."""
   subscriptions: [BlokSubscriptionInput!]! = []
+}
+
+"""
+When a client shows an action's own blok: RUN for a run of the action (it reads the run as `task`), ASSIGN before one, to start it (no `task`; `<args />` places the argument form, `assign.start()` starts the run).
+"""
+enum ActionBlokPhase {
+  RUN
+  ASSIGN
 }
 
 """
@@ -964,6 +1023,19 @@ type AgentWithValues {
 
   """The patches to move backward"""
   backwardPatches: [Patch!]!
+}
+
+"""
+Put an action on your auto list: under your runs an agent that asks for it gets it without a hold.
+"""
+input AllowActionInput {
+  """The action that runs without asking, in every version of it"""
+  action: ID!
+
+  """
+  The action that may ask for it, in every version of it; none for whoever asks
+  """
+  asker: ID = null
 }
 
 """
@@ -2922,6 +2994,11 @@ input DecideInput {
   The answer through the blok a task asks with (a hold on a blok), by the blok's returns, and checked against them. Only an approved ask takes them.
   """
   values: Args = null
+
+  """
+  Keep the approval as an allowance on the user's auto list, so the action is not asked for again: for the rest of this run (RUN), whenever the same action asks (ASKER), or whoever asks (ALWAYS). Only the approval of a child an agent asked for takes it. What else of the run waits for the same answer is released.
+  """
+  remember: HoldRemember = null
 }
 
 "A definition\n\n    Definitions are the building implementation for Actions and provide the\n    information needed to create a action. They are primarly composed of a name,\n    a description, and a list of ports.\n\n    Definitions provide a protocol of input and output, and do not contain\n    any information about the actual implementation of the action ( this is handled\n    by a implementation that implements a action).\n\n    "
@@ -3574,6 +3651,15 @@ type HideEffect implements Effect {
   dependencies: [String!]!
   source: String
   fade: Boolean!
+}
+
+"""
+What an approval is remembered as: the allowance it leaves on the user's auto list. RUN: this action, whoever asks, for the rest of this run. ASKER: this action whenever the action that asked now asks again, in every run of the user. ALWAYS: this action, whoever asks, in every run of the user.
+"""
+enum HoldRemember {
+  RUN
+  ASKER
+  ALWAYS
 }
 
 """
@@ -4849,9 +4935,17 @@ type Mutation {
   resume(input: ResumeInput!): Task! @auth(required_scopes: ["rekuest_root_call"], any_role_of: ["rekuest_editor"])
 
   """
-  Answer a held task. A child an agent asked for runs once approved, or ends DENIED without running; a task that holds itself carries on with the decision. Only the user the task runs for may decide, and never from the client of the agent that asked.
+  Answer a held task. A child an agent asked for runs once approved, or ends DENIED without running; a task that holds itself carries on with the decision. Only the user the task runs for may decide, and never from the client of the agent that asked. With `remember`, the approval of a child is kept as an allowance on their auto list.
   """
   decide(input: DecideInput!): Task! @auth(required_scopes: ["rekuest_root_call"], any_role_of: ["rekuest_editor"])
+
+  """
+  Put an action on your auto list: under your runs an agent that asks for it gets it without a hold. Optionally only when one action asks. Yours alone: it changes nothing for anyone else.
+  """
+  allowAction(input: AllowActionInput!): ActionAllowance! @auth(required_scopes: ["rekuest_root_call"], any_role_of: ["rekuest_editor"])
+
+  """Take an allowance off your auto list: the action is asked for again."""
+  revokeAllowance(input: RevokeAllowanceInput!): ID! @auth(required_scopes: ["rekuest_root_call"], any_role_of: ["rekuest_editor"])
 
   """Collect results from a task."""
   collect(input: CollectInput!): [String!]! @auth(required_scopes: ["rekuest_agent"], any_role_of: ["rekuest_editor"])
@@ -5704,6 +5798,11 @@ type Query {
   """
   similarActions(action: ID!, filters: ActionFilter = null, limit: Int! = 10, maxDistance: Float = null): [Action!]! @auth(required_scopes: ["rekuest_read"])
 
+  """
+  Your auto list in this organization: the actions that run under your runs without asking you, newest first. With `action`, the entries for that action. An allowance of a single run is not listed.
+  """
+  myAllowances(action: ID = null): [ActionAllowance!]! @auth(required_scopes: ["rekuest_read"])
+
   """Fetch the root tasks this client created (caller-scoped)."""
   myTasks: [Task!]! @auth(required_scopes: ["rekuest_read"])
 
@@ -6277,6 +6376,12 @@ type RevisionDependency {
 
   """Only agents of this version may be bound to it."""
   version: String
+}
+
+"""Take an allowance off your auto list: the action is asked for again."""
+input RevokeAllowanceInput {
+  """The allowance to remove"""
+  id: ID!
 }
 
 """Slim snapshot of a schedule or trigger for the change feeds."""

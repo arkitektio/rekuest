@@ -99,6 +99,7 @@ projects:
               - ResolvedDependencyInput
               - ResumeInput
               - DecideInput
+              - HoldRemember
               - StateRequirementInput
               - TaskEventKind
               - TaskPolicy

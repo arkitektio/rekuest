@@ -286,11 +286,13 @@ fragment BlokEdit on BlokEdit {
   }
 }
 
-# An action's own blok for one context: how a client shows a run of it. It names devices
-# only by the action's dependency keys, bound per run by Task.dependencyAgents.
+# An action's own blok for one context and phase: how a client shows a run of it (RUN), or
+# what it shows before there is one, to start it (ASSIGN). It names devices only by the
+# action's dependency keys, bound per run by Task.dependencyAgents.
 fragment ActionBlok on ActionBlok {
   id
   context
+  phase
   blok {
     ...DetailBlok
   }

@@ -28,6 +28,12 @@ class GraphQLDefault:
     def __repr__(self):
         return 'GraphQLDefault(' + repr(self.value) + ')'
 
+class ActionBlokPhase(str, Enum):
+    """When a client shows an action's own blok: RUN for a run of the action (it reads the run as `task`), ASSIGN before one, to start it (no `task`; `<args />` places the argument form, `assign.start()` starts the run)."""
+    RUN = 'RUN'
+    ASSIGN = 'ASSIGN'
+    __str__ = str.__str__
+
 class AgentKind(str, Enum):
     """No documentation"""
     WEBSOCKET = 'WEBSOCKET'
@@ -239,6 +245,12 @@ class AgentInput(BaseModel):
     kind: AgentKind | None = Field(default=None, description='The transport kind of the agent: WEBSOCKET (default) or WEBHOOK (a HookAgent the backend POSTs to).')
     hook_url: str | None = Field(validation_alias=AliasChoices('hook_url', 'hookUrl'), serialization_alias='hookUrl', default=None, description='For a WEBHOOK agent: the URL the backend POSTs messages (Assign, Cancel, Caller* events) to.')
     hook_url_secret: str | None = Field(validation_alias=AliasChoices('hook_url_secret', 'hookUrlSecret'), serialization_alias='hookUrlSecret', default=None, description='For a WEBHOOK agent: the shared secret used to HMAC-sign messages in both directions (outbound delivery and POST intake).')
+    model_config = ConfigDict(frozen=True, extra='forbid', populate_by_name=True, use_enum_values=True)
+
+class AllowActionInput(BaseModel):
+    """Put an action on your auto list: under your runs an agent that asks for it gets it without a hold."""
+    action: ID = Field(description='The action that runs without asking, in every version of it')
+    asker: ID | None = Field(default=None, description='The action that may ask for it, in every version of it; none for whoever asks')
     model_config = ConfigDict(frozen=True, extra='forbid', populate_by_name=True, use_enum_values=True)
 
 class BlokAgentMappingInput(BaseModel):
@@ -589,6 +601,11 @@ class RevertBlokInput(BaseModel):
     base: ID = Field(description='The revision the caller saw as the head; refused when the head moved since.')
     message: str | None = Field(default=None, description="Why, in a sentence. Defaults to 'Back to revision <n>'.")
     task: ID | None = Field(default=None, description="The task making the change (one the caller's agent runs).")
+    model_config = ConfigDict(frozen=True, extra='forbid', populate_by_name=True, use_enum_values=True)
+
+class RevokeAllowanceInput(BaseModel):
+    """Take an allowance off your auto list: the action is asked for again."""
+    id: ID = Field(description='The allowance to remove')
     model_config = ConfigDict(frozen=True, extra='forbid', populate_by_name=True, use_enum_values=True)
 
 class SavePlacementInput(BaseModel):
