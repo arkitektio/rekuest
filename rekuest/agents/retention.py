@@ -13,6 +13,12 @@ A small SQLite file (stdlib ``sqlite3``) with the same two tables the Rust agent
 
 Rows are scoped by ``agent`` (the agent's name), so apps sharing a working directory
 never send each other's frames. An acked frame is deleted at once.
+
+A session also records the spec version that wrote it. Frames written by another version
+are not sent: a server reads what the agent's current version speaks, and frames it
+cannot read would be refused for good, on every start, by an agent that was upgraded
+precisely to be let in. They stay in the file, and :meth:`RetainedFrames.set_aside` says
+how many there are.
 """
 
 import logging
@@ -49,9 +55,11 @@ class StoredFrame:
 class RetainedFrames:
     """The retained frames of one agent, in a SQLite file (``None``: in memory only)."""
 
-    def __init__(self, path: str | None, agent: str) -> None:
+    def __init__(self, path: str | None, agent: str, spec_version: str | None = None) -> None:
         self.path = path
         self.agent = agent
+        #: The spec version this process writes; None compares nothing (every session is sent).
+        self.spec_version = spec_version
         self._lock = threading.Lock()
         if path is not None and path != ":memory:":
             Path(path).parent.mkdir(parents=True, exist_ok=True)
@@ -81,6 +89,10 @@ class RetainedFrames:
                 )
                 """
             )
+            # A file from before sessions said which spec wrote them: its sessions say none.
+            columns = {row[1] for row in self._db.execute("PRAGMA table_info(journal_sync)")}
+            if "spec_version" not in columns:
+                self._db.execute("ALTER TABLE journal_sync ADD COLUMN spec_version TEXT")
 
     def __repr__(self) -> str:
         return f"RetainedFrames(path={self.path!r}, agent={self.agent!r})"
@@ -89,11 +101,12 @@ class RetainedFrames:
         """Know a session (its creation time orders the backlog); returns that time."""
         with self._lock, self._db:
             self._db.execute(
-                "INSERT OR IGNORE INTO journal_sync (agent, session_id, created_at) VALUES (?, ?, ?)",
+                "INSERT OR IGNORE INTO journal_sync (agent, session_id, created_at, spec_version) VALUES (?, ?, ?, ?)",
                 (
                     self.agent,
                     session_id,
                     time.time() if created_at is None else created_at,
+                    self.spec_version,
                 ),
             )
             row = self._db.execute(
@@ -137,8 +150,27 @@ class RetainedFrames:
                 (self.agent, keep or ""),
             )
 
+    def set_aside(self) -> int:
+        """How many retained frames were written by another spec version than this
+        process's, and so are not sent."""
+        if self.spec_version is None:
+            return 0
+        with self._lock:
+            (count,) = self._db.execute(
+                """
+                SELECT COUNT(*) FROM journal j
+                LEFT JOIN journal_sync s
+                ON s.agent = j.agent AND s.session_id = j.session_id
+                WHERE j.agent = ? AND j.pos > COALESCE(s.acked_pos, 0)
+                AND s.spec_version IS NOT ?
+                """,
+                (self.agent, self.spec_version),
+            ).fetchone()
+        return int(count)
+
     def load(self) -> Iterator[StoredFrame]:
-        """Every retained frame, in ``(session created, pos)`` order."""
+        """Every retained frame this process's spec version wrote, in ``(session created,
+        pos)`` order."""
         with self._lock:
             rows = self._db.execute(
                 """
@@ -147,9 +179,10 @@ class RetainedFrames:
                 LEFT JOIN journal_sync s
                 ON s.agent = j.agent AND s.session_id = j.session_id
                 WHERE j.agent = ? AND j.pos > COALESCE(s.acked_pos, 0)
+                AND (? IS NULL OR s.spec_version IS ?)
                 ORDER BY COALESCE(s.created_at, 0), j.session_id, j.pos
                 """,
-                (self.agent,),
+                (self.agent, self.spec_version, self.spec_version),
             ).fetchall()
         for session_id, created_at, pos, frame in rows:
             yield StoredFrame(session_id, float(created_at), int(pos), frame)

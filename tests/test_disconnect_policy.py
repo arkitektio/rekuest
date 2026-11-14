@@ -133,7 +133,7 @@ async def test_the_kill_report_is_retained_and_resent_on_reconnect(
     assert _errors(transport), "the kill must be reported"
     before = len(transport.of_type(messages.Critical))
 
-    transport.feed(messages.Init(agent="agent-1", inquiries=[]))
+    transport.feed(messages.Init(agent="agent-1"))
     await _pump(agent, 1)
 
     assert len(transport.of_type(messages.Critical)) > before, (

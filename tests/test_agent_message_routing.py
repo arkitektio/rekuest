@@ -80,7 +80,7 @@ async def test_init_releases_connect_and_resends_unacked_reports(
     assert len(resent) == 2, "the unacked report must be resent on the new connection"
     assert resent[1] == resent[0], "the resend is the frame as it was (seq, pos, step)"
 
-    transport.feed(messages.JournalAck(journal_session="s", pos=2))
+    transport.feed(messages.JournalAck(journal_session="s", through=2))
     await _pump(agent, 1)
     assert not agent.retained
 
@@ -103,7 +103,7 @@ async def test_caller_answers_go_to_the_postman_not_the_actors(
     seen: list[messages.ExecutionEvent] = []
     agent.caller_postman.handle_execution_event = seen.append  # type: ignore[method-assign]
 
-    transport.feed(messages.CompletedEvent(task="delegated-1", event="ev-1", seq=1))
+    transport.feed(messages.CompletedEvent(task="delegated-1", event="ev-1"))
     await _pump(agent, 1)
 
     assert len(seen) == 1, "an execution-event mirror belongs to the caller postman"
@@ -147,28 +147,28 @@ async def test_probe_response_is_routed_to_the_caller_postman(
 
 
 @pytest.mark.asyncio
-async def test_a_liveness_inquiry_does_not_contradict_a_replayed_report(
+async def test_an_inquiry_is_answered_at_once_from_what_the_agent_knows(
     agent: BaseAgent, transport: MemoryAgentTransport
 ) -> None:
-    """Init replays retained terminal reports and *then* answers inquiries.
+    """Asked about a task, the agent says what it knows of it, without touching it: one it
+    is on, one whose end it reported, and one it never had (which the backend then ends as
+    lost, so it is the last thing the agent says, never a guess)."""
+    release = asyncio.Event()
 
-    Both describe the same task, so the inquiry must defer: the replayed report
-    already says exactly how the task ended.
-    """
-
-    async def quick(x: int) -> int:
-        """Finish immediately."""
+    async def slow(x: int) -> int:
+        """Stay running until released."""
+        await release.wait()
         return x
 
     agent.app_registry.register(
-        quick,
+        slow,
     )
     agent.collect_from_registry()
 
     transport.feed(
         messages.Assign(
             task="task-1",
-            interface="quick",
+            interface="slow",
             args={"x": 1},
             implementation="impl-1",
             action="action-1",
@@ -179,33 +179,32 @@ async def test_a_liveness_inquiry_does_not_contradict_a_replayed_report(
     )
     await _pump(agent, 1)
     for _ in range(50):
-        if transport.of_type(messages.Completed):
+        if transport.of_type(messages.Started):
             break
         await asyncio.sleep(0)
 
-    def _liveness_answers() -> list[messages.FromAgentMessage]:
-        """Anything the agent says about task-1 other than replaying its report."""
-        return [
-            m
-            for m in transport.sent
-            if isinstance(m, (messages.Progress, messages.Critical))
-            and getattr(m, "task", None) == "task-1"
-        ]
+    async def ask(task: str) -> messages.InquiryAnswer:
+        transport.feed(messages.Inquire(task=task, request=f"q-{task}"))
+        await _pump(agent, 1)
+        answer = transport.of_type(messages.InquiryAnswer)[-1]
+        assert answer.request == f"q-{task}"
+        return answer
 
-    before = len(_liveness_answers())
-    transport.feed(
-        messages.Init(
-            agent="agent-1",
-            inquiries=[messages.AssignInquiry(task="task-1")],
-        )
-    )
-    await _pump(agent, 1)
+    assert (await ask("task-1")).status == messages.TaskStatus.RUNNING
+    assert (await ask("never-had")).status == messages.TaskStatus.UNKNOWN
 
-    assert len(_liveness_answers()) == before, (
-        "the inquiry must defer to the replayed report, but the agent also said "
-        f"{[m for m in _liveness_answers()[before:]]}"
-    )
+    # And what it last said of itself: how far it is, when it said so, and where it stands.
+    await agent._adispatch(messages.Progress(task="task-1", progress=40, message="half way"))
+    told = await ask("task-1")
+    assert (told.progress, told.message) == (40, "half way") and told.reported_at is not None
+    await agent._adispatch(messages.Paused(task="task-1"))
+    assert (await ask("task-1")).status == messages.TaskStatus.PAUSED
+    await agent._adispatch(messages.Resumed(task="task-1"))
+    assert (await ask("task-1")).status == messages.TaskStatus.RUNNING
 
-
-
-
+    release.set()
+    for _ in range(50):
+        if transport.of_type(messages.Completed):
+            break
+        await asyncio.sleep(0)
+    assert (await ask("task-1")).status == messages.TaskStatus.ENDED

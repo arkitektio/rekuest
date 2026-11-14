@@ -172,7 +172,7 @@ async def test_put_on_shelve_is_one_frame_and_waits_for_no_reply() -> None:
     assert agent.shelve[resource_id] is value, "kept before anything is sent"
     await _until(lambda: transport.of_type(messages.Shelve))
     (sent,) = transport.of_type(messages.Shelve)
-    assert (sent.ref, sent.resource_id) == (resource_id, resource_id)
+    assert sent.resource_id == resource_id
     assert sent.pos is not None and sent.task is None
     assert sent.identifier == "@test/thing" and sent.label == str(value)
     assert agent.shelve[resource_id] is value

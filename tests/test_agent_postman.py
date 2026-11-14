@@ -85,9 +85,9 @@ async def test_aassign_emits_assign_request_with_field_mapping() -> None:
         messages.AssignResponse(request=req.id, reference=req.reference, task="t1")
     )
     pm.handle_execution_event(
-        messages.YieldEvent(task="t1", event="e1", seq=1, returns={"0": 5})
+        messages.YieldEvent(task="t1", event="e1", returns={"0": 5})
     )
-    pm.handle_execution_event(messages.CompletedEvent(task="t1", event="e2", seq=2))
+    pm.handle_execution_event(messages.CompletedEvent(task="t1", event="e2"))
 
     await asyncio.wait_for(task, timeout=1.0)
 
@@ -113,12 +113,12 @@ async def test_event_before_response_is_buffered() -> None:
 
     # Yield arrives BEFORE we route reference -> task.
     pm.handle_execution_event(
-        messages.YieldEvent(task="t1", event="e1", seq=1, returns={"0": 9})
+        messages.YieldEvent(task="t1", event="e1", returns={"0": 9})
     )
     pm.handle_assign_response(
         messages.AssignResponse(request=req.id, reference=req.reference, task="t1")
     )
-    pm.handle_execution_event(messages.CompletedEvent(task="t1", event="e2", seq=2))
+    pm.handle_execution_event(messages.CompletedEvent(task="t1", event="e2"))
 
     await asyncio.wait_for(task, timeout=1.0)
     assert out[0].returns == {"0": 9}
@@ -170,7 +170,7 @@ async def test_failed_event_raises_error_call_error_through_stream() -> None:
         messages.AssignResponse(request=req.id, reference=req.reference, task="t1")
     )
     pm.handle_execution_event(
-        messages.FailedEvent(task="t1", event="e1", seq=1, error="boom")
+        messages.FailedEvent(task="t1", event="e1", error="boom")
     )
 
     with pytest.raises(ErrorCallError, match="boom"):
@@ -196,7 +196,7 @@ async def test_a_lost_event_raises_agent_lost_with_what_is_known() -> None:
     )
     pm.handle_execution_event(
         messages.LostEvent(
-            task="t1", event="e1", seq=1, started=True, last_progress=60,
+            task="t1", event="e1", started=True, last_progress=60,
             effects="IRREVERSIBLE", reason="its agent died",
         )
     )
@@ -227,11 +227,11 @@ async def test_a_held_child_carries_its_prompt_and_a_denial_raises_denied_error(
     assert req.prompt == prompt
 
     pm.handle_assign_response(messages.AssignResponse(request=req.id, reference=req.reference, task="t1"))
-    pm.handle_execution_event(messages.HeldEvent(task="t1", event="e1", seq=1, prompt=prompt))
+    pm.handle_execution_event(messages.HeldEvent(task="t1", event="e1", prompt=prompt))
     await asyncio.sleep(0.05)
     assert not task.done(), "a held child keeps its caller waiting"
 
-    pm.handle_execution_event(messages.DeniedEvent(task="t1", event="e2", seq=2, answer="not today"))
+    pm.handle_execution_event(messages.DeniedEvent(task="t1", event="e2", answer="not today"))
     with pytest.raises(DeniedError, match="not today") as denied:
         await asyncio.wait_for(task, timeout=1.0)
     assert (denied.value.answer, denied.value.task) == ("not today", "t1")
@@ -253,9 +253,9 @@ async def test_a_held_event_is_surfaced_to_the_caller() -> None:
     assert req.prompt is None
     pm.handle_assign_response(messages.AssignResponse(request=req.id, reference=req.reference, task="t1"))
     pm.handle_execution_event(
-        messages.HeldEvent(task="t1", event="e1", seq=1, prompt=AssignPrompt(title="Run it"))
+        messages.HeldEvent(task="t1", event="e1", prompt=AssignPrompt(title="Run it"))
     )
-    pm.handle_execution_event(messages.CompletedEvent(task="t1", event="e2", seq=2))
+    pm.handle_execution_event(messages.CompletedEvent(task="t1", event="e2"))
     await asyncio.wait_for(task, timeout=1.0)
 
     assert [(e.kind, e.message, e.task) for e in seen] == [
@@ -326,13 +326,13 @@ async def test_concurrent_calls_do_not_cross_deliver() -> None:
     )
 
     pm.handle_execution_event(
-        messages.YieldEvent(task="tb", event="eb", seq=1, returns={"0": "B"})
+        messages.YieldEvent(task="tb", event="eb", returns={"0": "B"})
     )
     pm.handle_execution_event(
-        messages.YieldEvent(task="ta", event="ea", seq=1, returns={"0": "A"})
+        messages.YieldEvent(task="ta", event="ea", returns={"0": "A"})
     )
-    pm.handle_execution_event(messages.CompletedEvent(task="ta", event="ea2", seq=2))
-    pm.handle_execution_event(messages.CompletedEvent(task="tb", event="eb2", seq=2))
+    pm.handle_execution_event(messages.CompletedEvent(task="ta", event="ea2"))
+    pm.handle_execution_event(messages.CompletedEvent(task="tb", event="eb2"))
 
     await asyncio.wait_for(asyncio.gather(ta, tb), timeout=1.0)
     assert out_a[0].returns == {"0": "A"}
@@ -366,9 +366,9 @@ async def test_aprobe_fires_a_probe_and_streams_its_events() -> None:
 
     pm.handle_probe_response(messages.ProbeResponse(request=request.id, probe="p-1"))
     pm.handle_execution_event(
-        messages.YieldEvent(task="p-1", event="e-1", seq=1, returns={"0": "ok"})
+        messages.YieldEvent(task="p-1", event="e-1", returns={"0": "ok"})
     )
-    pm.handle_execution_event(messages.CompletedEvent(task="p-1", event="e-2", seq=2))
+    pm.handle_execution_event(messages.CompletedEvent(task="p-1", event="e-2"))
 
     await asyncio.wait_for(task, timeout=1.0)
     assert [e.kind for e in out] == [TaskEventKind.YIELD, TaskEventKind.COMPLETED]
@@ -409,7 +409,7 @@ async def _request_of(pm: AgentPostman, sink: MemoryAgentTransport, **kwargs: ob
     await _until(lambda: len(sink.sent) > before)
     req = _last_request(sink)
     pm.handle_assign_response(messages.AssignResponse(request=req.id, reference=req.reference, task=f"t-{req.id}"))
-    pm.handle_execution_event(messages.CompletedEvent(task=f"t-{req.id}", event="e", seq=1))
+    pm.handle_execution_event(messages.CompletedEvent(task=f"t-{req.id}", event="e"))
     await asyncio.wait_for(task, timeout=1.0)
     return req
 
@@ -463,9 +463,9 @@ async def test_a_replayed_event_that_also_arrives_live_is_delivered_once() -> No
     await _until(lambda: sink.sent)
     req = _last_request(sink)
     pm.handle_assign_response(messages.AssignResponse(request=req.id, reference=req.reference, task="t1", created=False))
-    pm.handle_execution_event(messages.YieldEvent(task="t1", event="e1", seq=1, returns={"0": 5}))
-    pm.handle_execution_event(messages.YieldEvent(task="t1", event="e1", seq=1, returns={"0": 5}))
-    pm.handle_execution_event(messages.CompletedEvent(task="t1", event="e2", seq=2))
+    pm.handle_execution_event(messages.YieldEvent(task="t1", event="e1", returns={"0": 5}))
+    pm.handle_execution_event(messages.YieldEvent(task="t1", event="e1", returns={"0": 5}))
+    pm.handle_execution_event(messages.CompletedEvent(task="t1", event="e2"))
     await asyncio.wait_for(task, timeout=1.0)
 
     assert [e.kind for e in out] == [TaskEventKind.YIELD, TaskEventKind.COMPLETED]
@@ -481,3 +481,108 @@ async def test_a_parent_that_ended_is_forgotten() -> None:
     pm.forget_parent("p")
 
     assert pm._occurrences == {}
+
+
+@pytest.mark.asyncio
+async def test_a_finished_call_cancels_nothing_and_a_probe_fails_with_its_connection() -> None:
+    """A stream closed at its last event has nothing left to cancel. And a probe, which the
+    backend ends with the connection it was fired on, fails rather than waiting for an end
+    that was lost (a call does not: its request and its child's events are kept)."""
+    sink = MemoryAgentTransport()
+    pm = AgentPostman(sink)
+
+    async def call() -> list[CallerTaskEvent]:
+        return [ev async for ev in pm.aassign(**_call(parent="p", action="a1"))]
+
+    calling = asyncio.create_task(call())
+    await _until(lambda: sink.sent)
+    req = _last_request(sink)
+    pm.handle_assign_response(messages.AssignResponse(request=req.id, reference=req.reference, task="t1", created=True))
+    pm.handle_execution_event(messages.CompletedEvent(task="t1", event="e1"))
+    assert [e.kind for e in await asyncio.wait_for(calling, timeout=1.0)] == [TaskEventKind.COMPLETED]
+    assert not [m for m in sink.sent if isinstance(m, messages.CancelRequest)]
+
+    async def probe() -> None:
+        async for _ in pm.aprobe(**_probe_call(action="a1")):
+            pass
+
+    probing = asyncio.create_task(probe())
+    await _until(lambda: any(isinstance(m, messages.ProbeRequest) for m in sink.sent))
+    pm.fail_probes()
+    with pytest.raises(AssignException, match="a probe is not resumed"):
+        await asyncio.wait_for(probing, timeout=1.0)
+
+
+@pytest.mark.asyncio
+async def test_a_call_given_up_before_its_answer_cancels_the_child_the_answer_names() -> None:
+    """The request is kept until the backend has it, so the child is made whatever the
+    caller does meanwhile. Nobody waits for it: it is cancelled once its answer says which
+    task it is. An answer nobody asked for (a call of an earlier process) is dropped."""
+    sink = MemoryAgentTransport()
+    pm = AgentPostman(sink)
+
+    async def call() -> None:
+        async for _ in pm.aassign(**_call(parent="p", action="a1")):
+            pass
+
+    calling = asyncio.create_task(call())
+    await _until(lambda: sink.sent)
+    req = _last_request(sink)
+    calling.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await calling
+
+    pm.handle_assign_response(messages.AssignResponse(request=req.id, reference=req.reference, task="t9", created=True))
+    await _until(lambda: [m for m in sink.sent if isinstance(m, messages.CancelRequest)])
+    assert [m.task for m in sink.sent if isinstance(m, messages.CancelRequest)] == ["t9"]
+
+    pm.handle_assign_response(messages.AssignResponse(request="someone-else", reference="r", task="t10", created=True))
+    pm.handle_execution_event(messages.CompletedEvent(task="t10", event="e"))
+    assert not pm._task_queues and not pm._orphan_by_task, "nothing is kept for nobody"
+
+
+@pytest.mark.asyncio
+async def test_a_caller_asks_about_a_task_it_assigned() -> None:
+    sink = MemoryAgentTransport()
+    pm = AgentPostman(sink)
+    asking = asyncio.create_task(pm.ainquire("t1"))
+    await _until(lambda: [m for m in sink.sent if isinstance(m, messages.InquireRequest)])
+    (request,) = [m for m in sink.sent if isinstance(m, messages.InquireRequest)]
+    pm.handle_inquire_response(
+        messages.InquireResponse(request=request.id, task="t1", status=messages.TaskStatus.RUNNING, asked=True, step=3)
+    )
+    answer = await asyncio.wait_for(asking, timeout=1.0)
+    assert (answer.status, answer.asked, answer.step) == (messages.TaskStatus.RUNNING, True, 3)
+
+
+@pytest.mark.asyncio
+async def test_a_silent_child_is_asked_about_and_the_call_goes_on_waiting() -> None:
+    """After ``inquire_after`` seconds without an event the call asks whether the child's
+    agent is still on it. The answer changes nothing here: what an agent that lost the task
+    leads to (the backend ends it) arrives as the child's own end."""
+    sink = MemoryAgentTransport()
+    pm = AgentPostman(sink)
+    out: list[CallerTaskEvent] = []
+
+    async def call() -> None:
+        async for ev in pm.aassign(**_call(parent="p", action="a1"), inquire_after=0.02):
+            out.append(ev)
+
+    calling = asyncio.create_task(call())
+    await _until(lambda: sink.sent)
+    req = _last_request(sink)
+    pm.handle_assign_response(messages.AssignResponse(request=req.id, reference=req.reference, task="t1", created=True))
+
+    def asked() -> list[messages.InquireRequest]:
+        return [m for m in sink.sent if isinstance(m, messages.InquireRequest)]
+
+    await _until(asked, timeout=2.0)
+    assert asked()[0].task == "t1"
+    pm.handle_inquire_response(
+        messages.InquireResponse(request=asked()[0].id, task="t1", status=messages.TaskStatus.RUNNING, asked=True)
+    )
+    assert not calling.done(), "still running: the call waits on"
+
+    pm.handle_execution_event(messages.CompletedEvent(task="t1", event="e1"))
+    await asyncio.wait_for(calling, timeout=2.0)
+    assert [e.kind for e in out] == [TaskEventKind.COMPLETED]

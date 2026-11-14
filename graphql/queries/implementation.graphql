@@ -16,3 +16,24 @@ query ResolvedImplementations($resolution: ID!, $dependencyKey: String!, $method
     ...Implementation
   }
 }
+
+# A dry run of an assign's dependency resolution: what would be bound, and why not.
+query DependencyTree($input: DependencyTreeInput!) {
+  dependencyTree(input: $input) {
+    satisfied
+    dependencies {
+      key
+      unmet
+      mappedAgents {
+        agentId
+        mappedImplementations {
+          key
+          resolvedDependencies {
+            key
+            unmet
+          }
+        }
+      }
+    }
+  }
+}

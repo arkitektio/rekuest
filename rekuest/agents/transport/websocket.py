@@ -11,6 +11,7 @@ from arkitekt_runtime.agents.policy import Backoff, ConnectionPolicy
 from arkitekt_runtime.agents.transport.base import AgentTransport
 from arkitekt_runtime.agents.transport.types import HandshakeParams
 import asyncio
+import uuid
 import json
 from rekuest.agents.transport.errors import (
     AgentTransportException,
@@ -19,6 +20,7 @@ from arkitekt_runtime import messages
 import logging
 from websockets.exceptions import (
     ConnectionClosedError,
+    ConnectionClosedOK,
     InvalidHandshake,
 )
 from websockets.frames import CloseCode
@@ -210,6 +212,7 @@ class WebsocketAgentTransport(AgentTransport):
         return bool(self._healthy)
 
     _send_queue: Contextual[asyncio.Queue[str]] = None
+    _nonce: Contextual[str] = None
     _held: Contextual[str] = None
     """A frame taken off the send queue whose send failed: it goes out first on the
     next connection, ahead of everything queued after it, so a drop never reorders
@@ -415,6 +418,9 @@ class WebsocketAgentTransport(AgentTransport):
                     ) as client:
                         connected_at = time.monotonic()
                         self._client = client
+                        # Names this attempt: the Init that answers it says it again, and
+                        # one that names another (a connection gone since) is not ours.
+                        self._nonce = uuid.uuid4().hex
                         logger.info("Agent on Websockets connected")
 
                         declaration = (
@@ -424,6 +430,9 @@ class WebsocketAgentTransport(AgentTransport):
                         )
                         await client.send(
                             messages.Register(
+                                nonce=self._nonce,
+                                commands_seen=handshake.commands_seen,
+                                sessions=handshake.sessions,
                                 token=token,
                                 spec_version=handshake.spec_version,
                                 force=bool(handshake.force),
@@ -451,6 +460,15 @@ class WebsocketAgentTransport(AgentTransport):
                             )
                             await self._ahandle_inbound(message)
 
+                        if not self._closing:
+                            # A clean close (1000/1001: the server going away) ends the
+                            # iteration without an error. It is a drop like any other:
+                            # reported, counted and backed off.
+                            raise CorrectableConnectionFail("The server closed the connection")
+
+                except CorrectableConnectionFail:
+                    raise
+
                 except InvalidHandshake as e:
                     logger.warning(
                         (
@@ -477,6 +495,17 @@ class WebsocketAgentTransport(AgentTransport):
                 except ConnectionClosedError as e:
                     logger.warning("Websocket was closed", exc_info=True)
                     raise self._classify_close(e) from e
+
+                except ConnectionClosedOK as e:
+                    # Closed cleanly while we were still sending the Register.
+                    raise CorrectableConnectionFail("The server closed the connection") from e
+
+                except OSError as e:
+                    # Refused, unreachable, unresolvable or timed out (TimeoutError is an
+                    # OSError): the server is restarting or the network is away. That
+                    # passes, so it is retried under the same budget as a dropped socket.
+                    logger.warning("Could not reach %s", self.endpoint_url, exc_info=True)
+                    raise CorrectableConnectionFail(f"Could not reach the server: {e}") from e
 
                 except Exception as e:
                     logger.error("Websocket excepted closed definetely", exc_info=True)
@@ -593,6 +622,11 @@ class WebsocketAgentTransport(AgentTransport):
             # first and cancels this task while it is still inside client.send().
             requeue()
             logger.info("Sending Task sucessfully Cancelled")
+
+    @property
+    def nonce(self) -> str | None:
+        """What the current connection attempt's ``Register`` named itself."""
+        return self._nonce
 
     def release_sends(self) -> None:
         """Let this connection send (the host has handled the server's ``Init``)."""

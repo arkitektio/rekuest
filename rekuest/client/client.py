@@ -161,6 +161,9 @@ class RekuestCaller(Rekuest, RekuestCallerApi):
         cancel_timeout: float | None = None,
         policy: "TaskPolicy | None" = None,
         state_requires: "list[StateRequirement] | None" = None,
+        on_lost: str | None = None,
+        max_resumes: int | None = None,
+        inquire_after: float | None = None,
         **kwargs: Any,  # noqa: ANN401 -- ditto, by keyword
     ) -> Any:  # noqa: ANN401 -- whatever the action returns
         """Call an action as a root task, through this client's own postman.
@@ -189,6 +192,9 @@ class RekuestCaller(Rekuest, RekuestCallerApi):
             cancel_timeout=cancel_timeout,
             policy=policy,
             state_requires=state_requires,
+            on_lost=on_lost,
+            max_resumes=max_resumes,
+            inquire_after=inquire_after,
             **kwargs,
         )
 
@@ -215,6 +221,9 @@ class RekuestCaller(Rekuest, RekuestCallerApi):
         cancel_timeout: float | None = None,
         policy: "TaskPolicy | None" = None,
         state_requires: "list[StateRequirement] | None" = None,
+        on_lost: str | None = None,
+        max_resumes: int | None = None,
+        inquire_after: float | None = None,
     ) -> Any:  # noqa: ANN401 -- the raw backend payload
         """Call with already-serialized arguments, as a root task."""
         self._refuse_in_task("acall_raw")
@@ -232,6 +241,9 @@ class RekuestCaller(Rekuest, RekuestCallerApi):
             cancel_timeout=cancel_timeout,
             policy=policy,
             state_requires=state_requires,
+            on_lost=on_lost,
+            max_resumes=max_resumes,
+            inquire_after=inquire_after,
         )
 
     async def aiterate_raw(
@@ -247,6 +259,9 @@ class RekuestCaller(Rekuest, RekuestCallerApi):
         cancel_timeout: float | None = None,
         policy: "TaskPolicy | None" = None,
         state_requires: "list[StateRequirement] | None" = None,
+        on_lost: str | None = None,
+        max_resumes: int | None = None,
+        inquire_after: float | None = None,
     ) -> AsyncGenerator[Any, None]:
         """Stream with already-serialized arguments, as a root task."""
         self._refuse_in_task("aiterate_raw")
@@ -264,6 +279,9 @@ class RekuestCaller(Rekuest, RekuestCallerApi):
             cancel_timeout=cancel_timeout,
             policy=policy,
             state_requires=state_requires,
+            on_lost=on_lost,
+            max_resumes=max_resumes,
+            inquire_after=inquire_after,
         ):
             yield value
 
@@ -278,6 +296,9 @@ class RekuestCaller(Rekuest, RekuestCallerApi):
         cancel_timeout: float | None = None,
         policy: "TaskPolicy | None" = None,
         state_requires: "list[StateRequirement] | None" = None,
+        on_lost: str | None = None,
+        max_resumes: int | None = None,
+        inquire_after: float | None = None,
         **kwargs: Any,  # noqa: ANN401 -- ditto, by keyword
     ) -> AsyncGenerator[Any, None]:
         """Stream a generator action's yields, as a root task."""
@@ -296,6 +317,9 @@ class RekuestCaller(Rekuest, RekuestCallerApi):
             cancel_timeout=cancel_timeout,
             policy=policy,
             state_requires=state_requires,
+            on_lost=on_lost,
+            max_resumes=max_resumes,
+            inquire_after=inquire_after,
             **kwargs,
         ):
             yield value

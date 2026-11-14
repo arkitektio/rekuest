@@ -114,11 +114,11 @@ async def test_duplicate_assign_for_finished_task_resends_its_report(
 
     completed = transport.of_type(messages.Completed)
     assert len(completed) == 2, "the retained terminal report must be re-sent"
-    assert completed[1].seq == completed[0].seq, "re-sent as-is, not re-executed"
+    assert completed[1].pos == completed[0].pos, "re-sent as-is, not re-executed"
 
     # Once acked the outcome is known to the backend: a further duplicate is just dropped.
     assert completed[0].pos is not None
-    transport.feed(messages.JournalAck(journal_session="s", pos=completed[0].pos))
+    transport.feed(messages.JournalAck(journal_session="s", through=completed[0].pos))
     transport.feed(_assign("task-2", "aquick", x=1))
     await _pump(agent, 2)
     await asyncio.sleep(0.05)

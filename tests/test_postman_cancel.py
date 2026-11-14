@@ -190,7 +190,7 @@ async def _start_and_assign(
         messages.AssignResponse(request=req.id, reference=req.reference, task="t1")
     )
     pm.handle_execution_event(
-        messages.YieldEvent(task="t1", event="e0", seq=1, returns={"0": 1})
+        messages.YieldEvent(task="t1", event="e0", returns={"0": 1})
     )
     await _until(lambda: out)  # the loop is now running and parked on queue.get()
     return task
@@ -209,7 +209,7 @@ async def test_agent_awaits_cancelled_before_reraising() -> None:
     await asyncio.sleep(0)
     assert not task.done(), "re-raised before awaiting the CancelledEvent"
 
-    pm.handle_execution_event(messages.CancelledEvent(task="t1", event="e1", seq=2))
+    pm.handle_execution_event(messages.CancelledEvent(task="t1", event="e1"))
     with pytest.raises(asyncio.CancelledError):
         await asyncio.wait_for(task, timeout=1.0)
 
@@ -229,7 +229,7 @@ async def test_agent_escalates_to_interrupt_on_timeout() -> None:
     await _until(lambda: _has(sink, messages.InterruptRequest))
     assert _has(sink, messages.CancelRequest)
 
-    pm.handle_execution_event(messages.InterruptedEvent(task="t1", event="e2", seq=3))
+    pm.handle_execution_event(messages.InterruptedEvent(task="t1", event="e2"))
     with pytest.raises(asyncio.CancelledError):
         await asyncio.wait_for(task, timeout=1.0)
 

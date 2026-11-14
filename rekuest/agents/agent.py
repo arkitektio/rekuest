@@ -7,8 +7,12 @@ means something against a Rekuest server over its websocket:
 * the delivery side of the agent-report contract (rekuest's ``docs/design/journal.md``):
   every numbered frame is retained -- on disk, :mod:`rekuest.agents.retention` -- until a
   ``JOURNAL_ACK`` covers it; nothing goes out between ``REGISTER`` and ``INIT``; after
-  ``INIT`` the retained frames are sent again, earlier sessions' first, in
-  ``(session created, pos)`` order;
+  ``INIT``, which says how far the server has each session, the rest is sent again,
+  earlier sessions' first, in ``(session created, pos)`` order; a ``JOURNAL_NACK`` (a gap)
+  has it sent again from the position named;
+* the receiving side of the command contract: what the server sends is handled once per
+  position and acknowledged (``COMMAND_ACK``), so the server can send it again after a
+  dropped connection without it being run twice;
 * calls to other actions, routed through the server (:class:`~rekuest.agents.caller.AgentPostman`),
   each child call taking its parent's next task step as its ``reference``;
 * rath's task scope, so rath-based service clients attribute requests to the running task;
@@ -21,7 +25,7 @@ import contextlib
 import json
 import logging
 import time
-from collections.abc import Awaitable, Callable, Sequence
+from collections.abc import Awaitable, Callable
 from typing import Annotated, Any, ClassVar
 
 from pydantic import Field, PrivateAttr, TypeAdapter
@@ -31,6 +35,9 @@ from arkitekt_runtime import messages
 from arkitekt_runtime.agents.backend import LocalAgentBackend
 from arkitekt_runtime.agents.base import BaseAgent
 from arkitekt_runtime.agents.journal import JournalEntry
+from arkitekt_runtime.agents.transport.types import HandshakeParams
+from arkitekt_spec.base import current_spec_version
+from arkitekt_spec.declare.agents.errors import AgentException
 from arkitekt_spec.declare.agents.types import AppContext
 from rekuest.agents.backend import SocketAgentBackend
 from rekuest.agents.caller import AgentPostman
@@ -52,6 +59,24 @@ _FRAME: TypeAdapter[messages.FromAgentMessage] = TypeAdapter(
 
 #: A retained frame's key: its session and position.
 RetainedKey = tuple[str, int]
+
+#: How long handled commands wait to be acknowledged together.
+COMMAND_ACK_DELAY = 0.05
+
+
+class _OrderedSink:
+    """Where the caller postman puts a message: on the agent's ordered path, so a request
+    is numbered and retained like a report, behind what its task reported before it."""
+
+    def __init__(self, agent: "RekuestAgent") -> None:
+        self._agent = agent
+
+    @property
+    def connected(self) -> bool:
+        return self._agent.transport.connected
+
+    async def asend(self, message: messages.FromAgentMessage) -> None:
+        await self._agent._adispatch(message)
 
 
 class RekuestAgent(BaseAgent):
@@ -93,6 +118,11 @@ class RekuestAgent(BaseAgent):
     _state_flushers: list["asyncio.Task[None]"] = PrivateAttr(default_factory=list)
     _state_flush_stop: asyncio.Event | None = PrivateAttr(default=None)
     _after_registration_task: "asyncio.Task[None] | None" = PrivateAttr(default=None)
+    _commands_seen: int = PrivateAttr(default=0)
+    """The highest command position this process has handled."""
+    _command_ack_task: "asyncio.Task[None] | None" = PrivateAttr(default=None)
+    _skipped: set[tuple[str, int]] = PrivateAttr(default_factory=set)
+    """The gaps already declared gone, by session and first position: said once."""
 
     @property
     def control_plane(self) -> "SocketControlPlane":
@@ -108,7 +138,7 @@ class RekuestAgent(BaseAgent):
             self.backend = SocketAgentBackend(control_plane=self.control_plane)
         if self._caller_postman is None:
             self.use_caller(
-                AgentPostman(self.transport, child_step=self.areserve_call_step)
+                AgentPostman(_OrderedSink(self), child_step=self.areserve_call_step)
             )
 
     def _task_ended(self, task: str) -> None:
@@ -134,7 +164,9 @@ class RekuestAgent(BaseAgent):
         """The on-disk store, opened on first use; loads what earlier runs left."""
         if self._store is None:
             try:
-                self._store = RetainedFrames(self.journal_path, agent=self.name or "")
+                self._store = RetainedFrames(
+                    self.journal_path, agent=self.name or "", spec_version=current_spec_version()
+                )
             except Exception:  # noqa: BLE001 — an unwritable path must not stop the agent
                 logger.error(
                     "Could not open %s; unacknowledged frames are kept in memory only, "
@@ -143,6 +175,16 @@ class RekuestAgent(BaseAgent):
                     exc_info=True,
                 )
                 self._store = RetainedFrames(None, agent=self.name or "")
+            set_aside = self._store.set_aside()
+            if set_aside:
+                logger.error(
+                    "%d unsent frames in %s were written by another version of the spec than "
+                    "this agent runs (%s). They are not sent: a server reads what this version "
+                    "speaks. They stay in the file.",
+                    set_aside,
+                    self.journal_path,
+                    current_spec_version(),
+                )
             for stored in self._store.load():
                 try:
                     frame = _FRAME.validate_json(stored.frame)
@@ -390,10 +432,110 @@ class RekuestAgent(BaseAgent):
 
     # ------------------------------------------------------------------ inbound
 
+    async def aget_handshake_params(self) -> HandshakeParams:
+        """Where this agent stands, with what it offers: the commands it has handled and
+        the sessions it still owes frames of."""
+        params = await super().aget_handshake_params()
+        self._open_store()
+        return params.model_copy(
+            update={
+                "features": [*params.features, messages.FEATURE_PROTOCOL_2],
+                "commands_seen": self._commands_seen,
+                "sessions": sorted({session for session, _ in self._retained}),
+            }
+        )
+
+    def _is_current_init(self, message: messages.Init) -> bool:
+        """An ``Init`` names the connection it answers; one of a connection gone since
+        would release this connection's sends before its own arrived."""
+        current = getattr(self.transport, "nonce", None)
+        return message.nonce is None or current is None or message.nonce == current
+
+    async def process(self, message: messages.ToAgentMessage) -> None:
+        """Handle a command once per position, and acknowledge it."""
+        pos = message.pos if isinstance(message, messages.Command) else None
+        if pos is None:
+            await super().process(message)
+            return
+        if pos <= self._commands_seen:
+            logger.debug("Command %s was handled before; acknowledging it again", pos)
+        else:
+            try:
+                await super().process(message)
+            except Exception as e:  # noqa: BLE001 — one command must not end every task
+                await self._aset_aside(message, pos, e)
+            self._commands_seen = pos
+        if self._command_ack_task is None or self._command_ack_task.done():
+            self._command_ack_task = asyncio.create_task(self._aack_commands())
+
+    async def _aset_aside(self, command: messages.Command, pos: int, error: Exception) -> None:
+        """A command arrived intact and could not be handled: say so, and go on.
+
+        Letting it end the agent would end every other task with it, and solve nothing:
+        the command was not acknowledged, so the process that came next would be sent it
+        again. It is acknowledged like any other, and where it was about a task this
+        agent runs, that task is reported as failed, so nobody waits for it.
+        """
+        kind = type(command).__name__
+        logger.error("Could not handle command %s (%s); it is set aside", pos, kind, exc_info=error)
+        ours = (
+            messages.Assign,
+            messages.Cancel,
+            messages.Interrupt,
+            messages.Pause,
+            messages.Resume,
+            messages.Decide,
+            messages.BlokRefused,
+        )
+        if isinstance(command, ours):
+            await self._adispatch(
+                messages.Critical(
+                    task=command.task,
+                    error=f"The agent could not handle {kind}: {type(error).__name__}: {error}",
+                )
+            )
+
+    async def _aack_commands(self) -> None:
+        """One cumulative ``COMMAND_ACK`` for what was handled meanwhile."""
+        await asyncio.sleep(COMMAND_ACK_DELAY)
+        await self.transport.asend(messages.CommandAck(through=self._commands_seen))
+
+    async def _aprocess_nack(self, session: str, expected: int) -> None:
+        """A gap: send again from ``expected``, or say that it is gone."""
+        discard = getattr(self.transport, "discard_journaled", None)
+        if discard is not None:
+            discard()
+        held = sorted(pos for kept, pos in self._retained if kept == session)
+        if held and held[0] > expected:
+            if (session, expected) in self._skipped:
+                # Said once and asked again: the backend did not take it. Saying it over
+                # and over would send everything again each time, with no end.
+                raise AgentException(
+                    f"The backend keeps asking for report {expected} of session {session}, "
+                    "which this agent no longer holds and has already said is gone."
+                )
+            self._skipped.add((session, expected))
+            logger.error(
+                "The reports %s to %s of session %s are no longer held and cannot be sent again",
+                expected,
+                held[0] - 1,
+                session,
+            )
+            await self.transport.asend(
+                messages.JournalSkip(session=session, first=expected, last=held[0] - 1)
+            )
+        await self._aresend_retained()
+
     async def _aprocess_runtime_message(self, message: messages.ToAgentMessage) -> None:
         """The socket protocol: acks and caller answers."""
         if isinstance(message, messages.JournalAck):
-            self._journal_ack(message.journal_session, message.pos)
+            self._journal_ack(message.journal_session, message.through)
+        elif isinstance(message, messages.JournalNack):
+            await self._aprocess_nack(message.journal_session, message.expected)
+        elif isinstance(message, messages.InquireResponse):
+            postman = self.caller_postman
+            if isinstance(postman, AgentPostman):
+                postman.handle_inquire_response(message)
         elif isinstance(
             message,
             (messages.AssignResponse, messages.ProbeResponse, messages.StateRevisionResponse, messages.ExecutionEvent),
@@ -441,12 +583,18 @@ class RekuestAgent(BaseAgent):
             discard = getattr(self.transport, "discard_journaled", None)
             if discard is not None:
                 discard()
+            for session, projected in message.positions.items():
+                if projected > 0:
+                    self._journal_ack(session, projected)
             await self._aresend_retained()
         finally:
             release = getattr(self.transport, "release_sends", None)
             if release is not None:
                 release()
-        await self._areply_to_inquiries(message.inquiries)
+        # A probe does not survive the connection it was fired on.
+        postman = self.caller_postman
+        if isinstance(postman, AgentPostman):
+            postman.fail_probes()
         if self.after_registration is not None and self._after_registration_task is None:
             self._after_registration_task = asyncio.create_task(
                 self._arun_after_registration(self.after_registration)
@@ -460,54 +608,22 @@ class RekuestAgent(BaseAgent):
             logger.exception("What follows this agent's registration failed")
             self._after_registration_task = None
 
-    async def _areply_to_inquiries(
-        self, inquiries: "Sequence[messages.AssignInquiry]"
-    ) -> None:
-        """Tell the backend which of the tasks it is asking about are still alive."""
-        for inquiry in inquiries:
-            await self._areport_task_liveness(inquiry.task)
-
-    async def _areport_task_liveness(self, task: str) -> None:
-        """Report whether one task is still running on its actor."""
-        if self._has_retained_terminal_report(task):
-            # Inquiries arrive on the same Init that just triggered the resend of
-            # retained frames, and that says precisely how this task ended.
-            # Answering again here would only contradict it.
-            return
-
-        if task not in self.managed_assignments:
-            await self._adispatch(
-                messages.Critical(
-                    task=task,
-                    error="After disconnect actor was no longer managed (probably the app was restarted)",
-                )
-            )
-            return
-
-        assignment = self.managed_assignments[task]
-        actor = self.managed_actors[assignment.interface]
-        if await actor.acheck_task(assignment.task):
-            await self._adispatch(
-                messages.Progress(
-                    task=task,
-                    message="Actor is still running",
-                    progress=0,
-                )
-            )
-        else:
-            await self._adispatch(
-                messages.Critical(
-                    task=task,
-                    error="The assignment was not running anymore. But the actor was still managed. This could lead to some race conditions",
-                )
-            )
+    def task_status(self, task: str) -> messages.TaskStatus:
+        """As the core knows it; and a task whose end is still waiting to be acknowledged has
+        ended, however long ago this agent forgot the rest of it."""
+        status = super().task_status(task)
+        if status is messages.TaskStatus.UNKNOWN and self._has_retained_terminal_report(task):
+            return messages.TaskStatus.ENDED
+        return status
 
     async def atear_down(self) -> None:
         """Tear down, then close the store (what it holds is sent by the next run)."""
         follow_up, self._after_registration_task = self._after_registration_task, None
-        if follow_up is not None and not follow_up.done():
-            follow_up.cancel()
-            await asyncio.gather(follow_up, return_exceptions=True)
+        acking, self._command_ack_task = self._command_ack_task, None
+        for task in (follow_up, acking):
+            if task is not None and not task.done():
+                task.cancel()
+                await asyncio.gather(task, return_exceptions=True)
         try:
             await super().atear_down()
         finally:

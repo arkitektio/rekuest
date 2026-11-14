@@ -336,7 +336,7 @@ async def test_a_second_aconnect_in_one_session_does_not_see_the_old_close(
         # bring it back to life for the second attempt.
         socket._dropped = None
         await transport.aconnect()
-        socket.feed(messages.Init(agent="1", inquiries=[]))
+        socket.feed(messages.Init(agent="1"))
 
         async def first() -> messages.ToAgentMessage:
             async for message in transport.areceive():
@@ -864,3 +864,43 @@ async def test_the_socket_is_opened_through_the_proxy_only_when_one_is_set(
         assert seen[0]["proxy"] is None
     else:
         assert seen[0]["proxy"] == proxy
+
+
+@pytest.mark.asyncio
+async def test_a_refused_connect_and_a_clean_close_are_retried(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A server that restarts closes cleanly (1001) and then refuses for a moment. Both are
+    drops to retry and to tell the host about, not the end of the agent."""
+    first, second = FakeSocket(), FakeSocket()
+    attempts: list[object] = [first, ConnectionRefusedError("refused"), second]
+
+    def connect(*args: object, **kwargs: object) -> FakeConnect:
+        attempt = attempts.pop(0)
+        if isinstance(attempt, Exception):
+            raise attempt
+        return FakeConnect(cast(FakeSocket, attempt))
+
+    monkeypatch.setattr(websockets, "connect", connect)
+    transport = WebsocketAgentTransport(endpoint_url="ws://localhost:8000/agi", token_loader=_token)
+    host = _Host(ConnectionPolicy(backoff=_NO_DELAY))
+    transport.set_transport_host(host)
+
+    async with transport as transport:
+        await transport.aconnect()
+        received: list[messages.ToAgentMessage] = []
+
+        async def consume() -> None:
+            async for message in transport.areceive():
+                received.append(message)
+
+        consumer = asyncio.create_task(consume())
+        await asyncio.sleep(0.05)
+        first._incoming.put_nowait(None)  # the iteration ends without an error: a clean close
+        await asyncio.sleep(0.1)
+        second.feed(messages.Init(agent="agent-1"))
+        await asyncio.sleep(0.05)
+
+        assert len(received) == 1 and not consumer.done(), "the agent goes on, on the third attempt"
+        assert host.transitions[:3] == [True, False, False], "both drops are told to the host"
+
+        await transport.adisconnect()
+        await _stop(consumer)

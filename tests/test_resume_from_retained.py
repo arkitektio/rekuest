@@ -11,6 +11,7 @@ from pathlib import Path
 from arkitekt_runtime import messages
 from arkitekt_spec.declare.app import AppRegistry
 from rekuest.agents.agent import RekuestAgent
+from arkitekt_spec.base import current_spec_version
 from rekuest.agents.retention import RetainedFrames
 
 from arkitekt_runtime.local import MemoryAgentTransport
@@ -20,7 +21,8 @@ NAME = "resume-agent"
 
 def _retain(path: Path, *frames: messages.FromAgentMessage) -> None:
     """What a dead process left unacknowledged in its journal."""
-    store = RetainedFrames(str(path), agent=NAME)
+    # As the process before this one left it: the same spec version wrote it.
+    store = RetainedFrames(str(path), agent=NAME, spec_version=current_spec_version())
     store.open_session("dead", time.time())
     for pos, frame in enumerate(frames, start=1):
         store.add("dead", pos, frame.model_dump_json())

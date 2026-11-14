@@ -33,3 +33,19 @@ mutation decide($input: DecideInput!) {
     ...Task
   }
 }
+
+
+# Ask the agent of a task this caller assigned whether it is still on it. A read: nothing is
+# done to the task. An agent that does not know a task it was given has lost it (LOST).
+mutation inquire($input: InquireInput!) {
+  inquire(input: $input) {
+    task
+    status
+    asked
+    detail
+    step
+    reportedAt
+    progress
+    message
+  }
+}

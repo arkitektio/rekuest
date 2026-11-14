@@ -6,7 +6,7 @@ from arkitekt_spec.actions import ActionDemandInput, ActionKind, AgentDependency
 from datetime import datetime
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 from rath.scalars import ID, IDCoercible
-from rekuest.protocol.schema import ActionBlokPhase, ActionFilter, ActionOrder, AgentFilter, AgentInput, AgentKind, AllowActionInput, AssignWidgetKind, BlokAgentMappingInput, CatalogComponentInput, CatalogOperationInput, CatalogValueKind, CollectInput, ComponentContext, CreateAssetInput, CreateBlokInput, CreateDashboardInput, CreateHigherOrderImplementationInput, CreateShortcutInput, CreateTestCaseInput, CreateTestResultInput, DiagnosticLevel, EditBlokInput, FinishMediaUploadInput, ForkBlokInput, ImplementationFilter, InterruptInput, LocalKind, LogLevel, MaterializationScope, MaterializeBlokInput, OffsetPaginationInput, PinMaterializedBlokInput, RegisterModuleInput, RequestAssetUploadInput, RequestMediaAccessInput, RequestMediaUploadInput, ResetPlacementInput, ReturnWidgetKind, RevertBlokInput, RevokeAllowanceInput, SavePlacementInput, ShelveInMemoryDrawerInput, ShortcutBindingsInput, ShortcutFilter, ShortcutOrder, TaskInstructKind, ToolboxFilter, ToolboxOrder, UnshelveMemoryDrawerInput, UpdateBlokInput, UpdateMaterializedBlokInput, WidgetDefaultInput
+from rekuest.protocol.schema import ActionBlokPhase, ActionFilter, ActionOrder, AgentFilter, AgentInput, AgentKind, AllowActionInput, AssignWidgetKind, BlokAgentMappingInput, CatalogComponentInput, CatalogOperationInput, CatalogValueKind, CollectInput, ComponentContext, CreateAssetInput, CreateBlokInput, CreateDashboardInput, CreateHigherOrderImplementationInput, CreateShortcutInput, CreateTestCaseInput, CreateTestResultInput, DependencyTreeInput, DiagnosticLevel, EditBlokInput, FinishMediaUploadInput, ForkBlokInput, ImplementationFilter, InquireInput, InterruptInput, LocalKind, LogLevel, MaterializationScope, MaterializeBlokInput, OffsetPaginationInput, OnLost, PinMaterializedBlokInput, RegisterModuleInput, RequestAssetUploadInput, RequestMediaAccessInput, RequestMediaUploadInput, ResetPlacementInput, ReturnWidgetKind, RevertBlokInput, RevokeAllowanceInput, SavePlacementInput, ShelveInMemoryDrawerInput, ShortcutBindingsInput, ShortcutFilter, ShortcutOrder, TaskInstructKind, TaskStatus, ToolboxFilter, ToolboxOrder, UnshelveMemoryDrawerInput, UpdateBlokInput, UpdateMaterializedBlokInput, WidgetDefaultInput
 from rekuest.scalars import ActionHash, Args, Identifier, JSONSerializable, MediaLike
 from rekuest.traits.action import Callable
 from typing import Annotated, Any, AsyncIterator, ClassVar, Iterable, Iterator, Literal
@@ -2170,6 +2170,40 @@ class DecideMutation(BaseModel):
         """Meta class for decide """
         document = 'fragment Task on Task {\n  args\n  id\n  parent {\n    id\n    __typename\n  }\n  id\n  latestEventKind\n  policy\n  events(ordering: [{createdAt: ASC}]) {\n    id\n    returns\n    level\n    __typename\n  }\n  instructs {\n    id\n    __typename\n  }\n  reference\n  updatedAt\n  __typename\n}\n\nmutation decide($input: DecideInput!) {\n  decide(input: $input) {\n    ...Task\n    __typename\n  }\n}'
 
+class InquireMutationInquire(BaseModel):
+    """What is known of a task someone asked about: what its agent said of it, or, where the agent was not asked (it is away, or has not acknowledged the assign yet), what the server knows."""
+    typename: Literal['TaskInquiry'] = Field(alias='__typename', default='TaskInquiry', exclude=True)
+    task: ID
+    status: TaskStatus | None = Field(default=None)
+    'What the agent said; ENDED for a task the server already closed. Null where the agent was not asked or did not answer: `detail` says why.'
+    asked: bool
+    'Whether the agent was asked.'
+    detail: str | None = Field(default=None)
+    'Why the agent was not asked, or why there is no answer.'
+    step: int | None = Field(default=None)
+    'The last step the task reported, as the agent has it.'
+    reported_at: datetime | None = Field(default=None, alias='reportedAt')
+    'When the task last reported anything, as the agent has it.'
+    progress: int | None = Field(default=None)
+    'What the task last said of its progress, as the agent has it.'
+    message: str | None = Field(default=None)
+    'The message of its last progress or log, as the agent has it.'
+    model_config = ConfigDict(frozen=True)
+
+class InquireMutation(BaseModel):
+    """ Ask the agent of a task this caller assigned whether it is still on it. A read: nothing is
+ done to the task. An agent that does not know a task it was given has lost it (LOST)."""
+    inquire: InquireMutationInquire
+    'Ask the agent of a task you assigned whether it is still on it. It answers at once, from memory; nothing is done to the task and nothing is tried again. One answer has a consequence: an agent that does not know a task it was given has lost it, and the task ends LOST. While the agent is away, or has not acknowledged the assign yet, the server answers with what it knows.'
+
+    class Arguments(BaseModel):
+        """Arguments for inquire """
+        input: InquireInput
+
+    class Meta:
+        """Meta class for inquire """
+        document = 'mutation inquire($input: InquireInput!) {\n  inquire(input: $input) {\n    task\n    status\n    asked\n    detail\n    step\n    reportedAt\n    progress\n    message\n    __typename\n  }\n}'
+
 class EnsureAgentMutation(BaseModel):
     """No documentation found for this operation."""
     ensure_agent: Agent = Field(alias='ensureAgent')
@@ -2889,6 +2923,66 @@ class ResolvedImplementationsQuery(BaseModel):
     class Meta:
         """Meta class for ResolvedImplementations """
         document = 'fragment ActionArgumentLeaf on ActionArgument {\n  key\n  valueLiteral\n  valuePath\n  utilCall {\n    operation\n    __typename\n  }\n  __typename\n}\n\nfragment ActionArgumentNested on ActionArgument {\n  key\n  valueLiteral\n  valuePath\n  utilCall {\n    operation\n    arguments {\n      ...ActionArgumentLeaf\n      __typename\n    }\n    __typename\n  }\n  valueList {\n    ...ActionArgumentLeaf\n    __typename\n  }\n  valueDict {\n    ...ActionArgumentLeaf\n    __typename\n  }\n  __typename\n}\n\nfragment ComponentProp on ComponentProp {\n  key\n  staticValue\n  dynamicValue {\n    literal\n    path\n    __typename\n  }\n  declaresValue\n  utilCall {\n    ...UtilCall\n    __typename\n  }\n  __typename\n}\n\nfragment ActionArgument on ActionArgument {\n  key\n  valueLiteral\n  valuePath\n  utilCall {\n    operation\n    arguments {\n      ...ActionArgumentNested\n      __typename\n    }\n    __typename\n  }\n  valueList {\n    ...ActionArgumentNested\n    __typename\n  }\n  valueDict {\n    ...ActionArgumentNested\n    __typename\n  }\n  __typename\n}\n\nfragment ArgChildPortNested on ArgPort {\n  key\n  kind\n  children {\n    key\n    identifier\n    nullable\n    kind\n    referenceUnit\n    proposedUnits\n    dimension\n    __typename\n  }\n  choices {\n    value\n    label\n    description\n    __typename\n  }\n  identifier\n  nullable\n  default\n  referenceUnit\n  proposedUnits\n  dimension\n  __typename\n}\n\nfragment ChoiceAssignWidget on ChoiceAssignWidget {\n  __typename\n  kind\n  placeholder\n}\n\nfragment ChoiceReturnWidget on ChoiceReturnWidget {\n  __typename\n  kind\n}\n\nfragment CustomAssignWidget on CustomAssignWidget {\n  __typename\n  kind\n  component\n  props {\n    ...ComponentProp\n    __typename\n  }\n  dependencies\n}\n\nfragment CustomEffect on CustomEffect {\n  __typename\n  kind\n}\n\nfragment CustomReturnWidget on CustomReturnWidget {\n  __typename\n  kind\n  component\n  props {\n    ...ComponentProp\n    __typename\n  }\n}\n\nfragment MessageEffect on MessageEffect {\n  __typename\n  kind\n  message\n}\n\nfragment ReturnChildPortNested on ReturnPort {\n  key\n  kind\n  children {\n    key\n    identifier\n    nullable\n    kind\n    referenceUnit\n    proposedUnits\n    dimension\n    __typename\n  }\n  choices {\n    value\n    label\n    description\n    __typename\n  }\n  identifier\n  nullable\n  referenceUnit\n  proposedUnits\n  dimension\n  __typename\n}\n\nfragment SearchAssignWidget on SearchAssignWidget {\n  __typename\n  kind\n  query\n  ward\n  dependencies\n}\n\nfragment SliderAssignWidget on SliderAssignWidget {\n  __typename\n  kind\n  min\n  max\n  step\n}\n\nfragment StringAssignWidget on StringAssignWidget {\n  __typename\n  kind\n  placeholder\n  asParagraph\n}\n\nfragment ArgChildPort on ArgPort {\n  key\n  kind\n  identifier\n  children {\n    ...ArgChildPortNested\n    __typename\n  }\n  choices {\n    value\n    label\n    description\n    __typename\n  }\n  nullable\n  default\n  referenceUnit\n  proposedUnits\n  dimension\n  __typename\n}\n\nfragment PortAssignWidget on AssignWidget {\n  __typename\n  kind\n  ...StringAssignWidget\n  ...SearchAssignWidget\n  ...SliderAssignWidget\n  ...ChoiceAssignWidget\n  ...CustomAssignWidget\n}\n\nfragment PortEffect on Effect {\n  __typename\n  kind\n  dependencies\n  call {\n    ...UtilCall\n    __typename\n  }\n  callJson\n  source\n  ...CustomEffect\n  ...MessageEffect\n}\n\nfragment ReturnChildPort on ReturnPort {\n  key\n  kind\n  identifier\n  children {\n    ...ReturnChildPortNested\n    __typename\n  }\n  choices {\n    value\n    label\n    description\n    __typename\n  }\n  nullable\n  referenceUnit\n  proposedUnits\n  dimension\n  __typename\n}\n\nfragment ReturnWidget on ReturnWidget {\n  __typename\n  kind\n  ...CustomReturnWidget\n  ...ChoiceReturnWidget\n}\n\nfragment UtilCall on UtilCall {\n  operation\n  arguments {\n    ...ActionArgument\n    __typename\n  }\n  __typename\n}\n\nfragment ArgPort on ArgPort {\n  __typename\n  key\n  label\n  nullable\n  description\n  default\n  kind\n  identifier\n  referenceUnit\n  proposedUnits\n  dimension\n  children {\n    ...ArgChildPort\n    __typename\n  }\n  widget {\n    ...PortAssignWidget\n    __typename\n  }\n  choices {\n    value\n    label\n    description\n    __typename\n  }\n  validators {\n    call {\n      ...UtilCall\n      __typename\n    }\n    callJson\n    source\n    errorMessage\n    dependencies\n    label\n    __typename\n  }\n  effects {\n    ...PortEffect\n    __typename\n  }\n}\n\nfragment ReturnPort on ReturnPort {\n  __typename\n  key\n  label\n  nullable\n  description\n  kind\n  identifier\n  referenceUnit\n  proposedUnits\n  dimension\n  children {\n    ...ReturnChildPort\n    __typename\n  }\n  widget {\n    ...ReturnWidget\n    __typename\n  }\n  choices {\n    value\n    label\n    description\n    __typename\n  }\n  effects {\n    ...PortEffect\n    __typename\n  }\n}\n\nfragment Definition on Action {\n  args {\n    ...ArgPort\n    __typename\n  }\n  returns {\n    ...ReturnPort\n    __typename\n  }\n  kind\n  name\n  description\n  collections {\n    name\n    __typename\n  }\n  isDev\n  isTestFor {\n    id\n    __typename\n  }\n  portGroups {\n    key\n    __typename\n  }\n  stateful\n  __typename\n}\n\nfragment Action on Action {\n  hash\n  id\n  ...Definition\n  __typename\n}\n\nfragment Implementation on Implementation {\n  id\n  agent {\n    id\n    __typename\n  }\n  action {\n    ...Action\n    __typename\n  }\n  params\n  interface\n  diagnostics {\n    level\n    code\n    message\n    path\n    __typename\n  }\n  __typename\n}\n\nquery ResolvedImplementations($resolution: ID!, $dependencyKey: String!, $methodKey: String!) {\n  resolvedImplementations(\n    resolution: $resolution\n    dependencyKey: $dependencyKey\n    methodKey: $methodKey\n  ) {\n    ...Implementation\n    __typename\n  }\n}'
+
+class DependencyTreeQueryDependencyTreeDependenciesMappedAgentsMappedImplementationsResolvedDependencies(BaseModel):
+    """No documentation"""
+    typename: Literal['ResolvedAgentDependency'] = Field(alias='__typename', default='ResolvedAgentDependency', exclude=True)
+    key: str
+    'Get the key of the resolved dependency.'
+    unmet: str | None = Field(default=None)
+    'Why an assign would refuse this dependency as it is bound here. Only a dry run (dependencyTree) says so; null when it is met.'
+    model_config = ConfigDict(frozen=True)
+
+class DependencyTreeQueryDependencyTreeDependenciesMappedAgentsMappedImplementations(BaseModel):
+    """No documentation"""
+    typename: Literal['ImplementationMapping'] = Field(alias='__typename', default='ImplementationMapping', exclude=True)
+    key: str
+    'Get the key of the implementation mapping.'
+    resolved_dependencies: tuple[DependencyTreeQueryDependencyTreeDependenciesMappedAgentsMappedImplementationsResolvedDependencies, ...] = Field(alias='resolvedDependencies')
+    "What the bound implementation's own dependencies resolve to: the level below."
+    model_config = ConfigDict(frozen=True)
+
+class DependencyTreeQueryDependencyTreeDependenciesMappedAgents(BaseModel):
+    """No documentation"""
+    typename: Literal['AgentMapping'] = Field(alias='__typename', default='AgentMapping', exclude=True)
+    agent_id: str = Field(alias='agentId')
+    "Get the agent's ID from the mapping."
+    mapped_implementations: tuple[DependencyTreeQueryDependencyTreeDependenciesMappedAgentsMappedImplementations, ...] = Field(alias='mappedImplementations')
+    'Get a specific argument by key.'
+    model_config = ConfigDict(frozen=True)
+
+class DependencyTreeQueryDependencyTreeDependencies(BaseModel):
+    """No documentation"""
+    typename: Literal['ResolvedAgentDependency'] = Field(alias='__typename', default='ResolvedAgentDependency', exclude=True)
+    key: str
+    'Get the key of the resolved dependency.'
+    unmet: str | None = Field(default=None)
+    'Why an assign would refuse this dependency as it is bound here. Only a dry run (dependencyTree) says so; null when it is met.'
+    mapped_agents: tuple[DependencyTreeQueryDependencyTreeDependenciesMappedAgents, ...] = Field(alias='mappedAgents')
+    'Get a specific argument by key.'
+    model_config = ConfigDict(frozen=True)
+
+class DependencyTreeQueryDependencyTree(BaseModel):
+    """What assigning an implementation would bind: its dependency tree, resolved without assigning."""
+    typename: Literal['DependencyTree'] = Field(alias='__typename', default='DependencyTree', exclude=True)
+    satisfied: bool
+    'Whether an assign with these overwrites would go through: nothing in the tree is unmet.'
+    dependencies: tuple[DependencyTreeQueryDependencyTreeDependencies, ...]
+    "The implementation's dependencies, each with the agents it would bind and, below those, their own."
+    model_config = ConfigDict(frozen=True)
+
+class DependencyTreeQuery(BaseModel):
+    """ A dry run of an assign's dependency resolution: what would be bound, and why not."""
+    dependency_tree: DependencyTreeQueryDependencyTree = Field(alias='dependencyTree')
+    "What assigning an implementation with these overwrites would bind, level by level, and what is unmet: a dry run of the assign's dependency resolution."
+
+    class Arguments(BaseModel):
+        """Arguments for DependencyTree """
+        input: DependencyTreeInput
+
+    class Meta:
+        """Meta class for DependencyTree """
+        document = 'query DependencyTree($input: DependencyTreeInput!) {\n  dependencyTree(input: $input) {\n    satisfied\n    dependencies {\n      key\n      unmet\n      mappedAgents {\n        agentId\n        mappedImplementations {\n          key\n          resolvedDependencies {\n            key\n            unmet\n            __typename\n          }\n          __typename\n        }\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n}'
 
 class FindQuery(BaseModel):
     """No documentation found for this operation."""
@@ -5505,6 +5599,44 @@ Returns:
         variables['methodKey'] = method_key
         return self.execute(ResolvedImplementationsQuery, variables).resolved_implementations
 
+    async def adependency_tree(self, implementation: IDCoercible, dependencies: Iterable[ResolvedDependencyInput] | None | UnsetType=UNSET) -> DependencyTreeQueryDependencyTree:
+        """DependencyTree 
+ A dry run of an assign's dependency resolution: what would be bound, and why not.
+
+Args:
+    implementation: The implementation an assign would target.
+    dependencies: The overwrites the assign would carry.
+
+Returns:
+    DependencyTreeQueryDependencyTree
+"""
+        variables: dict[str, builtins.object] = {}
+        _input: dict[str, builtins.object] = {}
+        _input['implementation'] = implementation
+        if dependencies is not UNSET:
+            _input['dependencies'] = dependencies
+        variables['input'] = _input
+        return (await self.aexecute(DependencyTreeQuery, variables)).dependency_tree
+
+    def dependency_tree(self, implementation: IDCoercible, dependencies: Iterable[ResolvedDependencyInput] | None | UnsetType=UNSET) -> DependencyTreeQueryDependencyTree:
+        """DependencyTree 
+ A dry run of an assign's dependency resolution: what would be bound, and why not.
+
+Args:
+    implementation: The implementation an assign would target.
+    dependencies: The overwrites the assign would carry.
+
+Returns:
+    DependencyTreeQueryDependencyTree
+"""
+        variables: dict[str, builtins.object] = {}
+        _input: dict[str, builtins.object] = {}
+        _input['implementation'] = implementation
+        if dependencies is not UNSET:
+            _input['dependencies'] = dependencies
+        variables['input'] = _input
+        return self.execute(DependencyTreeQuery, variables).dependency_tree
+
     async def afind(self, id: IDCoercible | None | UnsetType=UNSET, implementation: IDCoercible | None | UnsetType=UNSET, hash: ActionHash | None | UnsetType=UNSET, matching: ActionDemandInput | None | UnsetType=UNSET) -> Action:
         """find 
 
@@ -6477,7 +6609,7 @@ Returns:
         variables['input'] = _input
         return self.execute(RevokeAllowanceMutation, variables).revoke_allowance
 
-    async def aassign(self, args: Args, capture: bool, action: IDCoercible | None | UnsetType=UNSET, resolution: IDCoercible | None | UnsetType=UNSET, implementation: IDCoercible | None | UnsetType=UNSET, agent: IDCoercible | None | UnsetType=UNSET, action_hash: ActionHash | None | UnsetType=UNSET, interface: str | None | UnsetType=UNSET, hooks: Iterable[HookInput] | None | UnsetType=UNSET, reference: str | None | UnsetType=UNSET, dependencies: Iterable[ResolvedDependencyInput] | None | UnsetType=UNSET, step: bool | None | UnsetType=UNSET, not_before: datetime | None | UnsetType=UNSET, policy: TaskPolicy | None | UnsetType=UNSET, state_requires: Iterable[StateRequirementInput] | None | UnsetType=UNSET, space: IDCoercible | None | UnsetType=UNSET) -> Task:
+    async def aassign(self, args: Args, capture: bool, action: IDCoercible | None | UnsetType=UNSET, resolution: IDCoercible | None | UnsetType=UNSET, implementation: IDCoercible | None | UnsetType=UNSET, agent: IDCoercible | None | UnsetType=UNSET, action_hash: ActionHash | None | UnsetType=UNSET, interface: str | None | UnsetType=UNSET, hooks: Iterable[HookInput] | None | UnsetType=UNSET, reference: str | None | UnsetType=UNSET, dependencies: Iterable[ResolvedDependencyInput] | None | UnsetType=UNSET, step: bool | None | UnsetType=UNSET, not_before: datetime | None | UnsetType=UNSET, policy: TaskPolicy | None | UnsetType=UNSET, state_requires: Iterable[StateRequirementInput] | None | UnsetType=UNSET, on_lost: OnLost | None | UnsetType=UNSET, max_resumes: int | None | UnsetType=UNSET, space: IDCoercible | None | UnsetType=UNSET) -> Task:
         """assign 
 
 Assign a task to an agent.
@@ -6498,6 +6630,8 @@ Args:
     not_before: Hold the task back until then: it is persisted now but only dispatched once due. A time in the past (or none) dispatches immediately.
     policy: Whether the work the agents ask for under this task waits for a person: ASK (the default) holds every child an agent assigns until someone approves it, AUTO runs it without asking (auto-mode). Honoured on a root only: a child always takes its parent's.
     state_requires: What the agent's state must hold for the task to run. Refused unless the agent says it tests them, and for a state or path its declaration does not have.
+    on_lost: What to do with the task should its agent be lost while it runs: FAIL, RESUME (workflows) or RESTART (idempotent actions). Not set, a workflow resumes from what it recorded and anything else ends LOST.
+    max_resumes: How often the task may be sent again (resumed or restarted) after its agent was lost, before it ends LOST after all. Not set, the server's own limit applies; 0 is never.
     space: The space (in the caller's organization) the run is started in: where a client draws the action's overlay over the placed agents (`Task.space`). Only a UI reads it; nothing runs differently. Honoured on a root only.
 
 Returns:
@@ -6533,12 +6667,16 @@ Returns:
             _input['policy'] = policy
         if state_requires is not UNSET:
             _input['stateRequires'] = state_requires
+        if on_lost is not UNSET:
+            _input['onLost'] = on_lost
+        if max_resumes is not UNSET:
+            _input['maxResumes'] = max_resumes
         if space is not UNSET:
             _input['space'] = space
         variables['input'] = _input
         return (await self.aexecute(AssignMutation, variables)).assign
 
-    def assign(self, args: Args, capture: bool, action: IDCoercible | None | UnsetType=UNSET, resolution: IDCoercible | None | UnsetType=UNSET, implementation: IDCoercible | None | UnsetType=UNSET, agent: IDCoercible | None | UnsetType=UNSET, action_hash: ActionHash | None | UnsetType=UNSET, interface: str | None | UnsetType=UNSET, hooks: Iterable[HookInput] | None | UnsetType=UNSET, reference: str | None | UnsetType=UNSET, dependencies: Iterable[ResolvedDependencyInput] | None | UnsetType=UNSET, step: bool | None | UnsetType=UNSET, not_before: datetime | None | UnsetType=UNSET, policy: TaskPolicy | None | UnsetType=UNSET, state_requires: Iterable[StateRequirementInput] | None | UnsetType=UNSET, space: IDCoercible | None | UnsetType=UNSET) -> Task:
+    def assign(self, args: Args, capture: bool, action: IDCoercible | None | UnsetType=UNSET, resolution: IDCoercible | None | UnsetType=UNSET, implementation: IDCoercible | None | UnsetType=UNSET, agent: IDCoercible | None | UnsetType=UNSET, action_hash: ActionHash | None | UnsetType=UNSET, interface: str | None | UnsetType=UNSET, hooks: Iterable[HookInput] | None | UnsetType=UNSET, reference: str | None | UnsetType=UNSET, dependencies: Iterable[ResolvedDependencyInput] | None | UnsetType=UNSET, step: bool | None | UnsetType=UNSET, not_before: datetime | None | UnsetType=UNSET, policy: TaskPolicy | None | UnsetType=UNSET, state_requires: Iterable[StateRequirementInput] | None | UnsetType=UNSET, on_lost: OnLost | None | UnsetType=UNSET, max_resumes: int | None | UnsetType=UNSET, space: IDCoercible | None | UnsetType=UNSET) -> Task:
         """assign 
 
 Assign a task to an agent.
@@ -6559,6 +6697,8 @@ Args:
     not_before: Hold the task back until then: it is persisted now but only dispatched once due. A time in the past (or none) dispatches immediately.
     policy: Whether the work the agents ask for under this task waits for a person: ASK (the default) holds every child an agent assigns until someone approves it, AUTO runs it without asking (auto-mode). Honoured on a root only: a child always takes its parent's.
     state_requires: What the agent's state must hold for the task to run. Refused unless the agent says it tests them, and for a state or path its declaration does not have.
+    on_lost: What to do with the task should its agent be lost while it runs: FAIL, RESUME (workflows) or RESTART (idempotent actions). Not set, a workflow resumes from what it recorded and anything else ends LOST.
+    max_resumes: How often the task may be sent again (resumed or restarted) after its agent was lost, before it ends LOST after all. Not set, the server's own limit applies; 0 is never.
     space: The space (in the caller's organization) the run is started in: where a client draws the action's overlay over the placed agents (`Task.space`). Only a UI reads it; nothing runs differently. Honoured on a root only.
 
 Returns:
@@ -6594,6 +6734,10 @@ Returns:
             _input['policy'] = policy
         if state_requires is not UNSET:
             _input['stateRequires'] = state_requires
+        if on_lost is not UNSET:
+            _input['onLost'] = on_lost
+        if max_resumes is not UNSET:
+            _input['maxResumes'] = max_resumes
         if space is not UNSET:
             _input['space'] = space
         variables['input'] = _input
@@ -6794,3 +6938,37 @@ Returns:
             _input['remember'] = remember
         variables['input'] = _input
         return self.execute(DecideMutation, variables).decide
+
+    async def ainquire(self, task: IDCoercible) -> InquireMutationInquire:
+        """inquire 
+ Ask the agent of a task this caller assigned whether it is still on it. A read: nothing is
+ done to the task. An agent that does not know a task it was given has lost it (LOST).
+
+Args:
+    task: The task to ask about: one the caller assigned
+
+Returns:
+    InquireMutationInquire
+"""
+        variables: dict[str, builtins.object] = {}
+        _input: dict[str, builtins.object] = {}
+        _input['task'] = task
+        variables['input'] = _input
+        return (await self.aexecute(InquireMutation, variables)).inquire
+
+    def inquire(self, task: IDCoercible) -> InquireMutationInquire:
+        """inquire 
+ Ask the agent of a task this caller assigned whether it is still on it. A read: nothing is
+ done to the task. An agent that does not know a task it was given has lost it (LOST).
+
+Args:
+    task: The task to ask about: one the caller assigned
+
+Returns:
+    InquireMutationInquire
+"""
+        variables: dict[str, builtins.object] = {}
+        _input: dict[str, builtins.object] = {}
+        _input['task'] = task
+        variables['input'] = _input
+        return self.execute(InquireMutation, variables).inquire

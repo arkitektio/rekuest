@@ -47,7 +47,6 @@ def _patch(rev: int, task: str | None, op: str = "replace", path: str = "/exposu
         op=op,
         path=path,
         value=rev + 1 if value is None else value,
-        old_value=None,
         task_id=task,
     )
 
@@ -91,7 +90,7 @@ async def test_journaled_frames_carry_their_position(
     early, init, log, other = transport.sent
     assert early.pos is None, "nothing is recorded before the session"  # type: ignore[union-attr]
     assert (init.pos, init.journal_session, init.task_step) == (1, "s", None)  # type: ignore[union-attr]
-    assert (log.pos, log.journal_session, log.seq, log.task_step) == (2, "s", 2, 1)  # type: ignore[union-attr]
+    assert (log.pos, log.journal_session, log.task_step) == (2, "s", 1)  # type: ignore[union-attr]
     assert (other.pos, other.task_step) == (3, None), "a task this process never ran"  # type: ignore[union-attr]
     assert log.agent_ts is not None and abs(log.agent_ts - time.time()) < 60  # type: ignore[union-attr]
     wire = json.loads(log.model_dump_json())
@@ -106,7 +105,7 @@ async def test_every_numbered_frame_is_retained_until_a_journal_ack_and_resent_i
     await agent._adispatch(_session_init("s"))  # pos 1
     await agent._adispatch(messages.Log(task="t", message="a"))  # pos 2
     await agent._adispatch(messages.Yield(task="t", returns={}))  # pos 3
-    await _process(agent, messages.JournalAck(journal_session="s", pos=1))
+    await _process(agent, messages.JournalAck(journal_session="s", through=1))
     await agent._adispatch(messages.Completed(task="t"))  # pos 4
     assert [m.pos for m in agent.retained] == [2, 3, 4]  # type: ignore[union-attr]
     first_sent = {m.pos: m for m in transport.sent}  # type: ignore[union-attr]
@@ -119,7 +118,7 @@ async def test_every_numbered_frame_is_retained_until_a_journal_ack_and_resent_i
 
     # The terminal report too retires on the JOURNAL_ACK.
     assert [m.pos for m in agent.retained] == [2, 3, 4]  # type: ignore[union-attr]
-    await _process(agent, messages.JournalAck(journal_session="s", pos=4))
+    await _process(agent, messages.JournalAck(journal_session="s", through=4))
     assert not agent.retained
 
 
@@ -168,7 +167,7 @@ async def test_retained_frames_survive_a_restart(tmp_path: Path) -> None:
     await dying._adispatch(_session_init("first"))
     await dying._adispatch(messages.Log(task="t", message="one"))
     await dying._adispatch(messages.Completed(task="t"))
-    await dying.process(messages.JournalAck(journal_session="first", pos=1))
+    await dying.process(messages.JournalAck(journal_session="first", through=1))
     await dying.atear_down()  # the process ends; pos 2 and 3 were never acked
 
     after = MemoryAgentTransport()
@@ -188,7 +187,7 @@ async def test_retained_frames_survive_a_restart(tmp_path: Path) -> None:
     ]
     assert after.sent[1] == before.sent[2], "as it was sent"
 
-    await agent.process(messages.JournalAck(journal_session="first", pos=3))
+    await agent.process(messages.JournalAck(journal_session="first", through=3))
     await agent.atear_down()
     again = RekuestAgent(name="restart", transport=MemoryAgentTransport(), app_registry=AppRegistry(), journal_path=path)
     await again.astart()
@@ -233,7 +232,10 @@ async def test_a_child_call_carries_its_parents_next_step(
     await _until(lambda: transport.of_type(messages.AssignRequest))
     (request,) = transport.of_type(messages.AssignRequest)
     assert (request.reference, request.parent, request.parent_step) == ("mine", "42", 2)
-    assert "pos" not in json.loads(request.model_dump_json()), "not numbered"
+    # Numbered like a report (kept until acknowledged; its answer is a command), in the
+    # session and in no task of this agent.
+    assert (request.pos, request.task_step) == (3, None)
+    assert (request.journal_session, request.pos) in agent._retained
     await agent._adispatch(messages.Log(task="42", message="after"))
     assert [m.task_step for m in transport.of_type(messages.Log)] == [1, 3]
 
@@ -339,7 +341,7 @@ async def test_nothing_is_sent_between_register_and_init_and_retained_frames_go_
             ("LOG", 3),
         ], "each unacked frame once, in pos order"
 
-        second.feed(messages.JournalAck(journal_session=agent.current_session, pos=3))
+        second.feed(messages.JournalAck(journal_session=agent.current_session, through=3))
         await _until(lambda: not agent.retained)
         await agent.atear_down()
 
@@ -399,3 +401,108 @@ async def test_an_unwritable_store_keeps_the_frames_in_memory(tmp_path: Path) ->
     await agent.process(messages.Init(agent="a"))
     assert [m.pos for m in transport.sent] == [1]  # type: ignore[union-attr]
     await agent.atear_down()
+
+
+# ------------------------------------------------------------------ protocol 2 --
+
+
+@pytest.mark.asyncio
+async def test_a_command_is_handled_once_per_position_and_acknowledged(
+    agent: RekuestAgent, transport: MemoryAgentTransport
+) -> None:
+    """The server sends a command again when it does not know it arrived (a dropped
+    connection). The same position is not carried out twice, and is acknowledged again."""
+    await _process(agent, messages.Init(agent="a"))
+    collected: list[str] = []
+
+    async def acollect(key: str) -> None:
+        collected.append(key)
+
+    object.__setattr__(agent, "acollect", acollect)
+    await _process(agent, messages.Collect(drawers=["d1"], pos=1))
+    await _process(agent, messages.Collect(drawers=["d1"], pos=1))  # sent again
+    await _process(agent, messages.Collect(drawers=["d2"], pos=2))
+
+    assert collected == ["d1", "d2"]
+    await _until(lambda: transport.of_type(messages.CommandAck))
+    assert transport.of_type(messages.CommandAck)[-1].through == 2
+    assert (await agent.aget_handshake_params()).commands_seen == 2, "and says so when it reconnects"
+
+
+@pytest.mark.asyncio
+async def test_init_positions_drop_what_arrived_and_a_gap_is_resent_or_given_up(
+    agent: RekuestAgent, transport: MemoryAgentTransport
+) -> None:
+    await _process(agent, messages.Init(agent="a"))
+    await agent._adispatch(_session_init("s"))  # pos 1
+    for letter in "abc":
+        await agent._adispatch(messages.Log(task="t", message=letter))  # pos 2, 3, 4
+    assert (await agent.aget_handshake_params()).sessions == ["s"]
+
+    # The Init of a reconnect says how far the server has the session: only the rest is owed.
+    await _process(agent, messages.Init(agent="a", positions={"s": 2}))
+    assert [m.pos for m in agent.retained] == [3, 4]  # type: ignore[union-attr]
+
+    # A gap: the server expects 3, and gets it again, with what follows, in order.
+    transport.sent.clear()
+    await _process(agent, messages.JournalNack(journal_session="s", expected=3))
+    assert [m.pos for m in transport.sent] == [3, 4]  # type: ignore[union-attr]
+
+    # A position the agent no longer holds is said to be gone, never silently passed over.
+    transport.sent.clear()
+    del agent._retained[("s", 3)]
+    await _process(agent, messages.JournalNack(journal_session="s", expected=3))
+    skip, resent = transport.sent
+    assert isinstance(skip, messages.JournalSkip) and (skip.session, skip.first, skip.last) == ("s", 3, 3)
+    assert resent.pos == 4  # type: ignore[union-attr]
+
+    # Said once. Asked for the same position again, it stops rather than loop.
+    with pytest.raises(Exception, match="already said is gone"):
+        await _process(agent, messages.JournalNack(journal_session="s", expected=3))
+
+
+@pytest.mark.asyncio
+async def test_the_init_of_a_connection_that_is_gone_is_ignored(agent: RekuestAgent) -> None:
+    """An Init still queued when its connection dropped must not release the next
+    connection's sends before that one's own Init arrived."""
+    object.__setattr__(agent.transport, "nonce", "now")
+    await _process(agent, messages.Init(agent="a", nonce="before"))
+    assert not agent._connected_event.is_set()
+    await _process(agent, messages.Init(agent="a", nonce="now"))
+    assert agent._connected_event.is_set()
+
+
+@pytest.mark.asyncio
+async def test_a_command_that_cannot_be_handled_fails_its_task_and_is_acknowledged(
+    agent: RekuestAgent, transport: MemoryAgentTransport
+) -> None:
+    """It is not sent to the next process again, and the agent's other tasks go on."""
+    await _process(agent, messages.Init(agent="a"))
+
+    async def broken(message: messages.ToAgentMessage) -> None:
+        raise KeyError("no actor for this task")
+
+    object.__setattr__(agent, "_aprocess_provider_message", broken)
+    await _process(agent, messages.Cancel(task="7", pos=1))
+
+    assert [m.task for m in transport.of_type(messages.Critical)] == ["7"]
+    await _until(lambda: transport.of_type(messages.CommandAck))
+    assert transport.of_type(messages.CommandAck)[-1].through == 1
+
+
+def test_frames_written_by_another_spec_version_are_set_aside_not_sent(tmp_path: Path) -> None:
+    """An agent upgraded to be let in must not be refused for what its old version left."""
+    from rekuest.agents.retention import RetainedFrames
+
+    path = str(tmp_path / "journal.db")
+    old = RetainedFrames(path, agent="a", spec_version="1.0.0")
+    old.open_session("before", 1.0)
+    old.add("before", 1, "{}")
+    old.close()
+
+    new = RetainedFrames(path, agent="a", spec_version="2.0.0")
+    new.open_session("now", 2.0)
+    new.add("now", 1, "{}")
+    assert [(frame.session_id, frame.pos) for frame in new.load()] == [("now", 1)]
+    assert new.set_aside() == 1
+    new.close()

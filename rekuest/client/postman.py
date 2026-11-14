@@ -33,6 +33,10 @@ class _FeedLost:
         self.reason = reason
 
 
+#: How long a call waits for the answer to a question about its task.
+INQUIRY_TIMEOUT = 10.0
+
+
 class GraphQLPostman(KoiledModel):
     """A GraphQL Postman
 
@@ -55,6 +59,10 @@ class GraphQLPostman(KoiledModel):
         description="Seconds until a call reads its task's events again while the change feed has delivered nothing yet (so is not known to be subscribed). Doubles with every read, up to ten times this.",
     )
 
+    inquire_after: float = Field(
+        default=30.0,
+        description="Seconds of silence from a task after which its call asks the task's agent whether it is still on it, and again after every further such silence. Asking changes nothing, with one exception: an agent that no longer knows the task has lost it, and the call ends with AgentLost. A call's own inquire_after overrides this; 0 never asks.",
+    )
     quiet_interval: float = Field(
         default=5.0,
         description="Seconds a call waits on a subscribed change feed that brings it nothing before it reads its task's events itself. The feed delivers at most once: an event it dropped is only ever found in the task's history. Doubles with every read that finds nothing, up to twelve times this, and starts over with the next event.",
@@ -250,6 +258,9 @@ class GraphQLPostman(KoiledModel):
         prompt: "AssignPrompt | None" = None,
         policy: "TaskPolicy | None" = None,
         state_requires: "list[StateRequirement] | None" = None,
+        on_lost: str | None = None,
+        max_resumes: int | None = None,
+        inquire_after: float | None = None,
     ) -> AsyncGenerator[TaskEventChange, None]:
         """Originate a root task over GraphQL and stream its events.
 
@@ -277,6 +288,8 @@ class GraphQLPostman(KoiledModel):
             dependencies=tuple(dependencies) if dependencies is not None else None,
             step=step,
             policy=policy,
+            on_lost=on_lost,
+            max_resumes=max_resumes,
             state_requires=(
                 tuple(
                     StateRequirementInput.model_validate(requirement.model_dump())
@@ -346,16 +359,30 @@ class GraphQLPostman(KoiledModel):
             quiet = self.quiet_interval
             handed: set[str] = set()
             yielded = False
+            ask_after = self.inquire_after if inquire_after is None else inquire_after
+            loop = asyncio.get_running_loop()
+            heard = loop.time()
             while True:
+                # Wake for whichever is due first: reading the history, or asking.
+                wait = quiet
+                if ask_after > 0:
+                    wait = min(wait, max(heard + ask_after - loop.time(), 0.05))
                 try:
-                    signal = await asyncio.wait_for(queue.get(), timeout=quiet)
+                    signal = await asyncio.wait_for(queue.get(), timeout=wait)
                 except TimeoutError:
+                    if ask_after > 0 and loop.time() - heard >= ask_after:
+                        # Silent for long enough to wonder: is its agent still on it? An
+                        # agent that is not has lost it, the server ends the task, and the
+                        # history read below (or the feed) brings that end.
+                        await self._aask_about(task.id)
+                        heard = loop.time()
                     # Nothing for a while. The task may be quiet, or the feed dropped
                     # what it reported (it delivers at most once): its history tells.
                     await self._acatch_up_safely(task.id)
                     quiet = min(quiet * 2, self.quiet_interval * 12)
                     continue
                 quiet = self.quiet_interval
+                heard = loop.time()
                 if isinstance(signal, TaskEventChange) and signal.id in handed:
                     continue  # already handed on from the task's history
                 if isinstance(signal, _FeedLost):
@@ -390,6 +417,18 @@ class GraphQLPostman(KoiledModel):
             # Also the ordinary way out: the consumer stops iterating once it has seen
             # a terminal event, which closes this generator. Idempotent.
             self._cleanup_reference(assign_reference)
+
+    async def _aask_about(self, task_id: str) -> None:
+        """Ask the task's agent whether it is still on it (the ``inquire`` mutation), for
+        what the asking does. Bounded, and a question that fails is only that."""
+        try:
+            answer = await asyncio.wait_for(
+                RekuestGraphQL(self.rath).ainquire(task=task_id), timeout=INQUIRY_TIMEOUT
+            )
+        except Exception:  # noqa: BLE001 — asking is best effort; the call goes on waiting
+            logger.debug("Asking about task %s failed", task_id, exc_info=True)
+            return
+        logger.debug("Task %s, asked about after a silence: %s", task_id, answer)
 
     def _cleanup_reference(self, reference: str) -> None:
         """Drop all per-call state for a finished/cancelled assignation."""
