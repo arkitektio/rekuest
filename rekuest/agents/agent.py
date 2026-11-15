@@ -97,6 +97,10 @@ class RekuestAgent(BaseAgent):
         description="Run beside the agent once the server accepted its registration, and again after a reconnect if it failed. It never holds the agent back, and what it raises is logged.",
     )
 
+    leaves_stopped_tasks_to_backend: ClassVar[bool] = True
+    """The server notices that this process is gone, and does with each task it had what
+    its caller asked for when it was lost: nothing is said for them at teardown."""
+
     holds_sends_until_init: ClassVar[bool] = True
     """Tells the transport to send nothing between ``Register`` and ``Init``: after
     ``Init`` the agent first re-sends what the server may be missing."""
@@ -505,7 +509,9 @@ class RekuestAgent(BaseAgent):
         discard = getattr(self.transport, "discard_journaled", None)
         if discard is not None:
             discard()
-        held = sorted(pos for kept, pos in self._retained if kept == session)
+        # What is still held from the position asked for on. An acknowledgement on its way
+        # may not have retired the frames before it yet: they are not what this is about.
+        held = sorted(pos for kept, pos in self._retained if kept == session and pos >= expected)
         if held and held[0] > expected:
             if (session, expected) in self._skipped:
                 # Said once and asked again: the backend did not take it. Saying it over
@@ -591,10 +597,11 @@ class RekuestAgent(BaseAgent):
             release = getattr(self.transport, "release_sends", None)
             if release is not None:
                 release()
-        # A probe does not survive the connection it was fired on.
+        # Neither a probe nor a question survives the connection it was sent on.
         postman = self.caller_postman
         if isinstance(postman, AgentPostman):
             postman.fail_probes()
+            postman.fail_questions()
         if self.after_registration is not None and self._after_registration_task is None:
             self._after_registration_task = asyncio.create_task(
                 self._arun_after_registration(self.after_registration)

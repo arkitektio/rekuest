@@ -211,8 +211,14 @@ class WebsocketAgentTransport(AgentTransport):
         """Whether a socket is live right now (set while the receive loop is running)."""
         return bool(self._healthy)
 
-    _send_queue: Contextual[asyncio.Queue[str]] = None
+    _send_queue: Contextual["asyncio.PriorityQueue[tuple[int, int, str]]"] = None
+    """What waits to be sent, as ``(lane, order, frame)``: lane 0 (an answer that is wanted
+    now: a heartbeat's, an inquiry's) goes ahead of lane 1 (everything else), and within a
+    lane frames keep the order they were queued in."""
+    _send_order: Contextual[int] = None
     _nonce: Contextual[str] = None
+    _left_at: Contextual[int] = None
+    """The position of an order to leave an older server numbered (see ``_aleave_at``)."""
     _held: Contextual[str] = None
     """A frame taken off the send queue whose send failed: it goes out first on the
     next connection, ahead of everything queued after it, so a drop never reorders
@@ -232,7 +238,8 @@ class WebsocketAgentTransport(AgentTransport):
         This prepares the inbound and outbound queues and the pending-future
         registry. The network connection is opened by ``aconnect()``.
         """
-        self._send_queue = asyncio.Queue()
+        self._send_queue = asyncio.PriorityQueue()
+        self._send_order = 0
         self._held = None
         self._in_queue = asyncio.Queue()
         self._closing = False
@@ -346,13 +353,37 @@ class WebsocketAgentTransport(AgentTransport):
         if isinstance(payload.message, messages.Heartbeat):
             await self.asend(messages.HeartbeatEvent())
         elif isinstance(payload.message, messages.Bounce):
+            await self._aleave_at(raw)
             raise BounceError("Was bounced. Debug call to reconnect")
         elif isinstance(payload.message, messages.Kick):
+            await self._aleave_at(raw)
             raise KickError(
                 f"Agent was kicked by the server: {payload.message.reason or 'No reason provided'}"
             )
         else:
             self._in_queue.put_nowait(payload.message)
+
+    async def _aleave_at(self, raw: object) -> None:
+        """An order to leave (``Bounce``, ``Kick``) is not a command and has no position.
+
+        A server from before that was settled sends it on the command stream, at a
+        position. Leaving is all this agent does with it, so nobody behind this transport
+        would ever acknowledge that position, and the server would give the order again on
+        every connection: without end for a bounce, and to every later process for a kick.
+        The position is acknowledged from here, on this socket before it closes, and the
+        next ``Register`` says it was seen.
+        """
+        pos = raw.get("pos") if isinstance(raw, dict) else None
+        if not isinstance(pos, int) or isinstance(pos, bool):
+            return
+        self._left_at = max(self._left_at or 0, pos)
+        client = self._client
+        if client is None:
+            return
+        try:
+            await client.send(messages.CommandAck(through=pos).model_dump_json())
+        except Exception:  # noqa: BLE001 — the next Register says it too
+            logger.debug("Could not acknowledge the order to leave at %s", pos, exc_info=True)
 
     async def _arefuse_unreadable_assign(
         self, raw: object, error: pydantic.ValidationError
@@ -431,7 +462,7 @@ class WebsocketAgentTransport(AgentTransport):
                         await client.send(
                             messages.Register(
                                 nonce=self._nonce,
-                                commands_seen=handshake.commands_seen,
+                                commands_seen=max(handshake.commands_seen, self._left_at or 0),
                                 sessions=handshake.sessions,
                                 token=token,
                                 spec_version=handshake.spec_version,
@@ -568,7 +599,7 @@ class WebsocketAgentTransport(AgentTransport):
 
     async def sending(self, client: websockets.ClientConnection) -> None:
         """Drain queued outbound messages into the active WebSocket connection."""
-        if not self._send_queue:
+        if self._send_queue is None:
             raise AgentTransportException(
                 "No send queue set. Can't send messages to the agent transport"
             )
@@ -600,7 +631,7 @@ class WebsocketAgentTransport(AgentTransport):
                 if self._held is not None:
                     in_flight, self._held = self._held, None
                 else:
-                    in_flight = await self._send_queue.get()
+                    in_flight = (await self._send_queue.get())[2]
                 try:
                     await client.send(in_flight)
                 except Exception:  # noqa: BLE001 — the socket died under us
@@ -656,19 +687,19 @@ class WebsocketAgentTransport(AgentTransport):
             self._held = None
             queue.task_done()
             dropped += 1
-        kept: list[str] = []
+        kept: list[tuple[int, int, str]] = []
         while True:
             try:
-                frame = queue.get_nowait()
+                queued = queue.get_nowait()
             except asyncio.QueueEmpty:
                 break
             queue.task_done()
-            if journaled(frame):
+            if journaled(queued[2]):
                 dropped += 1
             else:
-                kept.append(frame)
-        for frame in kept:
-            queue.put_nowait(frame)
+                kept.append(queued)
+        for queued in kept:
+            queue.put_nowait(queued)
         return dropped
 
     async def delayaction(self, action: messages.FromAgentMessage) -> None:
@@ -678,9 +709,14 @@ class WebsocketAgentTransport(AgentTransport):
         socket; the background sender started by ``areceive()`` flushes them in
         order.
         """
-        assert self._send_queue, "Should be connected"
+        assert self._send_queue is not None, "Should be connected"
         logger.debug(">>>>> Sending message %s", action.model_dump_json())
-        await self._send_queue.put(action.model_dump_json())
+        # An answer the backend is waiting for with a deadline must not queue behind a
+        # backlog of reports: a heartbeat answered late drops the connection, and the
+        # backlog is then sent all over again.
+        urgent = isinstance(action, (messages.HeartbeatEvent, messages.InquiryAnswer))
+        self._send_order = (self._send_order or 0) + 1
+        await self._send_queue.put((0 if urgent else 1, self._send_order, action.model_dump_json()))
 
     async def asend(self, message: messages.FromAgentMessage) -> None:
         """Public send API used by the agent runtime to queue one message."""

@@ -254,6 +254,37 @@ async def test_reconnects_after_a_dropped_socket(
 
 
 @pytest.mark.asyncio
+async def test_a_numbered_bounce_is_acknowledged_and_not_obeyed_twice(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A server from before bounces were unnumbered sends one at a position.
+
+    Leaving is all the agent does with it, so nobody else would acknowledge that position,
+    and the server would send the bounce again on every connection, without end. It is
+    acknowledged on the socket it came on, and the next ``Register`` says it was seen.
+    """
+    first, second = FakeSocket(), FakeSocket()
+    sockets = iter([first, second])
+    monkeypatch.setattr(
+        websockets, "connect", lambda *args, **kwargs: FakeConnect(next(sockets))
+    )
+    transport = WebsocketAgentTransport(endpoint_url="ws://localhost:8000/agi", token_loader=_token)
+    transport.set_transport_host(_Host(ConnectionPolicy(backoff=_NO_DELAY)))
+
+    async with transport as transport:
+        await transport.aconnect()
+        await asyncio.sleep(0.05)
+        first._incoming.put_nowait(json.dumps({"type": "BOUNCE", "id": "b", "pos": 7}))
+        await asyncio.sleep(0.15)
+
+        acks = [json.loads(frame) for frame in first.sent if "COMMAND_ACK" in frame]
+        assert [ack["through"] for ack in acks] == [7]
+        assert _register_frames(second)[0].commands_seen == 7
+
+        await transport.adisconnect()
+
+
+@pytest.mark.asyncio
 async def test_a_kick_close_code_surfaces_to_the_consumer(socket: FakeSocket) -> None:
     """A close code the backend uses to reject the agent is not a reconnect."""
     transport = WebsocketAgentTransport(

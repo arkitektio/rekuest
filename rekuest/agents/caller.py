@@ -195,6 +195,9 @@ class AgentPostman:
         # request id of a probe under way -> the probe id its response named (None until
         # then): what is failed when the connection drops (see fail_probes)
         self._probes: dict[str, str | None] = {}
+        # request ids of questions under way (a state's revision, an inquiry): unnumbered,
+        # so an answer lost with its connection never comes (see fail_questions)
+        self._questions: set[str] = set()
 
     @property
     def connected(self) -> bool:
@@ -352,6 +355,19 @@ class AgentPostman:
             elif probe is not None and probe in self._task_queues:
                 self._task_queues[probe].put_nowait(_Lost(lost))
 
+    def fail_questions(self) -> None:
+        """The connection was made anew: fail every question still waiting for its answer.
+
+        A question (a state's revision, an inquiry) has no position: it is not kept, and
+        neither is its answer. One lost with the connection never arrives, and whoever
+        asked would wait for ever. It fails here; asking again is the asker's to decide.
+        """
+        lost = AssignException("The connection dropped before the backend answered.")
+        for request_id in list(self._questions):
+            future = self._pending_responses.get(request_id)
+            if future is not None and not future.done():
+                future.set_exception(lost)
+
     def forget_parent(self, parent: str) -> None:
         """A parent task ended: its call counters are no longer needed."""
         for key in [k for k in self._occurrences if k[0] == parent]:
@@ -504,8 +520,10 @@ class AgentPostman:
         is set, sends an ``InterruptRequest`` and waits for the ``InterruptedEvent``.
         Every wait is bounded, so this never hangs.
         """
+        # Any end confirms it: a child that completed or failed as the cancel went out will
+        # never say it was cancelled, and there is nothing to wait for.
         await self._send_control(messages.CancelRequest(task=task), task)
-        if await self._await_terminal(queue, (messages.CancelledEvent,), timeout):
+        if await self._await_terminal(queue, _TERMINAL_TYPES, timeout):
             return
 
         if not escalate_to_interrupt:
@@ -513,9 +531,7 @@ class AgentPostman:
             return
 
         await self._send_control(messages.InterruptRequest(task=task), task)
-        if not await self._await_terminal(
-            queue, (messages.CancelledEvent, messages.InterruptedEvent), timeout
-        ):
+        if not await self._await_terminal(queue, _TERMINAL_TYPES, timeout):
             logger.warning("Timed out awaiting InterruptedEvent for task %s", task)
 
     async def _send_control(
@@ -605,11 +621,13 @@ class AgentPostman:
         request = messages.StateRevisionRequest(parent=parent, dependency=dependency, state=state, since=since, paths=list(paths))
         future: "asyncio.Future[Any]" = asyncio.get_running_loop().create_future()
         self._pending_responses[request.id] = future
+        self._questions.add(request.id)
         try:
             await self.sink.asend(request)
             response = await future
         finally:
             self._pending_responses.pop(request.id, None)
+            self._questions.discard(request.id)
         if response.error:
             raise AssignException(response.error)
         return response
@@ -637,11 +655,13 @@ class AgentPostman:
         request = messages.InquireRequest(task=task)
         future: "asyncio.Future[Any]" = asyncio.get_running_loop().create_future()
         self._pending_responses[request.id] = future
+        self._questions.add(request.id)
         try:
             await self.sink.asend(request)
             response = await future
         finally:
             self._pending_responses.pop(request.id, None)
+            self._questions.discard(request.id)
         if response.error:
             raise AssignException(response.error)
         return response
