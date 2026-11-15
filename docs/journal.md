@@ -9,7 +9,7 @@ This document is the contract shared by the Rust agent (`rekuest` crate), the Py
 Before the journal, there were two unrelated counters:
 
 - **`global_rev`** numbered state patches and was persisted.
-- **`seq`** numbered task events. It was per connection, restarted on reconnect, and was not persisted.
+- **`seq`** numbered task events. It was per connection, restarted on reconnect, and was not persisted. It is gone from every frame since agent protocol 2: `pos` is the one counter.
 
 No key related a `YIELD` to the patches around it. On top of that, several races meant the wire order was not the causal order:
 
@@ -31,7 +31,7 @@ No key related a `YIELD` to the patches around it. On top of that, several races
 | `action_key` | the task's action key (`interface`, else `action`, else `task`) |
 | `subject` | the state (`STATE_PATCH`) or lock key (`LOCK`/`UNLOCK`) |
 | `message_id` | the frame's `id`, the same one that went on the wire |
-| `payload` | the frame, without the stream-level `seq` (and without `token` for `ASSIGN`) |
+| `payload` | the frame (without `token` for `ASSIGN`) |
 
 `REGISTER` and `HEARTBEAT_ANSWER` are not journaled. Messages before the first session are passed on unrecorded.
 
@@ -113,7 +113,6 @@ A client that sends `"journal": true` in its first frame opts in:
   - The names are chosen not to clash: state frames already have `session_id`, and `STATE_PATCH` has `ts`.
   - Journal subscribers also get the session-wide frames (`SESSION_INIT`, `STATE_SNAPSHOT`) and `ASSIGN`.
 - **With `resume_after: N`:** the server first sends the entries in `(N, pos]` that match the filters (from memory, else from storage). Then it sends live frames after `pos`. Nothing is missed or repeated.
-  - Replayed frames have no `seq`, which is stream-level.
 - **`resync: true`** is sent, with no backlog, when `N` is ahead of the watermark or `session_id` is not the current session. `session_id` is required with `resume_after` unless `N` is 0 (replay from the start): a position alone may be from before a restart. Drop local state and use the INIT.
 - **A client that does not opt in** gets exactly Python's frames, as before.
 
@@ -131,8 +130,29 @@ for the distributed agent (`rekuest.agents.agent.RekuestAgent`):
   reports too), in a SQLite file (`$REKUEST_JOURNAL_PATH`, else
   `.arkitekt/rekuest_journal.db`) so it survives a restart. A new session never drops an
   earlier one's frames.
-- Nothing is sent between `REGISTER` and `INIT`. After `INIT` the retained frames go out
-  first, in `(session created, pos)` order, then everything new.
+- Requests, holds and informs are numbered like reports (`ASSIGN_REQUEST`, the control
+  requests, `HELD`, `INFORM`); only `PROBE_REQUEST` and `STATE_REVISION_REQUEST` are not.
+- Nothing is sent between `REGISTER` and `INIT`. `REGISTER` names the connection (`nonce`),
+  the journal sessions still owed (`sessions`) and the highest command position handled
+  (`commands_seen`), and must list the feature `protocol_2`. `INIT` echoes the nonce (an
+  `INIT` with another is ignored) and says how far the server has each named session
+  (`positions`): what it has is dropped, the rest goes out first, in
+  `(session created, pos)` order, then everything new.
+- A gap is refused: `JOURNAL_NACK {journal_session, expected}` is answered by sending again
+  from `expected`. A position the agent no longer holds is given up by saying so, once:
+  `JOURNAL_SKIP {session, first, last}`. Nothing else passes a position over.
+- Frames retained by another spec version are set aside: not sent, logged, left in the file.
+- The other direction is numbered too. A command from the server (`ASSIGN`, the controls,
+  the answer to a request, a child's `…_EVENT`) carries `pos`; the agent hands it on once
+  per position and answers `COMMAND_ACK {through}`. For an `ASSIGN` that acknowledgement is
+  the pickup. Nothing in the protocol is tried a second time: a frame sent again is the
+  same frame at the same position, and a failure is an outcome the caller decides about
+  (`on_lost`, `max_resumes`).
+- Asked about a task (`INQUIRE`), the agent answers at once from what it holds
+  (`INQUIRY_ANSWER`: `UNKNOWN`, `WAITING`, `RUNNING`, `PAUSED`, `HELD` or `ENDED`, with the
+  last step, report time, progress and message). `UNKNOWN` from the agent a task was
+  acknowledged by ends the task `LOST`. A caller asks with `ainquire(task)` or lets
+  `inquire_after` ask once a call has been silent that long.
 - `shelve` mints the drawer's `resource_id` itself and sends a numbered `SHELVE`; nothing
   is awaited. `COLLECT` names drawers by `resource_id`; dropping one sends a numbered
   `UNSHELVE`.
