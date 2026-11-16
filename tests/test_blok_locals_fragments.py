@@ -1,21 +1,17 @@
-"""A blok's locals come back twice: as written (a left-out kind is null) and as its tree
-resolves them (every kind set), on a blok, a revision and an edit's dry run alike."""
+"""A blok's locals are nodes of its tree; they come back as the tree resolves them: each with the
+node it was declared by and its kind always set, on a blok, a revision and an edit's dry run alike."""
 
-from rekuest.api.schema import BlokLocal, BlokRevision, LocalKind, ResolvedBlokLocal
+from rekuest.api.schema import BlokRevision, LocalKind, ResolvedBlokLocal
 
-WRITTEN = {"key": "zoom", "kind": None, "nullable": False, "persist": False, "default": 2}
-RESOLVED = {"key": "zoom", "kind": "INT", "nullable": False, "persist": False, "default": 2}
-
-
-def test_a_written_local_may_leave_its_kind_out() -> None:
-    assert BlokLocal.model_validate(WRITTEN).kind is None
+RESOLVED = {"node": "Blok[0]/local[0]", "key": "zoom", "kind": "INT", "nullable": False, "persist": False, "default": 2}
 
 
-def test_a_resolved_local_always_has_its_kind() -> None:
-    assert ResolvedBlokLocal.model_validate(RESOLVED).kind == LocalKind.INT
+def test_a_resolved_local_names_its_node_and_always_has_its_kind() -> None:
+    local = ResolvedBlokLocal.model_validate(RESOLVED)
+    assert (local.node, local.kind) == ("Blok[0]/local[0]", LocalKind.INT)
 
 
-def test_a_revision_carries_both() -> None:
+def test_a_revision_carries_its_resolved_locals() -> None:
     revision = BlokRevision.model_validate(
         {
             "id": "1",
@@ -23,9 +19,7 @@ def test_a_revision_carries_both() -> None:
             "createdAt": "2026-10-25T00:00:00Z",
             "vocab": 2,
             "catalogs": [],
-            "locals": [WRITTEN],
             "resolvedLocals": [RESOLVED],
         }
     )
-    assert [local.kind for local in revision.locals] == [None]
-    assert [local.kind for local in revision.resolved_locals] == [LocalKind.INT]
+    assert [local.node for local in revision.resolved_locals] == ["Blok[0]/local[0]"]

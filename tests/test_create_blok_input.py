@@ -3,58 +3,64 @@
 import pytest
 from pydantic import ValidationError
 
-from arkitekt_spec.actions import BlokLocalInput, BlokQueryInput, ComponentNodeInput, PortKind
+from arkitekt_spec.actions import ComponentNodeInput
 from arkitekt_spec.blok.bsx import parse_bsx
 from arkitekt_spec.blok.catalogs import default_view
 from rekuest.protocol.schema import CreateBlokInput
 
-IMAGES = BlokQueryInput(key="images", service="mikro", document="query Images { images { id } }")
-NAME = BlokLocalInput(key="name", kind=PortKind.STRING, default="x")
+NAME = '<local name="name" kind="STRING" default={"x"} />'
+IMAGES = '<query name="images" service="mikro" document="query Images { images { id } }" />'
+CARD = "<Card><Input bind={name} /><Text>{queries.images.value}</Text></Card>"
 
 
-def _tree() -> ComponentNodeInput:
-    return parse_bsx(
-        "<Html><Card><Input bind={name} /><Text>{queries.images.value}</Text></Card></Html>",
-        view=default_view(),
-    )
+def _source(*declarations: str) -> str:
+    return f'<Blok kind="custom" context="panel">{"".join(declarations)}{CARD}</Blok>'
+
+
+def _tree(*declarations: str) -> ComponentNodeInput:
+    return parse_bsx(_source(*declarations), view=default_view())
+
+
+def _children(tree: ComponentNodeInput) -> list[ComponentNodeInput]:
+    return list(tree.children or ())
 
 
 def test_a_blok_with_its_locals_and_queries_is_accepted() -> None:
-    blok = CreateBlokInput(name="images", vocab=2, components=(_tree(),), locals=(NAME,), queries=(IMAGES,))
+    blok = CreateBlokInput(name="images", vocab=2, components=(_tree(NAME, IMAGES),))
 
-    assert [local.key for local in blok.locals or ()] == ["name"]
-    assert [query.key for query in blok.queries or ()] == ["images"]
+    [root] = blok.components or ()
+    assert [child.component for child in _children(root)] == ["local", "query", "Card"]
     dumped = blok.model_dump(by_alias=True, exclude_none=True)
     assert dumped["vocab"] == 2
-    assert dumped["queries"][0]["service"] == "mikro"
+    assert "locals" not in dumped and "queries" not in dumped
 
 
 def test_a_query_it_does_not_declare_is_refused() -> None:
     with pytest.raises(ValidationError, match=r"query\.unknown"):
-        CreateBlokInput(name="images", vocab=2, components=(_tree(),), locals=(NAME,))
+        CreateBlokInput(name="images", vocab=2, components=(_tree(NAME),))
 
 
 def test_a_local_it_does_not_declare_is_refused() -> None:
     with pytest.raises(ValidationError, match=r"local\.unknown"):
-        CreateBlokInput(name="images", vocab=2, components=(_tree(),), queries=(IMAGES,))
+        CreateBlokInput(name="images", vocab=2, components=(_tree(IMAGES),))
 
 
 def test_a_blok_sent_as_its_source_is_checked_too() -> None:
-    source = "<Html><Card><Input bind={name} /><Text>{queries.images.value}</Text></Card></Html>"
-    CreateBlokInput(name="images", vocab=2, source=source, locals=(NAME,), queries=(IMAGES,))
+    CreateBlokInput(name="images", vocab=2, source=_source(NAME, IMAGES))
     with pytest.raises(ValidationError, match=r"query\.unknown"):
-        CreateBlokInput(name="images", vocab=2, source=source, locals=(NAME,))
+        CreateBlokInput(name="images", vocab=2, source=_source(NAME))
 
 
 def test_a_source_that_does_not_parse_is_refused_with_its_code() -> None:
     with pytest.raises(ValidationError, match=r"bsx\.unclosed"):
-        CreateBlokInput(name="images", vocab=2, source="<Html><Card>")
+        CreateBlokInput(name="images", vocab=2, source='<Blok kind="custom" context="panel"><Card>')
 
 
 def test_a_local_without_kind_is_sent_without_one() -> None:
     """The server infers a left-out kind; a filled-in ANY would stop it."""
-    untyped = BlokLocalInput(key="name")
-    blok = CreateBlokInput(name="images", vocab=2, components=(_tree(),), locals=(untyped,), queries=(IMAGES,))
+    blok = CreateBlokInput(name="images", vocab=2, components=(_tree('<local name="name" />', IMAGES),))
 
-    [local] = blok.model_dump(by_alias=True, exclude_unset=True)["locals"]
-    assert local == {"key": "name"}
+    [root] = blok.components or ()
+    local = _children(root)[0]
+    assert local.component == "local"
+    assert [prop.key for prop in local.props or ()] == ["name"]

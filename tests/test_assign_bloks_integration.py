@@ -1,6 +1,6 @@
 """An action's own bloks for starting a run of it, beside those that show one.
 
-An app declares them with ``assign_bloks=``: shown before there is a task, with the
+An app declares them in ``bloks=`` as ``<Blok kind="assign">``: shown before there is a task, with the
 arguments being filled in as ``args``, the argument form as ``<args />`` and
 ``assign.start()`` to start the run. The server keeps them apart from the run's
 (``Action.assignBloks`` / ``Action.bloks``), one per context and phase, so a client that
@@ -16,15 +16,15 @@ from rekuest.protocol.schema import ActionBlokPhase
 
 from .conftest import CONNECT_TIMEOUT, build_fresh_rekuest
 
-WATCH = "<Html><Card><ask /></Card></Html>"
+WATCH = '<Blok kind="action" context="panel"><Card><ask /></Card></Blok>'
 PREPARE = """
-<Html>
+<Blok kind="assign" context="panel">
   <Card>
     <Text>{args.printer}</Text>
     <args />
     <Button onClick={assign.start()}>Start</Button>
   </Card>
-</Html>
+</Blok>
 """
 
 
@@ -51,7 +51,7 @@ async def test_an_actions_assign_bloks_are_registered_and_read_apart_from_its_ru
         """An action with no bloks of its own."""
         return printer
 
-    app.register_workflow(stitch, bloks=WATCH, assign_bloks=PREPARE)
+    app.register_workflow(stitch, bloks=[WATCH, PREPARE])
     app.register(plain)
 
     async with app as app:
@@ -63,8 +63,8 @@ async def test_an_actions_assign_bloks_are_registered_and_read_apart_from_its_ru
 
             [run] = read.bloks
             [start] = read.assign_bloks
-            assert (run.phase, run.context) == (ActionBlokPhase.RUN, "HTML")
-            assert (start.phase, start.context) == (ActionBlokPhase.ASSIGN, "HTML")
+            assert (run.phase, run.context) == (ActionBlokPhase.RUN, "PANEL")
+            assert (start.phase, start.context) == (ActionBlokPhase.ASSIGN, "PANEL")
             assert run.blok.id != start.blok.id, "one blok per context and phase"
 
             starting, watching = _components(start.blok.component_tree), _components(run.blok.component_tree)

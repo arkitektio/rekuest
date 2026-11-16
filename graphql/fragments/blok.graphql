@@ -115,9 +115,6 @@ fragment DetailBlok on Blok {
   componentTree
   vocab
   catalogs
-  locals {
-    ...BlokLocal
-  }
   resolvedLocals {
     ...ResolvedBlokLocal
   }
@@ -144,31 +141,10 @@ fragment DetailBlok on Blok {
   }
 }
 
-fragment BlokLocal on BlokLocal {
-  key
-  label
-  kind
-  description
-  identifier
-  nullable
-  default
-  persist
-  referenceUnit
-  proposedUnits
-  dimension
-  children {
-    ...ArgChildPort
-  }
-  choices {
-    value
-    label
-    description
-  }
-}
-
-# A local as the blok's tree resolves it: its kind always set (inferred when the blok left it
-# out). What a renderer types the locals with; `locals` keeps them as written.
+# A `<local>` of the blok's tree as it resolves: its node and its kind (inferred when the blok
+# left it out). What a renderer types the locals with.
 fragment ResolvedBlokLocal on ResolvedBlokLocal {
+  node
   key
   label
   kind
@@ -233,9 +209,6 @@ fragment BlokRevision on BlokRevision {
   }
   vocab
   catalogs
-  locals {
-    ...BlokLocal
-  }
   resolvedLocals {
     ...ResolvedBlokLocal
   }

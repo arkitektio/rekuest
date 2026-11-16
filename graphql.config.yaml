@@ -42,9 +42,6 @@ projects:
               - AssignWidgetInput
               - BlokDemoInput
               - BlokImplementationInput
-              - BlokLocalInput
-              - BlokQueryInput
-              - BlokSubscriptionInput
               - ChoiceAssignWidgetInput
               - ChoiceInput
               - ChoiceReturnWidgetInput
