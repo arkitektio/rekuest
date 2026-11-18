@@ -4,6 +4,7 @@ from typing import TypeVar
 from arkitekt_spec.declare.protocol.types import AnyFunction
 from rekuest.client.rath import RekuestRath
 from rekuest.api.schema import Action, AssignMutation, Implementation, RekuestApi, RekuestCallerApi
+from arkitekt_runtime.invoke import AgentTarget
 from arkitekt_runtime.postmans.types import Postman
 from arkitekt_spec.declare.register import WrappedFunction
 from rath.scalars import ID
@@ -164,6 +165,7 @@ class RekuestCaller(Rekuest, RekuestCallerApi):
         on_lost: str | None = None,
         max_resumes: int | None = None,
         inquire_after: float | None = None,
+        on_agent: "AgentTarget | None" = None,
         **kwargs: Any,  # noqa: ANN401 -- ditto, by keyword
     ) -> Any:  # noqa: ANN401 -- whatever the action returns
         """Call an action as a root task, through this client's own postman.
@@ -176,6 +178,13 @@ class RekuestCaller(Rekuest, RekuestCallerApi):
         (:class:`~arkitekt_spec.declare.task.StateRequirement`). The agent tests it with
         the task's locks held; when it does not hold, nothing runs and this raises
         :class:`~arkitekt_spec.declare.errors.StatePreconditionFailed`.
+
+        ``on_agent`` is the agent an action is to run on (its id, or a fetched agent) rather
+        than whichever agent of it is free. A stateful action needs one: assigned by
+        action alone the server refuses it, and this raises
+        :class:`~arkitekt_runtime.postmans.errors.StatefulNeedsAgent`. An
+        ``Implementation`` (and a function registered on this app, which resolves to
+        one) names its agent already, so ``on_agent`` with one is a ``ValueError``.
         """
         self._refuse_in_task("acall")
         from arkitekt_runtime.invoke import _acall
@@ -195,6 +204,7 @@ class RekuestCaller(Rekuest, RekuestCallerApi):
             on_lost=on_lost,
             max_resumes=max_resumes,
             inquire_after=inquire_after,
+            on_agent=on_agent,
             **kwargs,
         )
 
@@ -202,11 +212,12 @@ class RekuestCaller(Rekuest, RekuestCallerApi):
         self,
         target: "CallTarget",
         *args: Any,  # noqa: ANN401 -- the action's own arguments
+        on_agent: "AgentTarget | None" = None,
         **kwargs: Any,  # noqa: ANN401 -- ditto, by keyword
     ) -> Any:  # noqa: ANN401 -- whatever the action returns
-        """Call an action as a root task, blocking for its result."""
+        """Call an action as a root task, blocking for its result (``on_agent`` as in :meth:`acall`)."""
         self._refuse_in_task("call")
-        return unkoil(self.acall, target, *args, **kwargs)
+        return unkoil(self.acall, target, *args, on_agent=on_agent, **kwargs)
 
     async def acall_raw(
         self,
@@ -224,8 +235,12 @@ class RekuestCaller(Rekuest, RekuestCallerApi):
         on_lost: str | None = None,
         max_resumes: int | None = None,
         inquire_after: float | None = None,
+        on_agent: "AgentTarget | None" = None,
     ) -> Any:  # noqa: ANN401 -- the raw backend payload
-        """Call with already-serialized arguments, as a root task."""
+        """Call with already-serialized arguments, as a root task.
+
+        ``on_agent`` goes with ``action``: this action, on that agent (see :meth:`acall`).
+        """
         self._refuse_in_task("acall_raw")
         from arkitekt_runtime.invoke import _acall_raw
 
@@ -244,6 +259,7 @@ class RekuestCaller(Rekuest, RekuestCallerApi):
             on_lost=on_lost,
             max_resumes=max_resumes,
             inquire_after=inquire_after,
+            on_agent=on_agent,
         )
 
     async def aiterate_raw(
@@ -262,8 +278,9 @@ class RekuestCaller(Rekuest, RekuestCallerApi):
         on_lost: str | None = None,
         max_resumes: int | None = None,
         inquire_after: float | None = None,
+        on_agent: "AgentTarget | None" = None,
     ) -> AsyncGenerator[Any, None]:
-        """Stream with already-serialized arguments, as a root task."""
+        """Stream with already-serialized arguments, as a root task (``on_agent`` as in :meth:`acall_raw`)."""
         self._refuse_in_task("aiterate_raw")
         from arkitekt_runtime.invoke import _aiterate_raw
 
@@ -282,6 +299,7 @@ class RekuestCaller(Rekuest, RekuestCallerApi):
             on_lost=on_lost,
             max_resumes=max_resumes,
             inquire_after=inquire_after,
+            on_agent=on_agent,
         ):
             yield value
 
@@ -299,9 +317,10 @@ class RekuestCaller(Rekuest, RekuestCallerApi):
         on_lost: str | None = None,
         max_resumes: int | None = None,
         inquire_after: float | None = None,
+        on_agent: "AgentTarget | None" = None,
         **kwargs: Any,  # noqa: ANN401 -- ditto, by keyword
     ) -> AsyncGenerator[Any, None]:
-        """Stream a generator action's yields, as a root task."""
+        """Stream a generator action's yields, as a root task (``on_agent`` as in :meth:`acall`)."""
         self._refuse_in_task("aiterate")
         from arkitekt_runtime.invoke import _aiterate
 
@@ -320,6 +339,7 @@ class RekuestCaller(Rekuest, RekuestCallerApi):
             on_lost=on_lost,
             max_resumes=max_resumes,
             inquire_after=inquire_after,
+            on_agent=on_agent,
             **kwargs,
         ):
             yield value
@@ -328,9 +348,10 @@ class RekuestCaller(Rekuest, RekuestCallerApi):
         self,
         target: "CallTarget",
         *args: Any,  # noqa: ANN401 -- the action's own arguments
+        on_agent: "AgentTarget | None" = None,
         **kwargs: Any,  # noqa: ANN401 -- ditto, by keyword
     ) -> Generator[Any, None, None]:
-        """Stream a generator action's yields, as a root task, blocking between them."""
+        """Stream a generator action's yields, as a root task, blocking between them (``on_agent`` as in :meth:`acall`)."""
         self._refuse_in_task("iterate")
-        return unkoil_gen(self.aiterate, target, *args, **kwargs)
+        return unkoil_gen(self.aiterate, target, *args, on_agent=on_agent, **kwargs)
 

@@ -6,6 +6,9 @@ from rath.origin import ContextBound
 import typing
 import logging
 
+if typing.TYPE_CHECKING:
+    from arkitekt_runtime.invoke import AgentTarget
+
 logger = logging.getLogger(__name__)
 
 
@@ -15,6 +18,9 @@ class Callable(ContextBound, KoiledModel):
     Calling an action directly goes through the client it was fetched with, which makes a
     root task -- so inside a running task it refuses, and the in-task spelling is
     ``task.call(action, ...)``.
+
+    Every call takes ``on_agent``: the agent to run this action on (its id, or a fetched
+    agent) rather than whichever agent of it is free. A stateful action needs one.
 
     ``ContextBound`` comes **first**, and the order is load-bearing: ``KoiledModel``
     defines its own ``model_post_init`` (pydantic's ``init_private_attributes``) which
@@ -48,41 +54,47 @@ class Callable(ContextBound, KoiledModel):
         return client
 
     def iterate(
-        self, *args: typing.Any, **kwargs: typing.Any
+        self, *args: typing.Any, on_agent: "AgentTarget | None" = None, **kwargs: typing.Any
     ) -> typing.Iterator[typing.Any]:
         """Stream this action's yields, through the client it was fetched with."""
         assert self.get_action_kind() == ActionKind.GENERATOR, (
             "Action kind must be GENERATOR to use iterate."
         )
-        return self._client("iterate").iterate(self, *args, **kwargs)
+        return self._client("iterate").iterate(self, *args, on_agent=on_agent, **kwargs)
 
-    def call(self, *args: typing.Any, **kwargs: typing.Any) -> typing.Any:
+    def call(
+        self, *args: typing.Any, on_agent: "AgentTarget | None" = None, **kwargs: typing.Any
+    ) -> typing.Any:
         """Call this action, through the client it was fetched with."""
         if self.get_action_kind() == ActionKind.GENERATOR:
             logger.warning(
                 "Action kind is Generator, but call is being used. This will exhaust the generator and return the last value. Consider using iterate instead."
             )
-        return self._client("call").call(self, *args, **kwargs)
+        return self._client("call").call(self, *args, on_agent=on_agent, **kwargs)
 
     def aiterate(
-        self, *args: typing.Any, **kwargs: typing.Any
+        self, *args: typing.Any, on_agent: "AgentTarget | None" = None, **kwargs: typing.Any
     ) -> typing.AsyncIterator[typing.Any]:
         """Stream this action's yields, through the client it was fetched with."""
         assert self.get_action_kind() == ActionKind.GENERATOR, (
             "Action kind must be GENERATOR to use aiterate."
         )
-        return self._client("aiterate").aiterate(self, *args, **kwargs)
+        return self._client("aiterate").aiterate(self, *args, on_agent=on_agent, **kwargs)
 
-    async def acall(self, *args: typing.Any, **kwargs: typing.Any) -> typing.Any:
+    async def acall(
+        self, *args: typing.Any, on_agent: "AgentTarget | None" = None, **kwargs: typing.Any
+    ) -> typing.Any:
         """Call this action, through the client it was fetched with."""
         assert self.get_action_kind() == ActionKind.FUNCTION, (
             "Action kind must be FUNCTION to use acall."
         )
-        return await self._client("acall").acall(self, *args, **kwargs)
+        return await self._client("acall").acall(self, *args, on_agent=on_agent, **kwargs)
 
-    def __call__(self, *args: typing.Any, **kwargs: typing.Any) -> typing.Any:
+    def __call__(
+        self, *args: typing.Any, on_agent: "AgentTarget | None" = None, **kwargs: typing.Any
+    ) -> typing.Any:
         """Call the action, or stream it if it is a generator."""
         if self.get_action_kind() == ActionKind.GENERATOR:
-            return self.iterate(*args, **kwargs)
+            return self.iterate(*args, on_agent=on_agent, **kwargs)
 
-        return self.call(*args, **kwargs)
+        return self.call(*args, on_agent=on_agent, **kwargs)

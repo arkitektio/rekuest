@@ -44,7 +44,7 @@ from arkitekt_runtime import messages
 from arkitekt_runtime.types import TaskEventKind, TaskPolicy
 from arkitekt_spec.declare.task import AssignPrompt, HookInput, StateRequirement
 from arkitekt_runtime.agents.transport.types import MessageSink
-from arkitekt_runtime.postmans.errors import AssignException
+from arkitekt_runtime.postmans.errors import STATEFUL_NEEDS_AGENT, AssignException, StatefulNeedsAgent
 from arkitekt_spec.declare.errors import NonDeterministicWorkflow
 from rekuest.scalars import ActionHash
 
@@ -252,6 +252,11 @@ class AgentPostman:
         ``on_lost`` says what becomes of the child should its agent be lost while it runs
         (:class:`~arkitekt_runtime.messages.OnLost`). Left out, a workflow resumes from
         what it recorded and anything else ends lost; ``FAIL`` opts a workflow out of that.
+
+        ``agent`` goes with ``interface`` (that agent's implementation of it) or with
+        ``action`` / ``action_hash`` (this action, on that agent). The second is part of
+        the call key derived for it: the same action with the same args on two agents is
+        two different children, which a resuming workflow must not find swapped.
         """
         parent_step = (
             await self.child_step(str(parent))
@@ -259,11 +264,10 @@ class AgentPostman:
             else None
         )
         if parent is not None and call_key is None:
-            call_key = self._derive_call_key(
-                str(parent),
-                action or action_hash or implementation or (f"{dependency}.{method}" if dependency else interface) or "call",
-                args,
-            )
+            target = action or action_hash or implementation or (f"{dependency}.{method}" if dependency else interface) or "call"
+            if agent is not None and (action or action_hash):
+                target = f"{target}@{agent}"
+            call_key = self._derive_call_key(str(parent), target, args)
         # The reference stays the caller's own; the parent's step travels next to it.
         request_reference = reference or str(uuid.uuid4())
         request = messages.AssignRequest(
@@ -422,6 +426,8 @@ class AgentPostman:
             if response.error:
                 if response.error.startswith("Nondeterministic workflow"):
                     raise NonDeterministicWorkflow(response.error)
+                if response.error.startswith(STATEFUL_NEEDS_AGENT):
+                    raise StatefulNeedsAgent(response.error)
                 raise AssignException(response.error)
             task = _response_id(response)
             if not task:

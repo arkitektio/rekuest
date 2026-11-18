@@ -3,6 +3,7 @@
 from types import TracebackType
 from typing import Any
 from collections.abc import AsyncGenerator, AsyncIterator, Sequence
+from rath.operation import GraphQLException
 from rath.scalars import ID
 from rekuest.client.graphql import RekuestGraphQL
 from arkitekt_spec.declare.task import AssignPrompt, HookInput, StateRequirement
@@ -19,7 +20,12 @@ import asyncio
 import uuid
 from pydantic import Field, PrivateAttr
 import logging
-from arkitekt_runtime.postmans.errors import PostmanException, RootOnlyAssignError
+from arkitekt_runtime.postmans.errors import (
+    STATEFUL_NEEDS_AGENT,
+    PostmanException,
+    RootOnlyAssignError,
+    StatefulNeedsAgent,
+)
 from rekuest.client.rath import RekuestRath
 from koil.composition import KoiledModel
 
@@ -271,7 +277,8 @@ class GraphQLPostman(KoiledModel):
         unused. So is ``prompt``: only a child is held for approval. ``policy`` is the
         root's: whether the work agents ask for under it waits for a person.
         ``state_requires`` is sent only when given: a server from before them refuses
-        the field.
+        the field. ``agent`` goes with ``interface`` (that agent's implementation of it)
+        or with ``action`` / ``action_hash`` (this action, on that agent).
         """
         self._reject_non_root(parent, dependency, method)
         assign_input = AssignInput(
@@ -338,6 +345,8 @@ class GraphQLPostman(KoiledModel):
         except BaseException as e:
             # No task was bound to this reference, so nothing else will drop its queue.
             self._cleanup_reference(assign_reference)
+            if isinstance(e, GraphQLException) and e.message.startswith(STATEFUL_NEEDS_AGENT):
+                raise StatefulNeedsAgent(e.message) from e
             if isinstance(e, Exception):
                 raise PostmanException(f"Cannot Assign: {e}") from e
             raise

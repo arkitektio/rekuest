@@ -14,7 +14,7 @@ from arkitekt_runtime import messages
 from arkitekt_runtime.local import MemoryAgentTransport
 from rekuest.agents.caller import AgentPostman, CallerTaskEvent
 from arkitekt_runtime.types import TaskEventKind
-from arkitekt_runtime.postmans.errors import AssignException
+from arkitekt_runtime.postmans.errors import AssignException, StatefulNeedsAgent
 from arkitekt_runtime.calls import _astream_raw
 from arkitekt_spec.declare.errors import AgentLost, DeniedError, ErrorCallError
 from arkitekt_spec.declare.task import AssignPrompt
@@ -149,6 +149,35 @@ async def test_nack_raises_assign_exception() -> None:
     )
 
     with pytest.raises(AssignException, match="can_assign_root"):
+        await asyncio.wait_for(task, timeout=1.0)
+
+
+@pytest.mark.asyncio
+async def test_a_stateful_action_refused_for_want_of_an_agent_says_how_to_name_one() -> None:
+    """The server's refusal becomes its own exception, and an agent given goes out beside the action."""
+    sink = MemoryAgentTransport()
+    pm = AgentPostman(sink)
+
+    async def consume() -> None:
+        async for _ in pm.aassign(**_call(action="a1", agent="agent-1")):
+            pass
+
+    task = asyncio.create_task(consume())
+    await _until(lambda: sink.sent)
+    req = _last_request(sink)
+    assert (req.action, req.agent, req.interface) == ("a1", "agent-1", None)
+
+    pm.handle_assign_response(
+        messages.AssignResponse(
+            request=req.id,
+            reference=req.reference,
+            task=None,
+            created=False,
+            error="A stateful action is assigned to a named agent: 'snap' keeps state",
+        )
+    )
+
+    with pytest.raises(StatefulNeedsAgent, match=r"keeps state\. Pass on_agent="):
         await asyncio.wait_for(task, timeout=1.0)
 
 
