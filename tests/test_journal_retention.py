@@ -354,20 +354,20 @@ async def test_reports_queue_behind_a_patch_whose_shrink_is_blocked(
     once, but is queued behind that patch rather than sent around it: once the
     shrink finishes, the patch goes out first, then the reports in their order."""
     import janus
-    from arkitekt_runtime.agents.dataclasses import QueuedPatchEvent
+    from arkitekt_runtime.agents.dataclasses import QueuedUpdate
     from arkitekt_spec.declare.state.publish import Patch
 
     replied = asyncio.Event()
 
-    async def shrink_waiting_for_a_reply(queued: QueuedPatchEvent) -> None:
+    async def shrink_waiting_for_a_reply(queued: QueuedUpdate) -> None:
         await replied.wait()
         await agent._aemit(_patch(1, "t"))
 
-    agent._aprocess_patch_event = shrink_waiting_for_a_reply  # type: ignore[method-assign]
+    agent._aprocess_update = shrink_waiting_for_a_reply  # type: ignore[method-assign]
     agent._event_queue = janus.Queue()
     agent._patch_processor_task = asyncio.create_task(agent.apatch_event_loop())
     try:
-        agent.publish_patch("Camera", Patch(op="replace", path="/exposure", value=2))
+        agent.publish_update("Camera", [Patch(op="replace", path="/exposure", value=2)])
         await asyncio.wait_for(agent._adispatch(messages.Log(task="t", message="after")), 1.0)
         await asyncio.wait_for(agent._adispatch(messages.Unlock(key="cam", task="t")), 1.0)
         assert transport.sent == [], "queued behind the patch, not sent around it"

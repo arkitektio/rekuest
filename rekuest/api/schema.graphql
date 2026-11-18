@@ -4135,10 +4135,13 @@ The `JSON` scalar type represents JSON values as specified by [ECMA-404](https:/
 """
 scalar JSON @specifiedBy(url: "https://ecma-international.org/wp-content/uploads/ECMA-404_2nd_edition_december_2017.pdf")
 
+"""One RFC 6902 operation of a state update."""
 type JSONPatch {
   op: JSONPatchOperation!
   path: String!
-  value: Args!
+
+  """What the operation sets; nothing for a `remove`."""
+  value: Args
 }
 
 enum JSONPatchOperation {
@@ -5067,18 +5070,25 @@ input ParamPair {
   value: String!
 }
 
+"""
+One update of a state: what takes it from one revision to the next. Its operations are applied in order and together.
+"""
 type Patch {
   id: ID!
-  op: String!
-  path: String!
-  value: Args!
-
-  """The value the patch replaced, when the agent reported it."""
-  oldValue: Args
   timestamp: DateTime!
+
+  """
+  Where in a task's or the agent's life the change was made, when not in its ordinary course: `cleanup` (a task being stopped, on its way out) or `shutdown` (the agent's shutdown hooks). Said by the agent's runtime.
+  """
+  lifecycle: String
   task: Task
   state: State!
   interface: String!
+
+  """
+  What the app says the change was for: its own names. Empty when it said nothing.
+  """
+  qualifiers: [String!]!
 
   """Global revision this patch applied to (global_rev - 1)."""
   globalCurrentRevision: Int!
@@ -5088,7 +5098,11 @@ type Patch {
 
   """The session identifier string this row belongs to."""
   sessionId: String
-  patch: JSONPatch!
+
+  """
+  What the update does, as RFC 6902 operations: apply them in order, and all of them before showing the state.
+  """
+  ops: [JSONPatch!]!
 }
 
 """The input for pausing a task."""
@@ -7197,17 +7211,28 @@ input StateImplementationInput {
   definition: StateDefinitionInput!
 }
 
-"""A plain patch event with no model cross-references."""
+"""
+One update of a state, with no model cross-references. Its operations are applied in order and together: the state is at `globalRevision` once all of them are.
+"""
 type StatePatchEvent {
   stateId: ID!
   agentId: ID!
   interface: String!
-  op: String!
-  path: String!
-  value: Args!
+  ops: [JSONPatch!]!
   globalRevision: Int!
   sessionId: String
   timestamp: DateTime
+
+  """The task that made the change, if one did."""
+  taskId: ID
+
+  """
+  Where in a task's or the agent's life the change was made, when not in its ordinary course: `cleanup` or `shutdown`.
+  """
+  lifecycle: String
+
+  """What the app says the change was for: its own names."""
+  qualifiers: [String!]!
 }
 
 """

@@ -9,7 +9,11 @@ means something against a Rekuest server over its websocket:
   ``JOURNAL_ACK`` covers it; nothing goes out between ``REGISTER`` and ``INIT``; after
   ``INIT``, which says how far the server has each session, the rest is sent again,
   earlier sessions' first, in ``(session created, pos)`` order; a ``JOURNAL_NACK`` (a gap)
-  has it sent again from the position named;
+  has that session sent again from the position named;
+* a send window: at most ``send_window`` numbered frames are out and unacknowledged at a
+  time, and the rest wait their turn in the retained backlog. The acknowledgements are the
+  credit, so what the server has to hold of this agent is bounded, and a backlog built up
+  while it was away goes out at the pace the server takes it;
 * the receiving side of the command contract: what the server sends is handled once per
   position and acknowledged (``COMMAND_ACK``), so the server can send it again after a
   dropped connection without it being run twice;
@@ -25,6 +29,7 @@ import contextlib
 import json
 import logging
 import time
+from collections import deque
 from collections.abc import Awaitable, Callable
 from typing import Annotated, Any, ClassVar
 
@@ -91,6 +96,12 @@ class RekuestAgent(BaseAgent):
         description="The SQLite file the agent keeps its unacknowledged frames in, across restarts ($REKUEST_JOURNAL_PATH, else .arkitekt/rekuest_journal.db). None keeps them in memory only.",
     )
 
+    send_window: int = Field(
+        default=256,
+        ge=1,
+        description="How many numbered frames may be sent and not yet acknowledged (JOURNAL_ACK) at a time. What is reported beyond it waits in the retained backlog, in order, and goes out as acknowledgements come in.",
+    )
+
     after_registration: Callable[[], Awaitable[None]] | None = Field(
         default=None,
         exclude=True,
@@ -110,6 +121,10 @@ class RekuestAgent(BaseAgent):
     """Numbered frames no ``JournalAck`` covered yet, every session's."""
     _session_created: dict[str, float] = PrivateAttr(default_factory=dict)
     """When each session with retained frames was created (orders the resend)."""
+    _sent: set[RetainedKey] = PrivateAttr(default_factory=set)
+    """The retained frames handed to the transport and not acknowledged yet: the window."""
+    _unsent: "deque[RetainedKey]" = PrivateAttr(default_factory=deque)
+    """The retained frames still waiting for room in the window, in the order they go out."""
     _store: RetainedFrames | None = PrivateAttr(default=None)
     _state_store: PersistedStates | None = PrivateAttr(default=None)
     """Only when a state opts in with ``persist=``."""
@@ -261,6 +276,8 @@ class RekuestAgent(BaseAgent):
         if entry is None:
             return
         self._retained[(entry.session_id, entry.pos)] = message
+        # Behind everything that waits: it is the newest frame of the newest session.
+        self._unsent.append((entry.session_id, entry.pos))
         try:
             self._know_session(entry.session_id)
             self._open_store().add(entry.session_id, entry.pos, message.model_dump_json())
@@ -272,6 +289,7 @@ class RekuestAgent(BaseAgent):
         """Everything of ``session`` up to ``pos`` is projected by the server."""
         for key in [k for k in self._retained if k[0] == session and k[1] <= pos]:
             del self._retained[key]
+            self._sent.discard(key)
         store = self._open_store()
         try:
             store.ack(session, pos)
@@ -280,14 +298,44 @@ class RekuestAgent(BaseAgent):
         except Exception:  # noqa: BLE001
             logger.error("Could not record the ack %s/%s", session, pos, exc_info=True)
 
-    async def _aresend_retained(self) -> None:
-        """Send every retained frame again, as it was, in ``(session created, pos)``
-        order: earlier sessions' first, then this one's. The server skips what it has
-        already projected, and acks again."""
-        for key in self._resend_order():
+    async def _asend_out(
+        self, message: messages.FromAgentMessage, entry: JournalEntry | None = None
+    ) -> None:
+        """A numbered frame goes out through the window, in its turn; anything else at once."""
+        if entry is None:
+            await self.transport.asend(message)
+            return
+        await self._apump()
+
+    async def _apump(self) -> None:
+        """Hand the transport what waits, in order, for as long as the window has room."""
+        while self._unsent and len(self._sent) < self.send_window:
+            key = self._unsent.popleft()
             message = self._retained.get(key)
-            if message is not None:
-                await self.transport.asend(message)
+            if message is None or key in self._sent:
+                continue  # acknowledged while it waited, or already out
+            self._sent.add(key)
+            await self.transport.asend(message)
+
+    async def _aresend_retained(self, session: str | None = None, start: int = 0) -> None:
+        """Send retained frames again, as they were, in ``(session created, pos)`` order:
+        earlier sessions' first, then this one's. All of them (after ``Init``), or those of
+        ``session`` from ``start`` on (after a gap there). The server skips what it has
+        already projected, and acks again. What the transport still queued of them is
+        dropped first, so nothing goes out twice or out of order."""
+        discard = getattr(self.transport, "discard_journaled", None)
+        if discard is not None:
+            if session is None:
+                discard()
+            else:
+                discard(session)
+
+        def again(key: RetainedKey) -> bool:
+            return session is None or (key[0] == session and key[1] >= start)
+
+        self._sent = {key for key in self._sent if key in self._retained and not again(key)}
+        self._unsent = deque(key for key in self._resend_order() if key not in self._sent)
+        await self._apump()
 
     def _retained_terminal_reports(self, task: str) -> list[messages.FromAgentMessage]:
         return [
@@ -370,8 +418,8 @@ class RekuestAgent(BaseAgent):
         """A persisted state changed: write it (``"synchronous"``), or leave it to its flusher."""
         if self._state_store is None:
             return
-        if isinstance(message, messages.StatePatch):
-            changed = [message.state_name]
+        if isinstance(message, messages.StateUpdate):
+            changed = [message.state]
         elif isinstance(message, messages.SessionInit):
             changed = list(self._state_policies)
         else:
@@ -506,9 +554,6 @@ class RekuestAgent(BaseAgent):
 
     async def _aprocess_nack(self, session: str, expected: int) -> None:
         """A gap: send again from ``expected``, or say that it is gone."""
-        discard = getattr(self.transport, "discard_journaled", None)
-        if discard is not None:
-            discard()
         # What is still held from the position asked for on. An acknowledgement on its way
         # may not have retired the frames before it yet: they are not what this is about.
         held = sorted(pos for kept, pos in self._retained if kept == session and pos >= expected)
@@ -530,12 +575,13 @@ class RekuestAgent(BaseAgent):
             await self.transport.asend(
                 messages.JournalSkip(session=session, first=expected, last=held[0] - 1)
             )
-        await self._aresend_retained()
+        await self._aresend_retained(session, expected)
 
     async def _aprocess_runtime_message(self, message: messages.ToAgentMessage) -> None:
         """The socket protocol: acks and caller answers."""
         if isinstance(message, messages.JournalAck):
             self._journal_ack(message.journal_session, message.through)
+            await self._apump()  # the window has room again
         elif isinstance(message, messages.JournalNack):
             await self._aprocess_nack(message.journal_session, message.expected)
         elif isinstance(message, messages.InquireResponse):
@@ -586,9 +632,6 @@ class RekuestAgent(BaseAgent):
         frames and in order, ahead of everything new; then the transport may send.
         """
         try:
-            discard = getattr(self.transport, "discard_journaled", None)
-            if discard is not None:
-                discard()
             for session, projected in message.positions.items():
                 if projected > 0:
                     self._journal_ack(session, projected)
@@ -622,6 +665,16 @@ class RekuestAgent(BaseAgent):
         if status is messages.TaskStatus.UNKNOWN and self._has_retained_terminal_report(task):
             return messages.TaskStatus.ENDED
         return status
+
+    def known_tasks(self) -> list[str]:
+        """As the core knows them, and every task whose end is still waiting to be
+        acknowledged: its report is on its way, however long ago the rest was forgotten."""
+        ended = [
+            message.task
+            for message in self._retained.values()
+            if isinstance(message, messages.TERMINAL_REPORTS)
+        ]
+        return list(dict.fromkeys([*super().known_tasks(), *ended]))
 
     async def atear_down(self) -> None:
         """Tear down, then close the store (what it holds is sent by the next run)."""

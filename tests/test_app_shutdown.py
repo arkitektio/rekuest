@@ -63,7 +63,7 @@ query Sessions {
   sessions {
     id
     agent { id }
-    patches { op path value interface }
+    patches { ops { op path value } interface }
   }
 }
 """
@@ -129,10 +129,11 @@ async def test_state_mutated_in_a_shutdown_hook_reaches_the_backend(
         result = await app.rath.aquery(PERSISTED_PATCHES, {})
 
     patches = [
-        (patch["interface"], patch["op"], patch["path"], patch["value"])
+        (patch["interface"], op["op"], op["path"], op["value"])
         for session in result.data["sessions"]
         if session["agent"]["id"] == agent_id
         for patch in session["patches"]
+        for op in patch["ops"]
     ]
     assert ("Counter", "replace", "/count", 7) in patches, (
         "The backend should have persisted the patch the shutdown hook wrote, "

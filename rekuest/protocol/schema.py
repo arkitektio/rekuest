@@ -83,6 +83,16 @@ class DiagnosticLevel(str, Enum):
     ERROR = 'ERROR'
     __str__ = str.__str__
 
+class JSONPatchOperation(str, Enum):
+    """No documentation"""
+    add = 'add'
+    remove = 'remove'
+    replace = 'replace'
+    move = 'move'
+    copy = 'copy'
+    test = 'test'
+    __str__ = str.__str__
+
 class LocalKind(str, Enum):
     """The kind of a blok local: a port kind, or ANY (an untyped value, which skips the bind and argument kind checks). No action port is ever ANY."""
     INT = 'INT'

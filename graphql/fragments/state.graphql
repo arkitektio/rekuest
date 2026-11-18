@@ -11,8 +11,11 @@ fragment State on State {
 
 fragment StatePatch on Patch {
   id
-  op
-  path
+  ops {
+    op
+    path
+    value
+  }
   interface
   timestamp
   globalFutureRevision

@@ -464,6 +464,7 @@ class WebsocketAgentTransport(AgentTransport):
                                 nonce=self._nonce,
                                 commands_seen=max(handshake.commands_seen, self._left_at or 0),
                                 sessions=handshake.sessions,
+                                tasks=handshake.tasks,
                                 token=token,
                                 spec_version=handshake.spec_version,
                                 force=bool(handshake.force),
@@ -664,12 +665,13 @@ class WebsocketAgentTransport(AgentTransport):
         if self._released is not None:
             self._released.set()
 
-    def discard_journaled(self) -> int:
-        """Drop the queued frames that carry a journal position (``pos``).
+    def discard_journaled(self, session: str | None = None) -> int:
+        """Drop the queued frames that carry a journal position (``pos``): all of them,
+        or those of the journal session ``session``.
 
         The host retains them and re-sends them, in order, once the server's ``Init``
-        says it is listening; sent from here they would go out ahead of that. Returns
-        how many were dropped.
+        says it is listening (or from the position a ``JournalNack`` names); sent from
+        here they would go out ahead of that. Returns how many were dropped.
         """
         queue = self._send_queue
         if queue is None:
@@ -680,7 +682,9 @@ class WebsocketAgentTransport(AgentTransport):
                 decoded = json.loads(frame)
             except ValueError:
                 return False
-            return isinstance(decoded, dict) and decoded.get("pos") is not None
+            if not isinstance(decoded, dict) or decoded.get("pos") is None:
+                return False
+            return session is None or decoded.get("journal_session") == session
 
         dropped = 0
         if self._held is not None and journaled(self._held):

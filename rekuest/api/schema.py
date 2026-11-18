@@ -6,7 +6,7 @@ from arkitekt_spec.actions import ActionDemandInput, ActionKind, AgentDependency
 from datetime import datetime
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 from rath.scalars import ID, IDCoercible
-from rekuest.protocol.schema import ActionBlokPhase, ActionFilter, ActionOrder, AgentFilter, AgentInput, AgentKind, AllowActionInput, AssignWidgetKind, BlokAgentMappingInput, CatalogComponentInput, CatalogOperationInput, CatalogValueKind, CollectInput, ComponentContext, CreateAssetInput, CreateBlokInput, CreateDashboardInput, CreateHigherOrderImplementationInput, CreateShortcutInput, CreateTestCaseInput, CreateTestResultInput, DependencyTreeInput, DiagnosticLevel, EditBlokInput, FinishMediaUploadInput, ForkBlokInput, ImplementationFilter, InquireInput, InterruptInput, LocalKind, LogLevel, MaterializationScope, MaterializeBlokInput, OffsetPaginationInput, OnLost, PinMaterializedBlokInput, RegisterModuleInput, RequestAssetUploadInput, RequestMediaAccessInput, RequestMediaUploadInput, ResetPlacementInput, ReturnWidgetKind, RevertBlokInput, RevokeAllowanceInput, SavePlacementInput, ShelveInMemoryDrawerInput, ShortcutBindingsInput, ShortcutFilter, ShortcutOrder, TaskInstructKind, TaskStatus, ToolboxFilter, ToolboxOrder, UnshelveMemoryDrawerInput, UpdateBlokInput, UpdateMaterializedBlokInput, WidgetDefaultInput
+from rekuest.protocol.schema import ActionBlokPhase, ActionFilter, ActionOrder, AgentFilter, AgentInput, AgentKind, AllowActionInput, AssignWidgetKind, BlokAgentMappingInput, CatalogComponentInput, CatalogOperationInput, CatalogValueKind, CollectInput, ComponentContext, CreateAssetInput, CreateBlokInput, CreateDashboardInput, CreateHigherOrderImplementationInput, CreateShortcutInput, CreateTestCaseInput, CreateTestResultInput, DependencyTreeInput, DiagnosticLevel, EditBlokInput, FinishMediaUploadInput, ForkBlokInput, ImplementationFilter, InquireInput, InterruptInput, JSONPatchOperation, LocalKind, LogLevel, MaterializationScope, MaterializeBlokInput, OffsetPaginationInput, OnLost, PinMaterializedBlokInput, RegisterModuleInput, RequestAssetUploadInput, RequestMediaAccessInput, RequestMediaUploadInput, ResetPlacementInput, ReturnWidgetKind, RevertBlokInput, RevokeAllowanceInput, SavePlacementInput, ShelveInMemoryDrawerInput, ShortcutBindingsInput, ShortcutFilter, ShortcutOrder, TaskInstructKind, TaskStatus, ToolboxFilter, ToolboxOrder, UnshelveMemoryDrawerInput, UpdateBlokInput, UpdateMaterializedBlokInput, WidgetDefaultInput
 from rekuest.scalars import ActionHash, Args, Identifier, JSONSerializable, MediaLike
 from rekuest.traits.action import Callable
 from typing import Annotated, Any, AsyncIterator, ClassVar, Iterable, Iterator, Literal
@@ -576,6 +576,15 @@ class ChoiceReturnWidget(BaseModel):
         name = 'ChoiceReturnWidget'
         type = 'ChoiceReturnWidget'
 
+class StatePatchOps(BaseModel):
+    """One RFC 6902 operation of a state update."""
+    typename: Literal['JSONPatch'] = Field(alias='__typename', default='JSONPatch', exclude=True)
+    op: JSONPatchOperation
+    path: str
+    value: Args | None = Field(default=None)
+    'What the operation sets; nothing for a `remove`.'
+    model_config = ConfigDict(frozen=True)
+
 class StatePatchTaskAction(Callable, BaseModel):
     """Represents an executable action in the system."""
     typename: Literal['Action'] = Field(alias='__typename', default='Action', exclude=True)
@@ -593,11 +602,11 @@ class StatePatchTask(BaseModel):
     model_config = ConfigDict(frozen=True)
 
 class StatePatch(BaseModel):
-    """No documentation"""
+    """One update of a state: what takes it from one revision to the next. Its operations are applied in order and together."""
     typename: Literal['Patch'] = Field(alias='__typename', default='Patch', exclude=True)
     id: ID
-    op: str
-    path: str
+    ops: tuple[StatePatchOps, ...]
+    'What the update does, as RFC 6902 operations: apply them in order, and all of them before showing the state.'
     interface: str
     timestamp: datetime
     global_future_revision: int = Field(alias='globalFutureRevision')
@@ -607,7 +616,7 @@ class StatePatch(BaseModel):
 
     class Meta:
         """Meta class for StatePatch"""
-        document = 'fragment StatePatch on Patch {\n  id\n  op\n  path\n  interface\n  timestamp\n  globalFutureRevision\n  task {\n    id\n    action {\n      name\n      __typename\n    }\n    __typename\n  }\n  __typename\n}'
+        document = 'fragment StatePatch on Patch {\n  id\n  ops {\n    op\n    path\n    value\n    __typename\n  }\n  interface\n  timestamp\n  globalFutureRevision\n  task {\n    id\n    action {\n      name\n      __typename\n    }\n    __typename\n  }\n  __typename\n}'
         name = 'StatePatch'
         type = 'Patch'
 
@@ -3166,7 +3175,7 @@ class CheckoutAgentQuery(BaseModel):
 
     class Meta:
         """Meta class for CheckoutAgent """
-        document = 'fragment StatePatch on Patch {\n  id\n  op\n  path\n  interface\n  timestamp\n  globalFutureRevision\n  task {\n    id\n    action {\n      name\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nquery CheckoutAgent($agent: ID!, $timestamp: DateTime, $forwardPatchCount: Int! = 0, $backwardPatchCount: Int! = 0) {\n  checkoutAgent(\n    agent: $agent\n    timestamp: $timestamp\n    forwardPatchCount: $forwardPatchCount\n    backwardPatchCount: $backwardPatchCount\n  ) {\n    agentId\n    values\n    globalRevision\n    forwardPatches {\n      ...StatePatch\n      __typename\n    }\n    backwardPatches {\n      ...StatePatch\n      __typename\n    }\n    __typename\n  }\n}'
+        document = 'fragment StatePatch on Patch {\n  id\n  ops {\n    op\n    path\n    value\n    __typename\n  }\n  interface\n  timestamp\n  globalFutureRevision\n  task {\n    id\n    action {\n      name\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nquery CheckoutAgent($agent: ID!, $timestamp: DateTime, $forwardPatchCount: Int! = 0, $backwardPatchCount: Int! = 0) {\n  checkoutAgent(\n    agent: $agent\n    timestamp: $timestamp\n    forwardPatchCount: $forwardPatchCount\n    backwardPatchCount: $backwardPatchCount\n  ) {\n    agentId\n    values\n    globalRevision\n    forwardPatches {\n      ...StatePatch\n      __typename\n    }\n    backwardPatches {\n      ...StatePatch\n      __typename\n    }\n    __typename\n  }\n}'
 
 class RequestsQuery(BaseModel):
     """No documentation found for this operation."""
