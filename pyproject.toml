@@ -10,14 +10,14 @@ license-files = ["LICENSE"]
 dependencies = [
     "websockets>=15.0",
     "pydantic>=2",
-    "rath>=4.1.3",
+    "rath>=4.2",
     "koil>=3.3.6",
     "fakts>=6.1",
     # The declaration an app is (the action language, AppRegistry, services, hooks)
     # is arkitekt-spec's; executing it is arkitekt-runtime's. rekuest is the
     # distributed runtime on top: the socket agent, its transport, and the client.
     "arkitekt-spec>=12.3",
-    "arkitekt-runtime>=10.4",
+    "arkitekt-runtime>=10.6",
     # Media uploads (MediaLike arguments) are put into the datalayer through obstore.
     "obstore>=0.11.0",
 ]

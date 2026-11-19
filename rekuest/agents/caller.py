@@ -41,6 +41,7 @@ from collections.abc import AsyncGenerator, Awaitable, Callable, Sequence
 from rath.scalars import ID
 
 from arkitekt_runtime import messages
+from arkitekt_runtime.trace import current_traceparent
 from arkitekt_runtime.types import TaskEventKind, TaskPolicy
 from arkitekt_spec.declare.task import AssignPrompt, HookInput, StateRequirement
 from arkitekt_runtime.agents.transport.types import MessageSink
@@ -291,6 +292,8 @@ class AgentPostman:
             state_requires=list(state_requires or ()),
             on_lost=on_lost,
             max_resumes=max_resumes,
+            # Where in the running trace the call is made: the child continues from here.
+            traceparent=current_traceparent(),
         )
         async for event in self._astream(
             request,

@@ -41,6 +41,7 @@ from arkitekt_runtime.agents.backend import LocalAgentBackend
 from arkitekt_runtime.agents.base import BaseAgent
 from arkitekt_runtime.agents.journal import JournalEntry
 from arkitekt_runtime.agents.transport.types import HandshakeParams
+from arkitekt_runtime.trace import trace_scope
 from arkitekt_spec.base import current_spec_version
 from arkitekt_spec.declare.agents.errors import AgentException
 from arkitekt_spec.declare.agents.types import AppContext
@@ -88,8 +89,8 @@ class RekuestAgent(BaseAgent):
     """The core agent in distributed mode: registered with, and assigned work by, a Rekuest server."""
 
     task_scopes: list[Any] = Field(
-        default_factory=lambda: [task_scope],
-        description="Scopes entered around every assignment; rath's by default, so rath-based service clients attribute their requests to the running task.",
+        default_factory=lambda: [trace_scope, task_scope],
+        description="Scopes entered around every assignment: the task's trace (what the assignment asks of others belongs to it), and rath's, so rath-based service clients attribute their requests to the running task.",
     )
     journal_path: str | None = Field(
         default_factory=default_journal_path,
