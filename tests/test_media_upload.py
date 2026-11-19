@@ -38,7 +38,7 @@ async def test_the_file_lands_at_the_granted_key_and_the_store_is_returned(monke
     store = MemoryStore()
     seen = {}
 
-    def fake_store(endpoint_url, credentials, proxy=None):
+    def fake_store(endpoint_url, credentials, proxy=None, certificates=None):
         seen["endpoint_url"], seen["proxy"] = endpoint_url, proxy
         return store
 
@@ -82,3 +82,24 @@ def test_an_https_store_without_a_session_token_or_proxy_sets_neither():
 
     assert "session_token" not in store.config
     assert not store.client_options
+
+
+HUB_CERTIFICATE = """-----BEGIN CERTIFICATE-----
+MIIBMzCB26ADAgECAgEBMAoGCCqGSM49BAMCMBcxFTATBgNVBAMMDEFya2l0ZWt0
+IGh1YjAeFw0yNjAxMDEwMDAwMDBaFw0zNTEyMzAwMDAwMDBaMBcxFTATBgNVBAMM
+DEFya2l0ZWt0IGh1YjBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABOipTSOE+oBd
+xKJHSWVaGWLqUmf8wK9hqIwK53vQupHv4EY05DnvYatyVaWZNFSSABXJyjVkUnCL
+BQNljdPSRdajGDAWMBQGA1UdEQQNMAuCCWxvY2FsaG9zdDAKBggqhkjOPQQDAgNH
+ADBEAiB3vd12o38Qp39iZKng0rOWnZkuBcIJGbVQxjImnPeo5wIgSGM06akz+rlV
+l0hiBf+cli9Wi5pinz2yRynHAGCXoE8=
+-----END CERTIFICATE-----
+"""
+"""A self-signed hub certificate, public half only: what a pinned alias carries."""
+
+
+def test_a_pinned_store_trusts_the_hub_certificate_alone():
+    """Per store, not via SSL_CERT_FILE: obstore >= 0.11 never reads it on macOS or Windows."""
+    store = media.create_s3_store("https://localhost:2577", _grant(), certificates=[HUB_CERTIFICATE])
+
+    assert store.client_options["root_certificate"] == HUB_CERTIFICATE.strip().encode()
+    assert str(store.client_options["disable_system_certificates"]).lower() == "true"

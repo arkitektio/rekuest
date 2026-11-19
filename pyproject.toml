@@ -19,7 +19,7 @@ dependencies = [
     "arkitekt-spec>=12.3",
     "arkitekt-runtime>=10.4",
     # Media uploads (MediaLike arguments) are put into the datalayer through obstore.
-    "obstore>=0.10.0",
+    "obstore>=0.11.0",
 ]
 
 [project.urls]

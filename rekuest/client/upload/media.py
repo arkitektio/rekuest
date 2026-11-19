@@ -15,7 +15,10 @@ if TYPE_CHECKING:
 
 
 def create_s3_store(
-    endpoint_url: str, credentials: "MediaUploadGrant | AssetUploadGrant", proxy: str | None = None
+    endpoint_url: str,
+    credentials: "MediaUploadGrant | AssetUploadGrant",
+    proxy: str | None = None,
+    certificates: list[str] | None = None,
 ) -> S3Store:
     """An S3 store for the bucket a grant writes into.
 
@@ -23,12 +26,20 @@ def create_s3_store(
     the deployment's gateway), not by bucket subdomain. ``http://`` endpoints have to
     be allowed explicitly, and ``proxy`` is the forward proxy a datalayer that is
     only reachable through the mesh is reached through.
+
+    ``certificates`` are a pinned datalayer's hub certificates: the store trusts them and
+    nothing else. Not through ``SSL_CERT_FILE``, which obstore >= 0.11 never reads on macOS
+    or Windows (it verifies with the platform's verifier there); with the system roots
+    disabled it checks against these alone with rustls's own verifier.
     """
     client_options: dict[str, object] = {}
     if endpoint_url.startswith("http://"):
         client_options["allow_http"] = True
     if proxy:
         client_options["proxy_url"] = proxy
+    if certificates:
+        client_options["root_certificate"] = "\n".join(pem.strip() for pem in certificates)
+        client_options["disable_system_certificates"] = True
 
     store_kwargs: dict[str, object] = {
         "access_key_id": credentials.access_key,
@@ -50,7 +61,7 @@ async def astore_media_file(
 ) -> str:
     """Put a media file at the key its grant names, and return the grant's store."""
     endpoint_url = await datalayer.get_endpoint_url()
-    store = create_s3_store(endpoint_url, credentials, proxy=datalayer.proxy)
+    store = create_s3_store(endpoint_url, credentials, proxy=datalayer.proxy, certificates=datalayer.certificates)
 
     try:
         await obstore.put_async(store, credentials.key, file.value)
