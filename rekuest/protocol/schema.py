@@ -569,7 +569,13 @@ class ParamPair(BaseModel):
     value: str
     model_config = ConfigDict(frozen=True, extra='forbid', populate_by_name=True, use_enum_values=True)
 
-class PinMaterializedBlokInput(BaseModel):
+class PinInput(BaseModel):
+    """The input for pinning an model."""
+    id: ID = Field(description='The unique identifier of the item to pin.')
+    pin: bool = Field(description='Boolean flag indicating whether to pin or unpin.')
+    model_config = ConfigDict(frozen=True, extra='forbid', populate_by_name=True, use_enum_values=True)
+
+class PinMaterializedBlokRevisionInput(BaseModel):
     """Keep a materialization at one revision of its blok, or let it follow the head."""
     id: ID = Field(description='The materialization.')
     revision: ID | None = Field(default=None, description='The revision to stay at; null follows the head again.')

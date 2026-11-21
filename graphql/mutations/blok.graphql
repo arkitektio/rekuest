@@ -41,8 +41,22 @@ mutation RevertBlok($input: RevertBlokInput!) {
   }
 }
 
-mutation PinMaterializedBlok($input: PinMaterializedBlokInput!) {
-  pinMaterializedBlok(input: $input) {
+mutation PinMaterializedBlokRevision($input: PinMaterializedBlokRevisionInput!) {
+  pinMaterializedBlokRevision(input: $input) {
     ...DetailMaterializedBlok
+  }
+}
+
+mutation PinMaterializedBlok($input: PinInput!) {
+  pinMaterializedBlok(input: $input) {
+    id
+    pinned
+  }
+}
+
+mutation PinBlok($input: PinInput!) {
+  pinBlok(input: $input) {
+    id
+    pinned
   }
 }

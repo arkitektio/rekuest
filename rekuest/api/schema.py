@@ -6,7 +6,7 @@ from arkitekt_spec.actions import ActionDemandInput, ActionKind, AgentDependency
 from datetime import datetime
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 from rath.scalars import ID, IDCoercible
-from rekuest.protocol.schema import ActionBlokPhase, ActionFilter, ActionOrder, AgentFilter, AgentInput, AgentKind, AllowActionInput, AssignWidgetKind, BlokAgentMappingInput, CatalogComponentInput, CatalogOperationInput, CatalogValueKind, CollectInput, ComponentContext, CreateAssetInput, CreateBlokInput, CreateDashboardInput, CreateHigherOrderImplementationInput, CreateShortcutInput, CreateTestCaseInput, CreateTestResultInput, DependencyTreeInput, DiagnosticLevel, EditBlokInput, FinishMediaUploadInput, ForkBlokInput, ImplementationFilter, InquireInput, InterruptInput, JSONPatchOperation, LocalKind, LogLevel, MaterializationScope, MaterializeBlokInput, OffsetPaginationInput, OnLost, PinMaterializedBlokInput, RegisterModuleInput, RequestAssetUploadInput, RequestMediaAccessInput, RequestMediaUploadInput, ResetPlacementInput, ReturnWidgetKind, RevertBlokInput, RevokeAllowanceInput, SavePlacementInput, ShelveInMemoryDrawerInput, ShortcutBindingsInput, ShortcutFilter, ShortcutOrder, TaskInstructKind, TaskStatus, ToolboxFilter, ToolboxOrder, UnshelveMemoryDrawerInput, UpdateBlokInput, UpdateMaterializedBlokInput, WidgetDefaultInput
+from rekuest.protocol.schema import ActionBlokPhase, ActionFilter, ActionOrder, AgentFilter, AgentInput, AgentKind, AllowActionInput, AssignWidgetKind, BlokAgentMappingInput, CatalogComponentInput, CatalogOperationInput, CatalogValueKind, CollectInput, ComponentContext, CreateAssetInput, CreateBlokInput, CreateDashboardInput, CreateHigherOrderImplementationInput, CreateShortcutInput, CreateTestCaseInput, CreateTestResultInput, DependencyTreeInput, DiagnosticLevel, EditBlokInput, FinishMediaUploadInput, ForkBlokInput, ImplementationFilter, InquireInput, InterruptInput, JSONPatchOperation, LocalKind, LogLevel, MaterializationScope, MaterializeBlokInput, OffsetPaginationInput, OnLost, PinInput, PinMaterializedBlokRevisionInput, RegisterModuleInput, RequestAssetUploadInput, RequestMediaAccessInput, RequestMediaUploadInput, ResetPlacementInput, ReturnWidgetKind, RevertBlokInput, RevokeAllowanceInput, SavePlacementInput, ShelveInMemoryDrawerInput, ShortcutBindingsInput, ShortcutFilter, ShortcutOrder, TaskInstructKind, TaskStatus, ToolboxFilter, ToolboxOrder, UnshelveMemoryDrawerInput, UpdateBlokInput, UpdateMaterializedBlokInput, WidgetDefaultInput
 from rekuest.scalars import ActionHash, Args, Identifier, JSONSerializable, MediaLike
 from rekuest.traits.action import Callable
 from typing import Annotated, Any, AsyncIterator, ClassVar, Iterable, Iterator, Literal
@@ -2331,18 +2331,60 @@ class RevertBlokMutation(BaseModel):
         """Meta class for RevertBlok """
         document = 'fragment ArgChildPortNested on ArgPort {\n  key\n  kind\n  children {\n    key\n    identifier\n    nullable\n    kind\n    referenceUnit\n    proposedUnits\n    dimension\n    __typename\n  }\n  choices {\n    value\n    label\n    description\n    __typename\n  }\n  identifier\n  nullable\n  default\n  referenceUnit\n  proposedUnits\n  dimension\n  __typename\n}\n\nfragment ArgChildPort on ArgPort {\n  key\n  kind\n  identifier\n  children {\n    ...ArgChildPortNested\n    __typename\n  }\n  choices {\n    value\n    label\n    description\n    __typename\n  }\n  nullable\n  default\n  referenceUnit\n  proposedUnits\n  dimension\n  __typename\n}\n\nfragment ResolvedBlokLocal on ResolvedBlokLocal {\n  node\n  key\n  label\n  kind\n  description\n  identifier\n  nullable\n  default\n  persist\n  referenceUnit\n  proposedUnits\n  dimension\n  children {\n    ...ArgChildPort\n    __typename\n  }\n  choices {\n    value\n    label\n    description\n    __typename\n  }\n  __typename\n}\n\nfragment BlokRevision on BlokRevision {\n  id\n  number\n  message\n  createdAt\n  author {\n    sub\n    __typename\n  }\n  task {\n    id\n    __typename\n  }\n  vocab\n  catalogs\n  resolvedLocals {\n    ...ResolvedBlokLocal\n    __typename\n  }\n  __typename\n}\n\nmutation RevertBlok($input: RevertBlokInput!) {\n  revertBlok(input: $input) {\n    ...BlokRevision\n    __typename\n  }\n}'
 
-class PinMaterializedBlokMutation(BaseModel):
+class PinMaterializedBlokRevisionMutation(BaseModel):
     """No documentation found for this operation."""
-    pin_materialized_blok: DetailMaterializedBlok = Field(alias='pinMaterializedBlok')
+    pin_materialized_blok_revision: DetailMaterializedBlok = Field(alias='pinMaterializedBlokRevision')
     'Keep a materialization at one revision of its blok, or let it follow the head again.'
 
     class Arguments(BaseModel):
+        """Arguments for PinMaterializedBlokRevision """
+        input: PinMaterializedBlokRevisionInput
+
+    class Meta:
+        """Meta class for PinMaterializedBlokRevision """
+        document = 'fragment ActionArgumentLeaf on ActionArgument {\n  key\n  valueLiteral\n  valuePath\n  utilCall {\n    operation\n    __typename\n  }\n  __typename\n}\n\nfragment ComponentProp on ComponentProp {\n  key\n  staticValue\n  dynamicValue {\n    literal\n    path\n    __typename\n  }\n  declaresValue\n  utilCall {\n    ...UtilCall\n    __typename\n  }\n  __typename\n}\n\nfragment ActionArgumentNested on ActionArgument {\n  key\n  valueLiteral\n  valuePath\n  utilCall {\n    operation\n    arguments {\n      ...ActionArgumentLeaf\n      __typename\n    }\n    __typename\n  }\n  valueList {\n    ...ActionArgumentLeaf\n    __typename\n  }\n  valueDict {\n    ...ActionArgumentLeaf\n    __typename\n  }\n  __typename\n}\n\nfragment ArgChildPortNested on ArgPort {\n  key\n  kind\n  children {\n    key\n    identifier\n    nullable\n    kind\n    referenceUnit\n    proposedUnits\n    dimension\n    __typename\n  }\n  choices {\n    value\n    label\n    description\n    __typename\n  }\n  identifier\n  nullable\n  default\n  referenceUnit\n  proposedUnits\n  dimension\n  __typename\n}\n\nfragment ChoiceAssignWidget on ChoiceAssignWidget {\n  __typename\n  kind\n  placeholder\n}\n\nfragment CustomAssignWidget on CustomAssignWidget {\n  __typename\n  kind\n  component\n  props {\n    ...ComponentProp\n    __typename\n  }\n  dependencies\n}\n\nfragment CustomEffect on CustomEffect {\n  __typename\n  kind\n}\n\nfragment MessageEffect on MessageEffect {\n  __typename\n  kind\n  message\n}\n\nfragment SearchAssignWidget on SearchAssignWidget {\n  __typename\n  kind\n  query\n  ward\n  dependencies\n}\n\nfragment SliderAssignWidget on SliderAssignWidget {\n  __typename\n  kind\n  min\n  max\n  step\n}\n\nfragment StringAssignWidget on StringAssignWidget {\n  __typename\n  kind\n  placeholder\n  asParagraph\n}\n\nfragment ActionArgument on ActionArgument {\n  key\n  valueLiteral\n  valuePath\n  utilCall {\n    operation\n    arguments {\n      ...ActionArgumentNested\n      __typename\n    }\n    __typename\n  }\n  valueList {\n    ...ActionArgumentNested\n    __typename\n  }\n  valueDict {\n    ...ActionArgumentNested\n    __typename\n  }\n  __typename\n}\n\nfragment ArgChildPort on ArgPort {\n  key\n  kind\n  identifier\n  children {\n    ...ArgChildPortNested\n    __typename\n  }\n  choices {\n    value\n    label\n    description\n    __typename\n  }\n  nullable\n  default\n  referenceUnit\n  proposedUnits\n  dimension\n  __typename\n}\n\nfragment BlokPortMatch on PortMatch {\n  at\n  key\n  kind\n  identifier\n  nullable\n  dimension\n  children {\n    at\n    key\n    kind\n    identifier\n    nullable\n    dimension\n    children {\n      at\n      key\n      kind\n      identifier\n      nullable\n      dimension\n      children {\n        at\n        key\n        kind\n        identifier\n        nullable\n        dimension\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment PortAssignWidget on AssignWidget {\n  __typename\n  kind\n  ...StringAssignWidget\n  ...SearchAssignWidget\n  ...SliderAssignWidget\n  ...ChoiceAssignWidget\n  ...CustomAssignWidget\n}\n\nfragment PortEffect on Effect {\n  __typename\n  kind\n  dependencies\n  call {\n    ...UtilCall\n    __typename\n  }\n  callJson\n  source\n  ...CustomEffect\n  ...MessageEffect\n}\n\nfragment UtilCall on UtilCall {\n  operation\n  arguments {\n    ...ActionArgument\n    __typename\n  }\n  __typename\n}\n\nfragment ArgPort on ArgPort {\n  __typename\n  key\n  label\n  nullable\n  description\n  default\n  kind\n  identifier\n  referenceUnit\n  proposedUnits\n  dimension\n  children {\n    ...ArgChildPort\n    __typename\n  }\n  widget {\n    ...PortAssignWidget\n    __typename\n  }\n  choices {\n    value\n    label\n    description\n    __typename\n  }\n  validators {\n    call {\n      ...UtilCall\n      __typename\n    }\n    callJson\n    source\n    errorMessage\n    dependencies\n    label\n    __typename\n  }\n  effects {\n    ...PortEffect\n    __typename\n  }\n}\n\nfragment BlokDemo on BlokDemo {\n  deps\n  args\n  task\n  queries\n  subscriptions\n  __typename\n}\n\nfragment BlokDependency on BlokDependency {\n  key\n  description\n  optional\n  autoResolvable\n  appFilter\n  versionFilter\n  minViableInstances\n  maxViableInstances\n  actionDependencies {\n    key\n    description\n    optional\n    demand {\n      hash\n      key\n      app\n      version\n      name\n      argMatches {\n        ...BlokPortMatch\n        __typename\n      }\n      returnMatches {\n        ...BlokPortMatch\n        __typename\n      }\n      protocols\n      forceArgLength\n      forceReturnLength\n      pure\n      idempotent\n      stateful\n      __typename\n    }\n    __typename\n  }\n  stateDependencies {\n    key\n    description\n    optional\n    demand {\n      hash\n      key\n      app\n      matches {\n        ...BlokPortMatch\n        __typename\n      }\n      protocols\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment BlokDiagnostic on Diagnostic {\n  level\n  code\n  message\n  path\n  __typename\n}\n\nfragment BlokQuery on BlokQuery {\n  key\n  service\n  document\n  variables {\n    ...ActionArgument\n    __typename\n  }\n  poll\n  more\n  __typename\n}\n\nfragment BlokSubscription on BlokSubscription {\n  key\n  service\n  document\n  variables {\n    ...ActionArgument\n    __typename\n  }\n  keep\n  history\n  __typename\n}\n\nfragment ResolvedBlokLocal on ResolvedBlokLocal {\n  node\n  key\n  label\n  kind\n  description\n  identifier\n  nullable\n  default\n  persist\n  referenceUnit\n  proposedUnits\n  dimension\n  children {\n    ...ArgChildPort\n    __typename\n  }\n  choices {\n    value\n    label\n    description\n    __typename\n  }\n  __typename\n}\n\nfragment BlokRevision on BlokRevision {\n  id\n  number\n  message\n  createdAt\n  author {\n    sub\n    __typename\n  }\n  task {\n    id\n    __typename\n  }\n  vocab\n  catalogs\n  resolvedLocals {\n    ...ResolvedBlokLocal\n    __typename\n  }\n  __typename\n}\n\nfragment DetailBlok on Blok {\n  id\n  name\n  description\n  provided\n  heldByAction\n  app {\n    id\n    identifier\n    __typename\n  }\n  context\n  module {\n    id\n    name\n    __typename\n  }\n  componentTree\n  vocab\n  catalogs\n  resolvedLocals {\n    ...ResolvedBlokLocal\n    __typename\n  }\n  demo {\n    ...BlokDemo\n    __typename\n  }\n  queries {\n    ...BlokQuery\n    __typename\n  }\n  subscriptions {\n    ...BlokSubscription\n    __typename\n  }\n  diagnostics {\n    ...BlokDiagnostic\n    __typename\n  }\n  dependencies {\n    ...BlokDependency\n    __typename\n  }\n  args {\n    ...ArgPort\n    __typename\n  }\n  head {\n    ...BlokRevision\n    __typename\n  }\n  __typename\n}\n\nfragment DetailMaterializedBlok on MaterializedBlok {\n  id\n  name\n  description\n  declaredBy {\n    id\n    declaredName\n    __typename\n  }\n  blok {\n    ...DetailBlok\n    __typename\n  }\n  agentMappings {\n    key\n    agent {\n      id\n      declaredName\n      connected\n      __typename\n    }\n    __typename\n  }\n  pinnedRevision {\n    ...BlokRevision\n    __typename\n  }\n  unboundDependencies\n  __typename\n}\n\nmutation PinMaterializedBlokRevision($input: PinMaterializedBlokRevisionInput!) {\n  pinMaterializedBlokRevision(input: $input) {\n    ...DetailMaterializedBlok\n    __typename\n  }\n}'
+
+class PinMaterializedBlokMutationPinMaterializedBlok(BaseModel):
+    """A materialized instance of a Blok that can be placed on dashboards and linked to agent states."""
+    typename: Literal['MaterializedBlok'] = Field(alias='__typename', default='MaterializedBlok', exclude=True)
+    id: ID
+    pinned: bool
+    'Whether the caller pinned this materialization (not `pinnedRevision`, which holds its content).'
+    model_config = ConfigDict(frozen=True)
+
+class PinMaterializedBlokMutation(BaseModel):
+    """No documentation found for this operation."""
+    pin_materialized_blok: PinMaterializedBlokMutationPinMaterializedBlok = Field(alias='pinMaterializedBlok')
+    'Pin a materialization of any kind for the caller, or unpin it.'
+
+    class Arguments(BaseModel):
         """Arguments for PinMaterializedBlok """
-        input: PinMaterializedBlokInput
+        input: PinInput
 
     class Meta:
         """Meta class for PinMaterializedBlok """
-        document = 'fragment ActionArgumentLeaf on ActionArgument {\n  key\n  valueLiteral\n  valuePath\n  utilCall {\n    operation\n    __typename\n  }\n  __typename\n}\n\nfragment ComponentProp on ComponentProp {\n  key\n  staticValue\n  dynamicValue {\n    literal\n    path\n    __typename\n  }\n  declaresValue\n  utilCall {\n    ...UtilCall\n    __typename\n  }\n  __typename\n}\n\nfragment ActionArgumentNested on ActionArgument {\n  key\n  valueLiteral\n  valuePath\n  utilCall {\n    operation\n    arguments {\n      ...ActionArgumentLeaf\n      __typename\n    }\n    __typename\n  }\n  valueList {\n    ...ActionArgumentLeaf\n    __typename\n  }\n  valueDict {\n    ...ActionArgumentLeaf\n    __typename\n  }\n  __typename\n}\n\nfragment ArgChildPortNested on ArgPort {\n  key\n  kind\n  children {\n    key\n    identifier\n    nullable\n    kind\n    referenceUnit\n    proposedUnits\n    dimension\n    __typename\n  }\n  choices {\n    value\n    label\n    description\n    __typename\n  }\n  identifier\n  nullable\n  default\n  referenceUnit\n  proposedUnits\n  dimension\n  __typename\n}\n\nfragment ChoiceAssignWidget on ChoiceAssignWidget {\n  __typename\n  kind\n  placeholder\n}\n\nfragment CustomAssignWidget on CustomAssignWidget {\n  __typename\n  kind\n  component\n  props {\n    ...ComponentProp\n    __typename\n  }\n  dependencies\n}\n\nfragment CustomEffect on CustomEffect {\n  __typename\n  kind\n}\n\nfragment MessageEffect on MessageEffect {\n  __typename\n  kind\n  message\n}\n\nfragment SearchAssignWidget on SearchAssignWidget {\n  __typename\n  kind\n  query\n  ward\n  dependencies\n}\n\nfragment SliderAssignWidget on SliderAssignWidget {\n  __typename\n  kind\n  min\n  max\n  step\n}\n\nfragment StringAssignWidget on StringAssignWidget {\n  __typename\n  kind\n  placeholder\n  asParagraph\n}\n\nfragment ActionArgument on ActionArgument {\n  key\n  valueLiteral\n  valuePath\n  utilCall {\n    operation\n    arguments {\n      ...ActionArgumentNested\n      __typename\n    }\n    __typename\n  }\n  valueList {\n    ...ActionArgumentNested\n    __typename\n  }\n  valueDict {\n    ...ActionArgumentNested\n    __typename\n  }\n  __typename\n}\n\nfragment ArgChildPort on ArgPort {\n  key\n  kind\n  identifier\n  children {\n    ...ArgChildPortNested\n    __typename\n  }\n  choices {\n    value\n    label\n    description\n    __typename\n  }\n  nullable\n  default\n  referenceUnit\n  proposedUnits\n  dimension\n  __typename\n}\n\nfragment BlokPortMatch on PortMatch {\n  at\n  key\n  kind\n  identifier\n  nullable\n  dimension\n  children {\n    at\n    key\n    kind\n    identifier\n    nullable\n    dimension\n    children {\n      at\n      key\n      kind\n      identifier\n      nullable\n      dimension\n      children {\n        at\n        key\n        kind\n        identifier\n        nullable\n        dimension\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment PortAssignWidget on AssignWidget {\n  __typename\n  kind\n  ...StringAssignWidget\n  ...SearchAssignWidget\n  ...SliderAssignWidget\n  ...ChoiceAssignWidget\n  ...CustomAssignWidget\n}\n\nfragment PortEffect on Effect {\n  __typename\n  kind\n  dependencies\n  call {\n    ...UtilCall\n    __typename\n  }\n  callJson\n  source\n  ...CustomEffect\n  ...MessageEffect\n}\n\nfragment UtilCall on UtilCall {\n  operation\n  arguments {\n    ...ActionArgument\n    __typename\n  }\n  __typename\n}\n\nfragment ArgPort on ArgPort {\n  __typename\n  key\n  label\n  nullable\n  description\n  default\n  kind\n  identifier\n  referenceUnit\n  proposedUnits\n  dimension\n  children {\n    ...ArgChildPort\n    __typename\n  }\n  widget {\n    ...PortAssignWidget\n    __typename\n  }\n  choices {\n    value\n    label\n    description\n    __typename\n  }\n  validators {\n    call {\n      ...UtilCall\n      __typename\n    }\n    callJson\n    source\n    errorMessage\n    dependencies\n    label\n    __typename\n  }\n  effects {\n    ...PortEffect\n    __typename\n  }\n}\n\nfragment BlokDemo on BlokDemo {\n  deps\n  args\n  task\n  queries\n  subscriptions\n  __typename\n}\n\nfragment BlokDependency on BlokDependency {\n  key\n  description\n  optional\n  autoResolvable\n  appFilter\n  versionFilter\n  minViableInstances\n  maxViableInstances\n  actionDependencies {\n    key\n    description\n    optional\n    demand {\n      hash\n      key\n      app\n      version\n      name\n      argMatches {\n        ...BlokPortMatch\n        __typename\n      }\n      returnMatches {\n        ...BlokPortMatch\n        __typename\n      }\n      protocols\n      forceArgLength\n      forceReturnLength\n      pure\n      idempotent\n      stateful\n      __typename\n    }\n    __typename\n  }\n  stateDependencies {\n    key\n    description\n    optional\n    demand {\n      hash\n      key\n      app\n      matches {\n        ...BlokPortMatch\n        __typename\n      }\n      protocols\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment BlokDiagnostic on Diagnostic {\n  level\n  code\n  message\n  path\n  __typename\n}\n\nfragment BlokQuery on BlokQuery {\n  key\n  service\n  document\n  variables {\n    ...ActionArgument\n    __typename\n  }\n  poll\n  more\n  __typename\n}\n\nfragment BlokSubscription on BlokSubscription {\n  key\n  service\n  document\n  variables {\n    ...ActionArgument\n    __typename\n  }\n  keep\n  history\n  __typename\n}\n\nfragment ResolvedBlokLocal on ResolvedBlokLocal {\n  node\n  key\n  label\n  kind\n  description\n  identifier\n  nullable\n  default\n  persist\n  referenceUnit\n  proposedUnits\n  dimension\n  children {\n    ...ArgChildPort\n    __typename\n  }\n  choices {\n    value\n    label\n    description\n    __typename\n  }\n  __typename\n}\n\nfragment BlokRevision on BlokRevision {\n  id\n  number\n  message\n  createdAt\n  author {\n    sub\n    __typename\n  }\n  task {\n    id\n    __typename\n  }\n  vocab\n  catalogs\n  resolvedLocals {\n    ...ResolvedBlokLocal\n    __typename\n  }\n  __typename\n}\n\nfragment DetailBlok on Blok {\n  id\n  name\n  description\n  provided\n  heldByAction\n  app {\n    id\n    identifier\n    __typename\n  }\n  context\n  module {\n    id\n    name\n    __typename\n  }\n  componentTree\n  vocab\n  catalogs\n  resolvedLocals {\n    ...ResolvedBlokLocal\n    __typename\n  }\n  demo {\n    ...BlokDemo\n    __typename\n  }\n  queries {\n    ...BlokQuery\n    __typename\n  }\n  subscriptions {\n    ...BlokSubscription\n    __typename\n  }\n  diagnostics {\n    ...BlokDiagnostic\n    __typename\n  }\n  dependencies {\n    ...BlokDependency\n    __typename\n  }\n  args {\n    ...ArgPort\n    __typename\n  }\n  head {\n    ...BlokRevision\n    __typename\n  }\n  __typename\n}\n\nfragment DetailMaterializedBlok on MaterializedBlok {\n  id\n  name\n  description\n  declaredBy {\n    id\n    declaredName\n    __typename\n  }\n  blok {\n    ...DetailBlok\n    __typename\n  }\n  agentMappings {\n    key\n    agent {\n      id\n      declaredName\n      connected\n      __typename\n    }\n    __typename\n  }\n  pinnedRevision {\n    ...BlokRevision\n    __typename\n  }\n  unboundDependencies\n  __typename\n}\n\nmutation PinMaterializedBlok($input: PinMaterializedBlokInput!) {\n  pinMaterializedBlok(input: $input) {\n    ...DetailMaterializedBlok\n    __typename\n  }\n}'
+        document = 'mutation PinMaterializedBlok($input: PinInput!) {\n  pinMaterializedBlok(input: $input) {\n    id\n    pinned\n    __typename\n  }\n}'
+
+class PinBlokMutationPinBlok(BaseModel):
+    """No documentation"""
+    typename: Literal['Blok'] = Field(alias='__typename', default='Blok', exclude=True)
+    id: ID
+    pinned: bool
+    'Whether the caller pinned this blok.'
+    model_config = ConfigDict(frozen=True)
+
+class PinBlokMutation(BaseModel):
+    """No documentation found for this operation."""
+    pin_blok: PinBlokMutationPinBlok = Field(alias='pinBlok')
+    'Pin a blok of any kind for the caller, or unpin it.'
+
+    class Arguments(BaseModel):
+        """Arguments for PinBlok """
+        input: PinInput
+
+    class Meta:
+        """Meta class for PinBlok """
+        document = 'mutation PinBlok($input: PinInput!) {\n  pinBlok(input: $input) {\n    id\n    pinned\n    __typename\n  }\n}'
 
 class RegisterModuleMutation(BaseModel):
     """No documentation found for this operation."""
@@ -4141,8 +4183,8 @@ Returns:
         variables['input'] = _input
         return self.execute(RevertBlokMutation, variables).revert_blok
 
-    async def apin_materialized_blok(self, id: IDCoercible, revision: IDCoercible | None | UnsetType=UNSET) -> DetailMaterializedBlok:
-        """PinMaterializedBlok 
+    async def apin_materialized_blok_revision(self, id: IDCoercible, revision: IDCoercible | None | UnsetType=UNSET) -> DetailMaterializedBlok:
+        """PinMaterializedBlokRevision 
 
 Keep a materialization at one revision of its blok, or let it follow the head again.
 
@@ -4158,28 +4200,104 @@ Returns:
         _input['id'] = id
         if revision is not UNSET:
             _input['revision'] = revision
+        variables['input'] = _input
+        return (await self.aexecute(PinMaterializedBlokRevisionMutation, variables)).pin_materialized_blok_revision
+
+    def pin_materialized_blok_revision(self, id: IDCoercible, revision: IDCoercible | None | UnsetType=UNSET) -> DetailMaterializedBlok:
+        """PinMaterializedBlokRevision 
+
+Keep a materialization at one revision of its blok, or let it follow the head again.
+
+Args:
+    id: The materialization.
+    revision: The revision to stay at; null follows the head again.
+
+Returns:
+    DetailMaterializedBlok
+"""
+        variables: dict[str, builtins.object] = {}
+        _input: dict[str, builtins.object] = {}
+        _input['id'] = id
+        if revision is not UNSET:
+            _input['revision'] = revision
+        variables['input'] = _input
+        return self.execute(PinMaterializedBlokRevisionMutation, variables).pin_materialized_blok_revision
+
+    async def apin_materialized_blok(self, id: IDCoercible, pin: bool) -> PinMaterializedBlokMutationPinMaterializedBlok:
+        """PinMaterializedBlok 
+
+Pin a materialization of any kind for the caller, or unpin it.
+
+Args:
+    id: The unique identifier of the item to pin.
+    pin: Boolean flag indicating whether to pin or unpin.
+
+Returns:
+    PinMaterializedBlokMutationPinMaterializedBlok
+"""
+        variables: dict[str, builtins.object] = {}
+        _input: dict[str, builtins.object] = {}
+        _input['id'] = id
+        _input['pin'] = pin
         variables['input'] = _input
         return (await self.aexecute(PinMaterializedBlokMutation, variables)).pin_materialized_blok
 
-    def pin_materialized_blok(self, id: IDCoercible, revision: IDCoercible | None | UnsetType=UNSET) -> DetailMaterializedBlok:
+    def pin_materialized_blok(self, id: IDCoercible, pin: bool) -> PinMaterializedBlokMutationPinMaterializedBlok:
         """PinMaterializedBlok 
 
-Keep a materialization at one revision of its blok, or let it follow the head again.
+Pin a materialization of any kind for the caller, or unpin it.
 
 Args:
-    id: The materialization.
-    revision: The revision to stay at; null follows the head again.
+    id: The unique identifier of the item to pin.
+    pin: Boolean flag indicating whether to pin or unpin.
 
 Returns:
-    DetailMaterializedBlok
+    PinMaterializedBlokMutationPinMaterializedBlok
 """
         variables: dict[str, builtins.object] = {}
         _input: dict[str, builtins.object] = {}
         _input['id'] = id
-        if revision is not UNSET:
-            _input['revision'] = revision
+        _input['pin'] = pin
         variables['input'] = _input
         return self.execute(PinMaterializedBlokMutation, variables).pin_materialized_blok
+
+    async def apin_blok(self, id: IDCoercible, pin: bool) -> PinBlokMutationPinBlok:
+        """PinBlok 
+
+Pin a blok of any kind for the caller, or unpin it.
+
+Args:
+    id: The unique identifier of the item to pin.
+    pin: Boolean flag indicating whether to pin or unpin.
+
+Returns:
+    PinBlokMutationPinBlok
+"""
+        variables: dict[str, builtins.object] = {}
+        _input: dict[str, builtins.object] = {}
+        _input['id'] = id
+        _input['pin'] = pin
+        variables['input'] = _input
+        return (await self.aexecute(PinBlokMutation, variables)).pin_blok
+
+    def pin_blok(self, id: IDCoercible, pin: bool) -> PinBlokMutationPinBlok:
+        """PinBlok 
+
+Pin a blok of any kind for the caller, or unpin it.
+
+Args:
+    id: The unique identifier of the item to pin.
+    pin: Boolean flag indicating whether to pin or unpin.
+
+Returns:
+    PinBlokMutationPinBlok
+"""
+        variables: dict[str, builtins.object] = {}
+        _input: dict[str, builtins.object] = {}
+        _input['id'] = id
+        _input['pin'] = pin
+        variables['input'] = _input
+        return self.execute(PinBlokMutation, variables).pin_blok
 
     async def aregister_module(self, name: str, components: Iterable[CatalogComponentInput], operations: Iterable[CatalogOperationInput], catalogs: Iterable[str], widget_defaults: Iterable[WidgetDefaultInput], description: str | None | UnsetType=UNSET) -> Module:
         """RegisterModule 
