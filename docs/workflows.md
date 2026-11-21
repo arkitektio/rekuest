@@ -87,9 +87,13 @@ raises `NonDeterministicWorkflow`.
 Pass `call_key=` yourself when two concurrent calls to the same target with the same
 arguments must be told apart (a flow engine names them by node).
 
-A workflow is resumed only by the code it ran: if its source changed in between, or its
-agent died three times, it ends LOST instead. Only the workflow function's own source is
-compared, so an edit to a helper it calls is not noticed.
+A workflow is resumed whatever its code is now, and held to the calls its first run made:
+the resumed run must make them again. A call the first run never made waits until it has
+(another branch may be about to), and is refused with `NonDeterministicWorkflow` if it has
+not within `replay_grace` (10 s). So is a run that ends without a call the first run made.
+An edit that leaves the calls as they were resumes like the code it replaces.
+
+A workflow whose agent died three times ends LOST instead.
 
 ## Handling a lost step
 

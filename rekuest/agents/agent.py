@@ -223,7 +223,7 @@ class RekuestAgent(BaseAgent):
         return self._store
 
     def _complete_resume(self, message: messages.Assign) -> messages.Assign:
-        """Add the task's effects this agent still holds unsent to its resume journal.
+        """Add the task's effects and calls this agent still holds unsent to its resume journal.
 
         A process that died may have recorded a value (the clock, a model's answer) that
         never reached the server. Its successor has it in the journal on disk, and the frame
@@ -243,7 +243,17 @@ class RekuestAgent(BaseAgent):
             for frame in self._retained.values()
             if getattr(frame, "task", None) == message.task and getattr(frame, "task_step", None)
         ]
-        if not held and not steps:
+        # A call it asked for that never reached the server is resent too: the resumed run
+        # makes it again like any the server knows.
+        calls = [
+            frame.call_key
+            for frame in self._retained.values()
+            if isinstance(frame, messages.AssignRequest)
+            and frame.parent == message.task
+            and frame.call_key
+            and frame.call_key not in message.resume.calls
+        ]
+        if not held and not steps and not calls:
             return message
         journal = message.resume.model_copy(
             update={
@@ -252,6 +262,7 @@ class RekuestAgent(BaseAgent):
                     *(messages.RecordedEffect(key=f.key, effect=f.effect, value=f.value) for f in held),
                 ],
                 "last_step": max([message.resume.last_step, *steps]),
+                "calls": [*message.resume.calls, *calls],
             }
         )
         return message.model_copy(update={"resume": journal})

@@ -16,7 +16,7 @@ from rekuest.agents.caller import AgentPostman, CallerTaskEvent
 from arkitekt_runtime.types import TaskEventKind
 from arkitekt_runtime.postmans.errors import AssignException, StatefulNeedsAgent
 from arkitekt_runtime.calls import _astream_raw
-from arkitekt_spec.declare.errors import AgentLost, DeniedError, ErrorCallError
+from arkitekt_spec.declare.errors import AgentLost, DeniedError, ErrorCallError, NonDeterministicWorkflow
 from arkitekt_spec.declare.task import AssignPrompt
 
 
@@ -615,3 +615,67 @@ async def test_a_silent_child_is_asked_about_and_the_call_goes_on_waiting() -> N
     pm.handle_execution_event(messages.CompletedEvent(task="t1", event="e1"))
     await asyncio.wait_for(calling, timeout=2.0)
     assert [e.kind for e in out] == [TaskEventKind.COMPLETED]
+
+
+@pytest.mark.asyncio
+async def test_a_resumed_run_is_refused_a_call_its_earlier_run_did_not_make() -> None:
+    """Refused before it is sent, and told that the code changed."""
+    sink = MemoryAgentTransport()
+    pm = AgentPostman(sink, replay_grace=0.05)
+    pm.begin_replay("7", ["recorded:1"], code_changed=True)
+
+    with pytest.raises(NonDeterministicWorkflow, match="'other:1'.*recorded:1.*code changed"):
+        async for _ in pm.aassign(**_call(parent="7", call_key="other:1")):
+            pass
+
+    assert sink.sent == []
+    assert pm.unclaimed_calls("7") == ["recorded:1"]
+
+
+@pytest.mark.asyncio
+async def test_a_new_call_waits_for_a_concurrent_branch_to_make_the_recorded_one() -> None:
+    sink = MemoryAgentTransport()
+    pm = AgentPostman(sink, replay_grace=5)
+    pm.begin_replay("7", ["recorded:1"])
+
+    async def call(key: str) -> None:
+        async for _ in pm.aassign(**_call(parent="7", call_key=key, reference=key)):
+            pass
+
+    new = asyncio.create_task(call("new:1"))
+    await asyncio.sleep(0.05)
+    assert sink.sent == [], "held back while a recorded call is outstanding"
+
+    recorded = asyncio.create_task(call("recorded:1"))
+    await _until(lambda: len(sink.sent) == 2)
+
+    assert [m.call_key for m in sink.sent] == ["recorded:1", "new:1"]
+    assert pm.unclaimed_calls("7") == []
+    for task in (new, recorded):
+        task.cancel()
+    await asyncio.gather(new, recorded, return_exceptions=True)
+
+
+@pytest.mark.asyncio
+async def test_identical_calls_are_keyed_in_the_order_they_were_made() -> None:
+    """Not the order their arguments finished serializing in: the second gets there first."""
+    sink = MemoryAgentTransport()
+    pm = AgentPostman(sink)
+    first, second = pm.reserve_call("7"), pm.reserve_call("7")
+
+    async def call(ticket: int, reference: str) -> None:
+        async for _ in pm.aassign(**_call(parent="7", action="a", ticket=ticket, reference=reference)):
+            pass
+
+    late = asyncio.create_task(call(second, "second"))
+    await asyncio.sleep(0.05)
+    assert sink.sent == [], "waits for the call made before it"
+
+    early = asyncio.create_task(call(first, "first"))
+    await _until(lambda: len(sink.sent) == 2)
+
+    occurrence = {m.reference: m.call_key.rsplit(":", 1)[1] for m in sink.sent}
+    assert occurrence == {"first": "1", "second": "2"}
+    for task in (late, early):
+        task.cancel()
+    await asyncio.gather(late, early, return_exceptions=True)

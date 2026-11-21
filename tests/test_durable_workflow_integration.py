@@ -3,7 +3,8 @@
 A real subprocess agent runs the workflow and is SIGKILLed at a crash point; a successor
 takes the agent over under the same name and journal. The server sends the workflow again
 with its journal, and the successor's run replays it: recorded values come back the same,
-and calls it already made find their children again (and their results) by call key.
+and calls it already made find their children again (and their results) by call key:
+whether the child had ended, was still running, or ended (or failed) while the workflow was down.
 
 Most kills wait until the dying process has nothing unacknowledged left, so the journal
 the server resumes from is complete; one kills at once, where the successor completes it
@@ -35,13 +36,15 @@ from .durable_workflow import (
     declare_handles_a_lost_step,
     declare_hang,
     declare_pipeline_changed,
+    declare_pipeline_diverged,
 )
 
 PACKAGE_ROOT = Path(__file__).resolve().parent.parent
 WORKER_TIMEOUT = 60
 RESUME_TIMEOUT = 30
 
-TASKS = "query { tasks { id reference parentStep callKey parent { id } } }"
+TASKS = "query { tasks { id reference parentStep callKey latestEventKind parent { id } } }"
+ENDED = {"COMPLETED", "FAILED", "CRITICAL"}
 HISTORY = """
 query History($id: ID!) {
   task(id: $id) {
@@ -93,6 +96,9 @@ class Run:
     events: list[dict] = field(default_factory=list)
     children: list[dict] = field(default_factory=list)
     double_calls: list[int] = field(default_factory=list)
+    slow_calls: list[int] = field(default_factory=list)
+    #: Set by the test to let the provider's slow step end.
+    release: asyncio.Event = field(default_factory=asyncio.Event)
 
     def effects(self, kind: str) -> list[dict]:
         return [e for e in self.events if e["kind"] == "EFFECT" and e["effect"] == kind]
@@ -154,15 +160,16 @@ async def kill_and_take_over(
     after_take_over: Callable[[Any, str], Awaitable[None]] | None = None,
     wait_for_acks: bool = True,
     provide: Callable[[Any, Run], None] | None = None,
-    while_down: Callable[[Any], Awaitable[None]] | None = None,
+    while_down: Callable[[Any, str], Awaitable[None]] | None = None,
     policy: TaskPolicy = TaskPolicy.AUTO,
+    run: Run | None = None,
 ) -> Run:
     """Call ``serve`` on a worker, kill it where it blocks, and let a successor take over.
 
     Unattended, so in auto-mode unless a test is about a person deciding (``policy``).
     """
     port = rekuest_port(deployment)
-    run = Run()
+    run = run or Run()
 
     def double(x: int) -> int:
         """Double a number."""
@@ -196,7 +203,7 @@ async def kill_and_take_over(
                 assert worker.process is not None
                 await worker.process.wait()
             if while_down is not None:
-                await while_down(provider)
+                await while_down(provider, task_id)
 
             successor = build_rekuest_at(port, "durable_token", name=AGENT_NAME, journal_path=str(worker.journal))
             (successor_declares or DECLARE[serve])(successor)
@@ -265,14 +272,25 @@ async def test_concurrent_calls_are_found_again_by_their_keys(deployment: Deploy
 
 @pytest.mark.integration
 @pytest.mark.asyncio(loop_scope="session")
-async def test_a_workflow_is_not_resumed_onto_changed_code(deployment: Deployment, tmp_path: Path) -> None:
+async def test_a_workflow_resumes_onto_edited_code_that_makes_the_same_calls(deployment: Deployment, tmp_path: Path) -> None:
     run = await kill_and_take_over(
         deployment, tmp_path, serve="pipeline", call={"x": 3}, successor_declares=declare_pipeline_changed
     )
 
-    assert isinstance(run.error, AgentLost), run.error
-    assert "code changed" in str(run.error)
-    assert run.kinds()[-1] == "LOST"
+    assert run.error is None, (run.error, run.kinds())
+    assert run.result.split(":")[0] == "6" and run.double_calls == [3]
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio(loop_scope="session")
+async def test_a_resumed_run_that_makes_another_call_is_refused_at_that_call(deployment: Deployment, tmp_path: Path) -> None:
+    run = await kill_and_take_over(
+        deployment, tmp_path, serve="pipeline", call={"x": 3}, successor_declares=declare_pipeline_diverged
+    )
+
+    assert isinstance(run.error, CriticalCallError), (run.error, run.result, run.kinds())
+    assert "never did" in str(run.error) and "code changed" in str(run.error)
+    assert run.double_calls == [3], "the other call was never sent"
 
 
 @pytest.mark.integration
@@ -372,7 +390,7 @@ def _provide_a_counter(provider: Any, run: Run) -> None:  # noqa: ANN401
     provider.register(bump)
 
 
-async def _bump_as_a_stranger(provider: Any) -> None:  # noqa: ANN401
+async def _bump_as_a_stranger(provider: Any, task_id: str) -> None:  # noqa: ANN401
     """Someone else changes the counter while the workflow is down."""
     await provider.acall(await provider.amy_implementation_at("bump"))
 
@@ -396,3 +414,127 @@ async def test_a_guard_lets_a_resumed_workflow_on_when_nothing_changed(deploymen
 
     assert run.error is None, (run.error, run.kinds())
     assert run.result == "went on"
+
+
+def _provide_slow(fails: bool = False) -> Callable[[Any, Run], None]:
+    """The provider's slow step: it ends when the test releases it, well or badly."""
+
+    def provide(provider: Any, run: Run) -> None:  # noqa: ANN401
+        async def slow(x: int) -> int:
+            """Double a number, once the test lets it; or fail."""
+            run.slow_calls.append(x)
+            await run.release.wait()
+            if fails:
+                raise ValueError(f"well {x} is dry")
+            return 2 * x
+
+        provider.register(slow)
+
+    return provide
+
+
+def _slow_runs(run: Run, doubles: int) -> Callable[[Any, str], Awaitable[bool]]:
+    """Where these workflows are killed: the quick steps ran, the slow one is under way."""
+
+    async def check(app: Any, task_id: str) -> bool:  # noqa: ANN401
+        return bool(run.slow_calls) and len(run.double_calls) == doubles
+
+    return check
+
+
+def _end_slow_while_down(run: Run, children: int) -> Callable[[Any, str], Awaitable[None]]:
+    """Let the slow step end while nobody runs the workflow, and wait until the server has it."""
+
+    async def while_down(provider: Any, task_id: str) -> None:  # noqa: ANN401
+        run.release.set()
+
+        async def all_ended() -> bool:
+            mine = [t for t in await _tasks(provider) if (t["parent"] or {}).get("id") == task_id]
+            return len(mine) == children and all(t["latestEventKind"] in ENDED for t in mine)
+
+        await _eventually(all_ended, RESUME_TIMEOUT, "the slow step to end while the workflow is down")
+
+    return while_down
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio(loop_scope="session")
+async def test_a_resumed_workflow_follows_on_a_call_still_running(deployment: Deployment, tmp_path: Path) -> None:
+    run = Run()
+
+    async def release_once_resumed(app: Any, task_id: str) -> None:  # noqa: ANN401
+        async def resumed() -> bool:
+            return [e["kind"] for e in (await _history(app, task_id))["events"]].count("STARTED") >= 2
+
+        await _eventually(resumed, RESUME_TIMEOUT, "the workflow to be resumed")
+        run.release.set()
+
+    await kill_and_take_over(
+        deployment, tmp_path, serve="careful_pipeline", call={"x": 3}, run=run,
+        provide=_provide_slow(), reached=_slow_runs(run, doubles=1), after_take_over=release_once_resumed,
+    )
+
+    assert run.error is None, (run.error, run.kinds())
+    value, started, why = run.result.split("|")
+    assert (value, why) == ("12", "")
+    assert float(started) == pytest.approx(run.effects("NOW")[0]["value"])
+    # Neither step ran again: the finished one was reused, the running one followed on.
+    assert (run.double_calls, run.slow_calls) == ([3], [6])
+    assert len(run.children) == 2 and len({c["callKey"] for c in run.children}) == 2
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio(loop_scope="session")
+async def test_a_call_that_ended_while_the_workflow_was_down_is_answered(deployment: Deployment, tmp_path: Path) -> None:
+    """Nobody heard the step end: its result comes with the server's answer to the call made again."""
+    run = Run()
+
+    await kill_and_take_over(
+        deployment, tmp_path, serve="careful_pipeline", call={"x": 3}, run=run,
+        provide=_provide_slow(), reached=_slow_runs(run, doubles=1), while_down=_end_slow_while_down(run, children=2),
+    )
+
+    assert run.error is None, (run.error, run.kinds())
+    assert run.result.split("|")[0] == "12"
+    assert (run.double_calls, run.slow_calls) == ([3], [6])
+    assert len(run.children) == 2
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio(loop_scope="session")
+async def test_a_call_that_failed_while_the_workflow_was_down_reaches_its_error_handler(deployment: Deployment, tmp_path: Path) -> None:
+    """The resumed run gets the step's own error, handles it, and goes on to its fallback."""
+    run = Run()
+
+    await kill_and_take_over(
+        deployment, tmp_path, serve="careful_pipeline", call={"x": 3}, run=run,
+        provide=_provide_slow(fails=True), reached=_slow_runs(run, doubles=1), while_down=_end_slow_while_down(run, children=2),
+    )
+
+    assert run.error is None, (run.error, run.kinds())
+    value, _, why = run.result.split("|")
+    assert "well 6 is dry" in why, "the step's error, as the server kept it"
+    assert run.slow_calls == [6], "a failed step is not tried again"
+    # The fallback is a call the first run never made: it runs now, once.
+    assert value == "12" and run.double_calls == [3, 6]
+    assert len(run.children) == 3
+    assert run.kinds()[-1] == "COMPLETED" and "LOST" not in run.kinds()
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio(loop_scope="session")
+async def test_a_resumed_asyncio_workflow_gets_each_concurrent_call_as_it_ended(deployment: Deployment, tmp_path: Path) -> None:
+    """Three calls at once, one failing while the workflow is down: each comes back as it ended."""
+    run = Run()
+
+    await kill_and_take_over(
+        deployment, tmp_path, serve="fanout", call={"x": 3}, run=run,
+        provide=_provide_slow(fails=True), reached=_slow_runs(run, doubles=2), while_down=_end_slow_while_down(run, children=3),
+    )
+
+    assert run.error is None, (run.error, run.kinds())
+    stamp, parts = run.result.split("|")
+    assert parts == "6,failed,8", "in the order they were called, not the order they ended"
+    assert stamp == run.effects("RANDOM")[0]["value"] and len(run.effects("RANDOM")) == 1
+    assert (sorted(run.double_calls), run.slow_calls) == ([3, 4], [3])
+    assert len({c["callKey"] for c in run.children}) == 3

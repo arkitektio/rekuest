@@ -33,7 +33,7 @@ import hashlib
 import json
 import logging
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from types import TracebackType
 from typing import Any
 from collections.abc import AsyncGenerator, Awaitable, Callable, Sequence
@@ -131,6 +131,25 @@ def _adapt(event: "messages.ExecutionEvent") -> CallerTaskEvent | None:
 INQUIRY_TIMEOUT = 10.0
 
 
+@dataclass
+class _Replay:
+    """The calls a resumed workflow's earlier run made, until the resumed run made them again."""
+
+    unclaimed: set[str]
+    code_changed: bool
+    caught_up: asyncio.Event = field(default_factory=asyncio.Event)
+    refused: str | None = None
+
+
+@dataclass
+class _Line:
+    """A parent's calls, in the order they were made: each is keyed when those before it were."""
+
+    issued: int = 0
+    open: set[int] = field(default_factory=set)
+    moved: asyncio.Event = field(default_factory=asyncio.Event)
+
+
 class _Lost:
     """Put on a call's queue when its task cannot be followed any further."""
 
@@ -167,8 +186,16 @@ class AgentPostman:
         cancel_timeout: float = 5.0,
         child_step: "Callable[[str], Awaitable[int | None]] | None" = None,
         inquire_after: float = 30.0,
+        replay_grace: float = 10.0,
     ) -> None:
         self.sink = sink
+        # Seconds a resumed workflow's new call waits for the calls its earlier run made to
+        # be made again (by a concurrent branch), before the run is taken to be on another path.
+        self.replay_grace = replay_grace
+        # parent task -> the calls its earlier run made, while it is being resumed
+        self._replays: dict[str, _Replay] = {}
+        # parent task -> its calls not yet keyed, in the order they were made
+        self._lines: dict[str, _Line] = {}
         # Seconds of silence from a child after which its call asks whether its agent is
         # still on it (a call's own ``inquire_after`` overrides this; 0 never asks).
         self.inquire_after = inquire_after
@@ -233,6 +260,7 @@ class AgentPostman:
         inquire_after: float | None = None,
         on_lost: "messages.OnLost | None" = None,
         max_resumes: int | None = None,
+        ticket: int | None = None,
     ) -> AsyncGenerator[CallerTaskEvent, None]:
         """Originate a task over the agent socket and stream its events.
 
@@ -259,16 +287,27 @@ class AgentPostman:
         the call key derived for it: the same action with the same args on two agents is
         two different children, which a resuming workflow must not find swapped.
         """
+        if parent is not None:
+            # Keyed in the order the calls were made (``ticket``: its place, taken before its
+            # arguments were serialized), so a derived key's occurrence is the same on every run.
+            ticket = self.reserve_call(str(parent)) if ticket is None else ticket
+            try:
+                await self._aturn(str(parent), ticket)
+                if call_key is None:
+                    target = action or action_hash or implementation or (f"{dependency}.{method}" if dependency else interface) or "call"
+                    if agent is not None and (action or action_hash):
+                        target = f"{target}@{agent}"
+                    call_key = self._derive_call_key(str(parent), target, args)
+            finally:
+                self.release_call(str(parent), ticket)
+        if parent is not None and call_key is not None:
+            # Before it takes a step: a refused call leaves no gap in the parent's steps.
+            await self._aclaim(str(parent), call_key)
         parent_step = (
             await self.child_step(str(parent))
             if parent is not None and self.child_step is not None
             else None
         )
-        if parent is not None and call_key is None:
-            target = action or action_hash or implementation or (f"{dependency}.{method}" if dependency else interface) or "call"
-            if agent is not None and (action or action_hash):
-                target = f"{target}@{agent}"
-            call_key = self._derive_call_key(str(parent), target, args)
         # The reference stays the caller's own; the parent's step travels next to it.
         request_reference = reference or str(uuid.uuid4())
         request = messages.AssignRequest(
@@ -379,6 +418,76 @@ class AgentPostman:
         """A parent task ended: its call counters are no longer needed."""
         for key in [k for k in self._occurrences if k[0] == parent]:
             del self._occurrences[key]
+        self._replays.pop(parent, None)
+        self._lines.pop(parent, None)
+
+    def reserve_call(self, parent: str) -> int:
+        """Take the next place among ``parent``'s calls. Before anything is awaited."""
+        line = self._lines.setdefault(parent, _Line())
+        line.issued += 1
+        line.open.add(line.issued)
+        return line.issued
+
+    def release_call(self, parent: str, ticket: int) -> None:
+        """Give a place up (the call was keyed, or never got that far). Idempotent."""
+        line = self._lines.get(parent)
+        if line is None or ticket not in line.open:
+            return
+        line.open.discard(ticket)
+        line.moved.set()
+        line.moved = asyncio.Event()
+
+    async def _aturn(self, parent: str, ticket: int) -> None:
+        """Wait until every call ``parent`` made before this one was keyed or given up."""
+        line = self._lines.get(parent)
+        while line is not None and any(earlier < ticket for earlier in line.open):
+            await line.moved.wait()
+
+    def begin_replay(self, parent: str, calls: Sequence[str], code_changed: bool = False) -> None:
+        """A resumed run of ``parent`` begins: ``calls`` are the keys its earlier run made."""
+        self.forget_parent(parent)
+        replay = _Replay(unclaimed=set(calls), code_changed=code_changed)
+        if not replay.unclaimed:
+            replay.caught_up.set()
+        self._replays[parent] = replay
+
+    def unclaimed_calls(self, parent: str) -> list[str]:
+        """The recorded call keys the resumed run of ``parent`` has not made again."""
+        replay = self._replays.get(parent)
+        return sorted(replay.unclaimed) if replay is not None else []
+
+    async def _aclaim(self, parent: str, call_key: str) -> None:
+        """Hold a resumed workflow to the calls its earlier run made.
+
+        A recorded call is let through. Any other waits until every recorded one was made
+        again: a concurrent branch may still make them, and a replayed run gets there
+        without waiting on anything new. If they are not made within ``replay_grace``, the
+        run is on another path, and the call is refused before it is sent.
+
+        Raises:
+            NonDeterministicWorkflow: The resumed run made a call its earlier run did not,
+                in place of one it did.
+        """
+        replay = self._replays.get(parent)
+        if replay is None or replay.caught_up.is_set():
+            return
+        if call_key in replay.unclaimed:
+            replay.unclaimed.discard(call_key)
+            if not replay.unclaimed:
+                replay.caught_up.set()
+            return
+        if replay.refused is None:
+            try:
+                await asyncio.wait_for(replay.caught_up.wait(), self.replay_grace)
+            except TimeoutError:
+                replay.refused = (
+                    f"Task {parent}: the resumed run called {call_key!r}, which the run it resumes "
+                    f"never did, and has not made {sorted(replay.unclaimed)}, which it did."
+                    + (" The workflow's code changed since that run started." if replay.code_changed else "")
+                )
+            else:
+                return
+        raise NonDeterministicWorkflow(replay.refused)
 
     def _derive_call_key(self, parent: str, target: str, args: dict[str, Any] | None) -> str:
         """What a parent calls a child it gave no key: the target, its args, the occurrence.

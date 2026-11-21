@@ -14,7 +14,7 @@ from typing import Any, Protocol
 
 from arkitekt_runtime.task import Task
 from arkitekt_spec.actions import Effects
-from arkitekt_spec.declare.errors import AgentLost
+from arkitekt_spec.declare.errors import AgentLost, CriticalCallError
 
 #: Both processes run the agent under this name: retained frames are kept per agent name.
 AGENT_NAME = "durable-workflow-agent"
@@ -66,7 +66,7 @@ def declare_pipeline(app: Any) -> None:  # noqa: ANN401 - a FreshApp
 
 
 def declare_pipeline_changed(app: Any) -> None:  # noqa: ANN401 - a FreshApp
-    """``pipeline`` again, with a different body: resuming onto it must be refused."""
+    """``pipeline`` again, edited without changing what it calls: it resumes all the same."""
     Doubler = _declare_doubler(app)
 
     def pipeline(atest: Doubler, x: int, task: Task) -> str:  # type: ignore[valid-type]
@@ -74,6 +74,21 @@ def declare_pipeline_changed(app: Any) -> None:  # noqa: ANN401 - a FreshApp
         now = task.now()
         drawn = task.random(4)
         doubled = atest.double(x) + 0  # a change the code hash sees
+        crash_point()
+        return f"{doubled}:{now}:{drawn}"
+
+    app.register_workflow(pipeline)
+
+
+def declare_pipeline_diverged(app: Any) -> None:  # noqa: ANN401 - a FreshApp
+    """``pipeline`` again, calling something else: the resumed run is refused at that call."""
+    Doubler = _declare_doubler(app)
+
+    def pipeline(atest: Doubler, x: int, task: Task) -> str:  # type: ignore[valid-type]
+        """Take the clock and randomness, and double another number on the provider."""
+        now = task.now()
+        drawn = task.random(4)
+        doubled = atest.double(x + 1)  # not the call the earlier run made
         crash_point()
         return f"{doubled}:{now}:{drawn}"
 
@@ -174,6 +189,69 @@ def declare_handles_a_lost_step(app: Any) -> None:  # noqa: ANN401 - a FreshApp
     app.register_workflow(careful)
 
 
+def _declare_steps(app: Any) -> Any:  # noqa: ANN401 - a FreshApp
+    @app.declare(app="atest", auto_resolvable=True, min=1)
+    class Steps(Protocol):
+        def double(self, x: int) -> int:
+            """Double a number."""
+            ...
+
+        def slow(self, x: int) -> int:
+            """Double a number, once the test lets it; or fail."""
+            ...
+
+    return Steps
+
+
+def declare_careful_pipeline(app: Any) -> None:  # noqa: ANN401 - a FreshApp
+    """``careful_pipeline``: a quick step, then a slow one it is killed in; falls back if that failed."""
+    Steps = _declare_steps(app)
+
+    def careful_pipeline(atest: Steps, x: int, task: Task) -> str:  # type: ignore[valid-type]
+        """Double, then double slowly; if the slow step failed, say why and double plainly."""
+        started = task.now()
+        doubled = atest.double(x)
+        task.progress(50, "doubled")
+        why = ""
+        try:
+            value = atest.slow(doubled)
+        except CriticalCallError as failed:
+            why = str(failed)
+            task.log(f"slow failed, falling back: {why}")
+            value = atest.double(doubled)
+        return f"{value}|{started}|{why}"
+
+    app.register_workflow(careful_pipeline)
+
+
+def declare_fanout(app: Any) -> None:  # noqa: ANN401 - a FreshApp
+    """``fanout``: three steps at once, killed while the slow one runs; a failed step is named, not fatal."""
+    Steps = _declare_steps(app)
+
+    async def fanout(atest: Steps, x: int, task: Task) -> str:  # type: ignore[valid-type]
+        """Run three steps at once, and report each: its value, or that it failed."""
+        stamp = await task.arandom(4)
+        # Deterministic whatever order they end in: each call is keyed by target, args and occurrence.
+        results = await asyncio.gather(
+            atest.double.acall(x),
+            atest.slow.acall(x),
+            atest.double.acall(x + 1),
+            return_exceptions=True,
+        )
+        parts = []
+        for result in results:
+            if isinstance(result, CriticalCallError):
+                parts.append("failed")
+            elif isinstance(result, BaseException):
+                raise result
+            else:
+                parts.append(str(result))
+        await task.aprogress(100, "all steps ended")
+        return f"{stamp}|{','.join(parts)}"
+
+    app.register_workflow(fanout)
+
+
 #: What ``tests/durable_worker.py`` can serve, by ``DURABLE_DECLARE``.
 DECLARE = {
     "pipeline": declare_pipeline,
@@ -182,4 +260,6 @@ DECLARE = {
     "guarded": declare_guarded,
     "held": declare_held,
     "hang": declare_hang,
+    "careful_pipeline": declare_careful_pipeline,
+    "fanout": declare_fanout,
 }
