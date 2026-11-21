@@ -151,3 +151,6 @@ token.temp
 
 # local integration override (mounts the live server source)
 tests/integration/docker-compose.local.yml
+
+# The server version the integration tests ran against, stamped into a release.
+rekuest/_tested.json

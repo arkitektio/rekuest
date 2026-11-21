@@ -1,5 +1,6 @@
 """Some configuration for pytest"""
 
+from arkitekt_spec.declare.tested import record_tested
 import asyncio
 import logging
 import socket
@@ -588,6 +589,8 @@ async def deployment(integration_ports: dict[str, int]) -> AsyncGenerator[Deploy
         await setup.apull()
         await setup.aup()
         await setup.acheck_health()
+        # What a release of this client then says it was tested against.
+        record_tested("rekuest", f"http://localhost:{setup.spec.find_service('rekuest').get_port_for_internal(80).published}/ht")
         yield setup
 
 

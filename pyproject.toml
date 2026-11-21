@@ -16,7 +16,7 @@ dependencies = [
     # The declaration an app is (the action language, AppRegistry, services, hooks)
     # is arkitekt-spec's; executing it is arkitekt-runtime's. rekuest is the
     # distributed runtime on top: the socket agent, its transport, and the client.
-    "arkitekt-spec>=12.3",
+    "arkitekt-spec>=12.9",
     "arkitekt-runtime>=10.7",
     # Media uploads (MediaLike arguments) are put into the datalayer through obstore.
     "obstore>=0.11.0",
@@ -67,11 +67,15 @@ include = ["rekuest"]
 exclude = ["**/__pycache__", "tests"]
 typeCheckingMode = "standard"
 
+# `_tested.json` is written by the integration tests (the server version they ran against)
+# and is not in git: named as an artifact, on both, it is shipped all the same.
 [tool.hatch.build.targets.sdist]
 include = ["rekuest"]
+artifacts = ["rekuest/_tested.json"]
 
 [tool.hatch.build.targets.wheel]
 include = ["rekuest"]
+artifacts = ["rekuest/_tested.json"]
 
 [build-system]
 requires = ["hatchling", "hatch-vcs"]

@@ -38,6 +38,7 @@ from rekuest.api.schema import (
     TestResult,
 )
 from arkitekt_spec.declare.app import AppRegistry
+from arkitekt_spec.declare.tested import tested_against
 from rekuest.agents.transport.websocket import WebsocketAgentTransport
 from rekuest.datalayer import DataLayer
 from rekuest.client.upload.assets import aupload_assets
@@ -56,18 +57,22 @@ registry = AppRegistry()
 """What rekuest brings to an app: its service, and the types it can send by id."""
 
 
+TESTED = tested_against("rekuest")
+"""The rekuest server this release wants: the one its release job tested it against."""
+
+
 @registry.service(
     schema=build_relative_path("api", "schema.graphql"),
     turms=build_relative_path("api", "project.json"),
     # The server this release of the client is written against: what a hub made for
     # an app's tests runs. Moves with the server's major, not with this package's.
-    image="jhnnsrs/rekuest:13",
+    image="jhnnsrs/rekuest:22",
 )
 def rekuest(
     rekuest: Annotated[
         Alias,
         Require(
-            "live.arkitekt.rekuest", "Where this app's actions are offered and assigned"
+            "live.arkitekt.rekuest", "Where this app's actions are offered and assigned", version=TESTED
         ),
     ],
     s3: Annotated[
@@ -131,7 +136,7 @@ def rekuest_agent(
     rekuest: Annotated[
         Alias,
         Require(
-            "live.arkitekt.rekuest", "Where this app's actions are offered and assigned"
+            "live.arkitekt.rekuest", "Where this app's actions are offered and assigned", version=TESTED
         ),
     ],
     s3: Annotated[
@@ -266,13 +271,13 @@ caller_registry.merge(registry)
 @caller_registry.service(
     schema=build_relative_path("api", "schema.graphql"),
     turms=build_relative_path("api", "project.json"),
-    image="jhnnsrs/rekuest:13",
+    image="jhnnsrs/rekuest:22",
 )
 def rekuest_caller(
     rekuest: Annotated[
         Alias,
         Require(
-            "live.arkitekt.rekuest", "Where this app's actions are offered and assigned"
+            "live.arkitekt.rekuest", "Where this app's actions are offered and assigned", version=TESTED
         ),
     ],
     s3: Annotated[
