@@ -50,6 +50,7 @@ class FakeTakt:
         self.pos = 0
         self.on_frame: Callable[[dict[str, Any]], Awaitable[None]] | None = None
         self.server: Any = None
+        self.welcome_delay = 0.0
 
     @property
     def url(self) -> str:
@@ -69,6 +70,7 @@ class FakeTakt:
             self.frames.append(frame)
             if frame["type"] == "HELLO":
                 self.hellos.append(frame)
+                await asyncio.sleep(self.welcome_delay)
                 resumed = frame.get("session") == "s-1"
                 await connection.send(
                     json.dumps(
@@ -315,3 +317,17 @@ async def test_cancelling_a_call_cancels_its_task_and_waits_for_the_confirmation
         with pytest.raises(asyncio.CancelledError):
             await running
     assert takt.sent("CANCEL")[0]["task"] == "7"
+
+
+@pytest.mark.asyncio
+async def test_nothing_but_hello_goes_out_before_the_welcome(takt: FakeTakt) -> None:
+    takt.welcome_delay = 0.3
+    session = CallerSession(takt.url, token)
+    async with session:
+        await until(lambda: takt.hellos)
+        async with session.watching("task:9"):
+            await session.wait_open(timeout=3)
+            await until(lambda: takt.sent("WATCH"))
+    kinds = [frame["type"] for frame in takt.frames]
+    assert kinds[0] == "HELLO"
+    assert kinds.index("WATCH") > 0

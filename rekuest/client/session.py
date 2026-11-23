@@ -248,7 +248,9 @@ class CallerSession:
         return True
 
     def _send_soon(self, frame: dict[str, Any]) -> None:
-        if self._socket is not None:
+        # Only once welcomed: takt closes a socket whose first frame is not HELLO, and
+        # what was asked before is sent on WELCOME.
+        if self._socket is not None and self._open.is_set():
             asyncio.ensure_future(self._send(frame))
 
     # --------------------------------------------------------------------------------- frames
@@ -371,7 +373,7 @@ class CallerSession:
                 current.queues.discard(queue)
                 if not current.queues:
                     del self._topics[name]
-                    if self._socket is not None:
+                    if self._socket is not None and self._open.is_set():
                         self._send_soon({"type": "UNWATCH", "topic": name})
                     else:
                         self._dropped.add(name)
