@@ -3,6 +3,7 @@
 import asyncio
 import logging
 import uuid
+import warnings
 from collections.abc import AsyncGenerator, AsyncIterator, Sequence
 from types import TracebackType
 from typing import Any
@@ -646,6 +647,12 @@ class GraphQLPostman(KoiledModel):
 
     async def __aenter__(self) -> "GraphQLPostman":
         """Enter the postman"""
+        warnings.warn(
+            "GraphQLPostman follows rekuest's deprecated task subscriptions; use "
+            "rekuest.client.session_postman.SessionPostman (a caller session on takt).",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         self._lock = asyncio.Lock()
         return self
 
