@@ -46,13 +46,12 @@ INQUIRY_TIMEOUT = 10.0
 
 
 class GraphQLPostman(KoiledModel):
-    """A GraphQL Postman
+    """A GraphQL Postman (superseded).
 
-    This postman is used to send messages to the GraphQL server via a graphql
-    transport.
-
-    This graphql postman
-
+    Assigns with the GraphQL mutation and follows the ``mytasks`` subscription, reading a
+    task's history whenever the feed may have dropped something. Callers use
+    :class:`rekuest.client.session_postman.SessionPostman` (a caller session on takt);
+    this one goes with the GraphQL task subscriptions.
     """
 
     rath: RekuestRath

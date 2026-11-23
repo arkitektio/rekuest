@@ -156,14 +156,6 @@
                     "endColumn": 42,
                     "lineCount": 1
                 }
-            },
-            {
-                "code": "reportArgumentType",
-                "range": {
-                    "startColumn": 16,
-                    "endColumn": 41,
-                    "lineCount": 1
-                }
             }
         ],
         "./rekuest/client/client.py": [
@@ -538,26 +530,10 @@
                 }
             },
             {
-                "code": "reportArgumentType",
-                "range": {
-                    "startColumn": 24,
-                    "endColumn": 49,
-                    "lineCount": 1
-                }
-            },
-            {
                 "code": "reportReturnType",
                 "range": {
                     "startColumn": 11,
                     "endColumn": 81,
-                    "lineCount": 1
-                }
-            },
-            {
-                "code": "reportArgumentType",
-                "range": {
-                    "startColumn": 20,
-                    "endColumn": 45,
                     "lineCount": 1
                 }
             },

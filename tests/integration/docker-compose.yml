@@ -97,7 +97,7 @@ configs:
   gateway:
     content: |
       :80 {
-        @takt path /agi /agi/* /agent /agent/*
+        @takt path /agi /agi/* /agent /agent/* /session
         handle @takt {
           reverse_proxy takt:8080
         }

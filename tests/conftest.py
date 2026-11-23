@@ -31,6 +31,8 @@ from rekuest.agents.retention import default_journal_path
 from rekuest.agents.transport.websocket import WebsocketAgentTransport
 from rekuest.client.client import Rekuest, RekuestCaller, RekuestRath
 from rekuest.client.postman import GraphQLPostman
+from rekuest.client.session import CallerSession
+from rekuest.client.session_postman import SessionPostman
 
 # Maximum time (seconds) to wait for an agent to connect and be acknowledged by
 # the server before a test fails. Used with ``app.aconnect(timeout=...)``.
@@ -357,10 +359,11 @@ def deployed_app(
             name="Test",
         )
 
+        session_url = f"ws://localhost:{setup.spec.find_service('rekuest').get_port_for_internal(80).published}/session"
         rekuest = FreshApp(
             client=RekuestCaller(
                 rath=rath,
-                postman=GraphQLPostman(rath=rath),
+                postman=SessionPostman(session=CallerSession(session_url, token_loader)),
                 structure_registry=agent.app_registry.structure_registry,
             ),
             agent=agent,
@@ -563,7 +566,9 @@ def build_rekuest_at(
     return FreshApp(
         client=RekuestCaller(
             rath=rath,
-            postman=GraphQLPostman(rath=rath),
+            postman=SessionPostman(
+                session=CallerSession(f"ws://localhost:{port}/session", loader)
+            ),
             structure_registry=agent.app_registry.structure_registry,
         ),
         agent=agent,

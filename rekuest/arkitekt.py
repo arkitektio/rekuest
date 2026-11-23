@@ -42,8 +42,9 @@ from rekuest.api.schema import (
     TestResult,
 )
 from rekuest.client.client import Rekuest, RekuestCaller
-from rekuest.client.postman import GraphQLPostman
 from rekuest.client.rath import RekuestRath
+from rekuest.client.session import CallerSession
+from rekuest.client.session_postman import SessionPostman
 from rekuest.client.upload.assets import aupload_assets
 from rekuest.client.upload.link import UploadLink
 from rekuest.datalayer import DataLayer
@@ -320,7 +321,16 @@ def rekuest_caller(
     rath = _rath(rekuest, s3, tokens)
     return RekuestCaller(
         rath=rath,
-        postman=GraphQLPostman(rath=rath),
+        # Calls go over a caller session on takt: gap-free events, resumed after a drop.
+        postman=SessionPostman(
+            session=CallerSession(
+                rekuest.to_ws_path("session"),
+                tokens.aget_token,
+                ssl_context=rekuest.ssl_context(),
+                proxy=rekuest.proxy,
+                client_info={"app": "rekuest-python"},
+            )
+        ),
         structure_registry=registry.structure_registry,
     )
 
