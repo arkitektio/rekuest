@@ -363,7 +363,9 @@ def deployed_app(
         rekuest = FreshApp(
             client=RekuestCaller(
                 rath=rath,
-                postman=SessionPostman(session=CallerSession(session_url, token_loader)),
+                postman=SessionPostman(
+                    session=CallerSession(session_url, token_loader)
+                ),
                 structure_registry=agent.app_registry.structure_registry,
             ),
             agent=agent,
