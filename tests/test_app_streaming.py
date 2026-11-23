@@ -14,7 +14,6 @@ from collections.abc import AsyncGenerator, Generator
 import pytest
 from dokker import Deployment
 
-
 from .conftest import CONNECT_TIMEOUT, build_fresh_rekuest
 
 

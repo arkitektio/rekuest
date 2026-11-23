@@ -7,17 +7,15 @@ drive it (the pre-existing ones had no ``areceive``). That is what makes the rou
 """
 
 import asyncio
-from rekuest.agents.agent import RekuestAgent
 from collections.abc import AsyncIterator
 
 import pytest
-
 from arkitekt_runtime import messages
 from arkitekt_runtime.agents.base import BaseAgent
+from arkitekt_runtime.local import MemoryAgentTransport
 from arkitekt_spec.declare.app import AppRegistry
 
-
-from arkitekt_runtime.local import MemoryAgentTransport
+from rekuest.agents.agent import RekuestAgent
 
 
 @pytest.fixture()
@@ -49,10 +47,6 @@ async def _pump(agent: BaseAgent, count: int) -> None:
 
 def _errors(transport: MemoryAgentTransport) -> list[str]:
     return [c.error for c in transport.of_type(messages.Critical)]
-
-
-
-
 
 
 @pytest.mark.asyncio
@@ -110,22 +104,12 @@ async def test_caller_answers_go_to_the_postman_not_the_actors(
     assert "delegated-1" not in agent.managed_assignments
 
 
-
-
-
-
 class _DeadSocket(MemoryAgentTransport):
     """A transport whose socket has gone away underneath it."""
 
     async def asend(self, message: messages.FromAgentMessage) -> None:
         """Fail the way a lost connection does."""
         raise ConnectionResetError("socket is gone")
-
-
-
-
-
-
 
 
 @pytest.mark.asyncio
@@ -140,10 +124,6 @@ async def test_probe_response_is_routed_to_the_caller_postman(
     await _pump(agent, 1)
 
     assert len(seen) == 1 and seen[0].probe == "p-1"
-
-
-
-
 
 
 @pytest.mark.asyncio
@@ -194,9 +174,14 @@ async def test_an_inquiry_is_answered_at_once_from_what_the_agent_knows(
     assert (await ask("never-had")).status == messages.TaskStatus.UNKNOWN
 
     # And what it last said of itself: how far it is, when it said so, and where it stands.
-    await agent._adispatch(messages.Progress(task="task-1", progress=40, message="half way"))
+    await agent._adispatch(
+        messages.Progress(task="task-1", progress=40, message="half way")
+    )
     told = await ask("task-1")
-    assert (told.progress, told.message) == (40, "half way") and told.reported_at is not None
+    assert (told.progress, told.message) == (
+        40,
+        "half way",
+    ) and told.reported_at is not None
     await agent._adispatch(messages.Paused(task="task-1"))
     assert (await ask("task-1")).status == messages.TaskStatus.PAUSED
     await agent._adispatch(messages.Resumed(task="task-1"))

@@ -24,7 +24,9 @@ class Counter(Protocol):
 
 
 @app.workflow
-async def count_and_add(counter: Counter, to: int, *, task: Task) -> AsyncGenerator[str, None]:
+async def count_and_add(
+    counter: Counter, to: int, *, task: Task
+) -> AsyncGenerator[str, None]:
     """Count And Add"""
     async for step in counter.count(to=to):  # a generator method streams every yield
         yield step
@@ -101,9 +103,9 @@ A workflow whose agent died three times ends LOST instead.
 try:
     handler.dispense(well, volume_ul=v)
 except AgentLost as lost:
-    if not lost.started:          # never reached the robot: nothing happened
+    if not lost.started:  # never reached the robot: nothing happened
         handler.dispense(well, volume_ul=v)
-    else:                         # started, fate unknown: a person decides
+    else:  # started, fate unknown: a person decides
         task.hold(f"dispense into {well} was lost: check the well", lost=lost)
 ```
 
@@ -123,6 +125,7 @@ except AgentLost as lost:
 ```python
 @app.action(effects=Effects.NONE)
 def count_cells(image: Image) -> int: ...
+
 
 app = App("liquid-handler", "0.1.0", effects=Effects.IRREVERSIBLE)  # the app's default
 ```

@@ -8,10 +8,7 @@ server is involved.
 from typing import Any
 
 import pytest
-from rath.expansion import ExpandsStructures
-
 from arkitekt_spec.declare.app import AppRegistry
-from rekuest.arkitekt import registry as rekuest_registry
 from arkitekt_spec.declare.structures.errors import (
     StructureDefinitionError,
     StructureOverwriteError,
@@ -20,6 +17,9 @@ from arkitekt_spec.declare.structures.errors import (
 from arkitekt_spec.declare.structures.registry import StructureRegistry
 from arkitekt_spec.declare.structures.types import is_valid_identifier
 from arkitekt_spec.declare.structures.utils import id_shrink
+from rath.expansion import ExpandsStructures
+
+from rekuest.arkitekt import registry as rekuest_registry
 
 from .service_helpers import with_client
 
@@ -272,7 +272,9 @@ def test_rekuests_own_structures_are_declared_the_same_way() -> None:
 
 
 @pytest.mark.asyncio
-async def test_a_materialized_blok_is_a_structure_under_the_identifier_orkestrator_links() -> None:
+async def test_a_materialized_blok_is_a_structure_under_the_identifier_orkestrator_links() -> (
+    None
+):
     """``@rekuest/materialized_blok``, underscore and all: what a room message attaches."""
     from rekuest.api.schema import DetailMaterializedBlok
     from rekuest.arkitekt import expand_materialized_blok

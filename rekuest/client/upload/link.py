@@ -1,16 +1,17 @@
 import asyncio
+from concurrent.futures import ThreadPoolExecutor
+from functools import partial
+from typing import TYPE_CHECKING, Any
+
+from pydantic import Field
 from rath.links.parsing import ParsingLink
 from rath.operation import Operation, opify
-from typing import Any
+
 from rekuest.client.upload.media import (
     astore_media_file,
 )
-from pydantic import Field
-from concurrent.futures import ThreadPoolExecutor
-from functools import partial
-from typing import TYPE_CHECKING
-from rekuest.scalars import MediaLike
 from rekuest.datalayer import DataLayer
+from rekuest.scalars import MediaLike
 
 if TYPE_CHECKING:
     from rekuest.api.schema import (
@@ -80,9 +81,11 @@ class UploadLink(ParsingLink):
         self._executor_session = self.executor.__enter__()
         return self
 
-    async def aget_media_upload_credentials(self, file: MediaLike) -> "MediaUploadGrant":
-        from rekuest.protocol.schema import RequestMediaUploadInput
+    async def aget_media_upload_credentials(
+        self, file: MediaLike
+    ) -> "MediaUploadGrant":
         from rekuest.api.schema import RequestMediaUploadMutation
+        from rekuest.protocol.schema import RequestMediaUploadInput
 
         if not self.next:
             raise ValueError("No next link found. Please set the next link.")

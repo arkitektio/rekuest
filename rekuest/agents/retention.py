@@ -55,7 +55,9 @@ class StoredFrame:
 class RetainedFrames:
     """The retained frames of one agent, in a SQLite file (``None``: in memory only)."""
 
-    def __init__(self, path: str | None, agent: str, spec_version: str | None = None) -> None:
+    def __init__(
+        self, path: str | None, agent: str, spec_version: str | None = None
+    ) -> None:
         self.path = path
         self.agent = agent
         #: The spec version this process writes; None compares nothing (every session is sent).
@@ -90,9 +92,13 @@ class RetainedFrames:
                 """
             )
             # A file from before sessions said which spec wrote them: its sessions say none.
-            columns = {row[1] for row in self._db.execute("PRAGMA table_info(journal_sync)")}
+            columns = {
+                row[1] for row in self._db.execute("PRAGMA table_info(journal_sync)")
+            }
             if "spec_version" not in columns:
-                self._db.execute("ALTER TABLE journal_sync ADD COLUMN spec_version TEXT")
+                self._db.execute(
+                    "ALTER TABLE journal_sync ADD COLUMN spec_version TEXT"
+                )
 
     def __repr__(self) -> str:
         return f"RetainedFrames(path={self.path!r}, agent={self.agent!r})"

@@ -13,7 +13,7 @@ pick one when your implementation is set up.
 ```python
 from arkitekt import AppRegistry
 
-app = AppRegistry()   # in arkitekt: `app = App(...)`
+app = AppRegistry()  # in arkitekt: `app = App(...)`
 
 
 class CameraState:
@@ -55,7 +55,7 @@ and the actor hands the function a proxy made for the task it runs in:
 @app.workflow
 def capture(camera: CameraDeps, task: Task) -> bytes:
     task.progress(10, "acquiring")
-    return camera.acquire(exposure_ms=10.0)   # a child of this task
+    return camera.acquire(exposure_ms=10.0)  # a child of this task
 ```
 
 `camera.acquire(...)` calls as the protocol declared the method: awaitable when it
@@ -199,9 +199,7 @@ class Deps:
     camera: CameraState
 
     # redirected: demands imagej.viewer_state instead of mymicroscope.viewer
-    viewer: Annotated[
-        ViewerState, demand_state(app="imagej", key="viewer_state")
-    ]
+    viewer: Annotated[ViewerState, demand_state(app="imagej", key="viewer_state")]
 ```
 
 `demand_state` accepts `app`, `key`, `hash`, `protocols`, `match_ports`, and

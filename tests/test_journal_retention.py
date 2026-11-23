@@ -17,13 +17,13 @@ from arkitekt_runtime import messages
 from arkitekt_runtime.agents.base import BaseAgent
 from arkitekt_runtime.agents.journal import TaskGate
 from arkitekt_runtime.agents.policy import ConnectionPolicy
+from arkitekt_runtime.local import MemoryAgentTransport
 from arkitekt_spec.declare.app import AppRegistry
 
 from rekuest.agents.agent import RekuestAgent
 from rekuest.agents.caller import AgentPostman
 from rekuest.agents.transport.websocket import WebsocketAgentTransport
 
-from arkitekt_runtime.local import MemoryAgentTransport
 from .test_transport_lifecycle import (
     _NO_DELAY,
     FakeConnect,
@@ -35,10 +35,18 @@ from .test_transport_lifecycle import (
 
 
 def _session_init(session: str) -> messages.SessionInit:
-    return messages.SessionInit(session_id=session, states={"Camera": {"exposure": 1, "tags": []}})
+    return messages.SessionInit(
+        session_id=session, states={"Camera": {"exposure": 1, "tags": []}}
+    )
 
 
-def _patch(rev: int, task: str | None, op: str = "replace", path: str = "/exposure", value: object = None) -> messages.StatePatch:
+def _patch(
+    rev: int,
+    task: str | None,
+    op: str = "replace",
+    path: str = "/exposure",
+    value: object = None,
+) -> messages.StatePatch:
     return messages.StatePatch(
         session_id="s",
         global_rev=rev,
@@ -70,7 +78,9 @@ def transport() -> MemoryAgentTransport:
 
 @pytest.fixture()
 def agent(transport: MemoryAgentTransport) -> RekuestAgent:
-    return RekuestAgent(name="journal-test", transport=transport, app_registry=AppRegistry())
+    return RekuestAgent(
+        name="journal-test", transport=transport, app_registry=AppRegistry()
+    )
 
 
 async def _process(agent: BaseAgent, message: messages.ToAgentMessage) -> None:
@@ -82,7 +92,9 @@ async def test_journaled_frames_carry_their_position(
     agent: RekuestAgent, transport: MemoryAgentTransport
 ) -> None:
     await agent._adispatch(messages.Progress(task="before"))
-    await agent._adispatch(_session_init(agent.current_session).model_copy(update={"session_id": "s"}))
+    await agent._adispatch(
+        _session_init(agent.current_session).model_copy(update={"session_id": "s"})
+    )
     agent.journal.begin_task("t")
     await agent._adispatch(messages.Log(task="t", message="a"))
     await agent._adispatch(messages.Log(task="other", message="not ours"))
@@ -163,7 +175,9 @@ async def test_retained_frames_survive_a_restart(tmp_path: Path) -> None:
     ``(session created, pos)`` order, each with its own ``journal_session``; then its own."""
     path = str(tmp_path / "journal.db")
     before = MemoryAgentTransport()
-    dying = RekuestAgent(name="restart", transport=before, app_registry=AppRegistry(), journal_path=path)
+    dying = RekuestAgent(
+        name="restart", transport=before, app_registry=AppRegistry(), journal_path=path
+    )
     await dying._adispatch(_session_init("first"))
     await dying._adispatch(messages.Log(task="t", message="one"))
     await dying._adispatch(messages.Completed(task="t"))
@@ -171,8 +185,15 @@ async def test_retained_frames_survive_a_restart(tmp_path: Path) -> None:
     await dying.atear_down()  # the process ends; pos 2 and 3 were never acked
 
     after = MemoryAgentTransport()
-    agent = RekuestAgent(name="restart", transport=after, app_registry=AppRegistry(), journal_path=path)
-    other = RekuestAgent(name="another-app", transport=MemoryAgentTransport(), app_registry=AppRegistry(), journal_path=path)
+    agent = RekuestAgent(
+        name="restart", transport=after, app_registry=AppRegistry(), journal_path=path
+    )
+    other = RekuestAgent(
+        name="another-app",
+        transport=MemoryAgentTransport(),
+        app_registry=AppRegistry(),
+        journal_path=path,
+    )
     await agent.astart()
     await other.astart()
     assert not other.retained, "never another agent's frames"
@@ -189,9 +210,16 @@ async def test_retained_frames_survive_a_restart(tmp_path: Path) -> None:
 
     await agent.process(messages.JournalAck(journal_session="first", through=3))
     await agent.atear_down()
-    again = RekuestAgent(name="restart", transport=MemoryAgentTransport(), app_registry=AppRegistry(), journal_path=path)
+    again = RekuestAgent(
+        name="restart",
+        transport=MemoryAgentTransport(),
+        app_registry=AppRegistry(),
+        journal_path=path,
+    )
     await again.astart()
-    assert [(m.journal_session, m.pos) for m in again.retained] == [(agent.current_session, 1)]  # type: ignore[union-attr]
+    assert [(m.journal_session, m.pos) for m in again.retained] == [  # type: ignore[union-attr]
+        (agent.current_session, 1)
+    ]
     await again.atear_down()
     await other.atear_down()
 
@@ -258,9 +286,13 @@ async def test_a_frame_whose_send_failed_goes_out_first_after_reconnect(
     """The failed frame used to be put back at the tail, behind what came after it."""
     first, second = FakeSocket(), FakeSocket()
     sockets = iter([first, second])
-    monkeypatch.setattr(websockets, "connect", lambda *args, **kwargs: FakeConnect(next(sockets)))
+    monkeypatch.setattr(
+        websockets, "connect", lambda *args, **kwargs: FakeConnect(next(sockets))
+    )
 
-    transport = WebsocketAgentTransport(endpoint_url="ws://localhost:8000/agi", token_loader=_token)
+    transport = WebsocketAgentTransport(
+        endpoint_url="ws://localhost:8000/agi", token_loader=_token
+    )
     transport.set_transport_host(_Host(ConnectionPolicy(backoff=_NO_DELAY)))
 
     async with transport as transport:
@@ -283,7 +315,9 @@ async def test_a_frame_whose_send_failed_goes_out_first_after_reconnect(
         await asyncio.sleep(0.1)
 
         logs = [json.loads(m)["message"] for m in second.sent if '"LOG"' in m]
-        assert logs == ["one", "two"], f"a drop must not reorder what was sent, got {logs}"
+        assert logs == ["one", "two"], (
+            f"a drop must not reorder what was sent, got {logs}"
+        )
 
         await transport.adisconnect()
         await _stop(consumer)
@@ -302,9 +336,13 @@ async def test_nothing_is_sent_between_register_and_init_and_retained_frames_go_
     ``pos`` order (what the transport still queued is dropped there and re-sent)."""
     first, second = FakeSocket(), FakeSocket()
     sockets = iter([first, second])
-    monkeypatch.setattr(websockets, "connect", lambda *args, **kwargs: FakeConnect(next(sockets)))
+    monkeypatch.setattr(
+        websockets, "connect", lambda *args, **kwargs: FakeConnect(next(sockets))
+    )
 
-    transport = WebsocketAgentTransport(endpoint_url="ws://localhost:8000/agi", token_loader=_token)
+    transport = WebsocketAgentTransport(
+        endpoint_url="ws://localhost:8000/agi", token_loader=_token
+    )
     agent = RekuestAgent(
         name="wire-test",
         transport=transport,
@@ -320,7 +358,9 @@ async def test_nothing_is_sent_between_register_and_init_and_retained_frames_go_
         await connecting
         await _until(lambda: any(f["type"] == "SESSION_INIT" for f in _frames(first)))
 
-        await agent._adispatch(messages.Log(task="t", message="acked by nobody"))  # pos 2
+        await agent._adispatch(
+            messages.Log(task="t", message="acked by nobody")
+        )  # pos 2
         await _until(lambda: len(_frames(first)) == 3)
         first.drop()
         await _until(lambda: not transport.connected)
@@ -341,7 +381,9 @@ async def test_nothing_is_sent_between_register_and_init_and_retained_frames_go_
             ("LOG", 3),
         ], "each unacked frame once, in pos order"
 
-        second.feed(messages.JournalAck(journal_session=agent.current_session, through=3))
+        second.feed(
+            messages.JournalAck(journal_session=agent.current_session, through=3)
+        )
         await _until(lambda: not agent.retained)
         await agent.atear_down()
 
@@ -368,8 +410,12 @@ async def test_reports_queue_behind_a_patch_whose_shrink_is_blocked(
     agent._patch_processor_task = asyncio.create_task(agent.apatch_event_loop())
     try:
         agent.publish_update("Camera", [Patch(op="replace", path="/exposure", value=2)])
-        await asyncio.wait_for(agent._adispatch(messages.Log(task="t", message="after")), 1.0)
-        await asyncio.wait_for(agent._adispatch(messages.Unlock(key="cam", task="t")), 1.0)
+        await asyncio.wait_for(
+            agent._adispatch(messages.Log(task="t", message="after")), 1.0
+        )
+        await asyncio.wait_for(
+            agent._adispatch(messages.Unlock(key="cam", task="t")), 1.0
+        )
         assert transport.sent == [], "queued behind the patch, not sent around it"
 
         replied.set()  # the shrink the processor was stuck in finishes
@@ -426,7 +472,9 @@ async def test_a_command_is_handled_once_per_position_and_acknowledged(
     assert collected == ["d1", "d2"]
     await _until(lambda: transport.of_type(messages.CommandAck))
     assert transport.of_type(messages.CommandAck)[-1].through == 2
-    assert (await agent.aget_handshake_params()).commands_seen == 2, "and says so when it reconnects"
+    assert (await agent.aget_handshake_params()).commands_seen == 2, (
+        "and says so when it reconnects"
+    )
 
 
 @pytest.mark.asyncio
@@ -453,7 +501,11 @@ async def test_init_positions_drop_what_arrived_and_a_gap_is_resent_or_given_up(
     del agent._retained[("s", 3)]
     await _process(agent, messages.JournalNack(journal_session="s", expected=3))
     skip, resent = transport.sent
-    assert isinstance(skip, messages.JournalSkip) and (skip.session, skip.first, skip.last) == ("s", 3, 3)
+    assert isinstance(skip, messages.JournalSkip) and (
+        skip.session,
+        skip.first,
+        skip.last,
+    ) == ("s", 3, 3)
     assert resent.pos == 4  # type: ignore[union-attr]
 
     # Said once. Asked for the same position again, it stops rather than loop.
@@ -462,7 +514,9 @@ async def test_init_positions_drop_what_arrived_and_a_gap_is_resent_or_given_up(
 
 
 @pytest.mark.asyncio
-async def test_the_init_of_a_connection_that_is_gone_is_ignored(agent: RekuestAgent) -> None:
+async def test_the_init_of_a_connection_that_is_gone_is_ignored(
+    agent: RekuestAgent,
+) -> None:
     """An Init still queued when its connection dropped must not release the next
     connection's sends before that one's own Init arrived."""
     object.__setattr__(agent.transport, "nonce", "now")
@@ -490,7 +544,9 @@ async def test_a_command_that_cannot_be_handled_fails_its_task_and_is_acknowledg
     assert transport.of_type(messages.CommandAck)[-1].through == 1
 
 
-def test_frames_written_by_another_spec_version_are_set_aside_not_sent(tmp_path: Path) -> None:
+def test_frames_written_by_another_spec_version_are_set_aside_not_sent(
+    tmp_path: Path,
+) -> None:
     """An agent upgraded to be let in must not be refused for what its old version left."""
     from rekuest.agents.retention import RetainedFrames
 

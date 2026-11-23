@@ -11,7 +11,9 @@ from rekuest.agents.agent import RekuestAgent
 from .test_journal_retention import _until
 
 
-def _agent(path: Path, persist: object, *, with_gain: bool = False) -> tuple[RekuestAgent, list]:
+def _agent(
+    path: Path, persist: object, *, with_gain: bool = False
+) -> tuple[RekuestAgent, list]:
     """An agent of an app with one persisted state, and what its startup hook was given."""
     registry = AppRegistry()
 
@@ -50,12 +52,16 @@ def _agent(path: Path, persist: object, *, with_gain: bool = False) -> tuple[Rek
 
 def _stored(agent: RekuestAgent) -> str:
     assert agent._state_store is not None
-    state = agent._state_store.load().get("camera")  # a periodic state: not before its first write
+    state = agent._state_store.load().get(
+        "camera"
+    )  # a periodic state: not before its first write
     return "" if state is None else state.value
 
 
 @pytest.mark.asyncio
-async def test_a_synchronous_state_is_on_disk_at_once_and_comes_back(tmp_path: Path) -> None:
+async def test_a_synchronous_state_is_on_disk_at_once_and_comes_back(
+    tmp_path: Path,
+) -> None:
     first, seen = _agent(tmp_path, "synchronous")
     await first.astart()
     await first.aactivate()
@@ -75,12 +81,16 @@ async def test_a_synchronous_state_is_on_disk_at_once_and_comes_back(tmp_path: P
 
 
 @pytest.mark.asyncio
-async def test_a_periodic_state_is_flushed_and_changed_ports_read_as_none(tmp_path: Path) -> None:
+async def test_a_periodic_state_is_flushed_and_changed_ports_read_as_none(
+    tmp_path: Path,
+) -> None:
     first, _ = _agent(tmp_path, 0.01)
     await first.astart()
     await first.aactivate()
     first.states["camera"].exposure = 7
-    await _until(lambda: first._state_store is not None and '"exposure": 7' in _stored(first))
+    await _until(
+        lambda: first._state_store is not None and '"exposure": 7' in _stored(first)
+    )
     await first.atear_down()
 
     changed, seen = _agent(tmp_path, 0.01, with_gain=True)

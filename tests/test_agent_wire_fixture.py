@@ -33,7 +33,10 @@ def _cases(*groups: str) -> list[Any]:
 
 
 @pytest.mark.parametrize(
-    "frame", _cases("numbered_from_agent", "numbered_requests_from_agent", "unnumbered_from_agent")
+    "frame",
+    _cases(
+        "numbered_from_agent", "numbered_requests_from_agent", "unnumbered_from_agent"
+    ),
 )
 def test_every_frame_from_the_agent_round_trips(frame: dict[str, Any]) -> None:
     message = FROM_AGENT.validate_python(frame)

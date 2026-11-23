@@ -6,19 +6,18 @@ calls leave over the agent's socket as children of that task, and the object it
 holds is the one a ``task: Task`` parameter receives.
 """
 
-from typing import Any, Protocol
 from collections.abc import AsyncGenerator
+from typing import Any, Protocol
 
 import pytest
-
-from arkitekt_spec.declare.agents.errors import NoCallerError
-
 from arkitekt_runtime.actors.dependency import AgentDependencyProxy
 from arkitekt_runtime.actors.helper import AssignmentHelper
 from arkitekt_runtime.agents.base import BaseAgent
-from rekuest.agents.caller import CallerTaskEvent
-from arkitekt_runtime.types import TaskEventKind
 from arkitekt_runtime.task import Task
+from arkitekt_runtime.types import TaskEventKind
+from arkitekt_spec.declare.agents.errors import NoCallerError
+
+from rekuest.agents.caller import CallerTaskEvent
 
 from .agent_helpers import run_assignment
 from .test_service_client_injection import assign, build_agent

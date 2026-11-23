@@ -8,16 +8,13 @@ from context. See :mod:`rekuest.invoke` for why the target is typed structurally
 from typing import Any
 
 import pytest
-
+from arkitekt_runtime.task import Task
 from arkitekt_spec.declare.agents.errors import NoCallerError
+from arkitekt_spec.declare.targets import CallTarget, ImplementationTarget
 from koil.composition.base import KoiledModel
 from rath.origin import ContextBound
 
-from arkitekt_spec.declare.targets import CallTarget, ImplementationTarget
-from arkitekt_runtime.task import Task
 from rekuest.traits.action import Callable
-
-
 
 # --------------------------------------------------------------------------- #
 # A task no agent runs cannot be a parent

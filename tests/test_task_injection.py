@@ -11,18 +11,17 @@ import asyncio
 from typing import Any
 
 import pytest
-
 from arkitekt_runtime import messages
+from arkitekt_runtime.task import Task
 from arkitekt_spec.actions import PortKind
 from arkitekt_spec.declare.definition.define import prepare_definition
 from arkitekt_spec.declare.structures.registry import StructureRegistry
+
 from rekuest.api.schema import Action
-from arkitekt_runtime.task import Task
 
 from .agent_helpers import run_assignment
 from .service_helpers import with_client
 from .test_service_client_injection import FakeApp, FakeClient, assign, build_agent
-
 
 ACTION = Action.model_construct(id="action-1")
 
@@ -64,7 +63,10 @@ async def test_reports_through_the_injected_task_in_loop_and_thread() -> None:
         run_assignment(agent_a, assign("in_loop")),
         run_assignment(agent_b, assign("in_thread")),
     )
-    assert returns == [{"return0": "task-in_loop-None"}, {"return0": "task-in_thread-None"}]
+    assert returns == [
+        {"return0": "task-in_loop-None"},
+        {"return0": "task-in_thread-None"},
+    ]
 
     for agent, text, pct in ((agent_a, "loop", 40), (agent_b, "thread", 60)):
         logs = agent.transport.of_type(messages.Log)  # type: ignore[attr-defined]
@@ -110,7 +112,9 @@ async def test_a_call_inside_a_task_goes_through_the_task(
     agent.app_registry.register_workflow(parent, dynamic_calls=True)
     agent.collect_from_registry()
 
-    assert await run_assignment(agent, assign("parent", x=1)) == {"return0": "child-result"}
+    assert await run_assignment(agent, assign("parent", x=1)) == {
+        "return0": "child-result"
+    }
     assert seen["parent"].task == "task-parent-None"
     assert seen["postman"] is agent.caller_postman
     assert seen["structure_registry"] is agent.app_registry.structure_registry
@@ -125,8 +129,9 @@ async def test_the_client_refuses_to_make_a_root_call_inside_a_task(
     """A call through the client is a root, so inside a task it would be the task's
     sibling rather than its child. It refuses, and points at the task.
     """
-    from rekuest.client.client import RekuestCaller
     from arkitekt_spec.declare.errors import RootOnlyCallError
+
+    from rekuest.client.client import RekuestCaller
 
     app = FakeApp("A")
     agent = build_agent(app)

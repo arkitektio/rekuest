@@ -1,9 +1,10 @@
 """Check the logic of the Identifier scalar"""
 
-from rekuest.scalars import Identifier
 import pydantic
-from pydantic import ValidationError
 import pytest
+from pydantic import ValidationError
+
+from rekuest.scalars import Identifier
 
 
 class Serializing(pydantic.BaseModel):

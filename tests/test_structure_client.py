@@ -11,12 +11,14 @@ from collections.abc import Sequence
 from typing import Any
 
 import pytest
-from rath.expansion import ExpandsStructures, UnknownStructureError
-
 from arkitekt_spec.declare.app import AppRegistry
-from arkitekt_spec.declare.structures.errors import StructureClientError, StructureDefinitionError
+from arkitekt_spec.declare.structures.errors import (
+    StructureClientError,
+    StructureDefinitionError,
+)
 from arkitekt_spec.declare.structures.registry import StructureRegistry
 from arkitekt_spec.declare.structures.types import FullFilledStructure
+from rath.expansion import ExpandsStructures, UnknownStructureError
 
 from .service_helpers import with_client
 

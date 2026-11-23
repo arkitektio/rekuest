@@ -1,10 +1,11 @@
 """Traits for actions , so that we can use them as reservable context"""
 
+import logging
+import typing
+
 from arkitekt_spec.actions import ActionKind
 from koil.composition.base import KoiledModel
 from rath.origin import ContextBound
-import typing
-import logging
 
 if typing.TYPE_CHECKING:
     from arkitekt_runtime.invoke import AgentTarget
@@ -35,7 +36,7 @@ class Callable(ContextBound, KoiledModel):
         Returns:
             str: The kind of the action.
         """
-        return getattr(self, "kind")
+        return self.kind
 
     def _client(self, method: str) -> typing.Any:  # noqa: ANN401 -- a Rekuest
         """The client this action was fetched with.
@@ -54,7 +55,10 @@ class Callable(ContextBound, KoiledModel):
         return client
 
     def iterate(
-        self, *args: typing.Any, on_agent: "AgentTarget | None" = None, **kwargs: typing.Any
+        self,
+        *args: typing.Any,
+        on_agent: "AgentTarget | None" = None,
+        **kwargs: typing.Any,
     ) -> typing.Iterator[typing.Any]:
         """Stream this action's yields, through the client it was fetched with."""
         assert self.get_action_kind() == ActionKind.GENERATOR, (
@@ -63,7 +67,10 @@ class Callable(ContextBound, KoiledModel):
         return self._client("iterate").iterate(self, *args, on_agent=on_agent, **kwargs)
 
     def call(
-        self, *args: typing.Any, on_agent: "AgentTarget | None" = None, **kwargs: typing.Any
+        self,
+        *args: typing.Any,
+        on_agent: "AgentTarget | None" = None,
+        **kwargs: typing.Any,
     ) -> typing.Any:
         """Call this action, through the client it was fetched with."""
         if self.get_action_kind() == ActionKind.GENERATOR:
@@ -73,25 +80,38 @@ class Callable(ContextBound, KoiledModel):
         return self._client("call").call(self, *args, on_agent=on_agent, **kwargs)
 
     def aiterate(
-        self, *args: typing.Any, on_agent: "AgentTarget | None" = None, **kwargs: typing.Any
+        self,
+        *args: typing.Any,
+        on_agent: "AgentTarget | None" = None,
+        **kwargs: typing.Any,
     ) -> typing.AsyncIterator[typing.Any]:
         """Stream this action's yields, through the client it was fetched with."""
         assert self.get_action_kind() == ActionKind.GENERATOR, (
             "Action kind must be GENERATOR to use aiterate."
         )
-        return self._client("aiterate").aiterate(self, *args, on_agent=on_agent, **kwargs)
+        return self._client("aiterate").aiterate(
+            self, *args, on_agent=on_agent, **kwargs
+        )
 
     async def acall(
-        self, *args: typing.Any, on_agent: "AgentTarget | None" = None, **kwargs: typing.Any
+        self,
+        *args: typing.Any,
+        on_agent: "AgentTarget | None" = None,
+        **kwargs: typing.Any,
     ) -> typing.Any:
         """Call this action, through the client it was fetched with."""
         assert self.get_action_kind() == ActionKind.FUNCTION, (
             "Action kind must be FUNCTION to use acall."
         )
-        return await self._client("acall").acall(self, *args, on_agent=on_agent, **kwargs)
+        return await self._client("acall").acall(
+            self, *args, on_agent=on_agent, **kwargs
+        )
 
     def __call__(
-        self, *args: typing.Any, on_agent: "AgentTarget | None" = None, **kwargs: typing.Any
+        self,
+        *args: typing.Any,
+        on_agent: "AgentTarget | None" = None,
+        **kwargs: typing.Any,
     ) -> typing.Any:
         """Call the action, or stream it if it is a generator."""
         if self.get_action_kind() == ActionKind.GENERATOR:

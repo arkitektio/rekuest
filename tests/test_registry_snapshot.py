@@ -6,22 +6,21 @@ So one declaration runs any number of times, concurrently too, and is still
 open for registration afterwards.
 """
 
-from arkitekt_runtime.actors.build import actor_builder_for
 import asyncio
-from dataclasses import dataclass
 import inspect
 import pickle
+from dataclasses import dataclass
 from typing import Annotated
 
 import pytest
-
+from arkitekt_runtime.actors.build import actor_builder_for
 from arkitekt_runtime.agents.base import BaseAgent
-from arkitekt_spec.declare.state.utils import prepare_injected_variables
+from arkitekt_runtime.local import MemoryAgentTransport
+from arkitekt_runtime.task import Task
 from arkitekt_spec.declare.app import AppRegistry
 from arkitekt_spec.declare.errors import RegistryFrozenError
-from arkitekt_runtime.task import Task
+from arkitekt_spec.declare.state.utils import prepare_injected_variables
 
-from arkitekt_runtime.local import MemoryAgentTransport
 from .agent_helpers import run_assignment
 from .service_helpers import with_client
 from .test_client_bound_expansion import (
@@ -81,7 +80,10 @@ def test_snapshot_leaves_the_declarations_structures_unbound() -> None:
     registry = declaration()
     registry.snapshot({"things": ThingClient("A")})
 
-    assert registry.structure_registry.get_fullfilled_structure("@things/thing").aexpand is expand_thing
+    assert (
+        registry.structure_registry.get_fullfilled_structure("@things/thing").aexpand
+        is expand_thing
+    )
 
 
 @pytest.mark.asyncio
@@ -159,7 +161,11 @@ def test_injected_parameters_are_the_ones_a_declared_service_returns() -> None:
         return x
 
     injected = prepare_injected_variables(segment, two_services().structure_registry)
-    assert injected.service_client_variables == {"fluss": Fluss, "mikro": Mikro, "again": Mikro}
+    assert injected.service_client_variables == {
+        "fluss": Fluss,
+        "mikro": Mikro,
+        "again": Mikro,
+    }
     assert injected.task_variables == ["task"]
 
 
@@ -213,7 +219,10 @@ async def test_a_snapshot_can_be_bound_after_its_clients_are_built() -> None:
     assert await run_assignment(agent, assign("owner", thing=ref("9"))) == {
         "return0": "9@late"
     }
-    assert registry.structure_registry.get_fullfilled_structure("@things/thing").aexpand is expand_thing
+    assert (
+        registry.structure_registry.get_fullfilled_structure("@things/thing").aexpand
+        is expand_thing
+    )
 
 
 def package_with_action() -> AppRegistry:

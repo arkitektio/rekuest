@@ -1,45 +1,45 @@
 """WebSocket transport used by agents to exchange messages with the backend."""
 
+import asyncio
+import json
+import logging
+import ssl
 import time
+import uuid
 import warnings
+from collections.abc import AsyncIterator, Awaitable, Callable
 from types import TracebackType
 from typing import Self, cast
-from collections.abc import Awaitable, Callable
+
+import certifi
 import pydantic
 import websockets
+from arkitekt_runtime import messages
 from arkitekt_runtime.agents.policy import Backoff, ConnectionPolicy
 from arkitekt_runtime.agents.transport.base import AgentTransport
 from arkitekt_runtime.agents.transport.types import HandshakeParams
-import asyncio
-import uuid
-import json
-from rekuest.agents.transport.errors import (
-    AgentTransportException,
-)
-from arkitekt_runtime import messages
-import logging
+from koil.types import ContextBool, Contextual
+from pydantic import BaseModel, ConfigDict, Field
 from websockets.exceptions import (
     ConnectionClosedError,
     ConnectionClosedOK,
     InvalidHandshake,
 )
 from websockets.frames import CloseCode
-from pydantic import ConfigDict, Field
-import ssl
-import certifi
-from koil.types import ContextBool, Contextual
+
+from rekuest.agents.transport.errors import (
+    AgentTransportException,
+)
+
 from .errors import (
+    AgentIsAlreadyBusy,
+    AgentWasBlocked,
+    AgentWasKicked,
     BounceError,
     CorrectableConnectionFail,
     DefiniteConnectionFail,
-    AgentWasKicked,
-    AgentIsAlreadyBusy,
-    AgentWasBlocked,
     KickError,
 )
-from collections.abc import AsyncIterator
-
-from pydantic import BaseModel
 
 
 class InMessagePayload(BaseModel):
@@ -345,7 +345,10 @@ class WebsocketAgentTransport(AgentTransport):
         try:
             payload = InMessagePayload(message=raw)
         except pydantic.ValidationError as e:
-            logger.error(f"Received a message that does not match the schema: {message}", exc_info=True)
+            logger.error(
+                f"Received a message that does not match the schema: {message}",
+                exc_info=True,
+            )
             await self._arefuse_unreadable_assign(raw, e)
             return
         logger.debug(f"<<<< {payload}")
@@ -383,7 +386,9 @@ class WebsocketAgentTransport(AgentTransport):
         try:
             await client.send(messages.CommandAck(through=pos).model_dump_json())
         except Exception:  # noqa: BLE001 — the next Register says it too
-            logger.debug("Could not acknowledge the order to leave at %s", pos, exc_info=True)
+            logger.debug(
+                "Could not acknowledge the order to leave at %s", pos, exc_info=True
+            )
 
     async def _arefuse_unreadable_assign(
         self, raw: object, error: pydantic.ValidationError
@@ -392,7 +397,9 @@ class WebsocketAgentTransport(AgentTransport):
         if not isinstance(raw, dict):
             return
         task = raw.get("task")
-        if raw.get("type") != messages.ToAgentMessageType.ASSIGN.value or not isinstance(task, str):
+        if raw.get(
+            "type"
+        ) != messages.ToAgentMessageType.ASSIGN.value or not isinstance(task, str):
             return
         await self.asend(
             messages.Critical(
@@ -462,7 +469,9 @@ class WebsocketAgentTransport(AgentTransport):
                         await client.send(
                             messages.Register(
                                 nonce=self._nonce,
-                                commands_seen=max(handshake.commands_seen, self._left_at or 0),
+                                commands_seen=max(
+                                    handshake.commands_seen, self._left_at or 0
+                                ),
                                 sessions=handshake.sessions,
                                 tasks=handshake.tasks,
                                 token=token,
@@ -496,7 +505,9 @@ class WebsocketAgentTransport(AgentTransport):
                             # A clean close (1000/1001: the server going away) ends the
                             # iteration without an error. It is a drop like any other:
                             # reported, counted and backed off.
-                            raise CorrectableConnectionFail("The server closed the connection")
+                            raise CorrectableConnectionFail(
+                                "The server closed the connection"
+                            )
 
                 except CorrectableConnectionFail:
                     raise
@@ -530,14 +541,20 @@ class WebsocketAgentTransport(AgentTransport):
 
                 except ConnectionClosedOK as e:
                     # Closed cleanly while we were still sending the Register.
-                    raise CorrectableConnectionFail("The server closed the connection") from e
+                    raise CorrectableConnectionFail(
+                        "The server closed the connection"
+                    ) from e
 
                 except OSError as e:
                     # Refused, unreachable, unresolvable or timed out (TimeoutError is an
                     # OSError): the server is restarting or the network is away. That
                     # passes, so it is retried under the same budget as a dropped socket.
-                    logger.warning("Could not reach %s", self.endpoint_url, exc_info=True)
-                    raise CorrectableConnectionFail(f"Could not reach the server: {e}") from e
+                    logger.warning(
+                        "Could not reach %s", self.endpoint_url, exc_info=True
+                    )
+                    raise CorrectableConnectionFail(
+                        f"Could not reach the server: {e}"
+                    ) from e
 
                 except Exception as e:
                     logger.error("Websocket excepted closed definetely", exc_info=True)
@@ -720,7 +737,9 @@ class WebsocketAgentTransport(AgentTransport):
         # backlog is then sent all over again.
         urgent = isinstance(action, (messages.HeartbeatEvent, messages.InquiryAnswer))
         self._send_order = (self._send_order or 0) + 1
-        await self._send_queue.put((0 if urgent else 1, self._send_order, action.model_dump_json()))
+        await self._send_queue.put(
+            (0 if urgent else 1, self._send_order, action.model_dump_json())
+        )
 
     async def asend(self, message: messages.FromAgentMessage) -> None:
         """Public send API used by the agent runtime to queue one message."""

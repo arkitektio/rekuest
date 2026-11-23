@@ -16,10 +16,10 @@ from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 
 import pytest
-from pydantic import PrivateAttr
-
 from arkitekt_runtime.types import AssignInput, TaskEventKind, TaskPolicy
+from pydantic import PrivateAttr
 from rath.links.testing.direct_succeeding_link import DirectSucceedingLink
+
 from rekuest.api.schema import Task, TaskChangeEvent, TaskEventChange
 from rekuest.client.postman import GraphQLPostman
 from rekuest.client.rath import RekuestRath
@@ -166,7 +166,9 @@ async def test_a_call_made_once_the_feed_is_subscribed_reads_nothing() -> None:
 
 
 @pytest.mark.asyncio
-async def test_an_event_a_subscribed_feed_dropped_is_read_once_the_feed_is_quiet() -> None:
+async def test_an_event_a_subscribed_feed_dropped_is_read_once_the_feed_is_quiet() -> (
+    None
+):
     """The feed delivers at most once: the end of a task it dropped is in the task's history."""
     backend = _backend()
     backend.quiet_interval = 0.02
@@ -188,7 +190,9 @@ async def test_an_event_a_subscribed_feed_dropped_is_read_once_the_feed_is_quiet
 
 
 @pytest.mark.asyncio
-async def test_a_result_the_feed_dropped_is_handed_on_before_the_end_of_its_run() -> None:
+async def test_a_result_the_feed_dropped_is_handed_on_before_the_end_of_its_run() -> (
+    None
+):
     """A run that ends on the feed without a result is looked up: it may have had one."""
     backend = _backend()
     async with backend:
@@ -223,7 +227,9 @@ async def test_a_quiet_task_is_read_ever_less_often_and_nothing_twice() -> None:
         second = asyncio.create_task(_call(backend))
         await asyncio.sleep(0)
         backend.reports(_event(2, task="t2"), on_feed=True)
-        await asyncio.sleep(0.2)  # quiet: 0.01 + 0.02 + 0.04 + 0.08 fit, a fixed 0.01 would be twenty
+        await asyncio.sleep(
+            0.2
+        )  # quiet: 0.01 + 0.02 + 0.04 + 0.08 fit, a fixed 0.01 would be twenty
         assert 2 <= len(backend._reads) <= 5
         backend.reports(_event(3, TaskEventKind.COMPLETED, task="t2"), on_feed=True)
 
@@ -254,7 +260,10 @@ async def test_a_root_carries_the_policy_it_was_called_with() -> None:
             call = asyncio.create_task(_drain(backend, policy))
             await backend._assigned.wait()
             backend._assigned.clear()
-            backend.reports(_event(number, TaskEventKind.COMPLETED, task=f"t{number + 1}"), on_feed=True)
+            backend.reports(
+                _event(number, TaskEventKind.COMPLETED, task=f"t{number + 1}"),
+                on_feed=True,
+            )
             await asyncio.wait_for(call, timeout=1)
 
     assert [sent.policy for sent in backend._sent] == ["AUTO", None]

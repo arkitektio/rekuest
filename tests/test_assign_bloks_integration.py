@@ -40,7 +40,9 @@ def _components(tree: object) -> set[str]:
 
 @pytest.mark.integration
 @pytest.mark.asyncio(loop_scope="session")
-async def test_an_actions_assign_bloks_are_registered_and_read_apart_from_its_runs(deployment: Deployment) -> None:
+async def test_an_actions_assign_bloks_are_registered_and_read_apart_from_its_runs(
+    deployment: Deployment,
+) -> None:
     app = build_fresh_rekuest(deployment, token="standalone_token")
 
     def stitch(printer: str) -> str:
@@ -67,19 +69,33 @@ async def test_an_actions_assign_bloks_are_registered_and_read_apart_from_its_ru
             assert (start.phase, start.context) == (ActionBlokPhase.ASSIGN, "PANEL")
             assert run.blok.id != start.blok.id, "one blok per context and phase"
 
-            starting, watching = _components(start.blok.component_tree), _components(run.blok.component_tree)
+            starting, watching = (
+                _components(start.blok.component_tree),
+                _components(run.blok.component_tree),
+            )
             assert "args" in starting and "args" not in watching
             assert "ask" in watching and "ask" not in starting
 
             # What a run shows is still only the run's.
             reference = "assign-bloks-run"
-            assert await asyncio.wait_for(app.acall(action, printer="p", reference=reference), 30) == "stitched-p"
-            tasks = (await app.rath.aquery("query { tasks { id reference } }", {})).data["tasks"]
+            assert (
+                await asyncio.wait_for(
+                    app.acall(action, printer="p", reference=reference), 30
+                )
+                == "stitched-p"
+            )
+            tasks = (
+                await app.rath.aquery("query { tasks { id reference } }", {})
+            ).data["tasks"]
             task = next(t["id"] for t in tasks if t["reference"] == reference)
             view = await app.atask_run_view(task)
-            assert [(b.phase, b.blok.id) for b in view.action_bloks] == [(ActionBlokPhase.RUN, run.blok.id)]
+            assert [(b.phase, b.blok.id) for b in view.action_bloks] == [
+                (ActionBlokPhase.RUN, run.blok.id)
+            ]
 
-            other = await app.aaction_bloks((await app.amy_implementation_at("plain")).action.id)
+            other = await app.aaction_bloks(
+                (await app.amy_implementation_at("plain")).action.id
+            )
             assert other.bloks == () and other.assign_bloks == ()
         finally:
             loop.cancel()

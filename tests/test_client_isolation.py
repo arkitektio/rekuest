@@ -4,13 +4,12 @@ The arkitekt service builder handing the app's registry to the agent is covered 
 the arkitekt side, where a real app can be built.
 """
 
-
-
 from arkitekt_spec.declare.app import AppRegistry
+from arkitekt_spec.declare.structures.registry import StructureRegistry
+
+from rekuest.client.client import Rekuest, RekuestCaller
 from rekuest.client.postman import GraphQLPostman
 from rekuest.client.rath import RekuestRath
-from rekuest.client.client import Rekuest, RekuestCaller
-from arkitekt_spec.declare.structures.registry import StructureRegistry
 
 from .conftest import DirectSucceedingLink
 
@@ -30,7 +29,9 @@ def test_client_has_exactly_one_structure_registry() -> None:
     client = build_client(registry)
 
     assert client.structure_registry is registry.structure_registry
-    assert client.structure_registry is not build_client(AppRegistry()).structure_registry
+    assert (
+        client.structure_registry is not build_client(AppRegistry()).structure_registry
+    )
 
 
 def test_the_state_decorator_keeps_the_structure_registry_it_was_given() -> None:
@@ -51,5 +52,3 @@ def test_the_state_decorator_keeps_the_structure_registry_it_was_given() -> None
     declare_state(Bare, registry=registry, structure_reg=structures)
 
     assert registry.state_registry_schemas["Bare"] is structures
-
-

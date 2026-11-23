@@ -3,7 +3,14 @@ node it was declared by and its kind always set, on a blok, a revision and an ed
 
 from rekuest.api.schema import BlokRevision, LocalKind, ResolvedBlokLocal
 
-RESOLVED = {"node": "Blok[0]/local[0]", "key": "zoom", "kind": "INT", "nullable": False, "persist": False, "default": 2}
+RESOLVED = {
+    "node": "Blok[0]/local[0]",
+    "key": "zoom",
+    "kind": "INT",
+    "nullable": False,
+    "persist": False,
+    "default": 2,
+}
 
 
 def test_a_resolved_local_names_its_node_and_always_has_its_kind() -> None:

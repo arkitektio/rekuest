@@ -9,20 +9,18 @@ They drive a real ``BaseAgent`` message loop over
 """
 
 import asyncio
-from rekuest.agents.agent import RekuestAgent
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 
 import pytest
-
 from arkitekt_runtime import messages
 from arkitekt_runtime.agents.base import BaseAgent
+from arkitekt_runtime.local import MemoryAgentTransport
 from arkitekt_runtime.types import TaskEventKind
-from rekuest.api.schema import TaskEventChange
 from arkitekt_spec.declare.app import AppRegistry
 
-from arkitekt_runtime.local import MemoryAgentTransport
-
+from rekuest.agents.agent import RekuestAgent
+from rekuest.api.schema import TaskEventChange
 
 # These states belong to a registry, as they would to an app. There is no
 # process-wide one to fall into.
@@ -90,8 +88,6 @@ def _register(agent: BaseAgent, function) -> None:
     agent.collect_from_registry()
 
 
-
-
 @pytest.mark.asyncio
 async def test_duplicate_assign_for_finished_task_resends_its_report(
     agent: BaseAgent, transport: MemoryAgentTransport
@@ -125,10 +121,6 @@ async def test_duplicate_assign_for_finished_task_resends_its_report(
     assert len(transport.of_type(messages.Completed)) == 2
 
 
-
-
-
-
 class _ScriptedPostman:
     """A postman whose ``aassign`` replays a fixed event script, then waits forever —
     exactly what the real one does once the backend has nothing more to say."""
@@ -142,5 +134,3 @@ class _ScriptedPostman:
                 id=str(index), task="t", kind=kind, createdAt="2026-01-01T00:00:00Z"
             )
         await asyncio.Event().wait()
-
-

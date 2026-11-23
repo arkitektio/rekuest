@@ -9,28 +9,27 @@ closes it — after flushing whatever is still queued.
 import asyncio
 import json
 import time
-from typing import cast
 from collections.abc import AsyncIterator
+from typing import cast
 
 import pytest
 import websockets
+from arkitekt_runtime import messages
+from arkitekt_runtime.agents.policy import Backoff, ConnectionPolicy
+from arkitekt_runtime.agents.transport.types import HandshakeParams
 from websockets.exceptions import ConnectionClosedError
 from websockets.frames import Close
 
-from arkitekt_runtime import messages
-from arkitekt_runtime.agents.policy import Backoff, ConnectionPolicy
 from rekuest.agents.transport.errors import (
     AgentIsAlreadyBusy,
     AgentWasKicked,
     DefiniteConnectionFail,
 )
-from arkitekt_runtime.agents.transport.types import HandshakeParams
 from rekuest.agents.transport.websocket import (
     BUSY_CODE,
     KICK_CODE,
     WebsocketAgentTransport,
 )
-
 
 DROP = object()
 
@@ -268,7 +267,9 @@ async def test_a_numbered_bounce_is_acknowledged_and_not_obeyed_twice(
     monkeypatch.setattr(
         websockets, "connect", lambda *args, **kwargs: FakeConnect(next(sockets))
     )
-    transport = WebsocketAgentTransport(endpoint_url="ws://localhost:8000/agi", token_loader=_token)
+    transport = WebsocketAgentTransport(
+        endpoint_url="ws://localhost:8000/agi", token_loader=_token
+    )
     transport.set_transport_host(_Host(ConnectionPolicy(backoff=_NO_DELAY)))
 
     async with transport as transport:
@@ -805,7 +806,9 @@ async def test_a_failed_send_does_not_wedge_the_flush(
 
 
 @pytest.mark.asyncio
-async def test_a_malformed_frame_does_not_take_the_agent_down(socket: FakeSocket) -> None:
+async def test_a_malformed_frame_does_not_take_the_agent_down(
+    socket: FakeSocket,
+) -> None:
     """``json.JSONDecodeError`` is a ValueError, not a pydantic error.
 
     The handler only caught ``pydantic.ValidationError``, so one garbled frame escaped it,
@@ -854,7 +857,9 @@ async def test_an_unreadable_assign_is_answered_not_dropped(socket: FakeSocket) 
         await transport.aconnect()
         # An Assign from a newer/older backend: right type and task id, wrong shape.
         socket._incoming.put_nowait(
-            json.dumps({"type": "ASSIGN", "task": "task-unreadable", "args": "not-a-dict"})
+            json.dumps(
+                {"type": "ASSIGN", "task": "task-unreadable", "args": "not-a-dict"}
+            )
         )
         await asyncio.sleep(0.1)
 
@@ -898,7 +903,9 @@ async def test_the_socket_is_opened_through_the_proxy_only_when_one_is_set(
 
 
 @pytest.mark.asyncio
-async def test_a_refused_connect_and_a_clean_close_are_retried(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_a_refused_connect_and_a_clean_close_are_retried(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """A server that restarts closes cleanly (1001) and then refuses for a moment. Both are
     drops to retry and to tell the host about, not the end of the agent."""
     first, second = FakeSocket(), FakeSocket()
@@ -911,7 +918,9 @@ async def test_a_refused_connect_and_a_clean_close_are_retried(monkeypatch: pyte
         return FakeConnect(cast(FakeSocket, attempt))
 
     monkeypatch.setattr(websockets, "connect", connect)
-    transport = WebsocketAgentTransport(endpoint_url="ws://localhost:8000/agi", token_loader=_token)
+    transport = WebsocketAgentTransport(
+        endpoint_url="ws://localhost:8000/agi", token_loader=_token
+    )
     host = _Host(ConnectionPolicy(backoff=_NO_DELAY))
     transport.set_transport_host(host)
 
@@ -925,13 +934,19 @@ async def test_a_refused_connect_and_a_clean_close_are_retried(monkeypatch: pyte
 
         consumer = asyncio.create_task(consume())
         await asyncio.sleep(0.05)
-        first._incoming.put_nowait(None)  # the iteration ends without an error: a clean close
+        first._incoming.put_nowait(
+            None
+        )  # the iteration ends without an error: a clean close
         await asyncio.sleep(0.1)
         second.feed(messages.Init(agent="agent-1"))
         await asyncio.sleep(0.05)
 
-        assert len(received) == 1 and not consumer.done(), "the agent goes on, on the third attempt"
-        assert host.transitions[:3] == [True, False, False], "both drops are told to the host"
+        assert len(received) == 1 and not consumer.done(), (
+            "the agent goes on, on the third attempt"
+        )
+        assert host.transitions[:3] == [True, False, False], (
+            "both drops are told to the host"
+        )
 
         await transport.adisconnect()
         await _stop(consumer)

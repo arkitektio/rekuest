@@ -1,33 +1,35 @@
 """A GraphQL postman"""
 
+import asyncio
+import logging
+import uuid
+from collections.abc import AsyncGenerator, AsyncIterator, Sequence
 from types import TracebackType
 from typing import Any
-from collections.abc import AsyncGenerator, AsyncIterator, Sequence
-from rath.operation import GraphQLException
-from rath.scalars import ID
-from rekuest.client.graphql import RekuestGraphQL
-from arkitekt_spec.declare.task import AssignPrompt, HookInput, StateRequirement
-from arkitekt_runtime.types import (
-    ResolvedDependencyInput,
-    TaskEventKind,
-    TaskPolicy,
-    AssignInput,
-    StateRequirementInput,
-)
-from rekuest.api.schema import Task, TaskChange, TaskChangeEvent, TaskEventChange
-from rekuest.scalars import ActionHash
-import asyncio
-import uuid
-from pydantic import Field, PrivateAttr
-import logging
+
 from arkitekt_runtime.postmans.errors import (
     STATEFUL_NEEDS_AGENT,
     PostmanException,
     RootOnlyAssignError,
     StatefulNeedsAgent,
 )
-from rekuest.client.rath import RekuestRath
+from arkitekt_runtime.types import (
+    AssignInput,
+    ResolvedDependencyInput,
+    StateRequirementInput,
+    TaskEventKind,
+    TaskPolicy,
+)
+from arkitekt_spec.declare.task import AssignPrompt, HookInput, StateRequirement
 from koil.composition import KoiledModel
+from pydantic import Field, PrivateAttr
+from rath.operation import GraphQLException
+from rath.scalars import ID
+
+from rekuest.api.schema import Task, TaskChange, TaskChangeEvent, TaskEventChange
+from rekuest.client.graphql import RekuestGraphQL
+from rekuest.client.rath import RekuestRath
+from rekuest.scalars import ActionHash
 
 logger = logging.getLogger(__name__)
 
@@ -74,8 +76,8 @@ class GraphQLPostman(KoiledModel):
         description="Seconds a call waits on a subscribed change feed that brings it nothing before it reads its task's events itself. The feed delivers at most once: an event it dropped is only ever found in the task's history. Doubles with every read that finds nothing, up to twelve times this, and starts over with the next event.",
     )
 
-    _ass_update_queues: dict[str, asyncio.Queue[TaskEventChange | _FeedLost]] = PrivateAttr(
-        default_factory=lambda: {}
+    _ass_update_queues: dict[str, asyncio.Queue[TaskEventChange | _FeedLost]] = (
+        PrivateAttr(default_factory=lambda: {})
     )
     # The change feed (TaskEventChange) only carries the task id, not the
     # client-generated reference the queues are keyed by, so we bind them here.
@@ -97,7 +99,9 @@ class GraphQLPostman(KoiledModel):
     # (`_acatch_up`), and whatever came both ways is handed on once (`_route`).
     _feed_live: bool = PrivateAttr(default=False)
     _routed_event_ids: dict[str, set[str]] = PrivateAttr(default_factory=lambda: {})
-    _catch_up_tasks: dict[str, asyncio.Task[None]] = PrivateAttr(default_factory=lambda: {})
+    _catch_up_tasks: dict[str, asyncio.Task[None]] = PrivateAttr(
+        default_factory=lambda: {}
+    )
 
     def _bind(self, task_id: str, reference: str) -> None:
         """Bind a durable task id to its client-generated reference.
@@ -124,7 +128,9 @@ class GraphQLPostman(KoiledModel):
             return
         routed.add(event.id)
         reference = self._task_to_reference.get(event.task)
-        queue = self._ass_update_queues.get(reference) if reference is not None else None
+        queue = (
+            self._ass_update_queues.get(reference) if reference is not None else None
+        )
         if queue is not None:
             queue.put_nowait(event)
         else:
@@ -157,14 +163,18 @@ class GraphQLPostman(KoiledModel):
         """
         history = await self._aread_events(task_id)
         reference = self._task_to_reference.get(task_id)
-        queue = self._ass_update_queues.get(reference) if reference is not None else None
+        queue = (
+            self._ass_update_queues.get(reference) if reference is not None else None
+        )
         if queue is None:
             return  # the call ended while its history was read
 
         waiting: list[TaskEventChange | _FeedLost] = []
         while not queue.empty():
             waiting.append(queue.get_nowait())
-        waiting_ids = {event.id for event in waiting if isinstance(event, TaskEventChange)}
+        waiting_ids = {
+            event.id for event in waiting if isinstance(event, TaskEventChange)
+        }
 
         routed = self._routed_event_ids.setdefault(task_id, set())
         taken = routed - waiting_ids
@@ -187,7 +197,9 @@ class GraphQLPostman(KoiledModel):
         try:
             history = await self._aread_events(task_id)
         except Exception:
-            logger.warning("Could not read the events of task %s", task_id, exc_info=True)
+            logger.warning(
+                "Could not read the events of task %s", task_id, exc_info=True
+            )
             return []
         missed: list[TaskEventChange] = []
         for reported in history:
@@ -202,7 +214,9 @@ class GraphQLPostman(KoiledModel):
         try:
             await self._acatch_up(task_id)
         except Exception:
-            logger.warning("Could not read the events of task %s", task_id, exc_info=True)
+            logger.warning(
+                "Could not read the events of task %s", task_id, exc_info=True
+            )
 
     async def _acatch_up_until_live(self, task_id: str) -> None:
         """Keep reading a task's events for as long as the feed has shown nothing.
@@ -345,7 +359,9 @@ class GraphQLPostman(KoiledModel):
         except BaseException as e:
             # No task was bound to this reference, so nothing else will drop its queue.
             self._cleanup_reference(assign_reference)
-            if isinstance(e, GraphQLException) and e.message.startswith(STATEFUL_NEEDS_AGENT):
+            if isinstance(e, GraphQLException) and e.message.startswith(
+                STATEFUL_NEEDS_AGENT
+            ):
                 raise StatefulNeedsAgent(e.message) from e
             if isinstance(e, Exception):
                 raise PostmanException(f"Cannot Assign: {e}") from e
@@ -432,7 +448,8 @@ class GraphQLPostman(KoiledModel):
         what the asking does. Bounded, and a question that fails is only that."""
         try:
             answer = await asyncio.wait_for(
-                RekuestGraphQL(self.rath).ainquire(task=task_id), timeout=INQUIRY_TIMEOUT
+                RekuestGraphQL(self.rath).ainquire(task=task_id),
+                timeout=INQUIRY_TIMEOUT,
             )
         except Exception:  # noqa: BLE001 — asking is best effort; the call goes on waiting
             logger.debug("Asking about task %s failed", task_id, exc_info=True)

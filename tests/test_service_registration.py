@@ -9,8 +9,6 @@ it all in with ``register_service``.
 from typing import Annotated, Optional
 
 import pytest
-from fakts import Alias, Require
-
 from arkitekt_spec.actions import PortKind
 from arkitekt_spec.declare.app import AppRegistry
 from arkitekt_spec.declare.definition.errors import DefinitionError
@@ -18,6 +16,7 @@ from arkitekt_spec.declare.errors import RegistryFrozenError
 from arkitekt_spec.declare.service import Service
 from arkitekt_spec.declare.state.utils import prepare_injected_variables
 from arkitekt_spec.declare.structures.errors import StructureDefinitionError
+from fakts import Alias, Require
 
 
 class Thing:

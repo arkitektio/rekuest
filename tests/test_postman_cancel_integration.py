@@ -11,9 +11,8 @@ import asyncio
 import uuid
 
 import pytest
-from dokker import Deployment
-
 from arkitekt_runtime.types import TaskEventKind
+from dokker import Deployment
 
 from .conftest import CONNECT_TIMEOUT, build_fresh_rekuest
 

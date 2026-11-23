@@ -7,9 +7,9 @@ arguments, so omitting one is a ``TypeError`` at the call, not a ``ValueError`` 
 
 import inspect
 
+import arkitekt_runtime.invoke as invoke
 import pytest
 
-import arkitekt_runtime.invoke as invoke
 from rekuest.api.schema import Action
 
 
@@ -57,7 +57,9 @@ async def test_a_call_serializes_with_the_registry_it_was_given(
 
 
 @pytest.mark.asyncio
-async def test_a_stream_expands_every_raw_yield(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_a_stream_expands_every_raw_yield(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     seen: list = []
     _patch(monkeypatch, seen)
     registry, postman = object(), object()
@@ -100,7 +102,12 @@ def test_the_dead_options_are_gone(dead: str) -> None:
     """``cached`` and ``log`` were accepted and then ``del``'d on the first line of four
     bodies; ``options``/``task`` were the merge layer that made the resolvers necessary.
     """
-    for fn in (invoke._acall, invoke._aiterate, invoke._acall_raw, invoke._aiterate_raw):
+    for fn in (
+        invoke._acall,
+        invoke._aiterate,
+        invoke._acall_raw,
+        invoke._aiterate_raw,
+    ):
         assert dead not in inspect.signature(fn).parameters, f"{fn.__name__}: {dead}"
 
 

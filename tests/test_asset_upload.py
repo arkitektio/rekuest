@@ -7,10 +7,10 @@ from typing import Any
 
 import obstore
 import pytest
+from arkitekt_spec.declare.app import AppRegistry
 from obstore.store import MemoryStore
 from rath.operation import GraphQLException
 
-from arkitekt_spec.declare.app import AppRegistry
 from rekuest.client.upload import assets, media
 from rekuest.datalayer import DataLayer
 
@@ -21,19 +21,34 @@ PNG = b"\x89PNG\r\n\x1a\n" + b"image"
 class FakeServer:
     """Answers the three asset-store operations, and records what it was asked."""
 
-    def __init__(self, stored: frozenset[str] = frozenset(), refuse: str | None = None) -> None:
+    def __init__(
+        self, stored: frozenset[str] = frozenset(), refuse: str | None = None
+    ) -> None:
         self.stored = set(stored)
         self.refuse = refuse
         self.asked: list[tuple[str, dict[str, Any]]] = []
 
     async def aquery(self, document: str, variables: dict[str, Any]) -> SimpleNamespace:
-        name = next(n for n in ("StoredAsset", "RequestAssetUpload", "CreateAsset") if f" {n}(" in document)
+        name = next(
+            n
+            for n in ("StoredAsset", "RequestAssetUpload", "CreateAsset")
+            if f" {n}(" in document
+        )
         self.asked.append((name, variables))
         if name == "StoredAsset":
             ref = variables["ref"]
-            return SimpleNamespace(data={"asset": {"id": "1", "ref": ref, "kind": "MODEL_3D"} if ref in self.stored else None})
+            return SimpleNamespace(
+                data={
+                    "asset": {"id": "1", "ref": ref, "kind": "MODEL_3D"}
+                    if ref in self.stored
+                    else None
+                }
+            )
         if self.refuse:
-            raise GraphQLException("refused", errors=[{"message": "refused", "extensions": {"code": self.refuse}}])
+            raise GraphQLException(
+                "refused",
+                errors=[{"message": "refused", "extensions": {"code": self.refuse}}],
+            )
         ref = variables["input"]["ref"]
         if name == "RequestAssetUpload":
             return SimpleNamespace(
@@ -52,7 +67,9 @@ class FakeServer:
                 }
             )
         self.stored.add(ref)
-        return SimpleNamespace(data={"createAsset": {"id": "1", "ref": ref, "kind": "MODEL_3D"}})
+        return SimpleNamespace(
+            data={"createAsset": {"id": "1", "ref": ref, "kind": "MODEL_3D"}}
+        )
 
 
 @pytest.fixture
@@ -73,17 +90,29 @@ def registry(tmp_path: Path) -> AppRegistry:
 
 
 async def _upload(server: FakeServer, registry: AppRegistry) -> None:
-    await assets.aupload_assets(server, DataLayer(endpoint_url="http://minio:9000"), registry.registered_assets.values())  # type: ignore[arg-type]
+    await assets.aupload_assets(
+        server,  # type: ignore[arg-type]
+        DataLayer(endpoint_url="http://minio:9000"),
+        registry.registered_assets.values(),
+    )
 
 
 @pytest.mark.asyncio
-async def test_missing_assets_are_put_where_their_grants_point_and_recorded_by_store(registry: AppRegistry, bucket: MemoryStore) -> None:
-    scope, logo = registry.registered_assets["scope"].ref, registry.registered_assets["logo"].ref
+async def test_missing_assets_are_put_where_their_grants_point_and_recorded_by_store(
+    registry: AppRegistry, bucket: MemoryStore
+) -> None:
+    scope, logo = (
+        registry.registered_assets["scope"].ref,
+        registry.registered_assets["logo"].ref,
+    )
     server = FakeServer()
 
     await _upload(server, registry)
 
-    assert bytes(obstore.get(bucket, scope).bytes()) == GLB and bytes(obstore.get(bucket, logo).bytes()) == PNG
+    assert (
+        bytes(obstore.get(bucket, scope).bytes()) == GLB
+        and bytes(obstore.get(bucket, logo).bytes()) == PNG
+    )
     assert server.asked[:3] == [
         ("StoredAsset", {"ref": scope}),
         ("RequestAssetUpload", {"input": {"ref": scope}}),
@@ -93,7 +122,9 @@ async def test_missing_assets_are_put_where_their_grants_point_and_recorded_by_s
 
 
 @pytest.mark.asyncio
-async def test_an_asset_the_server_holds_is_not_uploaded_again(registry: AppRegistry, bucket: MemoryStore) -> None:
+async def test_an_asset_the_server_holds_is_not_uploaded_again(
+    registry: AppRegistry, bucket: MemoryStore
+) -> None:
     held = frozenset(asset.ref for asset in registry.registered_assets.values())
     server = FakeServer(stored=held)
 
@@ -104,7 +135,9 @@ async def test_an_asset_the_server_holds_is_not_uploaded_again(registry: AppRegi
 
 
 @pytest.mark.asyncio
-async def test_a_refusal_is_logged_with_its_code_and_nothing_is_raised(registry: AppRegistry, bucket: MemoryStore, caplog: pytest.LogCaptureFixture) -> None:
+async def test_a_refusal_is_logged_with_its_code_and_nothing_is_raised(
+    registry: AppRegistry, bucket: MemoryStore, caplog: pytest.LogCaptureFixture
+) -> None:
     with caplog.at_level(logging.WARNING, logger=assets.__name__):
         await _upload(FakeServer(refuse="not_declared"), registry)
 
@@ -114,7 +147,9 @@ async def test_a_refusal_is_logged_with_its_code_and_nothing_is_raised(registry:
 
 
 @pytest.mark.asyncio
-async def test_a_file_that_changed_since_it_was_registered_is_not_uploaded(registry: AppRegistry, bucket: MemoryStore, caplog: pytest.LogCaptureFixture) -> None:
+async def test_a_file_that_changed_since_it_was_registered_is_not_uploaded(
+    registry: AppRegistry, bucket: MemoryStore, caplog: pytest.LogCaptureFixture
+) -> None:
     registry.registered_assets["scope"].path.write_bytes(b"glTF something else")
     server = FakeServer()
 
@@ -122,13 +157,20 @@ async def test_a_file_that_changed_since_it_was_registered_is_not_uploaded(regis
         await _upload(server, registry)
 
     assert "changed since it was registered as 'scope'" in caplog.text
-    assert [name for name, _ in server.asked if name != "StoredAsset"] == ["RequestAssetUpload", "CreateAsset"], "the image still goes"
+    assert [name for name, _ in server.asked if name != "StoredAsset"] == [
+        "RequestAssetUpload",
+        "CreateAsset",
+    ], "the image still goes"
 
 
 @pytest.mark.asyncio
-async def test_a_file_the_app_only_names_a_source_for_is_not_the_apps_to_upload(tmp_path: Path, bucket: MemoryStore) -> None:
+async def test_a_file_the_app_only_names_a_source_for_is_not_the_apps_to_upload(
+    tmp_path: Path, bucket: MemoryStore
+) -> None:
     registry = AppRegistry(root=tmp_path)
-    registry.register_asset("robot", source="https://vendor.example/ur5.glb", ref="sha256:" + "9f" * 32)
+    registry.register_asset(
+        "robot", source="https://vendor.example/ur5.glb", ref="sha256:" + "9f" * 32
+    )
     server = FakeServer()
 
     await _upload(server, registry)

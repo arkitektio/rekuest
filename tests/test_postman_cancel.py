@@ -14,27 +14,24 @@ with hand-written test doubles (no mocks, no socket/GraphQL backend):
 """
 
 import asyncio
-from datetime import datetime, UTC
+from collections.abc import AsyncGenerator, Callable, Sequence
+from datetime import UTC, datetime
 from types import TracebackType
 from typing import Any
-from collections.abc import AsyncGenerator, Callable, Sequence
 
 import pytest
-from pydantic import PrivateAttr
-
 from arkitekt_runtime import messages
-
-from arkitekt_runtime.local import MemoryAgentTransport
-from rekuest.agents.caller import AgentPostman
-from arkitekt_runtime.types import TaskEventKind
-from rekuest.api.schema import TaskEventChange
-from arkitekt_runtime.postmans.errors import RootOnlyAssignError
-from rekuest.client.postman import GraphQLPostman
-from rekuest.client.rath import RekuestRath
 from arkitekt_runtime.invoke import _aiterate_raw as aiterate_raw
-
+from arkitekt_runtime.local import MemoryAgentTransport
+from arkitekt_runtime.postmans.errors import RootOnlyAssignError
+from arkitekt_runtime.types import TaskEventKind
+from pydantic import PrivateAttr
 from rath.links.testing.direct_succeeding_link import DirectSucceedingLink
 
+from rekuest.agents.caller import AgentPostman
+from rekuest.api.schema import TaskEventChange
+from rekuest.client.postman import GraphQLPostman
+from rekuest.client.rath import RekuestRath
 
 # --------------------------------------------------------------------------- helpers
 
@@ -83,7 +80,7 @@ def _graphql_postman() -> RecordingGraphQLPostman:
 async def test_graphql_awaits_cancelled_before_returning() -> None:
     """_confirm_cancellation sends the cancel and only returns once CANCELLED arrives."""
     pm = _graphql_postman()
-    queue: "asyncio.Queue[TaskEventChange]" = asyncio.Queue()
+    queue: asyncio.Queue[TaskEventChange] = asyncio.Queue()
 
     confirm = asyncio.create_task(
         pm._confirm_cancellation("t1", queue, escalate_to_interrupt=False, timeout=1.0)
@@ -107,7 +104,7 @@ async def test_graphql_awaits_cancelled_before_returning() -> None:
 async def test_graphql_escalates_to_interrupt_on_timeout() -> None:
     """When CANCELLED never arrives and escalation is on, an interrupt is sent."""
     pm = _graphql_postman()
-    queue: "asyncio.Queue[TaskEventChange]" = asyncio.Queue()
+    queue: asyncio.Queue[TaskEventChange] = asyncio.Queue()
 
     confirm = asyncio.create_task(
         pm._confirm_cancellation("t1", queue, escalate_to_interrupt=True, timeout=0.05)
@@ -125,7 +122,7 @@ async def test_graphql_escalates_to_interrupt_on_timeout() -> None:
 async def test_graphql_no_escalation_when_disabled() -> None:
     """Without escalation, a cancel timeout returns without sending an interrupt."""
     pm = _graphql_postman()
-    queue: "asyncio.Queue[TaskEventChange]" = asyncio.Queue()
+    queue: asyncio.Queue[TaskEventChange] = asyncio.Queue()
 
     await asyncio.wait_for(
         pm._confirm_cancellation(
@@ -334,10 +331,13 @@ async def test_graphql_refuses_a_non_root_assign(non_root: dict[str, str]) -> No
 
 
 @pytest.mark.asyncio
-async def test_a_failed_assign_leaves_no_queue_behind(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_a_failed_assign_leaves_no_queue_behind(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """The reference's queue is registered before the mutation; a failure must drop it."""
-    from rekuest.client import postman as postman_module
     from arkitekt_runtime.postmans.errors import PostmanException
+
+    from rekuest.client import postman as postman_module
 
     class FailingGraphQL:
         def __init__(self, rath: object) -> None:

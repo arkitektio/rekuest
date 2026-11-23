@@ -68,7 +68,7 @@ not stop.
 @app.action(policy=CancelOnDisconnect())
 def move_stage(direction: str, task: Task) -> None:
     while motor.moving():
-        task.check_cancelled()   # required — without this the loop never stops
+        task.check_cancelled()  # required — without this the loop never stops
         motor.step()
 ```
 

@@ -5,12 +5,10 @@ bookkeeping ``Init`` carries. Shelving is the agent's own (numbered frames nothi
 answers).
 """
 
-
-
 from arkitekt_runtime import messages
-from rekuest.agents.control import SocketControlPlane
-
 from arkitekt_runtime.local import MemoryAgentTransport
+
+from rekuest.agents.control import SocketControlPlane
 
 
 def test_handle_init_records_the_agent_and_its_hash() -> None:

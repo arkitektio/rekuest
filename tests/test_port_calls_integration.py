@@ -11,8 +11,6 @@ import asyncio
 from typing import Annotated
 
 import pytest
-from dokker import Deployment
-
 from arkitekt_spec.actions import (
     ActionArgumentInput,
     EffectKind,
@@ -20,15 +18,17 @@ from arkitekt_spec.actions import (
     UtilCallInput,
     ValidatorInput,
 )
+from arkitekt_spec.declare.blok.parser import parse_util_call
+from arkitekt_spec.declare.definition.define import prepare_definition
+from arkitekt_spec.declare.definition.errors import DefinitionError
+from arkitekt_spec.declare.widgets import withEffect, withValidator
+from dokker import Deployment
+
 from rekuest.protocol.schema import (
     CatalogArgumentInput,
     CatalogOperationInput,
     CatalogValueKind,
 )
-from arkitekt_spec.declare.blok.parser import parse_util_call
-from arkitekt_spec.declare.definition.define import prepare_definition
-from arkitekt_spec.declare.definition.errors import DefinitionError
-from arkitekt_spec.declare.widgets import withEffect, withValidator
 
 from .conftest import CONNECT_TIMEOUT, build_fresh_rekuest
 
@@ -36,8 +36,13 @@ NESTED = 'if(value > start, [1, stop, {"unicode": "d\u00e9j\u00e0 vu", "neg": -1
 
 
 def crop(
-    start: Annotated[int, withValidator("gt(a=value, b=-1)", error_message="Must not be negative")],
-    stop: Annotated[int, withValidator(NESTED, error_message="Stop must exceed start", label="ordered")],
+    start: Annotated[
+        int, withValidator("gt(a=value, b=-1)", error_message="Must not be negative")
+    ],
+    stop: Annotated[
+        int,
+        withValidator(NESTED, error_message="Stop must exceed start", label="ordered"),
+    ],
     note: Annotated[str, withEffect(EffectKind.HIDE, "stop > 1000 and start > 0")] = "",
 ) -> int:
     """Crop a range.
@@ -50,7 +55,10 @@ def crop(
     return stop - start
 
 
-def offset(base: int, n: Annotated[int, withValidator("gt(a=value, b=0)", error_message="positive")]) -> int:
+def offset(
+    base: int,
+    n: Annotated[int, withValidator("gt(a=value, b=0)", error_message="positive")],
+) -> int:
     """Offset.
 
     Args:
@@ -124,7 +132,9 @@ async def test_port_calls_round_trip(deployment: Deployment) -> None:
         assert validator.source == "gt(a=value, b=-1)"
         assert validator.call_json["operation"] == "gt"
         assert validator.call.operation == "gt"
-        assert [(a.key, a.value_path, a.value_literal) for a in validator.call.arguments] == [
+        assert [
+            (a.key, a.value_path, a.value_literal) for a in validator.call.arguments
+        ] == [
             ("a", "value", None),
             ("b", None, -1),
         ]
@@ -136,8 +146,16 @@ async def test_port_calls_round_trip(deployment: Deployment) -> None:
         assert validator.call.operation == "if"
         cond, on_true, on_false = validator.call.arguments
         assert cond.util_call.operation == "gt"
-        assert [(a.key, a.value_path) for a in cond.util_call.arguments] == [("a", "value"), ("b", "start")]
-        assert validator.call_json["arguments"][0]["util_call"]["arguments"][1]["value_path"] == "start"
+        assert [(a.key, a.value_path) for a in cond.util_call.arguments] == [
+            ("a", "value"),
+            ("b", "start"),
+        ]
+        assert (
+            validator.call_json["arguments"][0]["util_call"]["arguments"][1][
+                "value_path"
+            ]
+            == "start"
+        )
         assert on_true.value_list[1].value_path == "stop"
         literals = {a.key: a.value_literal for a in on_true.value_list[2].value_dict}
         assert literals == {"unicode": "d\u00e9j\u00e0 vu", "neg": -1.5}
@@ -149,14 +167,26 @@ async def test_port_calls_round_trip(deployment: Deployment) -> None:
         assert impl.diagnostics == ()
 
         result = await app.rath.aquery(EFFECTS_QUERY, {"interface": "crop"})
-        note_port = next(a for a in result.data["myImplementationAt"]["action"]["args"] if a["key"] == "note")
+        note_port = next(
+            a
+            for a in result.data["myImplementationAt"]["action"]["args"]
+            if a["key"] == "note"
+        )
         (effect,) = note_port["effects"]
         assert effect["kind"] == "HIDE"
         assert effect["dependencies"] == ["stop", "start"]
         assert effect["source"] == "stop > 1000 and start > 0"
         assert effect["call"]["operation"] == "and"
-        assert [a["utilCall"]["operation"] for a in effect["call"]["arguments"]] == ["gt", "gt"]
-        assert effect["callJson"]["arguments"][1]["util_call"]["arguments"][0]["value_path"] == "start"
+        assert [a["utilCall"]["operation"] for a in effect["call"]["arguments"]] == [
+            "gt",
+            "gt",
+        ]
+        assert (
+            effect["callJson"]["arguments"][1]["util_call"]["arguments"][0][
+                "value_path"
+            ]
+            == "start"
+        )
 
         # ``value`` names a port's own value inside its calls, so no port may be
         # keyed that way -- in ``offset``'s validator ``value`` is n's own value.
@@ -204,7 +234,9 @@ def _bypass_definition(structure_registry, validator: ValidatorInput):  # noqa: 
     "validator, refusal, finding",
     [
         (
-            ValidatorInput.model_construct(call=parse_util_call("gt(value, ghost)"), dependencies=()),
+            ValidatorInput.model_construct(
+                call=parse_util_call("gt(value, ghost)"), dependencies=()
+            ),
             "via value_path",
             None,
         ),
@@ -212,7 +244,9 @@ def _bypass_definition(structure_registry, validator: ValidatorInput):  # noqa: 
             ValidatorInput.model_construct(
                 call=UtilCallInput.model_construct(
                     operation="gt",
-                    arguments=(ActionArgumentInput.model_construct(key=None, value_literal=1),),
+                    arguments=(
+                        ActionArgumentInput.model_construct(key=None, value_literal=1),
+                    ),
                 ),
                 dependencies=(),
             ),
@@ -223,7 +257,11 @@ def _bypass_definition(structure_registry, validator: ValidatorInput):  # noqa: 
             ValidatorInput.model_construct(
                 call=UtilCallInput.model_construct(
                     operation="gt",
-                    arguments=(ActionArgumentInput.model_construct(key="a", value_path="value"),),
+                    arguments=(
+                        ActionArgumentInput.model_construct(
+                            key="a", value_path="value"
+                        ),
+                    ),
                 ),
                 dependencies=(),
             ),
@@ -235,7 +273,9 @@ def _bypass_definition(structure_registry, validator: ValidatorInput):  # noqa: 
                 call=UtilCallInput.model_construct(
                     operation="between",
                     arguments=(
-                        ActionArgumentInput.model_construct(key="a", value_path="value"),
+                        ActionArgumentInput.model_construct(
+                            key="a", value_path="value"
+                        ),
                         ActionArgumentInput.model_construct(key="b", value_literal=1),
                     ),
                 ),
@@ -245,7 +285,9 @@ def _bypass_definition(structure_registry, validator: ValidatorInput):  # noqa: 
             "does not accept arguments ['a', 'b']",
         ),
         (
-            ValidatorInput.model_construct(call=parse_util_call("gt(value, b)"), dependencies=("b",)),
+            ValidatorInput.model_construct(
+                call=parse_util_call("gt(value, b)"), dependencies=("b",)
+            ),
             None,
             None,
         ),
@@ -269,7 +311,9 @@ async def test_server_enforces_call_rules_independently(
         definition = _bypass_definition(app.structure_registry, validator)
         coro = app.aimplement_agent(
             name=app.agent.name,
-            implementations=[ImplementationInput(definition=definition, interface="bypass")],
+            implementations=[
+                ImplementationInput(definition=definition, interface="bypass")
+            ],
             hash="bypass",
         )
         if refusal is not None:
@@ -296,15 +340,22 @@ async def test_catalog_validation_at_registration(deployment: Deployment) -> Non
     async def body(app):  # noqa: ANN001, ANN202
         base = await app.abase_catalog()
         assert base.name == "base" and base.version == 1
-        assert [a.key for a in next(op for op in base.operations if op.name == "gt").arguments] == ["a", "b"]
+        assert [
+            a.key
+            for a in next(op for op in base.operations if op.name == "gt").arguments
+        ] == ["a", "b"]
 
         with pytest.raises(Exception, match="cannot redefine base operations"):
             await app.aregister_module(
                 name="port-call-tests",
                 components=[],
-            catalogs=[],
-            widget_defaults=[],
-                operations=[CatalogOperationInput(name="gt", returns=CatalogValueKind.BOOL, arguments=[])],
+                catalogs=[],
+                widget_defaults=[],
+                operations=[
+                    CatalogOperationInput(
+                        name="gt", returns=CatalogValueKind.BOOL, arguments=[]
+                    )
+                ],
             )
 
         catalog = await app.aregister_module(
@@ -329,7 +380,9 @@ async def test_catalog_validation_at_registration(deployment: Deployment) -> Non
 
     await _run(app, body)
 
-    def positional(n: Annotated[int, withValidator("gt(value, 0)", error_message="positive")]) -> int:
+    def positional(
+        n: Annotated[int, withValidator("gt(value, 0)", error_message="positive")],
+    ) -> int:
         """Positional.
 
         Args:
@@ -345,7 +398,9 @@ async def test_catalog_validation_at_registration(deployment: Deployment) -> Non
         """
         return n
 
-    def extension(n: Annotated[int, withValidator("clamp(value=value, min=0, max=10) == value")]) -> int:
+    def extension(
+        n: Annotated[int, withValidator("clamp(value=value, min=0, max=10) == value")],
+    ) -> int:
         """Extension.
 
         Args:
@@ -375,11 +430,19 @@ async def test_catalog_validation_at_registration(deployment: Deployment) -> Non
         assert impl.diagnostics == ()
         if interface == "arithmetic":
             (validator,) = impl.action.args[1].validators
-            assert validator.source == "x < value + 3" and validator.dependencies == ("x",)
-            assert validator.call_json["arguments"][1]["util_call"]["operation"] == "add"
+            assert validator.source == "x < value + 3" and validator.dependencies == (
+                "x",
+            )
+            assert (
+                validator.call_json["arguments"][1]["util_call"]["operation"] == "add"
+            )
         return impl
 
-    def combined(n: Annotated[int, withValidator("fmt(a=clamp(value=value, min=0, max=10), b='x') == 'x'")]) -> int:
+    def combined(
+        n: Annotated[
+            int, withValidator("fmt(a=clamp(value=value, min=0, max=10), b='x') == 'x'")
+        ],
+    ) -> int:
         """Combined.
 
         Args:
@@ -398,7 +461,10 @@ async def test_catalog_validation_at_registration(deployment: Deployment) -> Non
                 CatalogOperationInput(
                     name="fmt",
                     returns=CatalogValueKind.STRING,
-                    arguments=[CatalogArgumentInput(key="a", kind=CatalogValueKind.ANY), CatalogArgumentInput(key="b", kind=CatalogValueKind.ANY)],
+                    arguments=[
+                        CatalogArgumentInput(key="a", kind=CatalogValueKind.ANY),
+                        CatalogArgumentInput(key="b", kind=CatalogValueKind.ANY),
+                    ],
                 )
             ],
         ),

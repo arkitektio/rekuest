@@ -15,11 +15,11 @@ from contextlib import asynccontextmanager
 from typing import Any, Protocol
 
 import pytest
+from arkitekt_runtime.types import HoldRemember
+from arkitekt_spec.declare.errors import DeniedError
 from dokker import Deployment
 
-from arkitekt_spec.declare.errors import DeniedError
 from rekuest.api.schema import ActionAllowance
-from arkitekt_runtime.types import HoldRemember
 
 from .conftest import CONNECT_TIMEOUT, build_fresh_rekuest
 
@@ -60,7 +60,9 @@ async def _held(app: Any, root: str, after: int = 0) -> dict:  # noqa: ANN401
     """The root's next HELD naming a child that waits, past the ``after`` it already showed."""
 
     async def held() -> dict | None:
-        waiting = [value for value in await _events(app, root, "HELD") if value.get("held")]
+        waiting = [
+            value for value in await _events(app, root, "HELD") if value.get("held")
+        ]
         return waiting[after] if len(waiting) > after else None
 
     return await _eventually(held, "the root to show a held child")
@@ -141,11 +143,15 @@ async def _is_asked_and_denied(workflow_app: Any, decider: Any, interface: str) 
     assert await asyncio.wait_for(pending, TIMEOUT) == "denied"
 
 
-async def _runs_unasked(workflow_app: Any, interface: str, scope: str) -> ActionAllowance | dict:  # noqa: ANN401
+async def _runs_unasked(
+    workflow_app: Any, interface: str, scope: str
+) -> ActionAllowance | dict:  # noqa: ANN401
     """A run of ``interface`` gets its child without a hold; the DECIDED that says why."""
     pending, root = await _start(workflow_app, interface)
     assert await asyncio.wait_for(pending, TIMEOUT) == "stitched-one"
-    assert [v for v in await _events(workflow_app, root, "HELD") if v.get("held")] == [], "nobody was asked"
+    assert [
+        v for v in await _events(workflow_app, root, "HELD") if v.get("held")
+    ] == [], "nobody was asked"
     [decided] = await _events(workflow_app, root, "DECIDED")
     assert decided["approved"] is True and decided["auto"] is True
     assert decided["allowance"]["scope"] == scope
@@ -154,7 +160,9 @@ async def _runs_unasked(workflow_app: Any, interface: str, scope: str) -> Action
 
 @pytest.mark.integration
 @pytest.mark.asyncio(loop_scope="session")
-async def test_an_approval_remembered_for_the_run_is_not_asked_again_in_it(deployment: Deployment) -> None:
+async def test_an_approval_remembered_for_the_run_is_not_asked_again_in_it(
+    deployment: Deployment,
+) -> None:
     async with _stage(deployment) as (_, workflow_app, decider):
         pending, root = await _start(workflow_app, "asks_twice")
         held = await _held(workflow_app, root)
@@ -164,11 +172,16 @@ async def test_an_approval_remembered_for_the_run_is_not_asked_again_in_it(deplo
         await decider.adecide(held["held"], True, remember=HoldRemember.RUN)
         assert await asyncio.wait_for(pending, TIMEOUT) == "stitched-a+stitched-b"
 
-        assert len([v for v in await _events(workflow_app, root, "HELD") if v.get("held")]) == 1, "the second call was not held"
+        assert (
+            len([v for v in await _events(workflow_app, root, "HELD") if v.get("held")])
+            == 1
+        ), "the second call was not held"
         remembered, allowed = await _events(workflow_app, root, "DECIDED")
         assert remembered["remember"] == "RUN" and not remembered.get("auto")
         assert allowed["auto"] is True and allowed["allowance"]["scope"] == "run"
-        assert allowed["held"] != held["held"], "it is the second child that ran unasked"
+        assert allowed["held"] != held["held"], (
+            "it is the second child that ran unasked"
+        )
 
         # The allowance is the run's: it is on no list, and another run asks again.
         assert await decider.amy_allowances() == ()
@@ -177,7 +190,9 @@ async def test_an_approval_remembered_for_the_run_is_not_asked_again_in_it(deplo
 
 @pytest.mark.integration
 @pytest.mark.asyncio(loop_scope="session")
-async def test_an_approval_remembered_for_its_asker_holds_in_every_run_of_that_asker_only(deployment: Deployment) -> None:
+async def test_an_approval_remembered_for_its_asker_holds_in_every_run_of_that_asker_only(
+    deployment: Deployment,
+) -> None:
     async with _stage(deployment) as (provider, workflow_app, decider):
         pending, root = await _start(workflow_app, "asks")
         held = await _held(workflow_app, root)
@@ -189,7 +204,9 @@ async def test_an_approval_remembered_for_its_asker_holds_in_every_run_of_that_a
         assert allowance.action is not None and allowance.asker is not None
         target = (await provider.amy_implementation_at("do_stuff")).action.id
         assert allowance.action.id == target
-        assert [a.id for a in await decider.amy_allowances(action=target)] == [allowance.id]
+        assert [a.id for a in await decider.amy_allowances(action=target)] == [
+            allowance.id
+        ]
 
         await _runs_unasked(workflow_app, "asks", scope="always")
         # Another action asking for the same one is still asked.
@@ -202,24 +219,37 @@ async def test_an_approval_remembered_for_its_asker_holds_in_every_run_of_that_a
 
 @pytest.mark.integration
 @pytest.mark.asyncio(loop_scope="session")
-async def test_an_action_put_on_the_auto_list_runs_whoever_asks_until_it_is_taken_off(deployment: Deployment) -> None:
+async def test_an_action_put_on_the_auto_list_runs_whoever_asks_until_it_is_taken_off(
+    deployment: Deployment,
+) -> None:
     async with _stage(deployment) as (provider, workflow_app, decider):
         target = (await provider.amy_implementation_at("do_stuff")).action.id
 
         allowance = await decider.aallow_action(target)
-        assert allowance.key == "do_stuff" and allowance.asker is None and allowance.asker_key is None
-        assert (await decider.aallow_action(target)).id == allowance.id, "allowing it twice is one entry"
+        assert (
+            allowance.key == "do_stuff"
+            and allowance.asker is None
+            and allowance.asker_key is None
+        )
+        assert (await decider.aallow_action(target)).id == allowance.id, (
+            "allowing it twice is one entry"
+        )
 
         await _runs_unasked(workflow_app, "asks", scope="always")
         pending, root = await _start(workflow_app, "asks_too")
         assert await asyncio.wait_for(pending, TIMEOUT) == "stitched-too"
-        assert [v for v in await _events(workflow_app, root, "HELD") if v.get("held")] == []
+        assert [
+            v for v in await _events(workflow_app, root, "HELD") if v.get("held")
+        ] == []
 
         # Bound to one asker, it is its own entry beside the general one.
         asker = (await workflow_app.amy_implementation_at("asks")).action.id
         bound = await decider.aallow_action(target, asker=asker)
         assert bound.id != allowance.id and bound.asker_key == "asks"
-        assert {a.id for a in await decider.amy_allowances(action=target)} == {allowance.id, bound.id}
+        assert {a.id for a in await decider.amy_allowances(action=target)} == {
+            allowance.id,
+            bound.id,
+        }
 
         for entry in (allowance, bound):
             await decider.arevoke_allowance(entry.id)

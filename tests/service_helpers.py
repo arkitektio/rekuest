@@ -7,10 +7,9 @@ test that wants ``client: FakeClient`` injected declares a service returning
 
 from typing import Annotated, Any
 
-from fakts import Alias, Require
-
 from arkitekt_spec.declare.app import AppRegistry
 from arkitekt_spec.declare.service import Service
+from fakts import Alias, Require
 
 
 def with_client(registry: AppRegistry, cls: type, name: str) -> Service[Any]:

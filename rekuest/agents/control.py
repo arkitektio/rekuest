@@ -12,7 +12,6 @@ as ``SHELVE``/``UNSHELVE`` frames, which nothing answers (``JOURNAL_ACK`` covers
 
 from __future__ import annotations
 
-
 from arkitekt_runtime import messages
 from arkitekt_runtime.agents.transport.types import MessageSink
 

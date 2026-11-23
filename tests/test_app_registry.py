@@ -9,15 +9,15 @@ does not have is refused where it is named.
 from enum import Enum
 
 import pytest
-
 from arkitekt_spec.actions import PortKind
-from rekuest.api.schema import Implementation
 from arkitekt_spec.declare.app import AppRegistry
-from rekuest.arkitekt import rekuest_service
 from arkitekt_spec.declare.definition.errors import DefinitionError
 from arkitekt_spec.declare.structures.errors import StructureRegistryError
 from arkitekt_spec.declare.structures.types import service_from_identifier
 from arkitekt_spec.declare.structures.utils import id_shrink
+
+from rekuest.api.schema import Implementation
+from rekuest.arkitekt import rekuest_service
 
 from .service_helpers import with_client
 

@@ -11,15 +11,19 @@ from collections.abc import Awaitable, Callable
 from typing import Annotated
 
 from arkitekt_spec import AppManifest
+from arkitekt_spec.declare.app import AppRegistry
+from arkitekt_spec.declare.tested import tested_against
+from arkitekt_spec.declare.widgets import SearchWidget
 from fakts import Alias, Require, TokenLoader
 from fakts.contrib.rath.auth import FaktsAuthLink
-from graphql import OperationType
 from rath.links.aiohttp import AIOHttpLink
 from rath.links.compose import compose
 from rath.links.graphql_ws import GraphQLWSLink
 from rath.links.split import SplitLink
 
+from graphql import OperationType
 from rekuest.agents.agent import RekuestAgent
+from rekuest.agents.transport.websocket import WebsocketAgentTransport
 from rekuest.api.schema import (
     Action,
     Agent,
@@ -37,16 +41,13 @@ from rekuest.api.schema import (
     TestCase,
     TestResult,
 )
-from arkitekt_spec.declare.app import AppRegistry
-from arkitekt_spec.declare.tested import tested_against
-from rekuest.agents.transport.websocket import WebsocketAgentTransport
-from rekuest.datalayer import DataLayer
-from rekuest.client.upload.assets import aupload_assets
-from rekuest.client.upload.link import UploadLink
+from rekuest.client.client import Rekuest, RekuestCaller
 from rekuest.client.postman import GraphQLPostman
 from rekuest.client.rath import RekuestRath
-from rekuest.client.client import Rekuest, RekuestCaller
-from arkitekt_spec.declare.widgets import SearchWidget
+from rekuest.client.upload.assets import aupload_assets
+from rekuest.client.upload.link import UploadLink
+from rekuest.datalayer import DataLayer
+
 
 def build_relative_path(*path: str) -> str:
     """Build a path relative to this file, for the files shipped beside it."""
@@ -72,7 +73,9 @@ def rekuest(
     rekuest: Annotated[
         Alias,
         Require(
-            "live.arkitekt.rekuest", "Where this app's actions are offered and assigned", version=TESTED
+            "live.arkitekt.rekuest",
+            "Where this app's actions are offered and assigned",
+            version=TESTED,
         ),
     ],
     s3: Annotated[
@@ -103,8 +106,16 @@ def _rath(rekuest: Alias, s3: Alias, tokens: TokenLoader) -> RekuestRath:
             UploadLink(datalayer=DataLayer.from_alias(s3)),
             FaktsAuthLink(token_loader=tokens),
             SplitLink(
-                left=AIOHttpLink(endpoint_url=rekuest.to_http_path("graphql"), proxy=rekuest.proxy, ssl_context=rekuest.ssl_context()),
-                right=GraphQLWSLink(ws_endpoint_url=rekuest.to_ws_path("graphql"), proxy=rekuest.proxy, ssl_context=rekuest.ssl_context()),
+                left=AIOHttpLink(
+                    endpoint_url=rekuest.to_http_path("graphql"),
+                    proxy=rekuest.proxy,
+                    ssl_context=rekuest.ssl_context(),
+                ),
+                right=GraphQLWSLink(
+                    ws_endpoint_url=rekuest.to_ws_path("graphql"),
+                    proxy=rekuest.proxy,
+                    ssl_context=rekuest.ssl_context(),
+                ),
                 split=lambda o: o.node.operation != OperationType.SUBSCRIPTION,
             ),
         )
@@ -120,7 +131,11 @@ def _asset_upload(
         client = RekuestRath(
             link=compose(
                 FaktsAuthLink(token_loader=tokens),
-                AIOHttpLink(endpoint_url=rekuest.to_http_path("graphql"), proxy=rekuest.proxy, ssl_context=rekuest.ssl_context()),
+                AIOHttpLink(
+                    endpoint_url=rekuest.to_http_path("graphql"),
+                    proxy=rekuest.proxy,
+                    ssl_context=rekuest.ssl_context(),
+                ),
             )
         )
         async with client:
@@ -136,7 +151,9 @@ def rekuest_agent(
     rekuest: Annotated[
         Alias,
         Require(
-            "live.arkitekt.rekuest", "Where this app's actions are offered and assigned", version=TESTED
+            "live.arkitekt.rekuest",
+            "Where this app's actions are offered and assigned",
+            version=TESTED,
         ),
     ],
     s3: Annotated[
@@ -173,7 +190,9 @@ def rekuest_agent(
         app_registry=registry,
         after_registration=(
             _asset_upload(rekuest, s3, tokens, registry)
-            if any(asset.path is not None for asset in registry.registered_assets.values())
+            if any(
+                asset.path is not None for asset in registry.registered_assets.values()
+            )
             else None
         ),
     )
@@ -251,7 +270,9 @@ def describe_agent(agent: Agent) -> dict[str, str]:
     return {SUPERVISOR: agent.supervisor} if agent.supervisor else {}
 
 
-@registry.structure("@rekuest/agent", widget=_search(SearchAgentsQuery), describe=describe_agent)
+@registry.structure(
+    "@rekuest/agent", widget=_search(SearchAgentsQuery), describe=describe_agent
+)
 async def expand_agent(id: str, rekuest: Rekuest) -> Agent:
     """An agent, by id: an app instance connected to rekuest, with its lok client id."""
     return await rekuest.aget_agent(id)
@@ -277,7 +298,9 @@ def rekuest_caller(
     rekuest: Annotated[
         Alias,
         Require(
-            "live.arkitekt.rekuest", "Where this app's actions are offered and assigned", version=TESTED
+            "live.arkitekt.rekuest",
+            "Where this app's actions are offered and assigned",
+            version=TESTED,
         ),
     ],
     s3: Annotated[
@@ -309,4 +332,10 @@ rekuest_service = rekuest
 rekuest_caller_service = rekuest_caller
 rekuest_provider = rekuest_agent
 
-__all__ = ["caller_registry", "registry", "rekuest_caller_service", "rekuest_service", "rekuest_provider"]
+__all__ = [
+    "caller_registry",
+    "registry",
+    "rekuest_caller_service",
+    "rekuest_service",
+    "rekuest_provider",
+]

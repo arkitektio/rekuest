@@ -1,18 +1,17 @@
-
 from arkitekt_spec.actions import (
     ArgPortInput,
     ImplementationInput,
     PortKind,
     StateImplementationInput,
 )
+from arkitekt_spec.declare.app import AppRegistry
+from arkitekt_spec.declare.declare import DeclaredAgentAction, DeclaredAgentState
+from arkitekt_spec.declare.definition.define import prepare_definition
 from arkitekt_spec.declare.definition.dependencies import (
     build_action_dependency_input,
     build_state_dependency_input,
 )
-from arkitekt_spec.declare.declare import DeclaredAgentAction, DeclaredAgentState
-from arkitekt_spec.declare.definition.define import prepare_definition
 from arkitekt_spec.declare.definition.match import build_port_match, build_port_matches
-from arkitekt_spec.declare.app import AppRegistry
 
 
 def test_build_port_match_preserves_nested_shape() -> None:

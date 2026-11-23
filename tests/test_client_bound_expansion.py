@@ -12,17 +12,16 @@ from collections.abc import Sequence
 from typing import Any
 
 import pytest
-from rath.expansion import ExpandsStructures
-
 from arkitekt_runtime.agents.base import BaseAgent
+from arkitekt_runtime.local import MemoryAgentTransport
 from arkitekt_spec.declare.app import AppRegistry
 from arkitekt_spec.declare.structures.errors import StructureClientError
 from arkitekt_spec.declare.structures.registry import StructureRegistry
+from rath.expansion import ExpandsStructures
 
-from arkitekt_runtime.local import MemoryAgentTransport
-from .test_service_client_injection import assign
 from .agent_helpers import run_assignment
 from .service_helpers import with_client
+from .test_service_client_injection import assign
 
 
 class Thing:

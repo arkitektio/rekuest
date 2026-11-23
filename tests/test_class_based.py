@@ -1,21 +1,23 @@
 """Test the reactify function which converts a function or generator into an actor definition."""
 
-from arkitekt_runtime.agents.hooks.materialize import materialize_hook
 from dataclasses import dataclass
 
-
-from arkitekt_runtime.agents.hooks.startup import ThreadedStartupHook
 from arkitekt_runtime.agents.hooks.background import WrappedThreadedBackgroundTask
+from arkitekt_runtime.agents.hooks.materialize import materialize_hook
+from arkitekt_runtime.agents.hooks.startup import ThreadedStartupHook
+from arkitekt_spec.declare.app import AppRegistry
+
 from rekuest.agents.agent import RekuestAgent
 from rekuest.client.client import Rekuest
-from arkitekt_spec.declare.app import AppRegistry
 
 # Hooks and states belong to a registry, as they would to an app.
 _REGISTRY = AppRegistry()
 _HOOKS = _REGISTRY.hooks_registry
 
 
-def test_actify_class_based_function(mock_rekuest: Rekuest, mock_agent: RekuestAgent) -> None:
+def test_actify_class_based_function(
+    mock_rekuest: Rekuest, mock_agent: RekuestAgent
+) -> None:
     """Test if the function is correctly buildable into an actor definition."""
 
     class ClassBase:
@@ -38,7 +40,9 @@ def test_actify_class_based_function(mock_rekuest: Rekuest, mock_agent: RekuestA
     assert len(implementation.definition.args) == 1
 
 
-def test_actify_class_based_startup(mock_rekuest: Rekuest, mock_agent: RekuestAgent) -> None:
+def test_actify_class_based_startup(
+    mock_rekuest: Rekuest, mock_agent: RekuestAgent
+) -> None:
     """Test if the function is correctly buildable into an actor definition."""
 
     @mock_agent.app_registry.state
@@ -65,7 +69,9 @@ def test_actify_class_based_startup(mock_rekuest: Rekuest, mock_agent: RekuestAg
     assert isinstance(materialize_hook(default), ThreadedStartupHook)
 
 
-def test_actify_class_based_background(mock_rekuest: Rekuest, mock_agent: RekuestAgent) -> None:
+def test_actify_class_based_background(
+    mock_rekuest: Rekuest, mock_agent: RekuestAgent
+) -> None:
     """Test if the function is correctly buildable into an actor definition."""
 
     @mock_agent.app_registry.state

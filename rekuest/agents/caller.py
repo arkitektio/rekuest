@@ -33,20 +33,24 @@ import hashlib
 import json
 import logging
 import uuid
+from collections.abc import AsyncGenerator, Awaitable, Callable, Sequence
 from dataclasses import dataclass, field
 from types import TracebackType
 from typing import Any
-from collections.abc import AsyncGenerator, Awaitable, Callable, Sequence
-
-from rath.scalars import ID
 
 from arkitekt_runtime import messages
+from arkitekt_runtime.agents.transport.types import MessageSink
+from arkitekt_runtime.postmans.errors import (
+    STATEFUL_NEEDS_AGENT,
+    AssignException,
+    StatefulNeedsAgent,
+)
 from arkitekt_runtime.trace import current_traceparent
 from arkitekt_runtime.types import TaskEventKind, TaskPolicy
-from arkitekt_spec.declare.task import AssignPrompt, HookInput, StateRequirement
-from arkitekt_runtime.agents.transport.types import MessageSink
-from arkitekt_runtime.postmans.errors import STATEFUL_NEEDS_AGENT, AssignException, StatefulNeedsAgent
 from arkitekt_spec.declare.errors import NonDeterministicWorkflow
+from arkitekt_spec.declare.task import AssignPrompt, HookInput, StateRequirement
+from rath.scalars import ID
+
 from rekuest.scalars import ActionHash
 
 logger = logging.getLogger(__name__)
@@ -79,7 +83,7 @@ class CallerTaskEvent:
 _TERMINAL_TYPES = messages.TERMINAL_EVENT_MIRRORS
 
 
-def _adapt(event: "messages.ExecutionEvent") -> CallerTaskEvent | None:
+def _adapt(event: messages.ExecutionEvent) -> CallerTaskEvent | None:
     """Translate a backend mirror into a ``CallerTaskEvent`` (or ``None`` to skip).
 
     Only the kinds ``_astream_raw`` acts on are surfaced, and HELD, so a caller can see
@@ -118,7 +122,9 @@ def _adapt(event: "messages.ExecutionEvent") -> CallerTaskEvent | None:
             task=event.task,
         )
     if isinstance(event, messages.DeniedEvent):
-        return CallerTaskEvent(kind=TaskEventKind.DENIED, message=event.answer, task=event.task)
+        return CallerTaskEvent(
+            kind=TaskEventKind.DENIED, message=event.answer, task=event.task
+        )
     if isinstance(event, (messages.CancelledEvent, messages.InterruptedEvent)):
         return CallerTaskEvent(
             kind=TaskEventKind.CRITICAL,
@@ -158,7 +164,7 @@ class _Lost:
 
 
 def _response_id(
-    response: "messages.AssignResponse | messages.ProbeResponse",
+    response: messages.AssignResponse | messages.ProbeResponse,
 ) -> str | None:
     """The id the backend assigned, whichever kind of answer this is.
 
@@ -184,7 +190,7 @@ class AgentPostman:
         self,
         sink: MessageSink,
         cancel_timeout: float = 5.0,
-        child_step: "Callable[[str], Awaitable[int | None]] | None" = None,
+        child_step: Callable[[str], Awaitable[int | None]] | None = None,
         inquire_after: float = 30.0,
         replay_grace: float = 10.0,
     ) -> None:
@@ -207,19 +213,19 @@ class AgentPostman:
         # request id -> future resolved with the AssignResponse or ProbeResponse
         self._pending_responses: dict[
             str,
-            "asyncio.Future[messages.AssignResponse | messages.ProbeResponse]",
+            asyncio.Future[messages.AssignResponse | messages.ProbeResponse],
         ] = {}
         # durable task id -> queue of ExecutionEvent mirrors
-        self._task_queues: dict[str, "asyncio.Queue[Any]"] = {}
+        self._task_queues: dict[str, asyncio.Queue[Any]] = {}
         # task id -> mirrors that arrived before the AssignResponse was processed
-        self._orphan_by_task: dict[str, list["messages.ExecutionEvent"]] = {}
+        self._orphan_by_task: dict[str, list[messages.ExecutionEvent]] = {}
         # (parent task, call) -> how often the parent has made that call: the derived
         # call key's occurrence
         self._occurrences: dict[tuple[str, str], int] = {}
         # request ids of calls given up before their answer came: the child the answer
         # names is cancelled, as nobody waits for it
         self._abandoned: set[str] = set()
-        self._cancelling: set["asyncio.Future[None]"] = set()
+        self._cancelling: set[asyncio.Future[None]] = set()
         # request id of a probe under way -> the probe id its response named (None until
         # then): what is failed when the connection drops (see fail_probes)
         self._probes: dict[str, str | None] = {}
@@ -254,11 +260,11 @@ class AgentPostman:
         escalate_to_interrupt: bool = False,
         cancel_timeout: float | None = None,
         call_key: str | None = None,
-        prompt: "AssignPrompt | None" = None,
-        policy: "TaskPolicy | None" = None,
-        state_requires: "list[StateRequirement] | None" = None,
+        prompt: AssignPrompt | None = None,
+        policy: TaskPolicy | None = None,
+        state_requires: list[StateRequirement] | None = None,
         inquire_after: float | None = None,
-        on_lost: "messages.OnLost | None" = None,
+        on_lost: messages.OnLost | None = None,
         max_resumes: int | None = None,
         ticket: int | None = None,
     ) -> AsyncGenerator[CallerTaskEvent, None]:
@@ -294,7 +300,13 @@ class AgentPostman:
             try:
                 await self._aturn(str(parent), ticket)
                 if call_key is None:
-                    target = action or action_hash or implementation or (f"{dependency}.{method}" if dependency else interface) or "call"
+                    target = (
+                        action
+                        or action_hash
+                        or implementation
+                        or (f"{dependency}.{method}" if dependency else interface)
+                        or "call"
+                    )
                     if agent is not None and (action or action_hash):
                         target = f"{target}@{agent}"
                     call_key = self._derive_call_key(str(parent), target, args)
@@ -443,7 +455,9 @@ class AgentPostman:
         while line is not None and any(earlier < ticket for earlier in line.open):
             await line.moved.wait()
 
-    def begin_replay(self, parent: str, calls: Sequence[str], code_changed: bool = False) -> None:
+    def begin_replay(
+        self, parent: str, calls: Sequence[str], code_changed: bool = False
+    ) -> None:
         """A resumed run of ``parent`` begins: ``calls`` are the keys its earlier run made."""
         self.forget_parent(parent)
         replay = _Replay(unclaimed=set(calls), code_changed=code_changed)
@@ -483,13 +497,19 @@ class AgentPostman:
                 replay.refused = (
                     f"Task {parent}: the resumed run called {call_key!r}, which the run it resumes "
                     f"never did, and has not made {sorted(replay.unclaimed)}, which it did."
-                    + (" The workflow's code changed since that run started." if replay.code_changed else "")
+                    + (
+                        " The workflow's code changed since that run started."
+                        if replay.code_changed
+                        else ""
+                    )
                 )
             else:
                 return
         raise NonDeterministicWorkflow(replay.refused)
 
-    def _derive_call_key(self, parent: str, target: str, args: dict[str, Any] | None) -> str:
+    def _derive_call_key(
+        self, parent: str, target: str, args: dict[str, Any] | None
+    ) -> str:
         """What a parent calls a child it gave no key: the target, its args, the occurrence.
 
         The same on every run of a deterministic parent, whatever order concurrent calls
@@ -497,7 +517,9 @@ class AgentPostman:
         Two calls with the same target and args are told apart by occurrence, and are
         interchangeable anyway.
         """
-        digest = hashlib.sha256(json.dumps(args or {}, sort_keys=True, default=str).encode()).hexdigest()[:8]
+        digest = hashlib.sha256(
+            json.dumps(args or {}, sort_keys=True, default=str).encode()
+        ).hexdigest()[:8]
         base = f"{target}:{digest}"
         occurrence = self._occurrences.get((parent, base), 0) + 1
         self._occurrences[(parent, base)] = occurrence
@@ -505,7 +527,7 @@ class AgentPostman:
 
     async def _astream(
         self,
-        request: "messages.AssignRequest | messages.ProbeRequest",
+        request: messages.AssignRequest | messages.ProbeRequest,
         reference: str,
         escalate_to_interrupt: bool,
         cancel_timeout: float | None,
@@ -523,11 +545,13 @@ class AgentPostman:
         cleanup below are identical for both.
         """
         loop = asyncio.get_running_loop()
-        response_future: "asyncio.Future[messages.AssignResponse | messages.ProbeResponse]" = loop.create_future()
+        response_future: asyncio.Future[
+            messages.AssignResponse | messages.ProbeResponse
+        ] = loop.create_future()
         self._pending_responses[request.id] = response_future
 
         task: str | None = None
-        queue: "asyncio.Queue[messages.ExecutionEvent | _Lost] | None" = None
+        queue: asyncio.Queue[messages.ExecutionEvent | _Lost] | None = None
         ended = False
         if isinstance(request, messages.ProbeRequest):
             self._probes[request.id] = None
@@ -557,7 +581,9 @@ class AgentPostman:
             while True:
                 if inquire_after > 0:
                     try:
-                        event = await asyncio.wait_for(queue.get(), timeout=inquire_after)
+                        event = await asyncio.wait_for(
+                            queue.get(), timeout=inquire_after
+                        )
                     except TimeoutError:
                         await self._aask_about(task)
                         continue
@@ -607,13 +633,11 @@ class AgentPostman:
                 self._task_queues.pop(task, None)
                 self._orphan_by_task.pop(task, None)
 
-    def _register_task(
-        self, reference: str, task: str
-    ) -> "asyncio.Queue[Any]":
+    def _register_task(self, reference: str, task: str) -> asyncio.Queue[Any]:
         """The queue of the task a response named, with any event that came before it."""
         return self._ensure_queue(task)
 
-    def _ensure_queue(self, task: str) -> "asyncio.Queue[Any]":
+    def _ensure_queue(self, task: str) -> asyncio.Queue[Any]:
         """Return ``task``'s event queue, creating it and draining any orphaned mirrors.
 
         Events can race ahead of the response that names their task; they are parked in
@@ -627,7 +651,7 @@ class AgentPostman:
     async def _confirm_cancellation(
         self,
         task: str,
-        queue: "asyncio.Queue[Any]",
+        queue: asyncio.Queue[Any],
         escalate_to_interrupt: bool,
         timeout: float,
     ) -> None:
@@ -654,7 +678,7 @@ class AgentPostman:
 
     async def _send_control(
         self,
-        request: "messages.CancelRequest | messages.InterruptRequest",
+        request: messages.CancelRequest | messages.InterruptRequest,
         task: str,
     ) -> None:
         """Send a lifecycle-control request over the socket (best-effort)."""
@@ -670,8 +694,8 @@ class AgentPostman:
 
     async def _await_terminal(
         self,
-        queue: "asyncio.Queue[Any]",
-        types: tuple[type["messages.ExecutionEvent"], ...],
+        queue: asyncio.Queue[Any],
+        types: tuple[type[messages.ExecutionEvent], ...],
         timeout: float,
     ) -> bool:
         """Drain ``queue`` until a mirror of one of ``types`` arrives.
@@ -695,7 +719,7 @@ class AgentPostman:
     # ------------------------------------------------------------------- inbound
 
     def handle_response(
-        self, message: "messages.AssignResponse | messages.ProbeResponse"
+        self, message: messages.AssignResponse | messages.ProbeResponse
     ) -> None:
         """Resolve the waiting ``aassign``/``aprobe`` with the backend's response."""
         task = _response_id(message)
@@ -718,7 +742,9 @@ class AgentPostman:
 
     def _cancel_unwanted(self, task: str) -> None:
         """Cancel a child whose caller is gone, from where no one can await it."""
-        cancelling = asyncio.ensure_future(self._send_control(messages.CancelRequest(task=task), task))
+        cancelling = asyncio.ensure_future(
+            self._send_control(messages.CancelRequest(task=task), task)
+        )
         self._cancelling.add(cancelling)
         cancelling.add_done_callback(self._cancelling.discard)
 
@@ -734,10 +760,16 @@ class AgentPostman:
         state: str,
         since: dict[str, Any] | None = None,
         paths: Sequence[str] = (),
-    ) -> "messages.StateRevisionResponse":
+    ) -> messages.StateRevisionResponse:
         """Ask the server about a state a workflow's guard watches (see ``task.guard``)."""
-        request = messages.StateRevisionRequest(parent=parent, dependency=dependency, state=state, since=since, paths=list(paths))
-        future: "asyncio.Future[Any]" = asyncio.get_running_loop().create_future()
+        request = messages.StateRevisionRequest(
+            parent=parent,
+            dependency=dependency,
+            state=state,
+            since=since,
+            paths=list(paths),
+        )
+        future: asyncio.Future[Any] = asyncio.get_running_loop().create_future()
         self._pending_responses[request.id] = future
         self._questions.add(request.id)
         try:
@@ -755,13 +787,15 @@ class AgentPostman:
         to act on (a task its agent does not know ends lost, and the stream hears of it).
         Never in the way of the call: bounded, and a question that fails is only that."""
         try:
-            answer = await asyncio.wait_for(self.ainquire(task), timeout=INQUIRY_TIMEOUT)
+            answer = await asyncio.wait_for(
+                self.ainquire(task), timeout=INQUIRY_TIMEOUT
+            )
         except Exception:  # noqa: BLE001 — asking is best effort; the call goes on waiting
             logger.debug("Asking about task %s failed", task, exc_info=True)
             return
         logger.debug("Task %s, asked about after a silence: %s", task, answer)
 
-    async def ainquire(self, task: str) -> "messages.InquireResponse":
+    async def ainquire(self, task: str) -> messages.InquireResponse:
         """Ask whether the agent of ``task``, which this agent assigned, is still on it.
 
         A read: nothing is done to the task, and nothing is tried again. The answer says
@@ -771,7 +805,7 @@ class AgentPostman:
         before asking, and what to do with the answer, is the caller's.
         """
         request = messages.InquireRequest(task=task)
-        future: "asyncio.Future[Any]" = asyncio.get_running_loop().create_future()
+        future: asyncio.Future[Any] = asyncio.get_running_loop().create_future()
         self._pending_responses[request.id] = future
         self._questions.add(request.id)
         try:
@@ -790,7 +824,9 @@ class AgentPostman:
         if future is not None and not future.done():
             future.set_result(message)
 
-    def handle_state_revision_response(self, message: messages.StateRevisionResponse) -> None:
+    def handle_state_revision_response(
+        self, message: messages.StateRevisionResponse
+    ) -> None:
         """Resolve the waiting ``astate_revision``."""
         future = self._pending_responses.get(message.request)
         if future is not None and not future.done():
@@ -813,7 +849,7 @@ class AgentPostman:
 
     # --------------------------------------------------------- protocol niceties
 
-    async def __aenter__(self) -> "AgentPostman":
+    async def __aenter__(self) -> AgentPostman:
         return self
 
     async def __aexit__(

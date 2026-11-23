@@ -20,10 +20,8 @@ the whole point of these tests.
 import asyncio
 
 import pytest
-
 from arkitekt_runtime.types import TaskPolicy
 from dokker import Deployment
-
 
 from .conftest import CONNECT_TIMEOUT, build_fresh_rekuest
 
@@ -183,7 +181,6 @@ async def test_memory_structure_round_trips_through_dependency(
     """
     from typing import Protocol
 
-    
     provider = build_fresh_rekuest(deployment, token="atest_token")
     provider.register_memory_structure(Image)
     provider.register_memory_structure(Mask)
@@ -229,9 +226,7 @@ async def test_memory_structure_round_trips_through_dependency(
         await workflow_app.aconnect(timeout=CONNECT_TIMEOUT)
         workflow_task = asyncio.create_task(workflow_app.aloop())
 
-        impl = await workflow_app.amy_implementation_at(
-            "pipe_through_dependency"
-        )
+        impl = await workflow_app.amy_implementation_at("pipe_through_dependency")
         result = await workflow_app.acall(
             impl,
             policy=TaskPolicy.AUTO,

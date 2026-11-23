@@ -14,9 +14,9 @@ from collections.abc import Iterable
 from pathlib import Path
 
 import rath
+from arkitekt_spec.declare.app import AssetDeclaration
 from rath.operation import GraphQLException
 
-from arkitekt_spec.declare.app import AssetDeclaration
 from rekuest.api.schema import (
     CreateAssetMutation,
     RequestAssetUploadMutation,
@@ -76,7 +76,12 @@ async def aupload_assets(
     """
     for asset in assets:
         if asset.path is None:
-            logger.debug("The %s '%s' is fetched from %s, not uploaded by the app", asset.kind.label, asset.name, asset.source)
+            logger.debug(
+                "The %s '%s' is fetched from %s, not uploaded by the app",
+                asset.kind.label,
+                asset.name,
+                asset.source,
+            )
             continue
         what = f"{asset.kind.label} '{asset.name}' ({asset.path.name})"
         try:

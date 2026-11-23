@@ -7,21 +7,21 @@ requests attributable is the ambient task, which the actor sets around the body.
 """
 
 import asyncio
-from rekuest.agents.agent import RekuestAgent
 from typing import Annotated, Any, Optional, Protocol
 
 import pytest
-
 from arkitekt_runtime import messages
 from arkitekt_runtime.agents.base import BaseAgent
-from arkitekt_spec.declare.agents.errors import StateRequirementsNotMet
+from arkitekt_runtime.local import MemoryAgentTransport
 from arkitekt_spec.actions import PortKind
+from arkitekt_spec.declare.agents.errors import StateRequirementsNotMet
 from arkitekt_spec.declare.app import AppRegistry
 from arkitekt_spec.declare.definition.define import prepare_definition
 from arkitekt_spec.declare.structures.registry import StructureRegistry
 from rath.task import current_task, token_of
 
-from arkitekt_runtime.local import MemoryAgentTransport
+from rekuest.agents.agent import RekuestAgent
+
 from .agent_helpers import run_assignment
 from .service_helpers import with_client
 
@@ -93,7 +93,9 @@ def assign(interface: str, token: str | None = None, **args: Any) -> messages.As
     )
 
 
-def test_a_client_is_what_a_declared_service_returns_seen_through_optional_and_annotated() -> None:
+def test_a_client_is_what_a_declared_service_returns_seen_through_optional_and_annotated() -> (
+    None
+):
     structures = registry_with_clients().structure_registry
     assert structures.is_client(FakeClient)
     assert structures.is_client(Optional[FakeClient])  # noqa: UP007 -- the Optional spelling is what is tested
@@ -102,12 +104,15 @@ def test_a_client_is_what_a_declared_service_returns_seen_through_optional_and_a
     assert not structures.is_client(FakeClient | OtherClient)
     assert not structures.is_client(FakeClient("x"))
     assert not structures.is_client(int)
-    assert not structures.is_client(Lab), "a declared protocol is a dependency, not a client"
+    assert not structures.is_client(Lab), (
+        "a declared protocol is a dependency, not a client"
+    )
     assert not StructureRegistry().is_client(FakeClient), "no service, no client"
 
 
 @pytest.mark.parametrize(
-    "annotation", [FakeClient, Optional[FakeClient], Annotated[FakeClient, "doc"]]  # noqa: UP007 -- the Optional spelling is what is tested
+    "annotation",
+    [FakeClient, Optional[FakeClient], Annotated[FakeClient, "doc"]],  # noqa: UP007 -- the Optional spelling is what is tested
 )
 def test_client_parameter_is_not_a_port(annotation: Any) -> None:
     def takes_client(x: int, client) -> int:  # noqa: ANN001

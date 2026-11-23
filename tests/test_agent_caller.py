@@ -17,7 +17,6 @@ import asyncio
 from typing import Any, Protocol
 
 import pytest
-
 from arkitekt_runtime.types import TaskPolicy
 from dokker import Deployment
 

@@ -7,15 +7,14 @@ ids at once gets them in one, and everything else behaves as it did.
 from typing import Any
 
 import pytest
-from rath.expansion import ExpandsStructures
-
 from arkitekt_runtime.actors.types import Shelver
+from arkitekt_runtime.structures.serialization.actor import expand_inputs
+from arkitekt_runtime.structures.serialization.expand import aexpand_returns
 from arkitekt_spec.declare.app import AppRegistry
 from arkitekt_spec.declare.definition.define import prepare_definition
 from arkitekt_spec.declare.structures.errors import ExpandingError
 from arkitekt_spec.declare.structures.registry import StructureRegistry
-from arkitekt_runtime.structures.serialization.actor import expand_inputs
-from arkitekt_runtime.structures.serialization.expand import aexpand_returns
+from rath.expansion import ExpandsStructures
 
 from .service_helpers import with_client
 

@@ -10,11 +10,10 @@ with that class is handed it.
 from typing import Annotated, Any
 
 import pytest
-from fakts import Alias, Fakts, Own, Require, TokenLoader
-from fakts.testing import build_testing_fakts
-
 from arkitekt_spec.declare.app import AppRegistry
 from arkitekt_spec.declare.service import Service, ServiceDefinitionError
+from fakts import Alias, Fakts, Own, Require, TokenLoader
+from fakts.testing import build_testing_fakts
 
 
 class Thing:

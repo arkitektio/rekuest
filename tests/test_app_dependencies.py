@@ -18,12 +18,10 @@ import time
 from typing import Protocol
 
 import pytest
-
 from arkitekt_runtime.types import TaskPolicy
 from dokker import Deployment
 from koil import check_cancelled
 from koil.errors import ThreadCancelledError
-
 
 from .conftest import CONNECT_TIMEOUT, build_fresh_rekuest
 

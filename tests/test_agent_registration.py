@@ -9,18 +9,17 @@ import asyncio
 import warnings
 
 import pytest
-
 from arkitekt_runtime import messages
-from rekuest.agents.backend import SocketAgentBackend
-from rekuest.agents.agent import RekuestAgent
 from arkitekt_runtime.agents.base import BaseAgent
-from arkitekt_spec.declare.agents.errors import AgentException
 from arkitekt_runtime.agents.transport.types import HandshakeParams
+from arkitekt_runtime.local import MemoryAgentTransport
+from arkitekt_spec.declare.agents.errors import AgentException
 from arkitekt_spec.declare.app import AppRegistry
 from arkitekt_spec.declare.catalogs import CatalogWarning
-from rekuest.scalars import Identifier
 
-from arkitekt_runtime.local import MemoryAgentTransport
+from rekuest.agents.agent import RekuestAgent
+from rekuest.agents.backend import SocketAgentBackend
+from rekuest.scalars import Identifier
 
 
 class RecordingTransport(MemoryAgentTransport):
@@ -66,7 +65,11 @@ async def _connected(
     agent = _agent(transport, registry)
     connecting = asyncio.create_task(agent.aconnect(timeout=2.0))
     await _until(lambda: transport.handshakes)
-    transport.feed(messages.Init(agent="agent-1", hash=transport.handshakes[0].declaration.hash, **init))
+    transport.feed(
+        messages.Init(
+            agent="agent-1", hash=transport.handshakes[0].declaration.hash, **init
+        )
+    )
     await connecting
     return agent
 
@@ -125,9 +128,14 @@ async def test_the_declaration_is_spelled_the_way_the_socket_models_are() -> Non
 @pytest.mark.asyncio
 async def test_init_diagnostics_surface_as_catalog_warnings() -> None:
     transport = RecordingTransport()
-    finding = messages.RegistrationDiagnostic(code="unknown_operation", message="'nope' is not provided", path="scan.args.x")
+    finding = messages.RegistrationDiagnostic(
+        code="unknown_operation", message="'nope' is not provided", path="scan.args.x"
+    )
 
-    with pytest.warns(CatalogWarning, match="unknown_operation: 'nope' is not provided \\(at scan.args.x\\)"):
+    with pytest.warns(
+        CatalogWarning,
+        match="unknown_operation: 'nope' is not provided \\(at scan.args.x\\)",
+    ):
         agent = await _connected(transport, diagnostics=[finding])
     await agent.atear_down()
 
@@ -139,9 +147,13 @@ async def test_a_refused_registration_fails_connect_and_tears_down() -> None:
     connecting = asyncio.create_task(agent.aconnect(timeout=2.0))
     await _until(lambda: transport.handshakes)
 
-    transport.feed(messages.ProtocolError(error="Registration refused: does not fit the catalog"))
+    transport.feed(
+        messages.ProtocolError(error="Registration refused: does not fit the catalog")
+    )
 
-    with pytest.raises(AgentException, match="refused this agent's registration.*does not fit"):
+    with pytest.raises(
+        AgentException, match="refused this agent's registration.*does not fit"
+    ):
         await connecting
     assert not transport.connected
     assert agent.registered_agent_id is None
@@ -205,7 +217,15 @@ async def test_collect_drops_the_drawer_and_sends_unshelve() -> None:
 async def test_work_assigned_before_activation_is_held_and_replayed() -> None:
     transport = MemoryAgentTransport()
     agent = _agent(transport)
-    assign = messages.Assign(task="task-1", interface="nope", args={}, user="u", org="o", action="a", implementation="i")
+    assign = messages.Assign(
+        task="task-1",
+        interface="nope",
+        args={},
+        user="u",
+        org="o",
+        action="a",
+        implementation="i",
+    )
 
     agent._provider_ready = False
     await agent.process(assign)
@@ -292,7 +312,9 @@ def test_a_description_changes_the_definition_hash() -> None:
 
     assert canonical() == canonical(description=None)
     assert canonical(description="One thing.") != canonical()
-    assert canonical(description="One thing.") != canonical(description="Another thing.")
+    assert canonical(description="One thing.") != canonical(
+        description="Another thing."
+    )
 
 
 @pytest.mark.asyncio
@@ -327,5 +349,7 @@ async def test_register_carries_the_supervisor_outside_the_declaration() -> None
     assert plain_handshake.declaration is not None and handshake.declaration is not None
     assert plain_handshake.declaration.hash == handshake.declaration.hash
 
-    frame = messages.Register(token="t", spec_version="8.0.0", supervisor="plugin_engine").model_dump()
+    frame = messages.Register(
+        token="t", spec_version="8.0.0", supervisor="plugin_engine"
+    ).model_dump()
     assert frame["supervisor"] == "plugin_engine"

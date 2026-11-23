@@ -38,8 +38,6 @@ from fakts import Alias
 from koil.composition import KoiledModel
 
 
-
-
 class DataLayer(KoiledModel):
     """Implements a S3 DataLayer
 
@@ -73,8 +71,11 @@ class DataLayer(KoiledModel):
         pinned, the public roots otherwise."""
         from arkitekt_spec.declare import tls
 
-        return tls.pinned_context(self.certificates) if self.certificates else tls.default_context()
-
+        return (
+            tls.pinned_context(self.certificates)
+            if self.certificates
+            else tls.default_context()
+        )
 
     @classmethod
     def from_alias(cls, alias: "Alias") -> "DataLayer":

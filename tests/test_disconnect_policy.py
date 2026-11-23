@@ -9,19 +9,18 @@ exactly it: the socket is gone, the stream is not.
 """
 
 import asyncio
-from rekuest.agents.agent import RekuestAgent
 from collections.abc import AsyncIterator
 
 import pytest
-
 from arkitekt_runtime import messages
+from arkitekt_runtime.agents.base import BaseAgent
+from arkitekt_runtime.local import MemoryAgentTransport
 from arkitekt_spec.declare.actors.policy import (
     CancelOnDisconnect,
 )
-from arkitekt_runtime.agents.base import BaseAgent
 from arkitekt_spec.declare.app import AppRegistry
 
-from arkitekt_runtime.local import MemoryAgentTransport
+from rekuest.agents.agent import RekuestAgent
 
 
 @pytest.fixture()
@@ -80,23 +79,7 @@ async def _settle() -> None:
 # -- the policy objects themselves -------------------------------------------------
 
 
-
-
-
-
-
-
 # -- the watchdog ------------------------------------------------------------------
-
-
-
-
-
-
-
-
-
-
 
 
 @pytest.mark.asyncio
@@ -141,16 +124,4 @@ async def test_the_kill_report_is_retained_and_resent_on_reconnect(
     )
 
 
-
-
-
-
-
-
-
-
 # -- the agent-level connection policy ---------------------------------------------
-
-
-
-

@@ -33,9 +33,6 @@ from collections import deque
 from collections.abc import Awaitable, Callable
 from typing import Annotated, Any, ClassVar
 
-from pydantic import Field, PrivateAttr, TypeAdapter
-from rath.task import task_scope
-
 from arkitekt_runtime import messages
 from arkitekt_runtime.agents.backend import LocalAgentBackend
 from arkitekt_runtime.agents.base import BaseAgent
@@ -45,6 +42,9 @@ from arkitekt_runtime.trace import trace_scope
 from arkitekt_spec.base import current_spec_version
 from arkitekt_spec.declare.agents.errors import AgentException
 from arkitekt_spec.declare.agents.types import AppContext
+from pydantic import Field, PrivateAttr, TypeAdapter
+from rath.task import task_scope
+
 from rekuest.agents.backend import SocketAgentBackend
 from rekuest.agents.caller import AgentPostman
 from rekuest.agents.control import SocketControlPlane
@@ -118,7 +118,9 @@ class RekuestAgent(BaseAgent):
     ``Init`` the agent first re-sends what the server may be missing."""
 
     _control_plane: "SocketControlPlane | None" = PrivateAttr(default=None)
-    _retained: dict[RetainedKey, messages.FromAgentMessage] = PrivateAttr(default_factory=dict)
+    _retained: dict[RetainedKey, messages.FromAgentMessage] = PrivateAttr(
+        default_factory=dict
+    )
     """Numbered frames no ``JournalAck`` covered yet, every session's."""
     _session_created: dict[str, float] = PrivateAttr(default_factory=dict)
     """When each session with retained frames was created (orders the resend)."""
@@ -185,7 +187,9 @@ class RekuestAgent(BaseAgent):
         if self._store is None:
             try:
                 self._store = RetainedFrames(
-                    self.journal_path, agent=self.name or "", spec_version=current_spec_version()
+                    self.journal_path,
+                    agent=self.name or "",
+                    spec_version=current_spec_version(),
                 )
             except Exception:  # noqa: BLE001 — an unwritable path must not stop the agent
                 logger.error(
@@ -210,7 +214,9 @@ class RekuestAgent(BaseAgent):
                     frame = _FRAME.validate_json(stored.frame)
                 except Exception:  # noqa: BLE001 — one unreadable frame must not stop the start
                     logger.error(
-                        "Could not read retained frame %s/%s", stored.session_id, stored.pos,
+                        "Could not read retained frame %s/%s",
+                        stored.session_id,
+                        stored.pos,
                         exc_info=True,
                     )
                     continue
@@ -218,7 +224,8 @@ class RekuestAgent(BaseAgent):
                 self._retained.setdefault((stored.session_id, stored.pos), frame)
             if self._retained:
                 logger.info(
-                    "%d frames of earlier runs are waiting to be sent", len(self._retained)
+                    "%d frames of earlier runs are waiting to be sent",
+                    len(self._retained),
                 )
         return self._store
 
@@ -236,12 +243,16 @@ class RekuestAgent(BaseAgent):
         held = [
             frame
             for frame in self._retained.values()
-            if isinstance(frame, messages.Effect) and frame.task == message.task and frame.key and frame.key not in known
+            if isinstance(frame, messages.Effect)
+            and frame.task == message.task
+            and frame.key
+            and frame.key not in known
         ]
         steps = [
             frame.task_step
             for frame in self._retained.values()
-            if getattr(frame, "task", None) == message.task and getattr(frame, "task_step", None)
+            if getattr(frame, "task", None) == message.task
+            and getattr(frame, "task_step", None)
         ]
         # A call it asked for that never reached the server is resent too: the resumed run
         # makes it again like any the server knows.
@@ -259,7 +270,12 @@ class RekuestAgent(BaseAgent):
             update={
                 "effects": [
                     *message.resume.effects,
-                    *(messages.RecordedEffect(key=f.key, effect=f.effect, value=f.value) for f in held),
+                    *(
+                        messages.RecordedEffect(
+                            key=f.key, effect=f.effect, value=f.value
+                        )
+                        for f in held
+                    ),
                 ],
                 "last_step": max([message.resume.last_step, *steps]),
                 "calls": [*message.resume.calls, *calls],
@@ -292,9 +308,16 @@ class RekuestAgent(BaseAgent):
         self._unsent.append((entry.session_id, entry.pos))
         try:
             self._know_session(entry.session_id)
-            self._open_store().add(entry.session_id, entry.pos, message.model_dump_json())
+            self._open_store().add(
+                entry.session_id, entry.pos, message.model_dump_json()
+            )
         except Exception:  # noqa: BLE001 — memory still has it; report the loss of durability
-            logger.error("Could not persist frame %s/%s", entry.session_id, entry.pos, exc_info=True)
+            logger.error(
+                "Could not persist frame %s/%s",
+                entry.session_id,
+                entry.pos,
+                exc_info=True,
+            )
         self._note_state_change(message)
 
     def _journal_ack(self, session: str, pos: int) -> None:
@@ -329,7 +352,9 @@ class RekuestAgent(BaseAgent):
             self._sent.add(key)
             await self.transport.asend(message)
 
-    async def _aresend_retained(self, session: str | None = None, start: int = 0) -> None:
+    async def _aresend_retained(
+        self, session: str | None = None, start: int = 0
+    ) -> None:
         """Send retained frames again, as they were, in ``(session created, pos)`` order:
         earlier sessions' first, then this one's. All of them (after ``Init``), or those of
         ``session`` from ``start`` on (after a gap there). The server skips what it has
@@ -345,8 +370,12 @@ class RekuestAgent(BaseAgent):
         def again(key: RetainedKey) -> bool:
             return session is None or (key[0] == session and key[1] >= start)
 
-        self._sent = {key for key in self._sent if key in self._retained and not again(key)}
-        self._unsent = deque(key for key in self._resend_order() if key not in self._sent)
+        self._sent = {
+            key for key in self._sent if key in self._retained and not again(key)
+        }
+        self._unsent = deque(
+            key for key in self._resend_order() if key not in self._sent
+        )
         await self._apump()
 
     def _retained_terminal_reports(self, task: str) -> list[messages.FromAgentMessage]:
@@ -365,7 +394,9 @@ class RekuestAgent(BaseAgent):
         reports = self._retained_terminal_reports(task)
         if not reports:
             return False
-        logger.warning(f"Duplicate Assign for finished task {task}; re-sending its report")
+        logger.warning(
+            f"Duplicate Assign for finished task {task}; re-sending its report"
+        )
         for report in reports:
             await self.transport.asend(report)
         return True
@@ -381,7 +412,11 @@ class RekuestAgent(BaseAgent):
             interface: registry.structure_registry.state_for(cls).persist
             for interface, cls in registry.state_interface_classes.items()
         }
-        policies = {interface: policy for interface, policy in policies.items() if policy is not None}
+        policies = {
+            interface: policy
+            for interface, policy in policies.items()
+            if policy is not None
+        }
         if not policies:
             return
         if self.journal_path in (None, ":memory:"):
@@ -392,16 +427,22 @@ class RekuestAgent(BaseAgent):
             )
             return
         try:
-            store = PersistedStates(state_store_path(self.journal_path), agent=self.name or "")
+            store = PersistedStates(
+                state_store_path(self.journal_path), agent=self.name or ""
+            )
             stored = store.load()
         except Exception:  # noqa: BLE001 — an unwritable path must not stop the agent
-            logger.error("Could not open the persisted states; they are not persisted", exc_info=True)
+            logger.error(
+                "Could not open the persisted states; they are not persisted",
+                exc_info=True,
+            )
             return
 
         self._state_store = store
         self._state_policies = policies
         self._state_hashes = {
-            interface: schema_hash(self._collected_state_schemas[interface]) for interface in policies
+            interface: schema_hash(self._collected_state_schemas[interface])
+            for interface in policies
         }
         self._previous_states = {}
         for interface, state in stored.items():
@@ -417,7 +458,9 @@ class RekuestAgent(BaseAgent):
 
         self._state_flush_stop = asyncio.Event()
         self._state_flushers = [
-            asyncio.create_task(self._aflush_state_loop(interface, policy, self._state_flush_stop))
+            asyncio.create_task(
+                self._aflush_state_loop(interface, policy, self._state_flush_stop)
+            )
             for interface, policy in policies.items()
             if not isinstance(policy, str)
         ]
@@ -471,9 +514,13 @@ class RekuestAgent(BaseAgent):
         try:
             store.put(state)
         except Exception:  # noqa: BLE001 — the agent runs on; report the loss of durability
-            logger.error("Could not persist the state %s", state.state_name, exc_info=True)
+            logger.error(
+                "Could not persist the state %s", state.state_name, exc_info=True
+            )
 
-    async def _aflush_state_loop(self, interface: str, period: float, stop: asyncio.Event) -> None:
+    async def _aflush_state_loop(
+        self, interface: str, period: float, stop: asyncio.Event
+    ) -> None:
         """Write a state at most once per ``period``. Ends on ``stop``, after a last write,
         and is not cancelled: a write under way is not abandoned, to land after a newer one."""
         while not stop.is_set():
@@ -532,7 +579,9 @@ class RekuestAgent(BaseAgent):
         if self._command_ack_task is None or self._command_ack_task.done():
             self._command_ack_task = asyncio.create_task(self._aack_commands())
 
-    async def _aset_aside(self, command: messages.Command, pos: int, error: Exception) -> None:
+    async def _aset_aside(
+        self, command: messages.Command, pos: int, error: Exception
+    ) -> None:
         """A command arrived intact and could not be handled: say so, and go on.
 
         Letting it end the agent would end every other task with it, and solve nothing:
@@ -541,7 +590,12 @@ class RekuestAgent(BaseAgent):
         agent runs, that task is reported as failed, so nobody waits for it.
         """
         kind = type(command).__name__
-        logger.error("Could not handle command %s (%s); it is set aside", pos, kind, exc_info=error)
+        logger.error(
+            "Could not handle command %s (%s); it is set aside",
+            pos,
+            kind,
+            exc_info=error,
+        )
         ours = (
             messages.Assign,
             messages.Cancel,
@@ -568,7 +622,9 @@ class RekuestAgent(BaseAgent):
         """A gap: send again from ``expected``, or say that it is gone."""
         # What is still held from the position asked for on. An acknowledgement on its way
         # may not have retired the frames before it yet: they are not what this is about.
-        held = sorted(pos for kept, pos in self._retained if kept == session and pos >= expected)
+        held = sorted(
+            pos for kept, pos in self._retained if kept == session and pos >= expected
+        )
         if held and held[0] > expected:
             if (session, expected) in self._skipped:
                 # Said once and asked again: the backend did not take it. Saying it over
@@ -602,7 +658,12 @@ class RekuestAgent(BaseAgent):
                 postman.handle_inquire_response(message)
         elif isinstance(
             message,
-            (messages.AssignResponse, messages.ProbeResponse, messages.StateRevisionResponse, messages.ExecutionEvent),
+            (
+                messages.AssignResponse,
+                messages.ProbeResponse,
+                messages.StateRevisionResponse,
+                messages.ExecutionEvent,
+            ),
         ):
             self._process_caller_message(message)
         elif isinstance(message, messages.ControlResponse):
@@ -657,12 +718,17 @@ class RekuestAgent(BaseAgent):
         if isinstance(postman, AgentPostman):
             postman.fail_probes()
             postman.fail_questions()
-        if self.after_registration is not None and self._after_registration_task is None:
+        if (
+            self.after_registration is not None
+            and self._after_registration_task is None
+        ):
             self._after_registration_task = asyncio.create_task(
                 self._arun_after_registration(self.after_registration)
             )
 
-    async def _arun_after_registration(self, follow_up: Callable[[], Awaitable[None]]) -> None:
+    async def _arun_after_registration(
+        self, follow_up: Callable[[], Awaitable[None]]
+    ) -> None:
         """Run the follow-up once; one that failed is tried again at the next ``Init``."""
         try:
             await follow_up()
@@ -674,7 +740,9 @@ class RekuestAgent(BaseAgent):
         """As the core knows it; and a task whose end is still waiting to be acknowledged has
         ended, however long ago this agent forgot the rest of it."""
         status = super().task_status(task)
-        if status is messages.TaskStatus.UNKNOWN and self._has_retained_terminal_report(task):
+        if status is messages.TaskStatus.UNKNOWN and self._has_retained_terminal_report(
+            task
+        ):
             return messages.TaskStatus.ENDED
         return status
 

@@ -1,33 +1,34 @@
 """Some configuration for pytest"""
 
-from arkitekt_spec.declare.tested import record_tested
 import asyncio
 import logging
+import os
 import socket
+from collections.abc import AsyncGenerator, Awaitable, Callable, Generator
 from dataclasses import dataclass
 from typing import Any
-from collections.abc import AsyncGenerator, Awaitable, Callable, Generator
 from uuid import uuid4
+
 import pytest
+import pytest_asyncio
 from arkitekt_spec.declare.app import AppRegistry
 from arkitekt_spec.declare.structures.registry import StructureRegistry
-from rekuest.client.client import Rekuest, RekuestCaller, RekuestRath
-from rath.links.testing.direct_succeeding_link import DirectSucceedingLink
-from rekuest.agents.agent import RekuestAgent
-from rekuest.agents.retention import default_journal_path
-from rekuest.client.postman import GraphQLPostman
-from rekuest.agents.transport.websocket import WebsocketAgentTransport
-import os
+from arkitekt_spec.declare.tested import record_tested
 from dokker import Deployment, testing
 from dokker.log_watcher import LogWatcher
-from rath.links.auth import ComposedAuthLink
 from rath.links.aiohttp import AIOHttpLink
+from rath.links.auth import ComposedAuthLink
+from rath.links.compose import compose
 from rath.links.graphql_ws import GraphQLWSLink
 from rath.links.split import SplitLink
-from graphql import OperationType
-import pytest_asyncio
-from rath.links.compose import compose
+from rath.links.testing.direct_succeeding_link import DirectSucceedingLink
 
+from graphql import OperationType
+from rekuest.agents.agent import RekuestAgent
+from rekuest.agents.retention import default_journal_path
+from rekuest.agents.transport.websocket import WebsocketAgentTransport
+from rekuest.client.client import Rekuest, RekuestCaller, RekuestRath
+from rekuest.client.postman import GraphQLPostman
 
 # Maximum time (seconds) to wait for an agent to connect and be acknowledged by
 # the server before a test fails. Used with ``app.aconnect(timeout=...)``.
@@ -76,13 +77,17 @@ def _stall_watchdog():  # noqa: ANN202
 
 
 @pytest.fixture(autouse=True, scope="session")
-def _journal_in_session_tmp(tmp_path_factory: pytest.TempPathFactory) -> Generator[None, None, None]:
+def _journal_in_session_tmp(
+    tmp_path_factory: pytest.TempPathFactory,
+) -> Generator[None, None, None]:
     """Agents built by session-scoped fixtures (before any test's own tmp dir exists)
     keep their retained frames in a tmp dir too, never in the repository."""
     from rekuest.agents.retention import JOURNAL_PATH_ENV
 
     with pytest.MonkeyPatch.context() as patch:
-        patch.setenv(JOURNAL_PATH_ENV, str(tmp_path_factory.mktemp("journal") / "journal.db"))
+        patch.setenv(
+            JOURNAL_PATH_ENV, str(tmp_path_factory.mktemp("journal") / "journal.db")
+        )
         yield
 
 
@@ -294,7 +299,9 @@ def most_basic_function(hello: str) -> str:
 
 
 @pytest.fixture(scope="session")
-def deployed_app(integration_ports: dict[str, int]) -> Generator[DeployedRekuest, None, None]:
+def deployed_app(
+    integration_ports: dict[str, int],
+) -> Generator[DeployedRekuest, None, None]:
     """Fixture to deploy the Mikro application with Docker Compose.
 
     This fixture sets up the Mikro application using Docker Compose,
@@ -562,7 +569,9 @@ def build_rekuest_at(
 
 
 @pytest_asyncio.fixture(scope="session")
-async def deployment(integration_ports: dict[str, int]) -> AsyncGenerator[Deployment, None]:
+async def deployment(
+    integration_ports: dict[str, int],
+) -> AsyncGenerator[Deployment, None]:
     """Bring the rekuest stack up once per session and yield the dokker setup.
 
     Tests build their own fresh ``Rekuest`` (fresh ``AppRegistry``, unique
@@ -590,7 +599,10 @@ async def deployment(integration_ports: dict[str, int]) -> AsyncGenerator[Deploy
         await setup.aup()
         await setup.acheck_health()
         # What a release of this client then says it was tested against.
-        record_tested("rekuest", f"http://localhost:{setup.spec.find_service('rekuest').get_port_for_internal(80).published}/ht")
+        record_tested(
+            "rekuest",
+            f"http://localhost:{setup.spec.find_service('rekuest').get_port_for_internal(80).published}/ht",
+        )
         yield setup
 
 

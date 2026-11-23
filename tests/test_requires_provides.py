@@ -20,10 +20,9 @@ import asyncio
 from typing import Annotated
 
 import pytest
-from dokker import Deployment
-
-from arkitekt_spec.declare.annotations import Provides, Requires
 from arkitekt_spec.actions import DescriptorOperator
+from arkitekt_spec.declare.annotations import Provides, Requires
+from dokker import Deployment
 
 from .conftest import CONNECT_TIMEOUT, build_fresh_rekuest
 

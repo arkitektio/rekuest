@@ -74,7 +74,10 @@ def test_the_store_is_path_style_and_carries_the_grant():
     assert store.config["access_key_id"] == "access"
     assert store.config["session_token"] == "session"
     assert store.config["virtual_hosted_style_request"] == "false"
-    assert store.client_options == {"allow_http": "true", "proxy_url": "http://mesh:1055"}
+    assert store.client_options == {
+        "allow_http": "true",
+        "proxy_url": "http://mesh:1055",
+    }
 
 
 def test_an_https_store_without_a_session_token_or_proxy_sets_neither():
@@ -99,7 +102,9 @@ l0hiBf+cli9Wi5pinz2yRynHAGCXoE8=
 
 def test_a_pinned_store_trusts_the_hub_certificate_alone():
     """Per store, not via SSL_CERT_FILE: obstore >= 0.11 never reads it on macOS or Windows."""
-    store = media.create_s3_store("https://localhost:2577", _grant(), certificates=[HUB_CERTIFICATE])
+    store = media.create_s3_store(
+        "https://localhost:2577", _grant(), certificates=[HUB_CERTIFICATE]
+    )
 
     assert store.client_options["root_certificate"] == HUB_CERTIFICATE.strip().encode()
     assert str(store.client_options["disable_system_certificates"]).lower() == "true"

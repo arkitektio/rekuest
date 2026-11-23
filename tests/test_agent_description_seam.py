@@ -12,10 +12,10 @@ never show a description in the UI.
 from typing import Any
 
 import pytest
+from arkitekt_spec.declare.app import AppRegistry
 from fakts import Alias
 from fakts.models import Manifest
 
-from arkitekt_spec.declare.app import AppRegistry
 from rekuest.arkitekt import rekuest_provider
 
 
@@ -75,7 +75,9 @@ class MeshStubFakts(StubFakts):
 
 
 @pytest.mark.asyncio
-async def test_the_agent_socket_goes_through_the_alias_proxy_with_the_run_tokens() -> None:
+async def test_the_agent_socket_goes_through_the_alias_proxy_with_the_run_tokens() -> (
+    None
+):
     fakts = MeshStubFakts(_manifest(None))
     agent = await rekuest_provider.build(fakts, AppRegistry(), {})
 
@@ -86,13 +88,19 @@ async def test_the_agent_socket_goes_through_the_alias_proxy_with_the_run_tokens
 
 
 @pytest.mark.asyncio
-async def test_only_an_app_with_assets_gets_something_to_do_after_registering(tmp_path) -> None:
+async def test_only_an_app_with_assets_gets_something_to_do_after_registering(
+    tmp_path,
+) -> None:
     assert (await _agent(None)).after_registration is None
 
     # A file the app does not hold is fetched by an admin's client: nothing to upload.
     registry = AppRegistry(root=tmp_path)
-    registry.register_asset("robot", source="https://vendor.example/ur5.glb", ref="sha256:" + "9f" * 32)
-    assert (await rekuest_provider.build(StubFakts(_manifest(None)), registry, {})).after_registration is None
+    registry.register_asset(
+        "robot", source="https://vendor.example/ur5.glb", ref="sha256:" + "9f" * 32
+    )
+    assert (
+        await rekuest_provider.build(StubFakts(_manifest(None)), registry, {})
+    ).after_registration is None
 
     (tmp_path / "scope.glb").write_bytes(b"glTF\x02\x00\x00\x00")
     registry.register_asset("scope", "scope.glb")

@@ -101,7 +101,9 @@ def declare_gathered(app: Any) -> None:  # noqa: ANN401 - a FreshApp
 
     async def gathered(atest: Doubler, x: int, task: Task) -> str:  # type: ignore[valid-type]
         """Double two numbers at once on the provider."""
-        first, second = await asyncio.gather(atest.double.acall(x), atest.double.acall(x + 1))
+        first, second = await asyncio.gather(
+            atest.double.acall(x), atest.double.acall(x + 1)
+        )
         await acrash_point()
         return f"{first}:{second}"
 

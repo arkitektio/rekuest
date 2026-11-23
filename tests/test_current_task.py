@@ -14,22 +14,22 @@ reader meets them as decisions.
 import asyncio
 import threading
 import time
-from rekuest.agents.agent import RekuestAgent
 from collections.abc import AsyncGenerator, Generator
-from types import SimpleNamespace
 from concurrent.futures import ThreadPoolExecutor
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
+from arkitekt_runtime import messages
+from arkitekt_runtime.agents.base import BaseAgent
+from arkitekt_runtime.local import MemoryAgentTransport
+from arkitekt_spec.declare.app import AppRegistry
 from koil import unkoil
 from rath.task import current_task, token_of
 
-from arkitekt_runtime import messages
-from arkitekt_runtime.agents.base import BaseAgent
-from arkitekt_spec.declare.app import AppRegistry
+from rekuest.agents.agent import RekuestAgent
 
 from .agent_helpers import run_assignment
-from arkitekt_runtime.local import MemoryAgentTransport
 
 
 def build_agent(name: str = "agent") -> BaseAgent:
@@ -248,7 +248,10 @@ class RecordingRath:
         self.headers: list[Any] = []
 
     async def aquery(
-        self, document: str, variables: dict[str, Any], headers: Any = None  # noqa: ANN401
+        self,
+        document: str,
+        variables: dict[str, Any],
+        headers: Any = None,  # noqa: ANN401
     ) -> Any:  # noqa: ANN401
         self.headers.append(headers)
         return SimpleNamespace(data={"ok": True})

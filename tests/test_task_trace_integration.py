@@ -11,11 +11,10 @@ import secrets
 from typing import Protocol
 
 import pytest
-from dokker import Deployment
-from opentelemetry import context, propagate
-
 from arkitekt_runtime.trace import current_traceparent
 from arkitekt_runtime.types import TaskPolicy
+from dokker import Deployment
+from opentelemetry import context, propagate
 
 from .conftest import CONNECT_TIMEOUT, build_fresh_rekuest
 
@@ -24,7 +23,9 @@ TIMEOUT = 30
 
 @pytest.mark.integration
 @pytest.mark.asyncio(loop_scope="session")
-async def test_a_child_is_handed_the_trace_its_root_was_assigned_in(deployment: Deployment) -> None:
+async def test_a_child_is_handed_the_trace_its_root_was_assigned_in(
+    deployment: Deployment,
+) -> None:
     provider = build_fresh_rekuest(deployment, token="atest_token")
 
     def where_am_i() -> str:
@@ -56,12 +57,18 @@ async def test_a_child_is_handed_the_trace_its_root_was_assigned_in(deployment: 
             traceparent = f"00-{secrets.token_hex(16)}-{secrets.token_hex(8)}-01"
             entered = context.attach(propagate.extract({"traceparent": traceparent}))
             try:
-                answer = await asyncio.wait_for(workflow_app.acall(impl, policy=TaskPolicy.AUTO), TIMEOUT)
+                answer = await asyncio.wait_for(
+                    workflow_app.acall(impl, policy=TaskPolicy.AUTO), TIMEOUT
+                )
             finally:
                 context.detach(entered)
-            assert answer == f"{traceparent} {traceparent}", "the root's agent and the child's agent were both handed the trace, unchanged"
+            assert answer == f"{traceparent} {traceparent}", (
+                "the root's agent and the child's agent were both handed the trace, unchanged"
+            )
 
-            untraced = await asyncio.wait_for(workflow_app.acall(impl, policy=TaskPolicy.AUTO), TIMEOUT)
+            untraced = await asyncio.wait_for(
+                workflow_app.acall(impl, policy=TaskPolicy.AUTO), TIMEOUT
+            )
             assert untraced == "none none", "a task assigned in no trace is in none"
         finally:
             for loop in loops:

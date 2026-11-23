@@ -8,13 +8,12 @@ every client and owns the agent; the provider binds and starts nothing.
 from typing import Annotated, Any
 
 import pytest
-from fakts import Alias, Fakts, Require
-from fakts.testing import build_testing_fakts
-
 from arkitekt_spec.declare.app import AppRegistry
 from arkitekt_spec.declare.errors import RegistryFrozenError
 from arkitekt_spec.declare.provider import ProviderBuildError, ProviderDefinitionError
 from arkitekt_spec.declare.service import ServiceDefinitionError
+from fakts import Alias, Fakts, Require
+from fakts.testing import build_testing_fakts
 
 
 class Client:
@@ -32,7 +31,9 @@ class Agent:
         self.registry = registry
 
     async def aprovide(self, context: Any) -> None: ...  # noqa: ANN401
-    async def aconnect(self, context: Any = None, timeout: float | None = None) -> None: ...  # noqa: ANN401
+    async def aconnect(
+        self, context: Any = None, timeout: float | None = None
+    ) -> None: ...  # noqa: ANN401
     async def aloop(self) -> None: ...
 
 
@@ -117,7 +118,9 @@ async def test_build_names_the_missing_client_and_the_missing_fakts() -> None:
     registry = package()
 
     @registry.provider()
-    def thing_agent(thing: Annotated[Alias, Require("live.test.thing")], client: Client) -> Agent:
+    def thing_agent(
+        thing: Annotated[Alias, Require("live.test.thing")], client: Client
+    ) -> Agent:
         """Serves the thing."""
         return Agent(client, AppRegistry())
 

@@ -10,11 +10,10 @@ import asyncio
 from typing import Any
 
 import pytest
-from dokker import Deployment
-
 from arkitekt_runtime.postmans.errors import PostmanException
 from arkitekt_spec.declare.errors import StatePreconditionFailed
 from arkitekt_spec.declare.task import StateRequirement
+from dokker import Deployment
 
 from .conftest import CONNECT_TIMEOUT, build_fresh_rekuest
 
@@ -51,7 +50,9 @@ def _mode_is(mode: str) -> StateRequirement:
 
 @pytest.mark.integration
 @pytest.mark.asyncio(loop_scope="session")
-async def test_a_call_runs_only_while_the_state_holds_what_it_requires(deployment: Deployment) -> None:
+async def test_a_call_runs_only_while_the_state_holds_what_it_requires(
+    deployment: Deployment,
+) -> None:
     ran.clear()
     provider = build_fresh_rekuest(deployment, token="atest_token")
     _provide_a_stage(provider)
@@ -61,10 +62,16 @@ async def test_a_call_runs_only_while_the_state_holds_what_it_requires(deploymen
         try:
             move = await provider.amy_implementation_at("move")
 
-            assert await provider.acall(move, "fast", state_requires=[_mode_is("idle")]) == "fast"
+            assert (
+                await provider.acall(move, "fast", state_requires=[_mode_is("idle")])
+                == "fast"
+            )
 
             # The stage is fast now: a call that wants it idle is refused before it runs.
-            with pytest.raises(StatePreconditionFailed, match=r"stage/mode EQUALS 'idle' \(actual 'fast'\)"):
+            with pytest.raises(
+                StatePreconditionFailed,
+                match=r"stage/mode EQUALS 'idle' \(actual 'fast'\)",
+            ):
                 await provider.acall(move, "slow", state_requires=[_mode_is("idle")])
             assert ran == ["fast"]
 
@@ -73,7 +80,11 @@ async def test_a_call_runs_only_while_the_state_holds_what_it_requires(deploymen
                 await provider.acall(
                     move,
                     "slow",
-                    state_requires=[StateRequirement(state="stage", path="/speed", operator="EQUALS", value=1)],
+                    state_requires=[
+                        StateRequirement(
+                            state="stage", path="/speed", operator="EQUALS", value=1
+                        )
+                    ],
                 )
 
             # Without requirements, the call runs as always.

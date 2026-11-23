@@ -9,7 +9,6 @@ from rekuest.client.upload.errors import UploadError
 from rekuest.datalayer import DataLayer
 from rekuest.scalars import MediaLike
 
-
 if TYPE_CHECKING:
     from rekuest.api.schema import AssetUploadGrant, MediaUploadGrant
 
@@ -38,7 +37,9 @@ def create_s3_store(
     if proxy:
         client_options["proxy_url"] = proxy
     if certificates:
-        client_options["root_certificate"] = "\n".join(pem.strip() for pem in certificates)
+        client_options["root_certificate"] = "\n".join(
+            pem.strip() for pem in certificates
+        )
         client_options["disable_system_certificates"] = True
 
     store_kwargs: dict[str, object] = {
@@ -61,7 +62,12 @@ async def astore_media_file(
 ) -> str:
     """Put a media file at the key its grant names, and return the grant's store."""
     endpoint_url = await datalayer.get_endpoint_url()
-    store = create_s3_store(endpoint_url, credentials, proxy=datalayer.proxy, certificates=datalayer.certificates)
+    store = create_s3_store(
+        endpoint_url,
+        credentials,
+        proxy=datalayer.proxy,
+        certificates=datalayer.certificates,
+    )
 
     try:
         await obstore.put_async(store, credentials.key, file.value)

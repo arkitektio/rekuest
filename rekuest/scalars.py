@@ -1,22 +1,21 @@
 """This module mirros exactly the scalars used in the  rekuest library."""
 
 import io
-
-from graphql import (
-    DocumentNode,
-    FieldNode,
-    parse,
-    OperationDefinitionNode,
-    OperationType,
-    print_ast,
-    print_source_location,
-    GraphQLSyntaxError,
-)
 from typing import IO, Any
 
 from pydantic import GetCoreSchemaHandler
 from pydantic_core import CoreSchema, core_schema
 
+from graphql import (
+    DocumentNode,
+    FieldNode,
+    GraphQLSyntaxError,
+    OperationDefinitionNode,
+    OperationType,
+    parse,
+    print_ast,
+    print_source_location,
+)
 
 ActionHash = str
 QString = str

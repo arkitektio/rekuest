@@ -1,30 +1,36 @@
 """The base client for rekuest"""
 
-from typing import TypeVar
-from arkitekt_spec.declare.protocol.types import AnyFunction
-from rekuest.client.rath import RekuestRath
-from rekuest.api.schema import Action, AssignMutation, Implementation, RekuestApi, RekuestCallerApi
-from arkitekt_runtime.invoke import AgentTarget
-from arkitekt_runtime.postmans.types import Postman
-from arkitekt_spec.declare.register import WrappedFunction
-from rath.scalars import ID
-from koil import unkoil, unkoil_gen
-from koil.composition import Composition
-from rath.origin import origin_context
-from rath.task import current_task
-from rath.turms.funcs import TOperation
-from pydantic import Field
-
+from collections.abc import AsyncGenerator, Generator
 from typing import (
     Any,
     ClassVar,
+    TypeVar,
 )
-from collections.abc import AsyncGenerator, Generator
-from arkitekt_spec.declare.errors import RootOnlyCallError
-from arkitekt_spec.declare.task import HookInput
+
+from arkitekt_runtime.invoke import AgentTarget
+from arkitekt_runtime.postmans.types import Postman
 from arkitekt_runtime.types import TaskPolicy
-from arkitekt_spec.declare.task import StateRequirement
+from arkitekt_spec.declare.errors import RootOnlyCallError
+from arkitekt_spec.declare.protocol.types import AnyFunction
+from arkitekt_spec.declare.register import WrappedFunction
 from arkitekt_spec.declare.structures.registry import StructureRegistry
+from arkitekt_spec.declare.task import HookInput, StateRequirement
+from koil import unkoil, unkoil_gen
+from koil.composition import Composition
+from pydantic import Field
+from rath.origin import origin_context
+from rath.scalars import ID
+from rath.task import current_task
+from rath.turms.funcs import TOperation
+
+from rekuest.api.schema import (
+    Action,
+    AssignMutation,
+    Implementation,
+    RekuestApi,
+    RekuestCallerApi,
+)
+from rekuest.client.rath import RekuestRath
 
 #: What :meth:`Rekuest.aresolve` accepts: a fetched model, an id, or a function this app
 #: registered. Only the client can turn the last two into the first -- that takes GraphQL.
@@ -50,16 +56,26 @@ class Rekuest(Composition, RekuestApi):
     structure_registry: StructureRegistry = Field(exclude=True)
     """The registry of the run this client belongs to: what its calls (de)serialize with."""
 
-    def _serialize(self, operation: type[TOperation], variables: dict[str, Any]) -> dict[str, Any]:
-        return operation.Arguments(**variables).model_dump(by_alias=True, exclude_unset=True)
+    def _serialize(
+        self, operation: type[TOperation], variables: dict[str, Any]
+    ) -> dict[str, Any]:
+        return operation.Arguments(**variables).model_dump(
+            by_alias=True, exclude_unset=True
+        )
 
-    def execute(self, operation: type[TOperation], variables: dict[str, Any]) -> TOperation:
+    def execute(
+        self, operation: type[TOperation], variables: dict[str, Any]
+    ) -> TOperation:
         """Executes a query or mutation in a blocking way."""
         return unkoil(self.aexecute, operation, variables)
 
-    async def aexecute(self, operation: type[TOperation], variables: dict[str, Any]) -> TOperation:
+    async def aexecute(
+        self, operation: type[TOperation], variables: dict[str, Any]
+    ) -> TOperation:
         """Executes a query or mutation in a non-blocking way."""
-        x = await self.rath.aquery(operation.Meta.document, self._serialize(operation, variables))
+        x = await self.rath.aquery(
+            operation.Meta.document, self._serialize(operation, variables)
+        )
         return operation.model_validate(
             x.data, context=origin_context(client=self, rath=self.rath)
         )
@@ -80,7 +96,6 @@ class Rekuest(Composition, RekuestApi):
             yield operation.model_validate(
                 event.data, context=origin_context(client=self, rath=self.rath)
             )
-
 
     async def aresolve(self, target: "CallTarget") -> Action | Implementation:
         """What to call: an action, an implementation, an action id, or a function
@@ -116,10 +131,14 @@ class RekuestCaller(Rekuest, RekuestCallerApi):
 
     postman: Postman
 
-    __scopes__: ClassVar[tuple[str, ...]] = tuple(sorted({*RekuestApi.__scopes__, *RekuestCallerApi.__scopes__}))
+    __scopes__: ClassVar[tuple[str, ...]] = tuple(
+        sorted({*RekuestApi.__scopes__, *RekuestCallerApi.__scopes__})
+    )
     """What its operations need: the plain client's, and starting tasks at the top level."""
 
-    async def aexecute(self, operation: type[TOperation], variables: dict[str, Any]) -> TOperation:
+    async def aexecute(
+        self, operation: type[TOperation], variables: dict[str, Any]
+    ) -> TOperation:
         """Executes a query or mutation in a non-blocking way; an assign refuses inside a task."""
         if operation is AssignMutation:
             self._refuse_in_task("aassign")
@@ -354,4 +373,3 @@ class RekuestCaller(Rekuest, RekuestCallerApi):
         """Stream a generator action's yields, as a root task, blocking between them (``on_agent`` as in :meth:`acall`)."""
         self._refuse_in_task("iterate")
         return unkoil_gen(self.aiterate, target, *args, on_agent=on_agent, **kwargs)
-
