@@ -8,13 +8,17 @@ CANCELLED state — which we assert by reading it back over GraphQL.
 """
 
 import asyncio
+import contextlib
 import uuid
+from collections.abc import AsyncIterator
+from typing import Any
 
 import pytest
 from arkitekt_runtime.types import TaskEventKind
 from dokker import Deployment
 
 from rekuest.api.schema import Task
+from rekuest.client.session import TopicEvent
 
 from .conftest import CONNECT_TIMEOUT, FreshApp, build_fresh_rekuest
 
@@ -96,14 +100,14 @@ async def test_cancel_awaits_backend_cancelled(deployment: Deployment) -> None:
 
 @pytest.mark.integration
 @pytest.mark.asyncio(loop_scope="session")
-@pytest.mark.parametrize("step", ["_send_assign", "_acatch_up_safely"])
+@pytest.mark.parametrize("step", ["assign_answer", "feed_opened"])
 async def test_a_call_cancelled_before_its_events_stream_cancels_its_task(
     deployment: Deployment, step: str
 ) -> None:
     """The server holds the task before the call reads its events: a cancel then still reaches it.
 
     ``step`` is held up after it is done -- the assign's answer on its way back, or the
-    first read of the task's events -- so the cancel lands exactly there.
+    task's feed just opened on the session -- so the cancel lands exactly there.
     """
     app = build_fresh_rekuest(deployment, token="standalone_token")
 
@@ -117,16 +121,32 @@ async def test_a_call_cancelled_before_its_events_stream_cancels_its_task(
     async with app as app:
         await app.aconnect(timeout=CONNECT_TIMEOUT)
         loop_task = asyncio.create_task(app.aloop())
+
         impl = await app.amy_implementation_at("sleeper")
 
-        done = getattr(app.postman, step)
+        session = app.postman.session
+        if step == "assign_answer":
+            call = session.call
 
-        async def held_up(*args, **kwargs):  # noqa: ANN002, ANN003, ANN202
-            result = await done(*args, **kwargs)
-            await asyncio.sleep(3)
-            return result
+            async def held_up(frame: dict[str, Any]) -> dict[str, Any]:
+                answer = await call(frame)
+                if frame.get("type") == "ASSIGN":
+                    await asyncio.sleep(3)
+                return answer
 
-        object.__setattr__(app.postman, step, held_up)
+            object.__setattr__(session, "call", held_up)
+        else:
+            watching = session.watching
+
+            @contextlib.asynccontextmanager
+            async def held_open(
+                name: str,
+            ) -> AsyncIterator[asyncio.Queue[TopicEvent]]:
+                async with watching(name) as feed:
+                    await asyncio.sleep(3)
+                    yield feed
+
+            object.__setattr__(session, "watching", held_open)
 
         reference = f"cancel-early-{uuid.uuid4().hex[:8]}"
         call_task = asyncio.create_task(

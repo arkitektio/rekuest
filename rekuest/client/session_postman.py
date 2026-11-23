@@ -21,6 +21,7 @@ from arkitekt_runtime.postmans.errors import (
     RootOnlyAssignError,
     StatefulNeedsAgent,
 )
+from arkitekt_runtime.trace import current_traceparent
 from arkitekt_runtime.types import (
     AssignInput,
     ResolvedDependencyInput,
@@ -186,10 +187,12 @@ class SessionPostman(KoiledModel):
             ),
         )
         timeout = cancel_timeout if cancel_timeout is not None else self.cancel_timeout
-        frame: dict[str, Any] = {
-            "type": "ASSIGN",
-            "input": assign_input.model_dump(mode="json", exclude_none=True),
-        }
+        wire_input = assign_input.model_dump(mode="json", exclude_none=True)
+        # Where in a trace the call is made: the server starts the root's trace there.
+        traceparent = current_traceparent()
+        if traceparent is not None:
+            wire_input["traceparent"] = traceparent
+        frame: dict[str, Any] = {"type": "ASSIGN", "input": wire_input}
         if deadman is not None:
             frame["deadman"] = deadman
 
@@ -216,47 +219,59 @@ class SessionPostman(KoiledModel):
         task_id = str(answer["task"])
         handed: set[str] = set()
         ask_after = self.inquire_after if inquire_after is None else inquire_after
-        async with self.session.watching(f"task:{task_id}") as feed:
-            try:
-                loop = asyncio.get_running_loop()
-                heard = loop.time()
-                while True:
-                    wait = None
-                    if ask_after > 0:
-                        wait = max(heard + ask_after - loop.time(), 0.05)
-                    try:
-                        signal = await asyncio.wait_for(feed.get(), timeout=wait)
-                    except TimeoutError:
-                        # Silent for long enough to wonder: is its agent still on it? An
-                        # agent that is not has lost it; the server ends the task, and that
-                        # end arrives on the feed.
-                        await self._aask_about(task_id)
-                        heard = loop.time()
-                        continue
+        # Cancelled while its feed was still opening: the task is the server's already, so
+        # it is cancelled all the same.
+        confirmed = False
+        try:
+            async with self.session.watching(f"task:{task_id}") as feed:
+                try:
+                    loop = asyncio.get_running_loop()
                     heard = loop.time()
-                    if isinstance(signal, Refused):
-                        raise PostmanException(
-                            f"Cannot follow task {task_id}: {signal.error}"
-                        )
-                    items = (
-                        signal.snapshot.get("events", [])
-                        if isinstance(signal, Resync)
-                        else [signal.item]
-                    )
-                    for item in items:
-                        event = event_of(item)
-                        if event.id in handed:
+                    while True:
+                        wait = None
+                        if ask_after > 0:
+                            wait = max(heard + ask_after - loop.time(), 0.05)
+                        try:
+                            signal = await asyncio.wait_for(feed.get(), timeout=wait)
+                        except TimeoutError:
+                            # Silent for long enough to wonder: is its agent still on it? An
+                            # agent that is not has lost it; the server ends the task, and that
+                            # end arrives on the feed.
+                            await self._aask_about(task_id)
+                            heard = loop.time()
                             continue
-                        handed.add(event.id)
-                        yield event
-            except asyncio.CancelledError:
-                # Tell the server to cancel and await the CANCELLED confirmation (and, if
-                # requested, escalate to an interrupt) before re-raising. Bounded by
-                # `cancel_timeout`, so cancelling can never hang.
-                await self._confirm_cancellation(
-                    task_id, feed, escalate_to_interrupt, timeout
-                )
-                raise
+                        heard = loop.time()
+                        if isinstance(signal, Refused):
+                            raise PostmanException(
+                                f"Cannot follow task {task_id}: {signal.error}"
+                            )
+                        items = (
+                            signal.snapshot.get("events", [])
+                            if isinstance(signal, Resync)
+                            else [signal.item]
+                        )
+                        for item in items:
+                            event = event_of(item)
+                            if event.id in handed:
+                                continue
+                            handed.add(event.id)
+                            yield event
+                except asyncio.CancelledError:
+                    # Tell the server to cancel and await the CANCELLED confirmation (and, if
+                    # requested, escalate to an interrupt) before re-raising. Bounded by
+                    # `cancel_timeout`, so cancelling can never hang.
+                    confirmed = True
+                    await self._confirm_cancellation(
+                        task_id, feed, escalate_to_interrupt, timeout
+                    )
+                    raise
+        except asyncio.CancelledError:
+            if not confirmed:
+                async with self.session.watching(f"task:{task_id}") as feed:
+                    await self._confirm_cancellation(
+                        task_id, feed, escalate_to_interrupt, timeout
+                    )
+            raise
 
     async def _assigned_despite_cancel(
         self, assigning: asyncio.Future[dict[str, Any]], timeout: float
