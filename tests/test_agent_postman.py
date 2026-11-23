@@ -6,6 +6,7 @@ by the integration test ``tests/test_agent_caller.py``.
 """
 
 import asyncio
+from collections.abc import Callable
 
 import pytest
 from arkitekt_runtime import messages
@@ -44,7 +45,7 @@ def _probe_call(**kwargs: object) -> dict:
     return base
 
 
-async def _until(predicate, timeout: float = 1.0) -> None:
+async def _until(predicate: Callable[[], object], timeout: float = 1.0) -> None:
     """Yield control until ``predicate()`` is truthy (bounded)."""
     loop = asyncio.get_event_loop()
     deadline = loop.time() + timeout
@@ -347,7 +348,7 @@ async def test_concurrent_calls_do_not_cross_deliver() -> None:
     out_a: list[CallerTaskEvent] = []
     out_b: list[CallerTaskEvent] = []
 
-    async def consume(call, out) -> None:
+    async def consume(call: dict, out: list[CallerTaskEvent]) -> None:
         async for ev in pm.aassign(**call):
             out.append(ev)
 

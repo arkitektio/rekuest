@@ -36,7 +36,7 @@ async def acrash_point() -> None:
     """:func:`crash_point` for async code: it must not block the event loop."""
     marker = os.environ.get(CRASH_MARKER_ENV)
     if marker:
-        Path(marker).write_text("reached")
+        await asyncio.to_thread(Path(marker).write_text, "reached")
         await asyncio.sleep(3600)
 
 

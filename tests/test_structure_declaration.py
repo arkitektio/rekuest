@@ -5,6 +5,7 @@ An identifier is a wire contract with the rekuest server, which only accepts
 server is involved.
 """
 
+from collections.abc import Sequence
 from typing import Any
 
 import pytest
@@ -15,9 +16,13 @@ from arkitekt_spec.declare.structures.errors import (
     StructureRegistryError,
 )
 from arkitekt_spec.declare.structures.registry import StructureRegistry
-from arkitekt_spec.declare.structures.types import is_valid_identifier
+from arkitekt_spec.declare.structures.types import (
+    FullFilledStructure,
+    is_valid_identifier,
+)
 from arkitekt_spec.declare.structures.utils import id_shrink
 from rath.expansion import ExpandsStructures
+from rath.scalars import ID
 
 from rekuest.arkitekt import registry as rekuest_registry
 
@@ -288,7 +293,7 @@ async def test_a_materialized_blok_is_a_structure_under_the_identifier_orkestrat
         def __init__(self) -> None:
             self.asked: list[str] = []
 
-        async def aget_materialized_blok(self, id: str) -> Any:
+        async def aget_materialized_blok(self, id: str) -> str:
             self.asked.append(id)
             return id
 
@@ -335,7 +340,7 @@ async def test_an_agent_is_a_structure_described_by_its_supervisor() -> None:
         def __init__(self) -> None:
             self.asked: list[str] = []
 
-        async def aget_agent(self, id: str) -> Any:
+        async def aget_agent(self, id: str) -> str:
             self.asked.append(id)
             return id
 
@@ -358,14 +363,16 @@ class BatchingThingClient(ThingClient):
         self.answer_short = answer_short
         self.calls: list[list[str]] = []
 
-    async def aexpand_many(self, identifier: str, ids: Any) -> list[Any]:
+    async def aexpand_many(
+        self, identifier: str, ids: Sequence[ID]
+    ) -> list[Thing | None]:
         self.calls.append(list(ids))
         if self.answer_short:
             return []
         return [None if id == "missing" else Thing(id) for id in ids]
 
 
-def bound_structure(client: Any) -> Any:
+def bound_structure(client: ThingClient) -> FullFilledStructure:
     registry = things_registry().structure_registry
     return registry.bound({"things": client}).get_fullfilled_structure("@things/thing")
 

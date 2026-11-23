@@ -7,6 +7,8 @@ how a refusal fails ``aconnect``, and the shelve round trips an agent makes afte
 
 import asyncio
 import warnings
+from collections.abc import Callable
+from typing import Any
 
 import pytest
 from arkitekt_runtime import messages
@@ -37,7 +39,7 @@ class RecordingTransport(MemoryAgentTransport):
         await super().aconnect()
 
 
-async def _until(predicate, timeout: float = 2.0) -> None:
+async def _until(predicate: Callable[[], object], timeout: float = 2.0) -> None:
     loop = asyncio.get_event_loop()
     deadline = loop.time() + timeout
     while not predicate():
@@ -59,7 +61,7 @@ def _agent(
 async def _connected(
     transport: RecordingTransport,
     registry: AppRegistry | None = None,
-    **init,
+    **init: Any,
 ) -> RekuestAgent:
     """An agent through ``aconnect``: the backend acknowledged what ``Register`` declared."""
     agent = _agent(transport, registry)

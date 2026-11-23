@@ -39,10 +39,10 @@ query History($id: ID!) {
 
 async def _wait_for(path: Path, what: str, log: Path) -> None:
     for _ in range(int(WORKER_TIMEOUT / 0.25)):
-        if path.exists():
+        if await asyncio.to_thread(path.exists):
             return
         await asyncio.sleep(0.25)
-    tail = "\n".join(log.read_text().splitlines()[-40:])
+    tail = "\n".join((await asyncio.to_thread(log.read_text)).splitlines()[-40:])
     raise AssertionError(
         f"timed out waiting for {what}; the worker's log ends:\n{tail}"
     )

@@ -8,6 +8,7 @@ each back and holds it to the rules of its kind. A refusal never stops the app: 
 bloks are registered either way, and a viewer shows the asset as missing.
 """
 
+import asyncio
 import hashlib
 import logging
 from collections.abc import Iterable
@@ -38,7 +39,7 @@ async def _aupload(
     if StoredAssetQuery.model_validate(stored.data).asset is not None:
         return False
 
-    data = path.read_bytes()
+    data = await asyncio.to_thread(path.read_bytes)
     if "sha256:" + hashlib.sha256(data).hexdigest() != asset.ref:
         raise UploadError(f"{path} changed since it was registered as '{asset.name}'")
 

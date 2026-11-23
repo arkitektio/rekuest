@@ -1,7 +1,8 @@
 import asyncio
+from collections.abc import Awaitable, Callable
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, TypeVar
 
 from pydantic import Field
 from rath.links.parsing import ParsingLink
@@ -19,9 +20,14 @@ if TYPE_CHECKING:
     )
 
 
+T = TypeVar("T")
+
+
 async def apply_recursive(
-    func, obj, typeguard: type[Any] | tuple[type[Any], ...]
-) -> Any:  # type: ignore
+    func: Callable[[T], Awaitable[object]],
+    obj: object,
+    typeguard: type[T] | tuple[type[T], ...],
+) -> object:
     """
     Recursively applies an asynchronous function to elements in a nested structure.
 
@@ -36,23 +42,23 @@ async def apply_recursive(
     if isinstance(
         obj, dict
     ):  # If obj is a dictionary, recursively apply to each key-value pair
-        return {k: await apply_recursive(func, v, typeguard) for k, v in obj.items()}  # type: ignore
+        return {k: await apply_recursive(func, v, typeguard) for k, v in obj.items()}
     elif isinstance(obj, list):  # If obj is a list, recursively apply to each element
         return await asyncio.gather(
             *[apply_recursive(func, elem, typeguard) for elem in obj]
-        )  # type: ignore
+        )
     elif isinstance(
         obj, tuple
     ):  # If obj is a tuple, recursively apply to each element and convert back to tuple
         return tuple(
             await asyncio.gather(
                 *[apply_recursive(func, elem, typeguard) for elem in obj]
-            )  # type: ignore
+            )
         )
     elif isinstance(obj, typeguard):
-        return await func(obj)  # type: ignore
+        return await func(obj)
     else:  # If obj is not a dict, list, tuple, or matching the typeguard, return it as is
-        return obj  # type: ignore
+        return obj
 
 
 class UploadLink(ParsingLink):
@@ -74,7 +80,7 @@ class UploadLink(ParsingLink):
     executor: ThreadPoolExecutor = Field(
         default_factory=lambda: ThreadPoolExecutor(max_workers=4), exclude=True
     )
-    _executor_session: Any = None
+    _executor_session: ThreadPoolExecutor | None = None
 
     async def __aenter__(self) -> "UploadLink":
         """Enter the context manager for the UploadLink"""
@@ -130,11 +136,14 @@ class UploadLink(ParsingLink):
             Operation: _description_
         """
 
-        operation.variables = await apply_recursive(
+        variables = await apply_recursive(
             partial(self.aupload_mediafile, datalayer=self.datalayer),
             operation.variables,
             (MediaLike),
         )
+        # A dict in is a dict out: only the MediaLike leaves are replaced.
+        assert isinstance(variables, dict)
+        operation.variables = variables
         return operation
 
     async def adisconnect(self) -> None:

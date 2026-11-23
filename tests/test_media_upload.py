@@ -34,11 +34,18 @@ def _file(content: bytes) -> MediaLike:
 
 
 @pytest.mark.asyncio
-async def test_the_file_lands_at_the_granted_key_and_the_store_is_returned(monkeypatch):
+async def test_the_file_lands_at_the_granted_key_and_the_store_is_returned(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     store = MemoryStore()
-    seen = {}
+    seen: dict[str, str | None] = {}
 
-    def fake_store(endpoint_url, credentials, proxy=None, certificates=None):
+    def fake_store(
+        endpoint_url: str,
+        credentials: MediaUploadGrant,
+        proxy: str | None = None,
+        certificates: list[str] | None = None,
+    ) -> MemoryStore:
         seen["endpoint_url"], seen["proxy"] = endpoint_url, proxy
         return store
 
@@ -53,7 +60,7 @@ async def test_the_file_lands_at_the_granted_key_and_the_store_is_returned(monke
 
 
 @pytest.mark.asyncio
-async def test_a_failed_put_is_an_upload_error(monkeypatch):
+async def test_a_failed_put_is_an_upload_error(monkeypatch: pytest.MonkeyPatch) -> None:
     class Refusing:
         pass
 
@@ -65,7 +72,7 @@ async def test_a_failed_put_is_an_upload_error(monkeypatch):
         )
 
 
-def test_the_store_is_path_style_and_carries_the_grant():
+def test_the_store_is_path_style_and_carries_the_grant() -> None:
     store = media.create_s3_store(
         "http://minio:9000", _grant(), proxy="http://mesh:1055"
     )
@@ -80,7 +87,7 @@ def test_the_store_is_path_style_and_carries_the_grant():
     }
 
 
-def test_an_https_store_without_a_session_token_or_proxy_sets_neither():
+def test_an_https_store_without_a_session_token_or_proxy_sets_neither() -> None:
     store = media.create_s3_store("https://s3.example.org", _grant(session_token=""))
 
     assert "session_token" not in store.config
@@ -100,7 +107,7 @@ l0hiBf+cli9Wi5pinz2yRynHAGCXoE8=
 """A self-signed hub certificate, public half only: what a pinned alias carries."""
 
 
-def test_a_pinned_store_trusts_the_hub_certificate_alone():
+def test_a_pinned_store_trusts_the_hub_certificate_alone() -> None:
     """Per store, not via SSL_CERT_FILE: obstore >= 0.11 never reads it on macOS or Windows."""
     store = media.create_s3_store(
         "https://localhost:2577", _grant(), certificates=[HUB_CERTIFICATE]

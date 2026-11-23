@@ -6,7 +6,7 @@ nothing another agent's app does can reach them.
 """
 
 import asyncio
-from typing import Any
+from typing import Any, TypeVar
 
 import pytest
 from arkitekt_runtime import messages
@@ -18,6 +18,8 @@ from rath.expansion import ExpandsStructures
 
 from .agent_helpers import run_assignment
 from .service_helpers import with_client
+
+T = TypeVar("T")
 
 
 class Thing:
@@ -49,7 +51,7 @@ class FakeApp:
         )
         self.services = self.clients
 
-    def get(self, key: type) -> Any:
+    def get(self, key: type[T]) -> T | None:
         return next((s for s in self.clients.values() if isinstance(s, key)), None)
 
 

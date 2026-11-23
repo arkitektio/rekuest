@@ -14,13 +14,14 @@ fixture) and a working executor path.
 """
 
 import asyncio
+from collections.abc import AsyncGenerator
 from typing import Any, Protocol
 
 import pytest
 from arkitekt_runtime.types import TaskPolicy
 from dokker import Deployment
 
-from rekuest.agents.caller import AgentPostman
+from rekuest.agents.caller import AgentPostman, CallerTaskEvent
 
 from .conftest import CONNECT_TIMEOUT, build_fresh_rekuest
 
@@ -39,7 +40,9 @@ async def test_actor_internal_dependency_call_uses_agent(
     delegated: list[dict[str, Any]] = []
     original_aassign = AgentPostman.aassign
 
-    def spy_aassign(self: AgentPostman, **kwargs: Any):
+    def spy_aassign(
+        self: AgentPostman, **kwargs: Any
+    ) -> AsyncGenerator[CallerTaskEvent, None]:
         delegated.append(kwargs)
         return original_aassign(self, **kwargs)
 

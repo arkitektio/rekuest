@@ -7,7 +7,7 @@ requests attributable is the ambient task, which the actor sets around the body.
 """
 
 import asyncio
-from typing import Annotated, Any, Optional, Protocol
+from typing import Annotated, Any, Optional, Protocol, TypeVar
 
 import pytest
 from arkitekt_runtime import messages
@@ -24,6 +24,8 @@ from rekuest.agents.agent import RekuestAgent
 
 from .agent_helpers import run_assignment
 from .service_helpers import with_client
+
+T = TypeVar("T")
 
 
 class FakeClient:
@@ -58,7 +60,7 @@ class FakeApp:
         self.clients = {type(c).__name__: c for c in clients}
         self.services = self.clients
 
-    def get(self, key: type) -> Any:
+    def get(self, key: type[T]) -> T | None:
         return next((s for s in self.services.values() if isinstance(s, key)), None)
 
 
@@ -98,7 +100,7 @@ def test_a_client_is_what_a_declared_service_returns_seen_through_optional_and_a
 ):
     structures = registry_with_clients().structure_registry
     assert structures.is_client(FakeClient)
-    assert structures.is_client(Optional[FakeClient])  # noqa: UP007 -- the Optional spelling is what is tested
+    assert structures.is_client(Optional[FakeClient])  # noqa: UP045 -- the Optional spelling is what is tested
     assert structures.is_client(FakeClient | None)
     assert structures.is_client(Annotated[FakeClient, "doc"])
     assert not structures.is_client(FakeClient | OtherClient)
@@ -112,9 +114,9 @@ def test_a_client_is_what_a_declared_service_returns_seen_through_optional_and_a
 
 @pytest.mark.parametrize(
     "annotation",
-    [FakeClient, Optional[FakeClient], Annotated[FakeClient, "doc"]],  # noqa: UP007 -- the Optional spelling is what is tested
+    [FakeClient, Optional[FakeClient], Annotated[FakeClient, "doc"]],  # noqa: UP045 -- the Optional spelling is what is tested
 )
-def test_client_parameter_is_not_a_port(annotation: Any) -> None:
+def test_client_parameter_is_not_a_port(annotation: object) -> None:
     def takes_client(x: int, client) -> int:  # noqa: ANN001
         """Takes a client."""
         return x
@@ -176,7 +178,9 @@ async def test_each_task_attributes_its_own_calls() -> None:
         run_assignment(agents[2], assign("who")),
     )
     assert results == [{"return0": "t1"}, {"return0": "t2"}, {"return0": "None"}]
-    assert app.get(FakeClient).token is None, "the shared client is never mutated"
+    shared = app.get(FakeClient)
+    assert shared is not None
+    assert shared.token is None, "the shared client is never mutated"
     assert current_task.get() is None, "no task outlives its assignment"
 
 

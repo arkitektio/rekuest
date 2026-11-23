@@ -44,6 +44,8 @@ class Backend(GraphQLPostman):
     )
     _assigned: asyncio.Event = PrivateAttr(default_factory=asyncio.Event)
     _answer_assign: asyncio.Event = PrivateAttr(default_factory=asyncio.Event)
+    _fed: asyncio.Event = PrivateAttr(default_factory=asyncio.Event)
+    """Set each time the feed hands the postman an event."""
     _reads: list[str] = PrivateAttr(default_factory=lambda: [])
     _reads_fail: bool = PrivateAttr(default=False)
     _task_ids: list[str] = PrivateAttr(default_factory=lambda: ["t1", "t2"])
@@ -58,7 +60,9 @@ class Backend(GraphQLPostman):
 
     async def _feed(self) -> AsyncIterator[TaskChangeEvent]:
         while True:
-            yield await self._feed_queue.get()
+            event = await self._feed_queue.get()
+            self._fed.set()
+            yield event
 
     async def _aread_events(self, task_id: str) -> list[TaskEventChange]:
         self._reads.append(task_id)
@@ -137,8 +141,7 @@ async def test_an_event_the_feed_delivered_first_stays_behind_the_ones_it_missed
         backend.reports(_event(1), on_feed=False)
         backend.reports(_event(2), on_feed=False)
         backend.reports(_event(3), on_feed=True)
-        while not backend._feed_queue.empty():
-            await asyncio.sleep(0)
+        await backend._fed.wait()
         backend._answer_assign.set()
 
         backend.reports(_event(4, TaskEventKind.COMPLETED), on_feed=True)

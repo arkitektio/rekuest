@@ -9,7 +9,7 @@ import uuid
 import warnings
 from collections.abc import AsyncIterator, Awaitable, Callable
 from types import TracebackType
-from typing import Self, cast
+from typing import TypeVar, cast
 
 import certifi
 import pydantic
@@ -99,6 +99,10 @@ class _Closed:
 
 
 CLOSED = _Closed()
+
+WebsocketAgentTransportT = TypeVar(
+    "WebsocketAgentTransportT", bound="WebsocketAgentTransport"
+)
 
 
 class WebsocketAgentTransport(AgentTransport):
@@ -232,7 +236,9 @@ class WebsocketAgentTransport(AgentTransport):
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    async def __aenter__(self) -> Self:
+    async def __aenter__(
+        self: WebsocketAgentTransportT,
+    ) -> WebsocketAgentTransportT:
         """Initialize per-session state used by the transport context.
 
         This prepares the inbound and outbound queues and the pending-future
@@ -596,13 +602,13 @@ class WebsocketAgentTransport(AgentTransport):
                 policy = self.connection_policy
                 if retry >= policy.max_retries:
                     logger.error("Max retries reached. Giving up")
-                    raise DefiniteConnectionFail("Exceeded Number of Retries")
+                    raise DefiniteConnectionFail("Exceeded Number of Retries") from e
                 if self._is_flapping(policy):
                     logger.error("Connection is flapping. Giving up")
                     raise DefiniteConnectionFail(
                         f"Connection dropped {len(self._drop_times)} times within "
                         f"{policy.flap_window}s"
-                    )
+                    ) from e
 
                 delay = policy.backoff.delay_for(retry)
                 logger.info(f"Waiting for some time before retrying: {delay}")

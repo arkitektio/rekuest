@@ -5,9 +5,10 @@ registry -- plus the clients the run built, by annotation. A run builds it after
 every client and owns the agent; the provider binds and starts nothing.
 """
 
-from typing import Annotated, Any
+from typing import Annotated
 
 import pytest
+from arkitekt_spec.declare.agents.types import AppContext
 from arkitekt_spec.declare.app import AppRegistry
 from arkitekt_spec.declare.errors import RegistryFrozenError
 from arkitekt_spec.declare.provider import ProviderBuildError, ProviderDefinitionError
@@ -30,10 +31,10 @@ class Agent:
         self.client = client
         self.registry = registry
 
-    async def aprovide(self, context: Any) -> None: ...  # noqa: ANN401
+    async def aprovide(self, context: AppContext) -> None: ...
     async def aconnect(
-        self, context: Any = None, timeout: float | None = None
-    ) -> None: ...  # noqa: ANN401
+        self, context: AppContext = None, timeout: float | None = None
+    ) -> None: ...
     async def aloop(self) -> None: ...
 
 

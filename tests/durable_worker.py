@@ -26,7 +26,9 @@ async def main() -> None:
     DECLARE[os.environ.get("DURABLE_DECLARE", "pipeline")](app)
     async with app:
         await app.aconnect(timeout=CONNECT_TIMEOUT)
-        Path(os.environ["DURABLE_READY"]).write_text("connected")
+        await asyncio.to_thread(
+            Path(os.environ["DURABLE_READY"]).write_text, "connected"
+        )
         await app.aloop()
 
 

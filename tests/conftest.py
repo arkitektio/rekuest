@@ -6,11 +6,13 @@ import os
 import socket
 from collections.abc import AsyncGenerator, Awaitable, Callable, Generator
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
 import pytest
 import pytest_asyncio
+from arkitekt_spec.declare.agents.types import AppContext
 from arkitekt_spec.declare.app import AppRegistry
 from arkitekt_spec.declare.structures.registry import StructureRegistry
 from arkitekt_spec.declare.tested import record_tested
@@ -92,7 +94,7 @@ def _journal_in_session_tmp(
 
 
 @pytest.fixture(autouse=True)
-def _journal_in_tmp(tmp_path: Any, monkeypatch: pytest.MonkeyPatch) -> None:
+def _journal_in_tmp(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Every test's agents keep their retained frames in its own tmp dir: never in the
     repository, and never a backlog of frames an earlier test left unacknowledged."""
     from rekuest.agents.retention import JOURNAL_PATH_ENV
@@ -447,7 +449,7 @@ class FreshApp:
 
     async def aconnect(
         self,
-        context: Any | None = None,
+        context: AppContext | None = None,
         *,
         force: bool | None = None,
         timeout: float | None = None,

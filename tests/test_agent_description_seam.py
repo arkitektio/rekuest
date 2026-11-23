@@ -9,13 +9,14 @@ testable without it -- which is exactly why it is worth pinning here: a typo in
 never show a description in the UI.
 """
 
-from typing import Any
+from pathlib import Path
 
 import pytest
 from arkitekt_spec.declare.app import AppRegistry
 from fakts import Alias
 from fakts.models import Manifest
 
+from rekuest.agents.agent import RekuestAgent
 from rekuest.arkitekt import rekuest_provider
 
 
@@ -41,7 +42,7 @@ def _manifest(description: str | None) -> Manifest:
     )
 
 
-async def _agent(description: str | None) -> Any:
+async def _agent(description: str | None) -> RekuestAgent:
     return await rekuest_provider.build(
         StubFakts(_manifest(description)), AppRegistry(), {}
     )
@@ -89,7 +90,7 @@ async def test_the_agent_socket_goes_through_the_alias_proxy_with_the_run_tokens
 
 @pytest.mark.asyncio
 async def test_only_an_app_with_assets_gets_something_to_do_after_registering(
-    tmp_path,
+    tmp_path: Path,
 ) -> None:
     assert (await _agent(None)).after_registration is None
 

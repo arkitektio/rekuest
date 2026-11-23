@@ -9,7 +9,7 @@ the recursive `_expand` helpers dropped the app, which nested ports exercise.
 
 import asyncio
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, TypeVar
 
 import pytest
 from arkitekt_runtime.agents.base import BaseAgent
@@ -22,6 +22,8 @@ from rath.expansion import ExpandsStructures
 from .agent_helpers import run_assignment
 from .service_helpers import with_client
 from .test_service_client_injection import assign
+
+T = TypeVar("T")
 
 
 class Thing:
@@ -84,10 +86,10 @@ class App:
 
     def __init__(self, *clients: Any) -> None:
         # Keyed by service name: what a registry is bound with.
-        self.clients = {"things": c for c in clients}
+        self.clients = {"things": clients[-1]} if clients else {}
         self.services = self.clients
 
-    def get(self, key: type) -> Any:
+    def get(self, key: type[T]) -> T | None:
         return next((c for c in self.clients.values() if isinstance(c, key)), None)
 
 

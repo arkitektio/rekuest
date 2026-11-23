@@ -14,10 +14,12 @@ import pytest
 from arkitekt_runtime.types import TaskEventKind
 from dokker import Deployment
 
-from .conftest import CONNECT_TIMEOUT, build_fresh_rekuest
+from rekuest.api.schema import Task
+
+from .conftest import CONNECT_TIMEOUT, FreshApp, build_fresh_rekuest
 
 
-async def _find_task(client, reference: str):  # noqa: ANN001
+async def _find_task(client: FreshApp, reference: str) -> Task | None:
     """Return the task with ``reference`` from the backend, or ``None``."""
     for task in await client.arequests():
         if task.reference == reference:

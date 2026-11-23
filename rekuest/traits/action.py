@@ -31,6 +31,11 @@ class Callable(ContextBound, KoiledModel):
     the origin is simply dropped. ``tests/test_action_trait.py`` pins the order.
     """
 
+    if typing.TYPE_CHECKING:
+        # The generated action models this trait is mixed into declare it; a
+        # class-body annotation here would make it a field of the trait itself.
+        kind: ActionKind
+
     def get_action_kind(self) -> str:
         """Get the kind of the action.
         Returns:
@@ -71,7 +76,7 @@ class Callable(ContextBound, KoiledModel):
         *args: typing.Any,
         on_agent: "AgentTarget | None" = None,
         **kwargs: typing.Any,
-    ) -> typing.Any:
+    ) -> typing.Any:  # noqa: ANN401 -- whatever the action returns
         """Call this action, through the client it was fetched with."""
         if self.get_action_kind() == ActionKind.GENERATOR:
             logger.warning(
@@ -98,7 +103,7 @@ class Callable(ContextBound, KoiledModel):
         *args: typing.Any,
         on_agent: "AgentTarget | None" = None,
         **kwargs: typing.Any,
-    ) -> typing.Any:
+    ) -> typing.Any:  # noqa: ANN401 -- whatever the action returns
         """Call this action, through the client it was fetched with."""
         assert self.get_action_kind() == ActionKind.FUNCTION, (
             "Action kind must be FUNCTION to use acall."
@@ -112,7 +117,7 @@ class Callable(ContextBound, KoiledModel):
         *args: typing.Any,
         on_agent: "AgentTarget | None" = None,
         **kwargs: typing.Any,
-    ) -> typing.Any:
+    ) -> typing.Any:  # noqa: ANN401 -- whatever the action returns
         """Call the action, or stream it if it is a generator."""
         if self.get_action_kind() == ActionKind.GENERATOR:
             return self.iterate(*args, on_agent=on_agent, **kwargs)

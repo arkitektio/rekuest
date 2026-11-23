@@ -29,7 +29,7 @@ from rath.task import current_task, token_of
 
 from rekuest.agents.agent import RekuestAgent
 
-from .agent_helpers import run_assignment
+from .agent_helpers import run_assignment, until_sent
 
 
 def build_agent(name: str = "agent") -> BaseAgent:
@@ -117,11 +117,7 @@ async def test_a_generator_action_sees_its_task_on_every_yield(func: Any) -> Non
     # `run_assignment` returns at the first Yield; wait for the whole stream.
     await run_assignment(agent, assign(func.__name__, token="t1"))
 
-    async def until_completed() -> None:
-        while not transport.of_type(messages.Completed):
-            await asyncio.sleep(0.01)
-
-    await asyncio.wait_for(until_completed(), timeout=5.0)
+    await until_sent(transport, messages.Completed)
 
     seen = [y.returns["return0"] for y in transport.of_type(messages.Yield)]
     assert seen == ["t1", "t1", "t1"], "the task must hold across yields"
@@ -185,13 +181,7 @@ async def test_a_failed_assignment_still_unwinds_the_task() -> None:
 
     await asyncio.wait_for(drive_one(), timeout=2.0)
 
-    async def until_failed() -> None:
-        while not (
-            transport.of_type(messages.Critical) or transport.of_type(messages.Failed)
-        ):
-            await asyncio.sleep(0.01)
-
-    await asyncio.wait_for(until_failed(), timeout=5.0)
+    await until_sent(transport, messages.Critical, messages.Failed)
     assert current_task.get() is None, "the task outlived a failed assignment"
 
 

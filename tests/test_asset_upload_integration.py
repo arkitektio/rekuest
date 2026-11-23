@@ -80,7 +80,8 @@ async def test_registered_assets_are_stored_after_the_app_registered(
         loop = asyncio.create_task(app.aloop())
         try:
             async with asyncio.timeout(30):
-                while not all([await app.astored_asset(ref) for ref in refs.values()]):
+                # Polling the server: nothing tells the test when the upload lands.
+                while not all([await app.astored_asset(ref) for ref in refs.values()]):  # noqa: ASYNC110
                     await asyncio.sleep(0.2)
         finally:
             loop.cancel()

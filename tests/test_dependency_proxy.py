@@ -141,7 +141,7 @@ async def test_a_name_that_is_not_a_declared_action_is_an_attribute_error() -> N
     lab = proxies["lab"]
 
     with pytest.raises(AttributeError, match="measure"):
-        lab.nope
+        _ = lab.nope
     assert not hasattr(lab, "nope")
     assert hasattr(lab, "measure")
     assert dir(lab) == ["ameasure", "measure"]

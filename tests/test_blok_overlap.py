@@ -12,6 +12,7 @@ from arkitekt_spec.declare.definition.dependencies import (
     build_state_dependency_input,
 )
 from arkitekt_spec.declare.definition.match import build_port_match, build_port_matches
+from arkitekt_spec.declare.structures.registry import StructureRegistry
 
 
 def test_build_port_match_preserves_nested_shape() -> None:
@@ -44,7 +45,7 @@ def test_build_port_matches_returns_none_for_empty_ports() -> None:
 
 
 def test_declared_action_and_blok_registry_build_same_action_dependency(
-    simple_registry,
+    simple_registry: StructureRegistry,
 ) -> None:
     class DemoProtocol:
         def run(self, item: str) -> str:
@@ -80,7 +81,7 @@ def test_declared_action_and_blok_registry_build_same_action_dependency(
 
 
 def test_declared_state_and_blok_registry_build_same_state_dependency(
-    simple_registry,
+    simple_registry: StructureRegistry,
 ) -> None:
     class DemoState:
         item: str

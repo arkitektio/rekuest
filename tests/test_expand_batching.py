@@ -4,6 +4,7 @@ A list of N structures used to be N requests. A structure that can fetch several
 ids at once gets them in one, and everything else behaves as it did.
 """
 
+from collections.abc import Awaitable, Callable, Sequence
 from typing import Any
 
 import pytest
@@ -15,6 +16,7 @@ from arkitekt_spec.declare.definition.define import prepare_definition
 from arkitekt_spec.declare.structures.errors import ExpandingError
 from arkitekt_spec.declare.structures.registry import StructureRegistry
 from rath.expansion import ExpandsStructures
+from rath.scalars import ID
 
 from .service_helpers import with_client
 
@@ -45,12 +47,12 @@ class Fetches:
         self.single_ctx: list[Any] = []
         self.many: list[tuple[list[str], Any]] = []
 
-    async def aexpand(self, client: "Client", id: str) -> Any:
+    async def aexpand(self, client: "Client", id: str) -> object:
         self.single.append(id)
         self.single_ctx.append(client)
         return self.cls(id)
 
-    async def aexpand_many(self, client: "Client", ids: Any) -> list[Any]:
+    async def aexpand_many(self, client: "Client", ids: Sequence[ID]) -> list[object]:
         self.many.append((list(ids), client))
         if self.broken:
             raise ConnectionError("the service is down")
@@ -73,7 +75,9 @@ class Client(ExpandsStructures):
         self.batched = batched
         self.EXPANDERS = {identifier: f.aexpand for identifier, f in fetches.items()}
 
-    async def aexpand_many(self, identifier: str, ids: Any) -> Any:
+    async def aexpand_many(
+        self, identifier: str, ids: Sequence[ID]
+    ) -> Sequence[object]:
         if not self.batched:
             return await super().aexpand_many(identifier, ids)
         return await self.fetches[identifier].aexpand_many(self, ids)
@@ -92,8 +96,10 @@ def declared_registry(*declared: tuple[type, str, Fetches]) -> StructureRegistry
     app = AppRegistry()
     with_client(app, Client, "images")
 
-    def expander(fetches: Fetches) -> Any:
-        async def expand(id: str, images: Client) -> Any:
+    def expander(fetches: Fetches) -> Callable[[str, Client], Awaitable[object]]:
+        # Any, not object: the registry reads this annotation and holds it to the
+        # structure's class, which differs per `fetches`.
+        async def expand(id: str, images: Client) -> Any:  # noqa: ANN401
             return await fetches.aexpand(images, id)
 
         return expand
@@ -380,7 +386,9 @@ async def test_a_list_of_federated_structures_is_one_entities_request(
         def __init__(self) -> None:
             self.requests: list[Any] = []
 
-        async def aquery(self, query: str, variables: dict[str, Any]) -> Any:
+        async def aquery(
+            self, query: str, variables: dict[str, Any]
+        ) -> SimpleNamespace:
             self.requests.append(variables["representations"])
             return SimpleNamespace(
                 data={
@@ -401,7 +409,9 @@ async def test_a_list_of_federated_structures_is_one_entities_request(
         def __init__(self) -> None:
             self.rath = Rath()
 
-        async def aexpand_many(self, identifier: str, ids: Any) -> Any:
+        async def aexpand_many(
+            self, identifier: str, ids: Sequence[ID]
+        ) -> Sequence[object]:
             return await via_entities["aexpand_many"](self, ids)
 
     app = Fluss()
@@ -571,7 +581,7 @@ async def test_the_batcher_holds_its_flush_until_it_is_done() -> None:
             True  # anything but None: the batcher only asks whether it can batch
         )
 
-        async def expand_many(self, ids):
+        async def expand_many(self, ids: Sequence[str]) -> list[str]:
             started.set()
             await release.wait()
             return list(ids)

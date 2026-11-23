@@ -144,8 +144,10 @@ async def _is_asked_and_denied(workflow_app: Any, decider: Any, interface: str) 
 
 
 async def _runs_unasked(
-    workflow_app: Any, interface: str, scope: str
-) -> ActionAllowance | dict:  # noqa: ANN401
+    workflow_app: Any,  # noqa: ANN401
+    interface: str,
+    scope: str,
+) -> ActionAllowance | dict:
     """A run of ``interface`` gets its child without a hold; the DECIDED that says why."""
     pending, root = await _start(workflow_app, interface)
     assert await asyncio.wait_for(pending, TIMEOUT) == "stitched-one"
