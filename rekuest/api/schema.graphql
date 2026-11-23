@@ -1,5 +1,7 @@
 directive @auth(required_scopes: [String!], required_roles: [String!], required_org_roles: [String!], any_scope_of: [String!], any_role_of: [String!], any_org_role_of: [String!], allow_scoped: Boolean) on FIELD_DEFINITION
 
+directive @identified(by: String!) on OBJECT
+
 directive @oneOf on INPUT_OBJECT
 
 directive @unionElementOf(union: String!, discriminator: String!, key: String!) repeatable on INPUT_OBJECT
@@ -129,6 +131,11 @@ type Action {
   hasFits: Boolean!
 
   """
+  Whether it can run: RUNNABLE now, RECENT (an implementing agent seen in the last 24 hours), OFFLINE, or NONE (no implementation). The same rank `ActionOrder.availability` orders and `ActionFilter.availability` filters by.
+  """
+  availability: ActionAvailability!
+
+  """
   This action's stored vector, as `<model id>:<floats>`. Null until it has been indexed.
   """
   embedding: Embedding
@@ -229,6 +236,16 @@ input ActionArgumentInput {
   Defines a list of key-value pairs if this argument should be a dictionary.
   """
   valueDict: [ActionArgumentInput!] = null
+}
+
+"""
+Whether an action can run, as a list groups it: RUNNABLE now (`Action.assignable`), RECENT (an implementing agent was seen in the last 24 hours), OFFLINE (implemented, but no agent seen for longer), NONE (no implementation). In that order, which is `ActionOrder.availability` ascending.
+"""
+enum ActionAvailability {
+  RUNNABLE
+  RECENT
+  OFFLINE
+  NONE
 }
 
 """
@@ -471,7 +488,7 @@ input ActionFilter {
   DISTINCT: Boolean
 
   """
-  Search by name: a case-insensitive substring, or semantic similarity of the query to the action's name and description. Substring matches rank first, then by similarity; an explicit `ordering` replaces that ranking.
+  Search by name: a case-insensitive substring, or semantic similarity of the query to the action's name and description. Ranked: an exact match, then a prefix, then other textual matches by trigram similarity, then by meaning; an explicit `ordering` replaces that ranking.
   """
   search: String
   ids: [ID!]
@@ -492,6 +509,11 @@ input ActionFilter {
   inCollection: String
   usedBefore: DateTime
   usedAfter: DateTime
+
+  """
+  Only actions of these availabilities (`Action.availability`). An empty list is ignored.
+  """
+  availability: [ActionAvailability!]
 
   """
   Whether an agent that can take the action is connected now (`Action.assignable`).
@@ -540,6 +562,22 @@ enum ActionKind {
 
 input ActionOrder @oneOf {
   definedAt: Ordering
+  kind: Ordering
+
+  """
+  By the identifier of the app the action belongs to, so one app's actions stay together across pages.
+  """
+  appIdentifier: Ordering
+
+  """
+  By the name of the action's first collection (alphabetically): the collection a grouped list files it under. Actions in no collection come last.
+  """
+  collection: Ordering
+
+  """
+  By `Action.availability`: runnable now first (ASC), then recently active, offline, and without an implementation; DESC reverses it. Keeps each availability group together across pages.
+  """
+  availability: Ordering
   usedAt: Ordering
 
   """
@@ -586,6 +624,20 @@ type ActionStats {
 """Datetime fields of Action for bucketing"""
 enum ActionTimestampField {
   CREATED_AT
+}
+
+"""Objects to put in a collaboration at once: all of them, or none"""
+input AddManyToCollaborationInput {
+  """The collaboration's key (lok's)"""
+  collaboration: ID!
+
+  """What to put in; a whole before its parts"""
+  objects: [CollaborationObjectRef!]!
+
+  """
+  The collaboration's name, kept here when these are the first things put in
+  """
+  name: String = null
 }
 
 """Represents a compute agent that can execute implementations."""
@@ -635,7 +687,7 @@ type Agent {
   description: String
 
   """
-  The app this agent says controls its lifecycle (e.g. 'plugin_engine'), as stated on its last registration. Self-declared: a hint for pickers (descriptor @rekuest/supervisor), never authority.
+  The app that provisioned this agent's client (e.g. 'plugin_engine'), as lok signed it into the token of its last registration. Null for an agent whose client nobody provisioned. Pickers match it as the descriptor @rekuest/supervisor.
   """
   supervisor: String
 
@@ -843,6 +895,12 @@ input AgentDependencyInput {
   preferedInstances: Int = null
 }
 
+"""Numeric/aggregatable fields of Agent"""
+enum AgentField {
+  INSTALLED_AT
+  LAST_SEEN
+}
+
 """A way to filter agents"""
 input AgentFilter {
   AND: AgentFilter
@@ -859,9 +917,22 @@ input AgentFilter {
   available: Boolean
 
   """
-  Agents whose self-declared supervisor is this app (e.g. 'plugin_engine').
+  Agents with a live connection (true): connected, with a fresh heartbeat. False keeps every other agent, webhook agents included. Unlike `available`, a webhook agent is never connected.
+  """
+  connected: Boolean
+
+  """Filter by the kind of agent (websocket, webhook, ...)"""
+  kind: AgentKind
+
+  """
+  Agents whose client this app provisioned (e.g. 'plugin_engine'), as lok signed it into their token.
   """
   supervisor: String
+
+  """
+  Agents whose client an app provisioned (true), or nobody (false), as of their last registration.
+  """
+  supervised: Boolean
 
   """
   Agents meeting a port's descriptor constraints (a picker hands them in as $requires). The only descriptor of @rekuest/agent is @rekuest/supervisor; any other key is refused.
@@ -977,6 +1048,7 @@ type AgentMapping {
 
 input AgentOrder @oneOf {
   lastSeen: Ordering
+  installedAt: Ordering
 }
 
 """
@@ -1004,9 +1076,40 @@ type AgentSnapshotEvent {
 
 union AgentSnapshotEventStatePatchEvent = AgentSnapshotEvent | StatePatchEvent
 
+type AgentStats {
+  """
+  Total number of agents in the selection. Ask once with `filters: {connected: true}` (aliased) for how many are online.
+  """
+  count: Int!
+
+  """Number of distinct values for the field"""
+  distinctCount(field: AgentField!): Int!
+
+  """Maximum"""
+  max(field: AgentField!): Float
+
+  """Minimum"""
+  min(field: AgentField!): Float
+
+  """Average"""
+  avg(field: AgentField!): Float
+
+  """Sum"""
+  sum(field: AgentField!): Float
+
+  """Time-bucketed stats over a datetime field."""
+  series(field: AgentField!, timestampField: AgentTimestampField!, by: Granularity!): [TimeBucket!]!
+}
+
 type AgentTaskUpdate {
   create: TaskChange
   update: TaskChange
+}
+
+"""Datetime fields of Agent for bucketing"""
+enum AgentTimestampField {
+  INSTALLED_AT
+  LAST_SEEN
 }
 
 type AgentWithValues {
@@ -1247,6 +1350,21 @@ type Asset {
 }
 
 """
+An asset that was just stored: enough to tell whether it is the one awaited.
+"""
+type AssetChange {
+  id: ID!
+
+  """
+  'sha256:' and the hex SHA-256 of the file's bytes: what an agent's declared asset names.
+  """
+  ref: String!
+
+  """What the file is (AssetKind)."""
+  kind: String!
+}
+
+"""
 Where an asset's bytes are: a kulisse store for a 3D model, a media store for an image.
 """
 union AssetFile = KulisseStore | MediaStore
@@ -1411,7 +1529,7 @@ input AssignWidgetInput {
   kind: AssignWidgetKind!
 
   """
-  (SLIDER, CHOICE, STRING, SEARCH, CUSTOM, STATE_CHOICE, PROXY) Port path of another port whose value this widget follows and mirrors.
+  (SLIDER, CHOICE, STRING, SEARCH, CUSTOM, BLOK, STATE_CHOICE, PROXY) Port path of another port whose value this widget follows and mirrors.
   """
   followValue: String = null
 
@@ -1466,9 +1584,17 @@ input AssignWidgetInput {
   children: [ComponentNodeInput!] = null
 
   """
-  (CUSTOM) Widget to render when the UI has no such component in its catalog.
+  (CUSTOM, BLOK) Widget to render when the UI has no such component in its catalog.
   """
   fallback: AssignWidgetInput = null
+
+  """
+  (BLOK) The port blok as v2 BSX: one `<Blok kind="port" context="panel">`. It reads the port as `port`, the form's other arguments as `args` and the agents a run would get as `self` and `deps`; it writes `port.value` and calls no agent.
+  """
+  source: String = null
+
+  """(BLOK) The blok language version the source speaks; 2 is the only one."""
+  vocab: Int = null
 
   """
   (STATE_CHOICE) The agent dependency (by key) whose state provides the choices; omitted: the implementing agent's own state.
@@ -1510,6 +1636,7 @@ enum AssignWidgetKind {
   CHOICE
   SLIDER
   CUSTOM
+  BLOK
   STRING
   STATE_CHOICE
   PROXY
@@ -1717,6 +1844,41 @@ input BlokAgentMappingInput {
   key: String!
 }
 
+"""
+A port blok as the port's widget: BSX the form draws where the port's control would be.
+"""
+type BlokAssignWidget implements AssignWidget {
+  kind: AssignWidgetKind!
+  followValue: String
+  source: String!
+  vocab: Int!
+  fallback: AssignWidget
+}
+
+"""
+A port blok as the port's widget: BSX the form draws where the port's control would be.
+"""
+input BlokAssignWidgetInput @unionElementOf(union: "AssignWidgetInput", discriminator: "kind", key: "BLOK") {
+  """Port path of another port whose value this widget follows and mirrors."""
+  followValue: String = null
+
+  """Which member of AssignWidgetInput this is."""
+  kind: AssignWidgetKind!
+
+  """
+  The port blok as v2 BSX: one `<Blok kind="port" context="panel">`. It reads the port as `port`, the form's other arguments as `args` and the agents a run would get as `self` and `deps`; it writes `port.value` and calls no agent.
+  """
+  source: String!
+
+  """The blok language version the source speaks; 2 is the only one."""
+  vocab: Int! = 2
+
+  """
+  Widget to render where the UI draws no port bloks; the port's own kind's widget when left out.
+  """
+  fallback: AssignWidgetInput = null
+}
+
 """What a preview renders a blok with, mirroring the roots it reads."""
 type BlokDemo {
   deps: JSONSerializable
@@ -1852,8 +2014,18 @@ input BlokFilter {
   """
   provided: Boolean
 
-  """Search by name"""
+  """Search by name or description (case-insensitive substring)."""
   search: String
+
+  """
+  Only bloks whose name starts with this (case-insensitive): the names a new blok would collide with, e.g. `X panel` and `X panel 2` for `X panel`.
+  """
+  nameStartsWith: String
+
+  """
+  Only bloks that render in one of these contexts: PANEL and SCENE are interfaces to open, LOGO draws an agent or an action.
+  """
+  contexts: [ComponentContext!]
 
   """Only bloks the caller pinned (true) or did not (false)."""
   pinned: Boolean
@@ -1918,9 +2090,9 @@ input BlokImplementationInput {
   description: String = null
 
   """
-  What draws it, as its `<Blok context=...>` says (the two must agree): PANEL for panels and dashboards, SCENE for a 3D view (one Scene), LOGO for a logo (one Logo): an agent's, or an action's when its kind is action.
+  What draws it, as its `<Blok context=...>` says (the two must agree): PANEL for panels and dashboards, SCENE for a 3D view (one Scene), LOGO for a logo (one Logo): an agent's, or an action's when its kind is action. A blok sent as its `source` need not say it: it is read off its `<Blok>`. PANEL otherwise.
   """
-  context: ComponentContext! = PANEL
+  context: ComponentContext = null
 
   """
   Whether this Blok is its agent's default for its context. A newly declared default replaces the previous one.
@@ -2362,12 +2534,98 @@ input ClientFilter {
   DISTINCT: Boolean
   ids: [ID!]
   hasImplementationsFor: [ActionHash!]
+
+  """
+  Search by OAuth client id, name, app identifier, release version or device id (case-insensitive substring).
+  """
+  search: String
   mine: Boolean
 }
 
 """A way to order apps"""
 input ClientOrder @oneOf {
   definedAt: Ordering
+}
+
+"""
+What a guest granted it sees of the organization: the objects put in it, and what is part of them.
+"""
+type Collaboration {
+  id: ID!
+  name: String!
+  description: String
+  createdAt: DateTime!
+
+  """
+  The collaboration's key across the hub: what lok grants, and what names it in every service
+  """
+  key: ID!
+
+  """
+  What is in the collaboration, oldest first; what is part of these is in it too. `brought` keeps what was put in by hand (false) or only what came along with it (true)
+  """
+  items(brought: Boolean = null, pagination: OffsetPaginationInput = null): [CollaborationItem!]!
+
+  """
+  How many objects are in the collaboration: all of them, or (`brought`) only those put in by hand (false) or only those that came along with one (true)
+  """
+  itemCount(brought: Boolean = null): Int!
+}
+
+"""
+One object in a collaboration: put there, or brought along with one that needs it to be seen.
+"""
+type CollaborationItem {
+  id: ID!
+
+  """The object's id, in its structure"""
+  objectId: String!
+  addedAt: DateTime!
+
+  """The structure the object is known by across the hub: @mikro/scene"""
+  identifier: String
+
+  """
+  Whether it is in the collaboration only as what another object in it needs to be seen
+  """
+  brought: Boolean!
+}
+
+"""An object to put in, or take out of, a collaboration"""
+input CollaborationObjectInput {
+  """The collaboration's key (lok's)"""
+  collaboration: ID!
+
+  """The structure the object is known by: @mikro/scene"""
+  identifier: String!
+
+  """The object's id"""
+  object: ID!
+
+  """
+  The collaboration's name, kept here when this is the first thing put in
+  """
+  name: String = null
+}
+
+"""An object, by its structure and id"""
+input CollaborationObjectRef {
+  """The structure the object is known by: @mikro/scene"""
+  identifier: String!
+
+  """The object's id"""
+  object: ID!
+}
+
+"""
+How many collaborations the organization has (a guest: theirs), and how much is in them
+"""
+type CollaborationStats {
+  """How many collaborations"""
+  count: Int!
+
+  """How many objects are in them altogether, brought along ones included"""
+  itemCount: Int!
 }
 
 """The input for collecting a shelved item in a drawer."""
@@ -2628,6 +2886,14 @@ input CreateShortcutInput {
 
   """The action ID to create a shortcut for"""
   action: ID!
+
+  """
+  Pin the shortcut to this agent (with `interface`): it then runs there. What a shortcut to a stateful action needs to run without asking.
+  """
+  agent: ID = null
+
+  """The implementation interface on the pinned agent."""
+  interface: String = null
 
   """
   The arguments to pre-pass to the shortcut. This is used to identify the shortcut in the system.
@@ -3575,7 +3841,7 @@ input HostedStructureFilter {
   ids: [ID!]
 
   """
-  Keep structures whose identifier, label or description contains this text, or whose label and description mean something close to it. Substring matches rank first, then by similarity; an explicit `ordering` replaces that ranking.
+  Keep structures whose identifier, label or description contains this text, or whose label and description mean something close to it. Ranked: an exact match, then a prefix, then other textual matches by trigram similarity, then by meaning; an explicit `ordering` replaces that ranking.
   """
   search: String
 
@@ -3724,7 +3990,7 @@ type Implementation {
   execution: Execution!
 
   """
-  A hash of the implementation's code; a workflow is only resumed by an implementation with the same hash.
+  A hash of the implementation's code; a resumed workflow is told whether it changed since its run started.
   """
   codeHash: String
 
@@ -3946,7 +4212,7 @@ input ImplementationInput {
   execution: Execution! = PLAIN
 
   """
-  A hash of the implementation's code. A workflow is only resumed by an implementation with the same hash.
+  A hash of the implementation's code. A resumed workflow is told whether it changed since its run started.
   """
   codeHash: String = null
 
@@ -4531,6 +4797,11 @@ input MaterializedBlokFilter {
   """Search by name"""
   search: String
 
+  """
+  Only materializations of the blok with exactly this name (case-sensitive), unlike the substring `search`.
+  """
+  blokName: String
+
   """Only materializations the caller pinned (true) or did not (false)."""
   pinned: Boolean
 
@@ -4758,6 +5029,31 @@ type Module {
 
 """Root mutation type for executing write operations on the API."""
 type Mutation {
+  """
+  Put a task in a collaboration (lok's, by its key), with what it needs to be seen: the action it ran, the tasks it caused as they are now, and the bloks it asked or informed with. Its events and logs are in with it, live. The collaboration's row here is made the first time something is put in
+  """
+  addToCollaboration(input: CollaborationObjectInput!): Collaboration! @auth(required_scopes: ["rekuest_share"], any_role_of: ["rekuest_editor"])
+
+  """
+  Put several tasks in a collaboration (by its key) at once, each with what it needs to be seen: all of them, or none
+  """
+  addManyToCollaboration(input: AddManyToCollaborationInput!): Collaboration! @auth(required_scopes: ["rekuest_share"], any_role_of: ["rekuest_editor"])
+
+  """
+  Put a workflow (a root task of the organization: one someone started, or a schedule or trigger did) in a collaboration, as it is now: the root and every task it caused, with their actions, events and logs. Tasks it causes later are not; `dryRun` only says what would be put in
+  """
+  shareWorkflow(input: ShareWorkflowInput!): WorkflowShare! @auth(required_scopes: ["rekuest_share"], any_role_of: ["rekuest_editor"])
+
+  """
+  Take a task out of a collaboration, with what it brought that nothing else there needs
+  """
+  removeFromCollaboration(input: CollaborationObjectInput!): Collaboration! @auth(required_scopes: ["rekuest_share"], any_role_of: ["rekuest_editor"])
+
+  """
+  Take everything rekuest put in a collaboration (by its key) out of it: whoever was granted it sees nothing of it here any more. lok's collaboration, and its grants, stay
+  """
+  deleteCollaboration(key: ID!): ID! @auth(required_scopes: ["rekuest_share"], any_role_of: ["rekuest_editor"])
+
   """
   Deploy a higher-order implementation: a wrapper onto the agent of the implementation it wraps, linked to it.
   """
@@ -5557,6 +5853,19 @@ type Query {
   _entities(representations: [_Any!]!): [_Entity]!
   _service: _Service!
 
+  """
+  List the organization's collaborations that hold tasks here: what a guest granted one sees of rekuest (a guest: the collaborations granted to them)
+  """
+  collaborations(pagination: OffsetPaginationInput = null): [Collaboration!]! @auth(required_scopes: ["rekuest_read"])
+
+  """Get a single collaboration by its key (lok's): what was put in it here"""
+  collaboration(key: ID!): Collaboration! @auth(required_scopes: ["rekuest_read"])
+
+  """
+  How many collaborations hold tasks here (a guest: of those granted to them), and how many objects are in them
+  """
+  collaborationsStats: CollaborationStats! @auth(required_scopes: ["rekuest_read"], allow_scoped: true)
+
   """List all registered clients."""
   clients(filters: ClientFilter, ordering: [ClientOrder!]! = [], pagination: OffsetPaginationInput): [Client!]! @auth(required_scopes: ["rekuest_read"])
 
@@ -5585,7 +5894,7 @@ type Query {
   toolboxes(filters: ToolboxFilter, ordering: [ToolboxOrder!]! = [], pagination: OffsetPaginationInput): [Toolbox!]! @auth(required_scopes: ["rekuest_read"])
 
   """All dashboards."""
-  dashboards: [Dashboard!]! @auth(required_scopes: ["rekuest_read"])
+  dashboards(pagination: OffsetPaginationInput): [Dashboard!]! @auth(required_scopes: ["rekuest_read"])
 
   """
   List of UI Blok. Leaves out the bloks a task made from its BSX to show: each goes with its task.
@@ -5670,6 +5979,16 @@ type Query {
   """Statistics about tasks and their states."""
   taskStats(filters: TaskFilter = null): TaskStats! @auth(required_scopes: ["rekuest_read"])
 
+  """
+  The apps that provisioned the organization's agents (e.g. 'plugin_engine'), as lok signed them into their tokens, with how many agents each (narrowed by filters, e.g. connected).
+  """
+  supervisors(filters: AgentFilter = null): [Supervisor!]! @auth(required_scopes: ["rekuest_read"])
+
+  """
+  Statistics about agents: how many (narrowed by filters, e.g. connected or kind) and when they registered or were last seen.
+  """
+  agentStats(filters: AgentFilter = null): AgentStats! @auth(required_scopes: ["rekuest_read"])
+
   """Get task boundaries."""
   taskBoundaries(correlationId: String!, stateId: ID = null): TaskBoundary @auth(required_scopes: ["rekuest_read"])
 
@@ -5742,17 +6061,17 @@ type Query {
   """
   All structures: those the org's action ports reference, and those a service of this hub hosts.
   """
-  structures(search: String = null): [Structure!]! @auth(required_scopes: ["rekuest_read"])
+  structures(search: String = null, pagination: OffsetPaginationInput = null): [Structure!]! @auth(required_scopes: ["rekuest_read"])
 
   """
   All structure packages referenced by the org's action ports (derived, not registered).
   """
-  structurePackages(search: String = null): [StructurePackage!]! @auth(required_scopes: ["rekuest_read"])
+  structurePackages(search: String = null, pagination: OffsetPaginationInput = null): [StructurePackage!]! @auth(required_scopes: ["rekuest_read"])
 
   """
   All interfaces referenced by the org's action ports (derived, not registered).
   """
-  interfaces(search: String = null): [Interface!]! @auth(required_scopes: ["rekuest_read"])
+  interfaces(search: String = null, pagination: OffsetPaginationInput = null): [Interface!]! @auth(required_scopes: ["rekuest_read"])
 
   """Fetch resolved dependencies for a resolution."""
   resolvedImplementations(resolution: ID!, dependencyKey: String = null, methodKey: String = null): [Implementation!]! @auth(required_scopes: ["rekuest_read"])
@@ -5777,6 +6096,11 @@ type Query {
 
   """The html bloks registered to decorate the model of this reference."""
   bloksForModel(ref: String!): [Blok!]! @auth(required_scopes: ["rekuest_read"])
+
+  """
+  The html bloks registered to decorate any of these models (each names its own in `forModel`): one request for every model a scene shows.
+  """
+  bloksForModels(refs: [String!]!): [Blok!]! @auth(required_scopes: ["rekuest_read"])
 
   """Retrieve state for a specific context."""
   stateFor(agent: ID!, stateHash: String = null, demand: StateDemandInput = null): State! @auth(required_scopes: ["rekuest_read"])
@@ -5854,7 +6178,7 @@ type Query {
     identifier: String = null
 
     """
-    Keep signals whose identifier or description contains this text, or whose description means something close to it; substring matches first, then by similarity
+    Keep signals whose identifier or description contains this text, or whose description means something close to it; ranked: an exact identifier, then a prefix, then other substring matches by trigram similarity, then by meaning
     """
     search: String = null
   ): [SignalDeclaration!]! @auth(required_scopes: ["rekuest_read"])
@@ -5872,6 +6196,11 @@ type Query {
   A dry run for a trigger not written yet: the organization's stored signals of this kind and structure whose descriptors satisfy the conditions, newest first. Fires nothing.
   """
   matchingSignals(kind: SignalKind!, identifier: String!, conditions: AnyDefault = null, limit: Int! = 20): [Signal!]! @auth(required_scopes: ["rekuest_read"])
+
+  """
+  How many of the organization's stored signals of this kind and structure satisfy the conditions: the uncapped count behind `matchingSignals`. Fires nothing.
+  """
+  matchingSignalCount(kind: SignalKind!, identifier: String!, conditions: AnyDefault = null): Int! @auth(required_scopes: ["rekuest_read"])
 
   """Fetch a wiregram by ID."""
   wiregram(id: ID!): Wiregram! @auth(required_scopes: ["rekuest_read"])
@@ -6477,6 +6806,7 @@ input ScheduleOrder @oneOf {
   name: Ordering
   createdAt: Ordering
   updatedAt: Ordering
+  consecutiveFailures: Ordering
 }
 
 """
@@ -6595,6 +6925,32 @@ input SessionOrder @oneOf {
   startedAt: Ordering
 }
 
+"""Put what a workflow created in a collaboration, as it is now"""
+input ShareWorkflowInput {
+  """The collaboration's key (lok's)"""
+  collaboration: ID!
+
+  """
+  The workflow: the id of the task a person started, the root of every task it caused
+  """
+  rootTask: ID!
+
+  """Only say what would be put in, and what left out"""
+  dryRun: Boolean! = false
+
+  """The collaboration's name, kept here when this puts the first things in"""
+  name: String = null
+}
+
+"""An object, by its structure and id"""
+type SharedObject {
+  """The structure the object is known by: @mikro/scene"""
+  identifier: String
+
+  """The object's id"""
+  object: ID!
+}
+
 input ShelveInMemoryDrawerInput {
   """
   The identifier of the drawer. This is used to identify the drawer in the system.
@@ -6631,6 +6987,14 @@ type Shortcut {
 
   """Implementation of the action."""
   implementation: Implementation
+
+  """
+  The agent the shortcut is pinned to (with `interface`): it runs there. Null when it is not pinned, or its agent is gone.
+  """
+  agent: Agent
+
+  """The implementation interface on the pinned agent."""
+  interface: String
 
   """The toolbox this shortcut belongs to."""
   toolbox: Toolbox!
@@ -6914,6 +7278,25 @@ enum SignalKind {
 input SignalOrder @oneOf {
   receivedAt: Ordering
   occurredAt: Ordering
+}
+
+"""
+Created in the workflow, but part of something made before it that is not shared: left out
+"""
+type SkippedObject {
+  """The structure the object is known by"""
+  identifier: String
+
+  """The object's id"""
+  object: ID!
+
+  """The structure of what it is part of"""
+  wholeIdentifier: String
+
+  """
+  The id of what it is part of: put that in, and share the workflow again, to bring it
+  """
+  whole: ID!
 }
 
 type SliderAssignWidget implements AssignWidget {
@@ -7438,7 +7821,7 @@ input StructureDescriptorFilter {
   ids: [ID!]
 
   """
-  Keep descriptors whose key or description contains this text, or whose description means something close to it. Substring matches rank first, then by similarity; an explicit `ordering` replaces that ranking.
+  Keep descriptors whose key or description contains this text, or whose description means something close to it. Ranked: an exact match, then a prefix, then other textual matches by trigram similarity, then by meaning; an explicit `ordering` replaces that ranking.
   """
   search: String
 
@@ -7489,13 +7872,18 @@ type StructurePackage {
 """Root subscription type for real-time event streams from the system."""
 type Subscription {
   """Subscribe to root tasks created by this client (caller-scoped)."""
-  mytasks: TaskChangeEvent! @auth(required_scopes: ["rekuest_read"])
+  mytasks: TaskChangeEvent! @auth(required_scopes: ["rekuest_read"]) @deprecated(reason: "Follow the caller session's `tasks:mine` topic on takt (`/session`) instead.")
 
   """Subscribe to root task changes across the whole organization."""
-  tasks: TaskChangeEvent! @auth(required_scopes: ["rekuest_read"])
+  tasks: TaskChangeEvent! @auth(required_scopes: ["rekuest_read"]) @deprecated(reason: "Follow the caller session's `tasks:org` topic on takt (`/session`) instead.")
 
   """Subscribe to updates on agent connections and statuses."""
-  agents: AgentChangeEvent! @auth(required_scopes: ["rekuest_read"])
+  agents: AgentChangeEvent! @auth(required_scopes: ["rekuest_read"]) @deprecated(reason: "Follow the caller session's `agents:org` topic on takt (`/session`) instead.")
+
+  """
+  The organization's assets as they are stored (only those of `refs`, if given): an agent's declared asset becomes available the moment one with its ref arrives.
+  """
+  assets(refs: [String!] = null): AssetChange! @auth(required_scopes: ["rekuest_read"])
 
   """
   Subscribe to the signals services send about the organization's objects: one arrived, or triggers were matched against it.
@@ -7519,33 +7907,56 @@ type Subscription {
   implementations(agent: ID!): ImplementationUpdate! @auth(required_scopes: ["rekuest_read"])
 
   """Subscribe to updates of state values and patches."""
-  stateUpdateEvents(stateId: ID!): State! @auth(required_scopes: ["rekuest_read"])
+  stateUpdateEvents(stateId: ID!): State! @auth(required_scopes: ["rekuest_read"]) @deprecated(reason: "Follow the caller session's `state:<agent>/<interface>` topic on takt (`/session`) instead.")
 
   """Watch a state: yields the current snapshot then streams patches."""
-  watchState(stateId: ID = null, agentId: ID = null, interface: String = null): StateSnapshotEventStatePatchEvent! @auth(required_scopes: ["rekuest_read"])
+  watchState(stateId: ID = null, agentId: ID = null, interface: String = null): StateSnapshotEventStatePatchEvent! @auth(required_scopes: ["rekuest_read"]) @deprecated(reason: "Follow the caller session's `state:<agent>/<interface>` topic on takt (`/session`) instead.")
 
   """Watch an agent: yields snapshots for all states then streams patches."""
-  watchAgent(agentId: ID!): AgentSnapshotEventStatePatchEvent! @auth(required_scopes: ["rekuest_read"])
+  watchAgent(agentId: ID!): AgentSnapshotEventStatePatchEvent! @auth(required_scopes: ["rekuest_read"]) @deprecated(reason: "Follow the caller session's `states:<agent>` topic on takt (`/session`) instead.")
 
   """Subscribe to all descendant task changes of a task."""
-  childTasks(id: ID!): ChildTaskEvent! @auth(required_scopes: ["rekuest_read"])
+  childTasks(id: ID!): ChildTaskEvent! @auth(required_scopes: ["rekuest_read"]) @deprecated(reason: "Follow the caller session's `children:<task>` topic on takt (`/session`) instead.")
 
   """Subscribe to task create/update for a specific agent."""
-  agentTasks(agent: ID!): AgentTaskUpdate! @auth(required_scopes: ["rekuest_read"])
+  agentTasks(agent: ID!): AgentTaskUpdate! @auth(required_scopes: ["rekuest_read"]) @deprecated(reason: "Follow the caller session's `agent:<agent>/tasks` topic on takt (`/session`) instead.")
 
   """
   The task an agent's action last ran as, whoever started it, kept current. Yields a `LatestTaskSnapshot` first, then that task's events (`TaskEventChange`: progress, results, its end) and, as a `TaskChange`, every task of the action that starts or ends: a started one with a higher id is the latest from then on. A snapshot without an implementation means the agent offers no action under that interface, and nothing follows.
   """
-  latestTask(agent: ID!, interface: String!): LatestTaskSnapshotTaskChangeTaskEventChange! @auth(required_scopes: ["rekuest_read"])
+  latestTask(agent: ID!, interface: String!): LatestTaskSnapshotTaskChangeTaskEventChange! @auth(required_scopes: ["rekuest_read"]) @deprecated(reason: "Follow the caller session's `latest:<agent>/<interface>` topic on takt (`/session`) instead.")
+
+  """
+  One task's events, whoever started it: those already recorded (all, or those newer than `after`), oldest first, then each new one as it is recorded, logs included. Replaces polling a task's event history.
+  """
+  taskEvents(task: ID!, after: ID = null, afterSeq: Int = null): TaskEventChange! @auth(required_scopes: ["rekuest_read"]) @deprecated(reason: "Follow the caller session's `task:<task>` topic on takt (`/session`) instead.")
 
   """
   Stream the events of one probe (caller-scoped, payload-carrying). Emits a state snapshot first when events already happened.
   """
-  probeEvents(probe: ID!): ProbeEvent! @auth(required_scopes: ["rekuest_read"])
+  probeEvents(probe: ID!): ProbeEvent! @auth(required_scopes: ["rekuest_read"]) @deprecated(reason: "Follow the caller session's `probe:<probe>` topic on takt (`/session`) instead.")
+}
+
+"""
+An app that provisioned agents of the organization (a plugin engine, a launcher), as lok signed it into their tokens. Its agents are `agents(filters: {supervisor: identifier})`.
+"""
+type Supervisor {
+  """
+  The app's identifier, as the agents carry it in `supervisor` (e.g. 'plugin_engine').
+  """
+  identifier: String!
+
+  """
+  How many of the organization's agents it provisioned (of those the filters keep).
+  """
+  agentCount: Int!
+
+  """How many of those have a live connection now."""
+  connectedCount: Int!
 }
 
 """Tracks the assignment of an implementation to a specific task."""
-type Task {
+type Task @identified(by: "@rekuest/task") {
   """Unique ID of the task."""
   id: ID!
 
@@ -7637,6 +8048,11 @@ type Task {
   latestReturns: AnyDefault
 
   """
+  The dead man switch: the task is cancelled when the window holding it has been gone this many seconds. Null: it never depends on a window.
+  """
+  deadmanSeconds: Int
+
+  """
   The space the caller started this run in (the assign's `space`): where a client draws the action's overlay. Null when none was named, or the space is gone.
   """
   space: Space
@@ -7672,6 +8088,11 @@ type Task {
 
   """The method of the dependency that caused this task, if applicable."""
   dependencyMethod: String
+
+  """
+  Whether a window's session holds the task's dead man switch (it is armed).
+  """
+  deadmanArmed: Boolean!
 
   """
   The bloks this task showed a person, oldest first: asks it holds on (or held on) and informs.
@@ -7832,6 +8253,11 @@ type TaskEvent {
   agentTs: DateTime
 
   """
+  The event's number within its task (1, 2, 3 …) in commit order; the cursor to resume a task's events from.
+  """
+  taskSeq: Int
+
+  """
   The report's step within its task; a task's history in step order. Null for server-written events.
   """
   step: Int
@@ -7870,6 +8296,11 @@ type TaskEventChange {
   """
   value: AnyDefault
   createdAt: DateTime!
+
+  """
+  The event's number within its task (1, 2, 3 …) in commit order: resume from it with `afterSeq`, never from the id.
+  """
+  taskSeq: Int
 }
 
 """A way to filter task events"""
@@ -7929,6 +8360,13 @@ enum TaskField {
 
 """A way to filter tasks"""
 input TaskFilter {
+  """
+  Only what is in this collaboration (its key): put in, or part of what was
+  """
+  inCollaboration: ID
+
+  """Only what the workflow (its root task id) created"""
+  createdUnder: ID
   AND: TaskFilter
   OR: TaskFilter
   NOT: TaskFilter
@@ -7954,8 +8392,15 @@ input TaskFilter {
   """Filter by the agent executing the task"""
   agent: ID
 
-  """Filter by the caller (client/user/organization) that created the task"""
+  """
+  Filter by the caller that created the task: the ID of a Caller row (one client, user and organization), not a user. For a person use `user`.
+  """
   caller: ID
+
+  """
+  Filter by the user (their sub) on whose behalf the task was created, whatever client they used.
+  """
+  user: ID
 
   """Filter by the direct parent task"""
   parent: ID
@@ -7965,6 +8410,11 @@ input TaskFilter {
 
   """Keep only root tasks (true) or only descendants of a root (false)"""
   rootIsnull: Boolean
+
+  """
+  Keep only workflows someone started (true): root tasks no schedule ran and no trigger or signal fired: what a person would share (`shareWorkflow` takes any root task). False keeps every other task
+  """
+  humanInduced: Boolean
 
   """Filter by whether the task has finished"""
   isDone: Boolean
@@ -8395,6 +8845,7 @@ input TriggerOrder @oneOf {
   name: Ordering
   createdAt: Ordering
   updatedAt: Ordering
+  consecutiveFailures: Ordering
 }
 
 """Remove a shortcut's binding to a user."""
@@ -8823,6 +9274,33 @@ input WiregramInput {
 
   """The triggers it wants."""
   triggers: [WireTriggerInput!] = []
+}
+
+"""
+What sharing a workflow put in a collaboration here (or, tried, would put in)
+"""
+type WorkflowShare {
+  """The collaboration's key"""
+  collaboration: ID!
+
+  """Whether nothing was written"""
+  dryRun: Boolean!
+
+  """Put in, with what each needs to be seen"""
+  added: [SharedObject!]!
+
+  """
+  How many parts came along with their whole, without being put in themselves
+  """
+  covered: Int!
+
+  """Left out: parts of something made before the workflow and not shared"""
+  skipped: [SkippedObject!]!
+
+  """
+  Structures here that cannot say what created their objects: not looked at
+  """
+  unknown: [String!]!
 }
 
 scalar _Any

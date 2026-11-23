@@ -97,6 +97,7 @@
                         "AskBlokInput",
                         "AssetKind",
                         "AssignWidgetInput",
+                        "BlokAssignWidgetInput",
                         "BlokDemoInput",
                         "BlokImplementationInput",
                         "ChoiceAssignWidgetInput",

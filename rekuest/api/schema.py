@@ -11,6 +11,15 @@ from rekuest.scalars import ActionHash, Args, Identifier, JSONSerializable, Medi
 from rekuest.traits.action import Callable
 from typing import Annotated, Any, AsyncIterator, ClassVar, Iterable, Iterator, Literal
 
+class Deprecated:
+    """Marks a field as deprecated, carrying the GraphQL deprecation reason."""
+
+    def __init__(self, reason=None):
+        self.reason = reason
+
+    def __repr__(self):
+        return 'Deprecated(' + repr(self.reason) + ')'
+
 class GraphQLDefault:
     """Records a GraphQL field schema default value. The client omits the field so the server applies its own default; this preserves the value for introspection."""
 
@@ -95,7 +104,7 @@ class Agent(BaseModel):
     hash: str
     "Hash representing the agent's definition for change detection."
     supervisor: str | None = Field(default=None)
-    "The app this agent says controls its lifecycle (e.g. 'plugin_engine'), as stated on its last registration. Self-declared: a hint for pickers (descriptor @rekuest/supervisor), never authority."
+    "The app that provisioned this agent's client (e.g. 'plugin_engine'), as lok signed it into the token of its last registration. Null for an agent whose client nobody provisioned. Pickers match it as the descriptor @rekuest/supervisor."
     connected: bool
     'Is the agent currently connected.'
     active: bool
@@ -1362,6 +1371,10 @@ class PortAssignWidgetCatch(PortAssignWidgetBase):
     'No documentation'
     kind: AssignWidgetKind
 
+class PortAssignWidgetBlokAssignWidget(PortAssignWidgetBase, BaseModel):
+    """A port blok as the port's widget: BSX the form draws where the port's control would be."""
+    typename: Literal['BlokAssignWidget'] = Field(alias='__typename', default='BlokAssignWidget', exclude=True)
+
 class PortAssignWidgetChoiceAssignWidget(ChoiceAssignWidget, PortAssignWidgetBase, BaseModel):
     """A dropdown over the port's own `choices`."""
     typename: Literal['ChoiceAssignWidget'] = Field(alias='__typename', default='ChoiceAssignWidget', exclude=True)
@@ -1411,6 +1424,10 @@ class ReturnWidgetCustomReturnWidget(CustomReturnWidget, ReturnWidgetBase, BaseM
 class ArgPortWidgetBase(BaseModel):
     """No documentation"""
     model_config = ConfigDict(frozen=True)
+
+class ArgPortWidgetBaseBlokAssignWidget(PortAssignWidgetBlokAssignWidget, ArgPortWidgetBase, BaseModel):
+    """A port blok as the port's widget: BSX the form draws where the port's control would be."""
+    typename: Literal['BlokAssignWidget'] = Field(alias='__typename', default='BlokAssignWidget', exclude=True)
 
 class ArgPortWidgetBaseChoiceAssignWidget(PortAssignWidgetChoiceAssignWidget, ArgPortWidgetBase, BaseModel):
     """A dropdown over the port's own `choices`."""
@@ -1498,7 +1515,7 @@ class ArgPort(BaseModel):
     proposed_units: tuple[str, ...] | None = Field(default=None, alias='proposedUnits')
     dimension: str | None = Field(default=None)
     children: tuple[ArgChildPort, ...] | None = Field(default=None)
-    widget: Annotated[ArgPortWidgetBaseChoiceAssignWidget | ArgPortWidgetBaseCustomAssignWidget | ArgPortWidgetBaseProxyWidget | ArgPortWidgetBaseSearchAssignWidget | ArgPortWidgetBaseSliderAssignWidget | ArgPortWidgetBaseStateChoiceAssignWidget | ArgPortWidgetBaseStringAssignWidget, Field(discriminator='typename')] | ArgPortWidgetBaseCatchAll | None = Field(default=None)
+    widget: Annotated[ArgPortWidgetBaseBlokAssignWidget | ArgPortWidgetBaseChoiceAssignWidget | ArgPortWidgetBaseCustomAssignWidget | ArgPortWidgetBaseProxyWidget | ArgPortWidgetBaseSearchAssignWidget | ArgPortWidgetBaseSliderAssignWidget | ArgPortWidgetBaseStateChoiceAssignWidget | ArgPortWidgetBaseStringAssignWidget, Field(discriminator='typename')] | ArgPortWidgetBaseCatchAll | None = Field(default=None)
     choices: tuple[ArgPortChoices, ...] | None = Field(default=None)
     validators: tuple[ArgPortValidators, ...] | None = Field(default=None)
     effects: tuple[Annotated[ArgPortEffectsBaseCustomEffect | ArgPortEffectsBaseHideEffect | ArgPortEffectsBaseMessageEffect, Field(discriminator='typename')] | ArgPortEffectsBaseCatchAll, ...] | None = Field(default=None)
@@ -3454,8 +3471,8 @@ class GetToolboxQuery(BaseModel):
 
 class WatchMyTasksSubscription(BaseModel):
     """No documentation found for this operation."""
-    mytasks: TaskChangeEvent
-    'Subscribe to root tasks created by this client (caller-scoped).'
+    mytasks: Annotated[TaskChangeEvent, Deprecated("Follow the caller session's `tasks:mine` topic on takt (`/session`) instead.")]
+    "Subscribe to root tasks created by this client (caller-scoped).\nDEPRECATED: Follow the caller session's `tasks:mine` topic on takt (`/session`) instead."
 
     class Arguments(BaseModel):
         """Arguments for WatchMyTasks """
@@ -4593,7 +4610,7 @@ Returns:
         variables['input'] = _input
         return self.execute(UnshelveMutation, variables).unshelve_memory_drawer
 
-    async def acreate_shortcut(self, name: str, action: IDCoercible, args: Args, allow_quick: bool, use_returns: bool, description: str | None | UnsetType=UNSET, bind_number: int | None | UnsetType=UNSET, toolbox: IDCoercible | None | UnsetType=UNSET, bindings: ShortcutBindingsInput | None | UnsetType=UNSET) -> Shortcut:
+    async def acreate_shortcut(self, name: str, action: IDCoercible, args: Args, allow_quick: bool, use_returns: bool, description: str | None | UnsetType=UNSET, agent: IDCoercible | None | UnsetType=UNSET, interface: str | None | UnsetType=UNSET, bind_number: int | None | UnsetType=UNSET, toolbox: IDCoercible | None | UnsetType=UNSET, bindings: ShortcutBindingsInput | None | UnsetType=UNSET) -> Shortcut:
         """CreateShortcut 
 
 Create a shortcut to an action.
@@ -4602,6 +4619,8 @@ Args:
     name: The name of the shortcut. This is used to identify the shortcut in the system.
     description: The description of the shortcut.This can described the shortcut and its purpose.
     action: The action ID to create a shortcut for
+    agent: Pin the shortcut to this agent (with `interface`): it then runs there. What a shortcut to a stateful action needs to run without asking.
+    interface: The implementation interface on the pinned agent.
     args: The arguments to pre-pass to the shortcut. This is used to identify the shortcut in the system.
     allow_quick: Whether to allow quick shortcuts. Quick shorts are shortcuts that can be autorun without scpeific assignment
     use_returns: Whether when running the short the returns should be used further. Allows to create mini pipelines
@@ -4618,6 +4637,10 @@ Returns:
         if description is not UNSET:
             _input['description'] = description
         _input['action'] = action
+        if agent is not UNSET:
+            _input['agent'] = agent
+        if interface is not UNSET:
+            _input['interface'] = interface
         _input['args'] = args
         _input['allowQuick'] = allow_quick
         _input['useReturns'] = use_returns
@@ -4630,7 +4653,7 @@ Returns:
         variables['input'] = _input
         return (await self.aexecute(CreateShortcutMutation, variables)).create_shortcut
 
-    def create_shortcut(self, name: str, action: IDCoercible, args: Args, allow_quick: bool, use_returns: bool, description: str | None | UnsetType=UNSET, bind_number: int | None | UnsetType=UNSET, toolbox: IDCoercible | None | UnsetType=UNSET, bindings: ShortcutBindingsInput | None | UnsetType=UNSET) -> Shortcut:
+    def create_shortcut(self, name: str, action: IDCoercible, args: Args, allow_quick: bool, use_returns: bool, description: str | None | UnsetType=UNSET, agent: IDCoercible | None | UnsetType=UNSET, interface: str | None | UnsetType=UNSET, bind_number: int | None | UnsetType=UNSET, toolbox: IDCoercible | None | UnsetType=UNSET, bindings: ShortcutBindingsInput | None | UnsetType=UNSET) -> Shortcut:
         """CreateShortcut 
 
 Create a shortcut to an action.
@@ -4639,6 +4662,8 @@ Args:
     name: The name of the shortcut. This is used to identify the shortcut in the system.
     description: The description of the shortcut.This can described the shortcut and its purpose.
     action: The action ID to create a shortcut for
+    agent: Pin the shortcut to this agent (with `interface`): it then runs there. What a shortcut to a stateful action needs to run without asking.
+    interface: The implementation interface on the pinned agent.
     args: The arguments to pre-pass to the shortcut. This is used to identify the shortcut in the system.
     allow_quick: Whether to allow quick shortcuts. Quick shorts are shortcuts that can be autorun without scpeific assignment
     use_returns: Whether when running the short the returns should be used further. Allows to create mini pipelines
@@ -4655,6 +4680,10 @@ Returns:
         if description is not UNSET:
             _input['description'] = description
         _input['action'] = action
+        if agent is not UNSET:
+            _input['agent'] = agent
+        if interface is not UNSET:
+            _input['interface'] = interface
         _input['args'] = args
         _input['allowQuick'] = allow_quick
         _input['useReturns'] = use_returns
@@ -6557,7 +6586,7 @@ Returns:
         variables['id'] = id
         return self.execute(GetToolboxQuery, variables).toolbox
 
-    async def awatch_my_tasks(self) -> AsyncIterator[TaskChangeEvent]:
+    async def awatch_my_tasks(self) -> AsyncIterator[Annotated[TaskChangeEvent, Deprecated("Follow the caller session's `tasks:mine` topic on takt (`/session`) instead.")]]:
         """WatchMyTasks 
 
 Subscribe to root tasks created by this client (caller-scoped).
@@ -6571,7 +6600,7 @@ Returns:
         async for event in self.asubscribe(WatchMyTasksSubscription, variables):
             yield event.mytasks
 
-    def watch_my_tasks(self) -> Iterator[TaskChangeEvent]:
+    def watch_my_tasks(self) -> Iterator[Annotated[TaskChangeEvent, Deprecated("Follow the caller session's `tasks:mine` topic on takt (`/session`) instead.")]]:
         """WatchMyTasks 
 
 Subscribe to root tasks created by this client (caller-scoped).

@@ -28,6 +28,14 @@ class GraphQLDefault:
     def __repr__(self):
         return 'GraphQLDefault(' + repr(self.value) + ')'
 
+class ActionAvailability(str, Enum):
+    """Whether an action can run, as a list groups it: RUNNABLE now (`Action.assignable`), RECENT (an implementing agent was seen in the last 24 hours), OFFLINE (implemented, but no agent seen for longer), NONE (no implementation). In that order, which is `ActionOrder.availability` ascending."""
+    RUNNABLE = 'RUNNABLE'
+    RECENT = 'RECENT'
+    OFFLINE = 'OFFLINE'
+    NONE = 'NONE'
+    __str__ = str.__str__
+
 class ActionBlokPhase(str, Enum):
     """When a client shows an action's own blok: RUN for a run of the action (it reads the run as `task`), ASSIGN before one, to start it (no `task`; `<args />` places the argument form, `assign.start()` starts the run)."""
     RUN = 'RUN'
@@ -46,6 +54,7 @@ class AssignWidgetKind(str, Enum):
     CHOICE = 'CHOICE'
     SLIDER = 'SLIDER'
     CUSTOM = 'CUSTOM'
+    BLOK = 'BLOK'
     STRING = 'STRING'
     STATE_CHOICE = 'STATE_CHOICE'
     PROXY = 'PROXY'
@@ -193,7 +202,7 @@ class ActionFilter(BaseModel):
     or_: 'ActionFilter | None' = Field(validation_alias=AliasChoices('or_', 'OR'), serialization_alias='OR', default=None)
     not_: 'ActionFilter | None' = Field(validation_alias=AliasChoices('not_', 'NOT'), serialization_alias='NOT', default=None)
     distinct: bool | None = Field(validation_alias=AliasChoices('distinct', 'DISTINCT'), serialization_alias='DISTINCT', default=None)
-    search: str | None = Field(default=None, description="Search by name: a case-insensitive substring, or semantic similarity of the query to the action's name and description. Substring matches rank first, then by similarity; an explicit `ordering` replaces that ranking.")
+    search: str | None = Field(default=None, description="Search by name: a case-insensitive substring, or semantic similarity of the query to the action's name and description. Ranked: an exact match, then a prefix, then other textual matches by trigram similarity, then by meaning; an explicit `ordering` replaces that ranking.")
     ids: tuple[ID, ...] | None = None
     demands: tuple['PortDemandInput', ...] | None = None
     any_demands: tuple[tuple['PortDemandInput', ...], ...] | None = Field(validation_alias=AliasChoices('any_demands', 'anyDemands'), serialization_alias='anyDemands', default=None, description='Any of these demand sets: the rows that satisfy every demand of at least one set (each set as `demands`). One statement, so prefer it to `OR`-ing `demands`, which tests every row of the organization. An empty list is ignored; an empty set is an error.')
@@ -204,6 +213,7 @@ class ActionFilter(BaseModel):
     in_collection: str | None = Field(validation_alias=AliasChoices('in_collection', 'inCollection'), serialization_alias='inCollection', default=None)
     used_before: datetime | None = Field(validation_alias=AliasChoices('used_before', 'usedBefore'), serialization_alias='usedBefore', default=None)
     used_after: datetime | None = Field(validation_alias=AliasChoices('used_after', 'usedAfter'), serialization_alias='usedAfter', default=None)
+    availability: tuple[ActionAvailability, ...] | None = Field(default=None, description='Only actions of these availabilities (`Action.availability`). An empty list is ignored.')
     assignable: bool | None = Field(default=None, description='Whether an agent that can take the action is connected now (`Action.assignable`).')
     stateful: bool | None = None
     app_identifier: str | None = Field(validation_alias=AliasChoices('app_identifier', 'appIdentifier'), serialization_alias='appIdentifier', default=None, description='Filter using app identifier')
@@ -220,6 +230,26 @@ class ActionOrderDefinedAt(BaseModel):
     defined_at: Ordering = Field(validation_alias=AliasChoices('defined_at', 'definedAt'), serialization_alias='definedAt')
     model_config = ConfigDict(frozen=True, extra='forbid', populate_by_name=True, use_enum_values=True)
 
+class ActionOrderKind(BaseModel):
+    """'kind' variant of the @oneOf input 'ActionOrder'"""
+    kind: Ordering
+    model_config = ConfigDict(frozen=True, extra='forbid', populate_by_name=True, use_enum_values=True)
+
+class ActionOrderAppIdentifier(BaseModel):
+    """By the identifier of the app the action belongs to, so one app's actions stay together across pages."""
+    app_identifier: Ordering = Field(validation_alias=AliasChoices('app_identifier', 'appIdentifier'), serialization_alias='appIdentifier', description="By the identifier of the app the action belongs to, so one app's actions stay together across pages.")
+    model_config = ConfigDict(frozen=True, extra='forbid', populate_by_name=True, use_enum_values=True)
+
+class ActionOrderCollection(BaseModel):
+    """By the name of the action's first collection (alphabetically): the collection a grouped list files it under. Actions in no collection come last."""
+    collection: Ordering = Field(description="By the name of the action's first collection (alphabetically): the collection a grouped list files it under. Actions in no collection come last.")
+    model_config = ConfigDict(frozen=True, extra='forbid', populate_by_name=True, use_enum_values=True)
+
+class ActionOrderAvailability(BaseModel):
+    """By `Action.availability`: runnable now first (ASC), then recently active, offline, and without an implementation; DESC reverses it. Keeps each availability group together across pages."""
+    availability: Ordering = Field(description='By `Action.availability`: runnable now first (ASC), then recently active, offline, and without an implementation; DESC reverses it. Keeps each availability group together across pages.')
+    model_config = ConfigDict(frozen=True, extra='forbid', populate_by_name=True, use_enum_values=True)
+
 class ActionOrderUsedAt(BaseModel):
     """'usedAt' variant of the @oneOf input 'ActionOrder'"""
     used_at: Ordering = Field(validation_alias=AliasChoices('used_at', 'usedAt'), serialization_alias='usedAt')
@@ -234,7 +264,7 @@ class ActionOrderAssignable(BaseModel):
     """Runnable first (DESC) or last (ASC) by `Action.assignable`. The order the filters set (a `search`'s ranking) is kept as the tie-break, so `search` with this ordering lists runnable matches first, each group still ranked by relevance."""
     assignable: Ordering = Field(description="Runnable first (DESC) or last (ASC) by `Action.assignable`. The order the filters set (a `search`'s ranking) is kept as the tie-break, so `search` with this ordering lists runnable matches first, each group still ranked by relevance.")
     model_config = ConfigDict(frozen=True, extra='forbid', populate_by_name=True, use_enum_values=True)
-ActionOrder = ActionOrderDefinedAt | ActionOrderUsedAt | ActionOrderEstimatedRuntime | ActionOrderAssignable
+ActionOrder = ActionOrderDefinedAt | ActionOrderKind | ActionOrderAppIdentifier | ActionOrderCollection | ActionOrderAvailability | ActionOrderUsedAt | ActionOrderEstimatedRuntime | ActionOrderAssignable
 
 class AgentFilter(BaseModel):
     """A way to filter agents"""
@@ -244,7 +274,10 @@ class AgentFilter(BaseModel):
     distinct: bool | None = Field(validation_alias=AliasChoices('distinct', 'DISTINCT'), serialization_alias='DISTINCT', default=None)
     client_id: str | None = Field(validation_alias=AliasChoices('client_id', 'clientId'), serialization_alias='clientId', default=None, description='Filter by client ID of the app the agent is registered to')
     available: bool | None = Field(default=None, description="Agents that can receive work now: a webhook agent, or a connected one with a fresh heartbeat (takt's rule).")
-    supervisor: str | None = Field(default=None, description="Agents whose self-declared supervisor is this app (e.g. 'plugin_engine').")
+    connected: bool | None = Field(default=None, description='Agents with a live connection (true): connected, with a fresh heartbeat. False keeps every other agent, webhook agents included. Unlike `available`, a webhook agent is never connected.')
+    kind: AgentKind | None = Field(default=None, description='Filter by the kind of agent (websocket, webhook, ...)')
+    supervisor: str | None = Field(default=None, description="Agents whose client this app provisioned (e.g. 'plugin_engine'), as lok signed it into their token.")
+    supervised: bool | None = Field(default=None, description='Agents whose client an app provisioned (true), or nobody (false), as of their last registration.')
     requires: tuple[RequiresInput, ...] | None = Field(default=None, description="Agents meeting a port's descriptor constraints (a picker hands them in as $requires). The only descriptor of @rekuest/agent is @rekuest/supervisor; any other key is refused.")
     caller_of: ID | None = Field(validation_alias=AliasChoices('caller_of', 'callerOf'), serialization_alias='callerOf', default=None, description="The agents that called this task, nearest first: its ancestors' agents, then the agent of the app its run was started from. Never the task's own agent. How an app finds what its caller offers (with actionDemands) and calls it.")
     ids: tuple[ID, ...] | None = Field(default=None, description='Filter by IDs of the agents')
@@ -393,6 +426,8 @@ class CreateShortcutInput(BaseModel):
     name: str = Field(description='The name of the shortcut. This is used to identify the shortcut in the system.')
     description: str | None = Field(default=None, description='The description of the shortcut.This can described the shortcut and its purpose.')
     action: ID = Field(description='The action ID to create a shortcut for')
+    agent: ID | None = Field(default=None, description='Pin the shortcut to this agent (with `interface`): it then runs there. What a shortcut to a stateful action needs to run without asking.')
+    interface: str | None = Field(default=None, description='The implementation interface on the pinned agent.')
     args: Args = Field(description='The arguments to pre-pass to the shortcut. This is used to identify the shortcut in the system.')
     allow_quick: Annotated[bool | None, GraphQLDefault('False')] = Field(validation_alias=AliasChoices('allow_quick', 'allowQuick'), serialization_alias='allowQuick', default=None, description='Whether to allow quick shortcuts. Quick shorts are shortcuts that can be autorun without scpeific assignment')
     'Whether to allow quick shortcuts. Quick shorts are shortcuts that can be autorun without scpeific assignment\nDefault: False'
