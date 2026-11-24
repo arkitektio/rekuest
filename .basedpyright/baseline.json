@@ -2180,22 +2180,6 @@
             {
                 "code": "reportArgumentType",
                 "range": {
-                    "startColumn": 76,
-                    "endColumn": 78,
-                    "lineCount": 1
-                }
-            },
-            {
-                "code": "reportArgumentType",
-                "range": {
-                    "startColumn": 30,
-                    "endColumn": 21,
-                    "lineCount": 5
-                }
-            },
-            {
-                "code": "reportArgumentType",
-                "range": {
                     "startColumn": 30,
                     "endColumn": 21,
                     "lineCount": 4
