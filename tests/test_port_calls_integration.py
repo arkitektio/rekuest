@@ -15,6 +15,7 @@ from arkitekt_spec.actions import (
     ActionArgumentInput,
     EffectKind,
     ImplementationInput,
+    PortKind,
     UtilCallInput,
     ValidatorInput,
 )
@@ -27,7 +28,7 @@ from dokker import Deployment
 from rekuest.protocol.schema import (
     CatalogArgumentInput,
     CatalogOperationInput,
-    CatalogValueKind,
+    CatalogPortInput,
 )
 
 from .conftest import CONNECT_TIMEOUT, build_fresh_rekuest
@@ -353,7 +354,9 @@ async def test_catalog_validation_at_registration(deployment: Deployment) -> Non
                 widget_defaults=[],
                 operations=[
                     CatalogOperationInput(
-                        name="gt", returns=CatalogValueKind.BOOL, arguments=[]
+                        name="gt",
+                        returns=CatalogPortInput(kind=PortKind.BOOL),
+                        arguments=(),
                     )
                 ],
             )
@@ -366,12 +369,18 @@ async def test_catalog_validation_at_registration(deployment: Deployment) -> Non
             operations=[
                 CatalogOperationInput(
                     name="clamp",
-                    returns=CatalogValueKind.FLOAT,
-                    arguments=[
-                        CatalogArgumentInput(key="value", kind=CatalogValueKind.FLOAT),
-                        CatalogArgumentInput(key="min", kind=CatalogValueKind.FLOAT),
-                        CatalogArgumentInput(key="max", kind=CatalogValueKind.FLOAT),
-                    ],
+                    returns=CatalogPortInput(kind=PortKind.FLOAT),
+                    arguments=(
+                        CatalogArgumentInput(
+                            key="value", port=CatalogPortInput(kind=PortKind.FLOAT)
+                        ),
+                        CatalogArgumentInput(
+                            key="min", port=CatalogPortInput(kind=PortKind.FLOAT)
+                        ),
+                        CatalogArgumentInput(
+                            key="max", port=CatalogPortInput(kind=PortKind.FLOAT)
+                        ),
+                    ),
                 )
             ],
         )
@@ -460,10 +469,10 @@ async def test_catalog_validation_at_registration(deployment: Deployment) -> Non
             operations=[
                 CatalogOperationInput(
                     name="fmt",
-                    returns=CatalogValueKind.STRING,
+                    returns=CatalogPortInput(kind=PortKind.STRING),
                     arguments=[
-                        CatalogArgumentInput(key="a", kind=CatalogValueKind.ANY),
-                        CatalogArgumentInput(key="b", kind=CatalogValueKind.ANY),
+                        CatalogArgumentInput(key="a", port=None),
+                        CatalogArgumentInput(key="b", port=None),
                     ],
                 )
             ],

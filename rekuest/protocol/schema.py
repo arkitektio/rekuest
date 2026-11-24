@@ -60,19 +60,6 @@ class AssignWidgetKind(str, Enum):
     PROXY = 'PROXY'
     __str__ = str.__str__
 
-class CatalogValueKind(str, Enum):
-    """The kind of value a catalog component prop accepts or a catalog operation argument/return carries."""
-    STRING = 'STRING'
-    INT = 'INT'
-    FLOAT = 'FLOAT'
-    BOOL = 'BOOL'
-    DICT = 'DICT'
-    LIST = 'LIST'
-    ANY = 'ANY'
-    CALLBACK = 'CALLBACK'
-    ASSET = 'ASSET'
-    __str__ = str.__str__
-
 class ComponentContext(str, Enum):
     """What draws a blok, as its `<Blok context=...>` says, and the renderer a catalog component lives in: PANEL (panels, dashboards, popouts), SCENE (a 3D view) or LOGO (an SVG drawing: an agent's logo, or an action's when the blok's kind is action)."""
     PANEL = 'PANEL'
@@ -103,7 +90,7 @@ class JSONPatchOperation(str, Enum):
     __str__ = str.__str__
 
 class LocalKind(str, Enum):
-    """The kind of a blok local: a port kind, or ANY (an untyped value, which skips the bind and argument kind checks). No action port is ever ANY."""
+    """The kind of a blok local: a port kind (never CALLBACK, ASSET or BINDING, which only a catalog types by), or ANY (an untyped value, which skips the bind and argument kind checks). No action port is ever ANY."""
     INT = 'INT'
     'An integer. No children; choices optional.'
     STRING = 'STRING'
@@ -321,10 +308,33 @@ class BlokAgentMappingInput(BaseModel):
 class CatalogArgumentInput(BaseModel):
     """An argument a catalog operation accepts."""
     key: str = Field(description='The argument key a UtilCall argument must use.')
-    kind: CatalogValueKind = Field(description='The value kind of the argument.')
+    port: 'CatalogPortInput | None' = Field(default=None, description='What it takes; none: open (any value).')
     required: Annotated[bool | None, GraphQLDefault('True')] = Field(default=None, description='Whether every call must pass this argument.')
     'Whether every call must pass this argument.\nDefault: True'
     description: str | None = Field(default=None, description='Human-readable description of the argument.')
+    model_config = ConfigDict(frozen=True, extra='forbid', populate_by_name=True, use_enum_values=True)
+
+class CatalogChildPortInput(BaseModel):
+    """A catalog port below another: an item ('...'), a field, a variant, a payload field."""
+    kind: PortKind | None = Field(default=None, description='Its kind; none: open (any value).')
+    identifier: str | None = Field(default=None, description='STRUCTURE, MEMORY_STRUCTURE, INTERFACE: what it references (`*`: any).')
+    nullable: Annotated[bool | None, GraphQLDefault('False')] = Field(default=None, description='Whether it takes null.')
+    'Whether it takes null.\nDefault: False'
+    choices: tuple['CatalogChoiceInput', ...] | None = Field(default=None, description='The values it takes (required for ENUM).')
+    children: tuple['CatalogChildPortInput', ...] | None = Field(default=None, description="LIST/BINDING: its one item, keyed '...'; DICT/MODEL: its fields; UNION: its variants; CALLBACK: its payload.")
+    default: Any | None = Field(default=None, description='Its default value.')
+    reference_unit: str | None = Field(validation_alias=AliasChoices('reference_unit', 'referenceUnit'), serialization_alias='referenceUnit', default=None, description='For a QUANTITY: its reference unit.')
+    proposed_units: tuple[str, ...] | None = Field(validation_alias=AliasChoices('proposed_units', 'proposedUnits'), serialization_alias='proposedUnits', default=None, description='For a QUANTITY: the units offered.')
+    dimension: str | None = Field(default=None, description='For a QUANTITY: its dimensionality.')
+    key: str = Field(description='Its key (may be `value`).')
+    description: str | None = Field(default=None, description='What it is.')
+    model_config = ConfigDict(frozen=True, extra='forbid', populate_by_name=True, use_enum_values=True)
+
+class CatalogChoiceInput(BaseModel):
+    """A value a catalog port takes."""
+    value: Any = Field(description="The value (any JSON value fitting the port's kind).")
+    label: str | None = Field(default=None, description='How it is shown.')
+    description: str | None = Field(default=None, description='What it means.')
     model_config = ConfigDict(frozen=True, extra='forbid', populate_by_name=True, use_enum_values=True)
 
 class CatalogComponentInput(BaseModel):
@@ -348,30 +358,38 @@ class CatalogComponentInput(BaseModel):
     catalog: str | None = Field(default=None, description='The catalog it belongs to, as name@version (`ui@1`), or the name of the module it is from.')
     model_config = ConfigDict(frozen=True, extra='forbid', populate_by_name=True, use_enum_values=True)
 
-class CatalogEventFieldInput(BaseModel):
-    """A field of the event a CALLBACK prop hands its callback (`event.<key>`)."""
-    key: str = Field(description='The field a callback reads as `event.<key>`.')
-    kind: CatalogValueKind = Field(description='The value kind of the field.')
-    description: str | None = Field(default=None, description='Human-readable description of the field.')
-    model_config = ConfigDict(frozen=True, extra='forbid', populate_by_name=True, use_enum_values=True)
-
 class CatalogOperationInput(BaseModel):
     """A pure operation a UI catalog can evaluate for UtilCalls."""
     name: str = Field(description='The operation name a UtilCall.operation must match.')
     description: str | None = Field(default=None, description='Human-readable description of the operation.')
     arguments: Annotated[tuple[CatalogArgumentInput, ...] | None, GraphQLDefault('[]')] = Field(default=None, description='The arguments the operation accepts.')
     'The arguments the operation accepts.\nDefault: []'
-    returns: CatalogValueKind = Field(description='The kind of value the operation returns (BOOL for effect and validator calls).')
+    returns: 'CatalogPortInput | None' = Field(default=None, description='What it returns (BOOL for effect and validator calls); none: open.')
+    model_config = ConfigDict(frozen=True, extra='forbid', populate_by_name=True, use_enum_values=True)
+
+class CatalogPortInput(BaseModel):
+    """The port a catalog types a prop, an operation argument or a result by: an action's port, plus CALLBACK, ASSET and BINDING and the open identifier `*`. No kind: open (any value)."""
+    kind: PortKind | None = Field(default=None, description='Its kind; none: open (any value).')
+    identifier: str | None = Field(default=None, description='STRUCTURE, MEMORY_STRUCTURE, INTERFACE: what it references (`*`: any).')
+    nullable: Annotated[bool | None, GraphQLDefault('False')] = Field(default=None, description='Whether it takes null.')
+    'Whether it takes null.\nDefault: False'
+    choices: tuple[CatalogChoiceInput, ...] | None = Field(default=None, description='The values it takes (required for ENUM).')
+    children: tuple[CatalogChildPortInput, ...] | None = Field(default=None, description="LIST/BINDING: its one item, keyed '...'; DICT/MODEL: its fields; UNION: its variants; CALLBACK: its payload.")
+    default: Any | None = Field(default=None, description='Its default value.')
+    reference_unit: str | None = Field(validation_alias=AliasChoices('reference_unit', 'referenceUnit'), serialization_alias='referenceUnit', default=None, description='For a QUANTITY: its reference unit.')
+    proposed_units: tuple[str, ...] | None = Field(validation_alias=AliasChoices('proposed_units', 'proposedUnits'), serialization_alias='proposedUnits', default=None, description='For a QUANTITY: the units offered.')
+    dimension: str | None = Field(default=None, description='For a QUANTITY: its dimensionality.')
     model_config = ConfigDict(frozen=True, extra='forbid', populate_by_name=True, use_enum_values=True)
 
 class CatalogPropInput(BaseModel):
     """A prop a catalog component accepts."""
     key: str = Field(description='The prop key a ComponentProp.key must match.')
-    kind: CatalogValueKind = Field(description='The value kind this prop accepts. CALLBACK props hold one task call or one effect. On `bind`, the kind the control writes (`locals.bind_kinds`).')
     required: Annotated[bool | None, GraphQLDefault('False')] = Field(default=None, description='Whether every component instance must set this prop.')
     'Whether every component instance must set this prop.\nDefault: False'
     description: str | None = Field(default=None, description='Human-readable description of the prop.')
-    event: tuple[CatalogEventFieldInput, ...] | None = Field(default=None, description='For a CALLBACK prop: the fields of the event it hands its callback (`event.<key>`); none when it hands none.')
+    since: Annotated[int | None, GraphQLDefault('0')] = Field(default=None, description='The catalog minor that added it; 0: from the start.')
+    'The catalog minor that added it; 0: from the start.\nDefault: 0'
+    port: CatalogPortInput | None = Field(default=None, description="What it takes; none: open (the language's own props). CALLBACK props hold one task call or one effect; `bind` is a BINDING.")
     model_config = ConfigDict(frozen=True, extra='forbid', populate_by_name=True, use_enum_values=True)
 
 class CollectInput(BaseModel):
@@ -805,7 +823,10 @@ class WidgetDefaultInput(BaseModel):
     model_config = ConfigDict(frozen=True, extra='forbid', populate_by_name=True, use_enum_values=True)
 ActionFilter.model_rebuild()
 AgentFilter.model_rebuild()
+CatalogArgumentInput.model_rebuild()
+CatalogChildPortInput.model_rebuild()
 CatalogComponentInput.model_rebuild()
+CatalogOperationInput.model_rebuild()
 CreateShortcutInput.model_rebuild()
 ImplementationActionFilter.model_rebuild()
 ImplementationAgentFilter.model_rebuild()

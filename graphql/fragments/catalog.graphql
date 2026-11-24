@@ -1,6 +1,9 @@
 fragment CatalogArgument on CatalogArgument {
   key
-  kind
+  port {
+    kind
+    tree
+  }
   required
   description
 }
@@ -8,26 +11,24 @@ fragment CatalogArgument on CatalogArgument {
 fragment CatalogOperation on CatalogOperation {
   name
   description
-  returns
+  returns {
+    kind
+    tree
+  }
   arguments {
     ...CatalogArgument
   }
 }
 
-fragment CatalogEventField on CatalogEventField {
-  key
-  kind
-  description
-}
-
 fragment CatalogProp on CatalogProp {
   key
-  kind
+  port {
+    kind
+    tree
+  }
   required
   description
-  event {
-    ...CatalogEventField
-  }
+  since
 }
 
 fragment CatalogComponent on CatalogComponent {

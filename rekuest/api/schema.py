@@ -6,7 +6,7 @@ from arkitekt_spec.actions import ActionDemandInput, ActionKind, AgentDependency
 from datetime import datetime
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 from rath.scalars import ID, IDCoercible
-from rekuest.protocol.schema import ActionBlokPhase, ActionFilter, ActionOrder, AgentFilter, AgentInput, AgentKind, AllowActionInput, AssignWidgetKind, BlokAgentMappingInput, CatalogComponentInput, CatalogOperationInput, CatalogValueKind, CollectInput, ComponentContext, CreateAssetInput, CreateBlokInput, CreateDashboardInput, CreateHigherOrderImplementationInput, CreateShortcutInput, CreateTestCaseInput, CreateTestResultInput, DependencyTreeInput, DiagnosticLevel, EditBlokInput, FinishMediaUploadInput, ForkBlokInput, ImplementationFilter, InquireInput, InterruptInput, JSONPatchOperation, LocalKind, LogLevel, MaterializationScope, MaterializeBlokInput, OffsetPaginationInput, OnLost, PinInput, PinMaterializedBlokRevisionInput, RegisterModuleInput, RequestAssetUploadInput, RequestMediaAccessInput, RequestMediaUploadInput, ResetPlacementInput, ReturnWidgetKind, RevertBlokInput, RevokeAllowanceInput, SavePlacementInput, ShelveInMemoryDrawerInput, ShortcutBindingsInput, ShortcutFilter, ShortcutOrder, TaskInstructKind, TaskStatus, ToolboxFilter, ToolboxOrder, UnshelveMemoryDrawerInput, UpdateBlokInput, UpdateMaterializedBlokInput, WidgetDefaultInput
+from rekuest.protocol.schema import ActionBlokPhase, ActionFilter, ActionOrder, AgentFilter, AgentInput, AgentKind, AllowActionInput, AssignWidgetKind, BlokAgentMappingInput, CatalogComponentInput, CatalogOperationInput, CollectInput, ComponentContext, CreateAssetInput, CreateBlokInput, CreateDashboardInput, CreateHigherOrderImplementationInput, CreateShortcutInput, CreateTestCaseInput, CreateTestResultInput, DependencyTreeInput, DiagnosticLevel, EditBlokInput, FinishMediaUploadInput, ForkBlokInput, ImplementationFilter, InquireInput, InterruptInput, JSONPatchOperation, LocalKind, LogLevel, MaterializationScope, MaterializeBlokInput, OffsetPaginationInput, OnLost, PinInput, PinMaterializedBlokRevisionInput, RegisterModuleInput, RequestAssetUploadInput, RequestMediaAccessInput, RequestMediaUploadInput, ResetPlacementInput, ReturnWidgetKind, RevertBlokInput, RevokeAllowanceInput, SavePlacementInput, ShelveInMemoryDrawerInput, ShortcutBindingsInput, ShortcutFilter, ShortcutOrder, TaskInstructKind, TaskStatus, ToolboxFilter, ToolboxOrder, UnshelveMemoryDrawerInput, UpdateBlokInput, UpdateMaterializedBlokInput, WidgetDefaultInput
 from rekuest.scalars import ActionHash, Args, Identifier, JSONSerializable, MediaLike
 from rekuest.traits.action import Callable
 from typing import Annotated, Any, AsyncIterator, ClassVar, Iterable, Iterator, Literal
@@ -275,34 +275,52 @@ class BlokDemo(BaseModel):
         name = 'BlokDemo'
         type = 'BlokDemo'
 
+class CatalogArgumentPort(BaseModel):
+    """The port a catalog types a prop, an operation argument or a result by: an action's port, plus CALLBACK, ASSET and BINDING and the open identifier `*`. No kind: open (any value)."""
+    typename: Literal['CatalogPort'] = Field(alias='__typename', default='CatalogPort', exclude=True)
+    kind: PortKind | None = Field(default=None)
+    tree: JSONSerializable
+    'The whole port, children at every depth, as a catalog writes it (camelCase, empty fields left out): what a client compares a catalog by.'
+    model_config = ConfigDict(frozen=True)
+
 class CatalogArgument(BaseModel):
     """An argument a catalog operation accepts."""
     typename: Literal['CatalogArgument'] = Field(alias='__typename', default='CatalogArgument', exclude=True)
     key: str
-    kind: CatalogValueKind
+    port: CatalogArgumentPort | None = Field(default=None)
     required: bool
     description: str | None = Field(default=None)
     model_config = ConfigDict(frozen=True)
 
     class Meta:
         """Meta class for CatalogArgument"""
-        document = 'fragment CatalogArgument on CatalogArgument {\n  key\n  kind\n  required\n  description\n  __typename\n}'
+        document = 'fragment CatalogArgument on CatalogArgument {\n  key\n  port {\n    kind\n    tree\n    __typename\n  }\n  required\n  description\n  __typename\n}'
         name = 'CatalogArgument'
         type = 'CatalogArgument'
 
-class CatalogEventField(BaseModel):
-    """A field of the event a CALLBACK prop hands its callback."""
-    typename: Literal['CatalogEventField'] = Field(alias='__typename', default='CatalogEventField', exclude=True)
+class CatalogPropPort(BaseModel):
+    """The port a catalog types a prop, an operation argument or a result by: an action's port, plus CALLBACK, ASSET and BINDING and the open identifier `*`. No kind: open (any value)."""
+    typename: Literal['CatalogPort'] = Field(alias='__typename', default='CatalogPort', exclude=True)
+    kind: PortKind | None = Field(default=None)
+    tree: JSONSerializable
+    'The whole port, children at every depth, as a catalog writes it (camelCase, empty fields left out): what a client compares a catalog by.'
+    model_config = ConfigDict(frozen=True)
+
+class CatalogProp(BaseModel):
+    """A prop a catalog component accepts."""
+    typename: Literal['CatalogProp'] = Field(alias='__typename', default='CatalogProp', exclude=True)
     key: str
-    kind: CatalogValueKind
+    port: CatalogPropPort | None = Field(default=None)
+    required: bool
     description: str | None = Field(default=None)
+    since: int
     model_config = ConfigDict(frozen=True)
 
     class Meta:
-        """Meta class for CatalogEventField"""
-        document = 'fragment CatalogEventField on CatalogEventField {\n  key\n  kind\n  description\n  __typename\n}'
-        name = 'CatalogEventField'
-        type = 'CatalogEventField'
+        """Meta class for CatalogProp"""
+        document = 'fragment CatalogProp on CatalogProp {\n  key\n  port {\n    kind\n    tree\n    __typename\n  }\n  required\n  description\n  since\n  __typename\n}'
+        name = 'CatalogProp'
+        type = 'CatalogProp'
 
 class Dashboard(BaseModel):
     """No documentation"""
@@ -963,36 +981,50 @@ class BlokDependency(BaseModel):
         name = 'BlokDependency'
         type = 'BlokDependency'
 
+class CatalogOperationReturns(BaseModel):
+    """The port a catalog types a prop, an operation argument or a result by: an action's port, plus CALLBACK, ASSET and BINDING and the open identifier `*`. No kind: open (any value)."""
+    typename: Literal['CatalogPort'] = Field(alias='__typename', default='CatalogPort', exclude=True)
+    kind: PortKind | None = Field(default=None)
+    tree: JSONSerializable
+    'The whole port, children at every depth, as a catalog writes it (camelCase, empty fields left out): what a client compares a catalog by.'
+    model_config = ConfigDict(frozen=True)
+
 class CatalogOperation(BaseModel):
     """A pure operation a UI catalog can evaluate for UtilCalls."""
     typename: Literal['CatalogOperation'] = Field(alias='__typename', default='CatalogOperation', exclude=True)
     name: str
     description: str | None = Field(default=None)
-    returns: CatalogValueKind
+    returns: CatalogOperationReturns | None = Field(default=None)
     arguments: tuple[CatalogArgument, ...]
     model_config = ConfigDict(frozen=True)
 
     class Meta:
         """Meta class for CatalogOperation"""
-        document = 'fragment CatalogArgument on CatalogArgument {\n  key\n  kind\n  required\n  description\n  __typename\n}\n\nfragment CatalogOperation on CatalogOperation {\n  name\n  description\n  returns\n  arguments {\n    ...CatalogArgument\n    __typename\n  }\n  __typename\n}'
+        document = 'fragment CatalogArgument on CatalogArgument {\n  key\n  port {\n    kind\n    tree\n    __typename\n  }\n  required\n  description\n  __typename\n}\n\nfragment CatalogOperation on CatalogOperation {\n  name\n  description\n  returns {\n    kind\n    tree\n    __typename\n  }\n  arguments {\n    ...CatalogArgument\n    __typename\n  }\n  __typename\n}'
         name = 'CatalogOperation'
         type = 'CatalogOperation'
 
-class CatalogProp(BaseModel):
-    """A prop a catalog component accepts."""
-    typename: Literal['CatalogProp'] = Field(alias='__typename', default='CatalogProp', exclude=True)
-    key: str
-    kind: CatalogValueKind
-    required: bool
+class CatalogComponent(BaseModel):
+    """A component a UI catalog can render."""
+    typename: Literal['CatalogComponent'] = Field(alias='__typename', default='CatalogComponent', exclude=True)
+    name: str
     description: str | None = Field(default=None)
-    event: tuple[CatalogEventField, ...] | None = Field(default=None)
+    accepts_children: bool = Field(alias='acceptsChildren')
+    context: ComponentContext
+    children_context: ComponentContext | None = Field(default=None, alias='childrenContext')
+    inherits_context: bool = Field(alias='inheritsContext')
+    downstream_of: tuple[str, ...] = Field(alias='downstreamOf')
+    not_downstream_of: tuple[str, ...] = Field(alias='notDownstreamOf')
+    text_prop: str | None = Field(default=None, alias='textProp')
+    catalog: str | None = Field(default=None)
+    props: tuple[CatalogProp, ...]
     model_config = ConfigDict(frozen=True)
 
     class Meta:
-        """Meta class for CatalogProp"""
-        document = 'fragment CatalogEventField on CatalogEventField {\n  key\n  kind\n  description\n  __typename\n}\n\nfragment CatalogProp on CatalogProp {\n  key\n  kind\n  required\n  description\n  event {\n    ...CatalogEventField\n    __typename\n  }\n  __typename\n}'
-        name = 'CatalogProp'
-        type = 'CatalogProp'
+        """Meta class for CatalogComponent"""
+        document = 'fragment CatalogProp on CatalogProp {\n  key\n  port {\n    kind\n    tree\n    __typename\n  }\n  required\n  description\n  since\n  __typename\n}\n\nfragment CatalogComponent on CatalogComponent {\n  name\n  description\n  acceptsChildren\n  context\n  childrenContext\n  inheritsContext\n  downstreamOf\n  notDownstreamOf\n  textProp\n  catalog\n  props {\n    ...CatalogProp\n    __typename\n  }\n  __typename\n}'
+        name = 'CatalogComponent'
+        type = 'CatalogComponent'
 
 class ActionArgumentNestedUtilCall(BaseModel):
     """Defines a utility call that can be invoked within the system."""
@@ -1088,27 +1120,27 @@ class TaskChangeEvent(BaseModel):
         name = 'TaskChangeEvent'
         type = 'TaskChangeEvent'
 
-class CatalogComponent(BaseModel):
-    """A component a UI catalog can render."""
-    typename: Literal['CatalogComponent'] = Field(alias='__typename', default='CatalogComponent', exclude=True)
+class Module(BaseModel):
+    """A module: an app's own, unversioned UI extras (the components a UI app can render beyond the spec's catalogs and the pure operations it can evaluate for UtilCalls), registered per organization with the catalogs it implements whole. A blok names at most one as its `module`."""
+    typename: Literal['Module'] = Field(alias='__typename', default='Module', exclude=True)
+    id: ID
     name: str
     description: str | None = Field(default=None)
-    accepts_children: bool = Field(alias='acceptsChildren')
-    context: ComponentContext
-    children_context: ComponentContext | None = Field(default=None, alias='childrenContext')
-    inherits_context: bool = Field(alias='inheritsContext')
-    downstream_of: tuple[str, ...] = Field(alias='downstreamOf')
-    not_downstream_of: tuple[str, ...] = Field(alias='notDownstreamOf')
-    text_prop: str | None = Field(default=None, alias='textProp')
-    catalog: str | None = Field(default=None)
-    props: tuple[CatalogProp, ...]
+    is_registered: bool = Field(alias='isRegistered')
+    'Whether a UI app has registered components or operations; unregistered modules validate nothing.'
+    catalogs: tuple[str, ...]
+    "The spec's versioned catalogs (blok language v2) the UI app implements whole, as name@version ('ui@1'), as it registered them."
+    components: tuple[CatalogComponent, ...]
+    'Registered components. Empty until a UI app registers the module.'
+    operations: tuple[CatalogOperation, ...]
+    'Registered pure operations UtilCalls may name. Empty until a UI app registers the module.'
     model_config = ConfigDict(frozen=True)
 
     class Meta:
-        """Meta class for CatalogComponent"""
-        document = 'fragment CatalogEventField on CatalogEventField {\n  key\n  kind\n  description\n  __typename\n}\n\nfragment CatalogProp on CatalogProp {\n  key\n  kind\n  required\n  description\n  event {\n    ...CatalogEventField\n    __typename\n  }\n  __typename\n}\n\nfragment CatalogComponent on CatalogComponent {\n  name\n  description\n  acceptsChildren\n  context\n  childrenContext\n  inheritsContext\n  downstreamOf\n  notDownstreamOf\n  textProp\n  catalog\n  props {\n    ...CatalogProp\n    __typename\n  }\n  __typename\n}'
-        name = 'CatalogComponent'
-        type = 'CatalogComponent'
+        """Meta class for Module"""
+        document = 'fragment CatalogArgument on CatalogArgument {\n  key\n  port {\n    kind\n    tree\n    __typename\n  }\n  required\n  description\n  __typename\n}\n\nfragment CatalogProp on CatalogProp {\n  key\n  port {\n    kind\n    tree\n    __typename\n  }\n  required\n  description\n  since\n  __typename\n}\n\nfragment CatalogComponent on CatalogComponent {\n  name\n  description\n  acceptsChildren\n  context\n  childrenContext\n  inheritsContext\n  downstreamOf\n  notDownstreamOf\n  textProp\n  catalog\n  props {\n    ...CatalogProp\n    __typename\n  }\n  __typename\n}\n\nfragment CatalogOperation on CatalogOperation {\n  name\n  description\n  returns {\n    kind\n    tree\n    __typename\n  }\n  arguments {\n    ...CatalogArgument\n    __typename\n  }\n  __typename\n}\n\nfragment Module on Module {\n  id\n  name\n  description\n  isRegistered\n  catalogs\n  components {\n    ...CatalogComponent\n    __typename\n  }\n  operations {\n    ...CatalogOperation\n    __typename\n  }\n  __typename\n}'
+        name = 'Module'
+        type = 'Module'
 
 class ActionArgumentUtilCall(BaseModel):
     """Defines a utility call that can be invoked within the system."""
@@ -1166,28 +1198,6 @@ class ResolvedBlokLocal(BaseModel):
         document = 'fragment ArgChildPortNested on ArgPort {\n  key\n  kind\n  children {\n    key\n    identifier\n    nullable\n    kind\n    referenceUnit\n    proposedUnits\n    dimension\n    __typename\n  }\n  choices {\n    value\n    label\n    description\n    __typename\n  }\n  identifier\n  nullable\n  default\n  referenceUnit\n  proposedUnits\n  dimension\n  __typename\n}\n\nfragment ArgChildPort on ArgPort {\n  key\n  kind\n  identifier\n  children {\n    ...ArgChildPortNested\n    __typename\n  }\n  choices {\n    value\n    label\n    description\n    __typename\n  }\n  nullable\n  default\n  referenceUnit\n  proposedUnits\n  dimension\n  __typename\n}\n\nfragment ResolvedBlokLocal on ResolvedBlokLocal {\n  node\n  key\n  label\n  kind\n  description\n  identifier\n  nullable\n  default\n  persist\n  referenceUnit\n  proposedUnits\n  dimension\n  children {\n    ...ArgChildPort\n    __typename\n  }\n  choices {\n    value\n    label\n    description\n    __typename\n  }\n  __typename\n}'
         name = 'ResolvedBlokLocal'
         type = 'ResolvedBlokLocal'
-
-class Module(BaseModel):
-    """A module: an app's own, unversioned UI extras (the components a UI app can render beyond the spec's catalogs and the pure operations it can evaluate for UtilCalls), registered per organization with the catalogs it implements whole. A blok names at most one as its `module`."""
-    typename: Literal['Module'] = Field(alias='__typename', default='Module', exclude=True)
-    id: ID
-    name: str
-    description: str | None = Field(default=None)
-    is_registered: bool = Field(alias='isRegistered')
-    'Whether a UI app has registered components or operations; unregistered modules validate nothing.'
-    catalogs: tuple[str, ...]
-    "The spec's versioned catalogs (blok language v2) the UI app implements whole, as name@version ('ui@1'), as it registered them."
-    components: tuple[CatalogComponent, ...]
-    'Registered components. Empty until a UI app registers the module.'
-    operations: tuple[CatalogOperation, ...]
-    'Registered pure operations UtilCalls may name. Empty until a UI app registers the module.'
-    model_config = ConfigDict(frozen=True)
-
-    class Meta:
-        """Meta class for Module"""
-        document = 'fragment CatalogEventField on CatalogEventField {\n  key\n  kind\n  description\n  __typename\n}\n\nfragment CatalogArgument on CatalogArgument {\n  key\n  kind\n  required\n  description\n  __typename\n}\n\nfragment CatalogProp on CatalogProp {\n  key\n  kind\n  required\n  description\n  event {\n    ...CatalogEventField\n    __typename\n  }\n  __typename\n}\n\nfragment CatalogComponent on CatalogComponent {\n  name\n  description\n  acceptsChildren\n  context\n  childrenContext\n  inheritsContext\n  downstreamOf\n  notDownstreamOf\n  textProp\n  catalog\n  props {\n    ...CatalogProp\n    __typename\n  }\n  __typename\n}\n\nfragment CatalogOperation on CatalogOperation {\n  name\n  description\n  returns\n  arguments {\n    ...CatalogArgument\n    __typename\n  }\n  __typename\n}\n\nfragment Module on Module {\n  id\n  name\n  description\n  isRegistered\n  catalogs\n  components {\n    ...CatalogComponent\n    __typename\n  }\n  operations {\n    ...CatalogOperation\n    __typename\n  }\n  __typename\n}'
-        name = 'Module'
-        type = 'Module'
 
 class BlokQuery(BaseModel):
     """A declared read: one GraphQL query on a service, read as `queries.<key>` (status, value, error, refetching, fetching_more)."""
@@ -2414,7 +2424,7 @@ class RegisterModuleMutation(BaseModel):
 
     class Meta:
         """Meta class for RegisterModule """
-        document = 'fragment CatalogEventField on CatalogEventField {\n  key\n  kind\n  description\n  __typename\n}\n\nfragment CatalogArgument on CatalogArgument {\n  key\n  kind\n  required\n  description\n  __typename\n}\n\nfragment CatalogProp on CatalogProp {\n  key\n  kind\n  required\n  description\n  event {\n    ...CatalogEventField\n    __typename\n  }\n  __typename\n}\n\nfragment CatalogComponent on CatalogComponent {\n  name\n  description\n  acceptsChildren\n  context\n  childrenContext\n  inheritsContext\n  downstreamOf\n  notDownstreamOf\n  textProp\n  catalog\n  props {\n    ...CatalogProp\n    __typename\n  }\n  __typename\n}\n\nfragment CatalogOperation on CatalogOperation {\n  name\n  description\n  returns\n  arguments {\n    ...CatalogArgument\n    __typename\n  }\n  __typename\n}\n\nfragment Module on Module {\n  id\n  name\n  description\n  isRegistered\n  catalogs\n  components {\n    ...CatalogComponent\n    __typename\n  }\n  operations {\n    ...CatalogOperation\n    __typename\n  }\n  __typename\n}\n\nmutation RegisterModule($input: RegisterModuleInput!) {\n  registerModule(input: $input) {\n    ...Module\n    __typename\n  }\n}'
+        document = 'fragment CatalogArgument on CatalogArgument {\n  key\n  port {\n    kind\n    tree\n    __typename\n  }\n  required\n  description\n  __typename\n}\n\nfragment CatalogProp on CatalogProp {\n  key\n  port {\n    kind\n    tree\n    __typename\n  }\n  required\n  description\n  since\n  __typename\n}\n\nfragment CatalogComponent on CatalogComponent {\n  name\n  description\n  acceptsChildren\n  context\n  childrenContext\n  inheritsContext\n  downstreamOf\n  notDownstreamOf\n  textProp\n  catalog\n  props {\n    ...CatalogProp\n    __typename\n  }\n  __typename\n}\n\nfragment CatalogOperation on CatalogOperation {\n  name\n  description\n  returns {\n    kind\n    tree\n    __typename\n  }\n  arguments {\n    ...CatalogArgument\n    __typename\n  }\n  __typename\n}\n\nfragment Module on Module {\n  id\n  name\n  description\n  isRegistered\n  catalogs\n  components {\n    ...CatalogComponent\n    __typename\n  }\n  operations {\n    ...CatalogOperation\n    __typename\n  }\n  __typename\n}\n\nmutation RegisterModule($input: RegisterModuleInput!) {\n  registerModule(input: $input) {\n    ...Module\n    __typename\n  }\n}'
 
 class CreateDashboardMutation(BaseModel):
     """No documentation found for this operation."""
@@ -2839,7 +2849,7 @@ class ModulesQuery(BaseModel):
 
     class Meta:
         """Meta class for Modules """
-        document = 'fragment CatalogEventField on CatalogEventField {\n  key\n  kind\n  description\n  __typename\n}\n\nfragment CatalogArgument on CatalogArgument {\n  key\n  kind\n  required\n  description\n  __typename\n}\n\nfragment CatalogProp on CatalogProp {\n  key\n  kind\n  required\n  description\n  event {\n    ...CatalogEventField\n    __typename\n  }\n  __typename\n}\n\nfragment CatalogComponent on CatalogComponent {\n  name\n  description\n  acceptsChildren\n  context\n  childrenContext\n  inheritsContext\n  downstreamOf\n  notDownstreamOf\n  textProp\n  catalog\n  props {\n    ...CatalogProp\n    __typename\n  }\n  __typename\n}\n\nfragment CatalogOperation on CatalogOperation {\n  name\n  description\n  returns\n  arguments {\n    ...CatalogArgument\n    __typename\n  }\n  __typename\n}\n\nfragment Module on Module {\n  id\n  name\n  description\n  isRegistered\n  catalogs\n  components {\n    ...CatalogComponent\n    __typename\n  }\n  operations {\n    ...CatalogOperation\n    __typename\n  }\n  __typename\n}\n\nquery Modules {\n  modules {\n    ...Module\n    __typename\n  }\n}'
+        document = 'fragment CatalogArgument on CatalogArgument {\n  key\n  port {\n    kind\n    tree\n    __typename\n  }\n  required\n  description\n  __typename\n}\n\nfragment CatalogProp on CatalogProp {\n  key\n  port {\n    kind\n    tree\n    __typename\n  }\n  required\n  description\n  since\n  __typename\n}\n\nfragment CatalogComponent on CatalogComponent {\n  name\n  description\n  acceptsChildren\n  context\n  childrenContext\n  inheritsContext\n  downstreamOf\n  notDownstreamOf\n  textProp\n  catalog\n  props {\n    ...CatalogProp\n    __typename\n  }\n  __typename\n}\n\nfragment CatalogOperation on CatalogOperation {\n  name\n  description\n  returns {\n    kind\n    tree\n    __typename\n  }\n  arguments {\n    ...CatalogArgument\n    __typename\n  }\n  __typename\n}\n\nfragment Module on Module {\n  id\n  name\n  description\n  isRegistered\n  catalogs\n  components {\n    ...CatalogComponent\n    __typename\n  }\n  operations {\n    ...CatalogOperation\n    __typename\n  }\n  __typename\n}\n\nquery Modules {\n  modules {\n    ...Module\n    __typename\n  }\n}'
 
 class ModuleQuery(BaseModel):
     """No documentation found for this operation."""
@@ -2852,7 +2862,7 @@ class ModuleQuery(BaseModel):
 
     class Meta:
         """Meta class for Module """
-        document = 'fragment CatalogEventField on CatalogEventField {\n  key\n  kind\n  description\n  __typename\n}\n\nfragment CatalogArgument on CatalogArgument {\n  key\n  kind\n  required\n  description\n  __typename\n}\n\nfragment CatalogProp on CatalogProp {\n  key\n  kind\n  required\n  description\n  event {\n    ...CatalogEventField\n    __typename\n  }\n  __typename\n}\n\nfragment CatalogComponent on CatalogComponent {\n  name\n  description\n  acceptsChildren\n  context\n  childrenContext\n  inheritsContext\n  downstreamOf\n  notDownstreamOf\n  textProp\n  catalog\n  props {\n    ...CatalogProp\n    __typename\n  }\n  __typename\n}\n\nfragment CatalogOperation on CatalogOperation {\n  name\n  description\n  returns\n  arguments {\n    ...CatalogArgument\n    __typename\n  }\n  __typename\n}\n\nfragment Module on Module {\n  id\n  name\n  description\n  isRegistered\n  catalogs\n  components {\n    ...CatalogComponent\n    __typename\n  }\n  operations {\n    ...CatalogOperation\n    __typename\n  }\n  __typename\n}\n\nquery Module($id: ID!) {\n  module(id: $id) {\n    ...Module\n    __typename\n  }\n}'
+        document = 'fragment CatalogArgument on CatalogArgument {\n  key\n  port {\n    kind\n    tree\n    __typename\n  }\n  required\n  description\n  __typename\n}\n\nfragment CatalogProp on CatalogProp {\n  key\n  port {\n    kind\n    tree\n    __typename\n  }\n  required\n  description\n  since\n  __typename\n}\n\nfragment CatalogComponent on CatalogComponent {\n  name\n  description\n  acceptsChildren\n  context\n  childrenContext\n  inheritsContext\n  downstreamOf\n  notDownstreamOf\n  textProp\n  catalog\n  props {\n    ...CatalogProp\n    __typename\n  }\n  __typename\n}\n\nfragment CatalogOperation on CatalogOperation {\n  name\n  description\n  returns {\n    kind\n    tree\n    __typename\n  }\n  arguments {\n    ...CatalogArgument\n    __typename\n  }\n  __typename\n}\n\nfragment Module on Module {\n  id\n  name\n  description\n  isRegistered\n  catalogs\n  components {\n    ...CatalogComponent\n    __typename\n  }\n  operations {\n    ...CatalogOperation\n    __typename\n  }\n  __typename\n}\n\nquery Module($id: ID!) {\n  module(id: $id) {\n    ...Module\n    __typename\n  }\n}'
 
 class BaseCatalogQueryBaseCatalog(BaseModel):
     """The built-in base catalog: the pure operations and control-flow components every UI implements, applied to every definition and blok before any registered UI catalog. Virtual: shipped with the server, not registered, identical in every organization."""
@@ -2878,7 +2888,7 @@ class BaseCatalogQuery(BaseModel):
 
     class Meta:
         """Meta class for BaseCatalog """
-        document = 'fragment CatalogArgument on CatalogArgument {\n  key\n  kind\n  required\n  description\n  __typename\n}\n\nfragment CatalogOperation on CatalogOperation {\n  name\n  description\n  returns\n  arguments {\n    ...CatalogArgument\n    __typename\n  }\n  __typename\n}\n\nquery BaseCatalog {\n  baseCatalog {\n    name\n    version\n    description\n    operations {\n      ...CatalogOperation\n      __typename\n    }\n    __typename\n  }\n}'
+        document = 'fragment CatalogArgument on CatalogArgument {\n  key\n  port {\n    kind\n    tree\n    __typename\n  }\n  required\n  description\n  __typename\n}\n\nfragment CatalogOperation on CatalogOperation {\n  name\n  description\n  returns {\n    kind\n    tree\n    __typename\n  }\n  arguments {\n    ...CatalogArgument\n    __typename\n  }\n  __typename\n}\n\nquery BaseCatalog {\n  baseCatalog {\n    name\n    version\n    description\n    operations {\n      ...CatalogOperation\n      __typename\n    }\n    __typename\n  }\n}'
 
 class GetDashboardQuery(BaseModel):
     """No documentation found for this operation."""
