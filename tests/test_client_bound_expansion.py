@@ -9,7 +9,7 @@ the recursive `_expand` helpers dropped the app, which nested ports exercise.
 
 import asyncio
 from collections.abc import Sequence
-from typing import Any, TypeVar
+from typing import Any, TypeVar, cast
 
 import pytest
 from arkitekt_runtime.agents.base import BaseAgent
@@ -157,7 +157,7 @@ async def test_one_declaration_binds_independently_per_run() -> None:
         one.get_fullfilled_structure("@things/thing").expand("1"),
         two.get_fullfilled_structure("@things/thing").expand("2"),
     )
-    assert [t.owner for t in fetched] == ["A", "B"]
+    assert [cast("Thing", t).owner for t in fetched] == ["A", "B"]
     assert library.get_fullfilled_structure("@things/thing").aexpand is expand_thing
 
 
@@ -195,5 +195,5 @@ async def test_hand_registered_structures_are_untouched_by_binding() -> None:
     bound = registry.bound({})
     structure = bound.get_fullfilled_structure("@things/thing")
     assert structure.aexpand is aexpand
-    thing = await structure.expand("1")
+    thing = cast("Thing", await structure.expand("1"))
     assert thing.owner == "self-resolved"

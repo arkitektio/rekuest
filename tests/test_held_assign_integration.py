@@ -10,7 +10,7 @@ import asyncio
 import time
 import uuid
 from collections.abc import Awaitable, Callable
-from typing import Any, Protocol
+from typing import Any, Protocol, cast
 
 import pytest
 from arkitekt_spec.declare.errors import DeniedError
@@ -216,11 +216,14 @@ async def test_the_prompt_the_agent_writes_is_shown_on_the_held_child(
 
     async def explains(task: Task) -> str:
         """Ask for the provider's action, saying why."""
-        return await task.acall(
-            target[0],
-            printer="p",
-            prompt=AssignPrompt(
-                title="Stitch it", description="The room asked for a poster."
+        return cast(
+            str,
+            await task.acall(
+                target[0],
+                printer="p",
+                prompt=AssignPrompt(
+                    title="Stitch it", description="The room asked for a poster."
+                ),
             ),
         )
 

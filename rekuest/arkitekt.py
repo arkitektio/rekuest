@@ -68,7 +68,7 @@ TESTED = tested_against("rekuest")
     turms=build_relative_path("api", "project.json"),
     # The server this release of the client is written against: what a hub made for
     # an app's tests runs. Moves with the server's major, not with this package's.
-    image="jhnnsrs/rekuest:22",
+    image="jhnnsrs/rekuest:23",
 )
 def rekuest(
     rekuest: Annotated[
@@ -293,7 +293,7 @@ caller_registry.merge(registry)
 @caller_registry.service(
     schema=build_relative_path("api", "schema.graphql"),
     turms=build_relative_path("api", "project.json"),
-    image="jhnnsrs/rekuest:22",
+    image="jhnnsrs/rekuest:23",
 )
 def rekuest_caller(
     rekuest: Annotated[

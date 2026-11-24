@@ -32,6 +32,12 @@ class StubFakts:
     async def aget_token(self) -> str:
         return "token"
 
+    async def aget_alias_or_none(self, name: str) -> Alias | None:
+        return await self.aget_alias(name)
+
+    async def aget_self_alias(self) -> None:
+        return None
+
 
 def _manifest(description: str | None) -> Manifest:
     return Manifest(

@@ -8,7 +8,7 @@ use it only as a real service client would.
 """
 
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from arkitekt_spec.declare.app import AppRegistry
@@ -262,7 +262,7 @@ async def test_a_hand_registered_structure_uses_its_own_expand_and_shrink() -> N
 
     assert not structure.declared
     assert structure.aexpand_many is None
-    assert (await structure.expand("1")).by == "by-hand"
+    assert cast(Thing, await structure.expand("1")).by == "by-hand"
     assert [t.id for t in await structure.expand_many(["2", "3"])] == ["2", "3"]
     assert await structure.shrink(Thing("4")) == "hand-4"
     assert expanded == ["1", "2", "3"]
