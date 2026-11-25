@@ -41,6 +41,10 @@ class SessionClosed(Exception):
     """The session was closed while a call or a watch waited on it."""
 
 
+class SessionUnavailable(SessionClosed):
+    """The session could not be opened for longer than its ``max_backoff``."""
+
+
 @dataclass
 class Resync:
     """Replace what you hold for the topic with ``snapshot``.
@@ -118,6 +122,9 @@ class CallerSession:
         ssl_context: For ``wss``.
         proxy: An HTTP forward proxy to tunnel the socket through (None: direct).
         client_info: What the server records of this client (app, version, ...).
+        max_backoff: How long, in seconds, the session may stay unopened before the calls
+            waiting on it (and new ones) fail with :class:`SessionUnavailable`. It keeps
+            reconnecting either way. ``None`` waits for it forever.
     """
 
     def __init__(
@@ -128,8 +135,10 @@ class CallerSession:
         ssl_context: ssl.SSLContext | None = None,
         proxy: str | None = None,
         client_info: dict[str, Any] | None = None,
+        max_backoff: float | None = 30.0,
     ) -> None:
         self.endpoint_url = endpoint_url
+        self.max_backoff = max_backoff
         self.token_loader = token_loader
         self.ssl_context = ssl_context
         self.proxy = proxy
@@ -145,11 +154,14 @@ class CallerSession:
         self._open = asyncio.Event()
         self._runner: asyncio.Task[None] | None = None
         self._closing = False
+        self._unopened_since: float | None = None
+        self._last_error: BaseException | None = None
 
     # ------------------------------------------------------------------------------- lifecycle
 
     async def __aenter__(self) -> CallerSession:
         self._closing = False
+        self._unopened_since = asyncio.get_running_loop().time()
         self._runner = asyncio.create_task(self._run())
         return self
 
@@ -219,16 +231,42 @@ class CallerSession:
                     logger.warning(
                         "The session's token was refused; trying a fresh one"
                     )
-            except Exception:  # noqa: BLE001 - the session reconnects whatever went wrong
+            except Exception as e:  # noqa: BLE001 - the session reconnects whatever went wrong
+                self._last_error = e
                 logger.debug("The session socket failed", exc_info=True)
             finally:
                 self._socket = None
                 self._open.clear()
             if self._closing:
                 return
+            if self._unopened_since is None:
+                self._unopened_since = asyncio.get_running_loop().time()
+            if self._gave_up():
+                self._fail_pending()
             wait = min(30.0, 1.0 * 2 ** min(attempt, 5)) + random.random()  # noqa: S311
             attempt += 1
             await asyncio.sleep(wait)
+
+    def _gave_up(self) -> bool:
+        """Whether the session has stayed unopened for longer than ``max_backoff``."""
+        if self.max_backoff is None or self._unopened_since is None:
+            return False
+        waited = asyncio.get_running_loop().time() - self._unopened_since
+        return waited >= self.max_backoff
+
+    def _unavailable(self) -> SessionUnavailable:
+        reason = f": {self._last_error!r}" if self._last_error is not None else ""
+        return SessionUnavailable(
+            f"The session at {self.endpoint_url} could not be opened for "
+            f"{self.max_backoff:g}s{reason}"
+        )
+
+    def _fail_pending(self) -> None:
+        error = self._unavailable()
+        logger.warning("%s", error)
+        for pending in self._pending.values():
+            if not pending.future.done():
+                pending.future.set_exception(error)
 
     async def _ping(self) -> None:
         """Liveness, and how far this client got (the server's resume record follows it)."""
@@ -302,6 +340,8 @@ class CallerSession:
         self.session = frame.get("session")
         limits = frame.get("limits") or {}
         self.ping_interval = float(max(1, int(limits.get("ping_interval", 15))))
+        self._unopened_since = None
+        self._last_error = None
         self._open.set()
         for name in list(self._dropped):
             self._send_soon({"type": "UNWATCH", "topic": name})
@@ -384,7 +424,10 @@ class CallerSession:
         Raises:
             SessionRefusal: The server refused it, with its reason.
             SessionClosed: The session was closed before an answer came.
+            SessionUnavailable: The session could not be opened within ``max_backoff``.
         """
+        if not self._open.is_set() and self._gave_up():
+            raise self._unavailable()
         request = uuid.uuid4().hex
         full = {**frame, "request": request}
         future: asyncio.Future[dict[str, Any]] = (

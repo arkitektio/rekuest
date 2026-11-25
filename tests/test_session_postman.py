@@ -331,3 +331,19 @@ async def test_nothing_but_hello_goes_out_before_the_welcome(takt: FakeTakt) -> 
     kinds = [frame["type"] for frame in takt.frames]
     assert kinds[0] == "HELLO"
     assert kinds.index("WATCH") > 0
+
+
+@pytest.mark.asyncio
+async def test_a_session_that_cannot_open_fails_its_calls_after_max_backoff() -> None:
+    """A refused socket is retried, but a call does not wait for it forever."""
+    from rekuest.client.session import CallerSession, SessionUnavailable
+
+    async def token() -> str:
+        return "token"
+
+    # Nothing listens on port 9: every connect is refused at once.
+    async with CallerSession(
+        "ws://127.0.0.1:9/session", token, max_backoff=0.5
+    ) as session:
+        with pytest.raises(SessionUnavailable, match="could not be opened"):
+            await asyncio.wait_for(session.call({"type": "ASSIGN"}), timeout=10)
