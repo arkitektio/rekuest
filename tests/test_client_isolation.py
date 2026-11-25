@@ -1,37 +1,7 @@
-"""The rekuest client keeps to one app's registry, and calls through what is its own.
-
-The arkitekt service builder handing the app's registry to the agent is covered from
-the arkitekt side, where a real app can be built.
-"""
+"""A state keeps the structure registry it was declared with."""
 
 from arkitekt_spec.declare.app import AppRegistry
 from arkitekt_spec.declare.structures.registry import StructureRegistry
-
-from rekuest.client.client import Rekuest, RekuestCaller
-from rekuest.client.postman import GraphQLPostman
-from rekuest.client.rath import RekuestRath
-
-from .conftest import DirectSucceedingLink
-
-
-def build_client(registry: AppRegistry) -> Rekuest:
-    rath = RekuestRath(link=DirectSucceedingLink())
-    return RekuestCaller(
-        rath=rath,
-        postman=GraphQLPostman(rath=rath),
-        structure_registry=registry.structure_registry,
-    )
-
-
-def test_client_has_exactly_one_structure_registry() -> None:
-    """It used to default to the process-wide one while ``register`` used the agent's."""
-    registry = AppRegistry()
-    client = build_client(registry)
-
-    assert client.structure_registry is registry.structure_registry
-    assert (
-        client.structure_registry is not build_client(AppRegistry()).structure_registry
-    )
 
 
 def test_the_state_decorator_keeps_the_structure_registry_it_was_given() -> None:

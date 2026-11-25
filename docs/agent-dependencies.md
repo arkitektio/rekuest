@@ -67,7 +67,8 @@ calling it gives an iterator over every yield of the remote action (`.iterate(..
 
 The call leaves over your agent's socket, parented to the task the proxy was made for
 -- the very object a `task: Task` parameter receives -- and is (de)serialized with your
-app's structures. A name the protocol does not declare raises `AttributeError`. A
+app's structures: unlike `task.call(action, ...)`, which returns `Ref`s, it returns the
+objects the protocol declares. A name the protocol does not declare raises `AttributeError`. A
 state demand reads as a reference to the resolved agent's state: not its value, but
 what `task.guard(camera.state, "exposure_ms")` takes to notice a change across a resume.
 

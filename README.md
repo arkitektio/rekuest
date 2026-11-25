@@ -56,21 +56,35 @@ if __name__ == "__main__":
     run(app)
 ```
 
-An app can also name the provider explicitly: `App(..., providers=[rekuest_provider])`
+An app can also name the provider explicitly: `App(..., provider=rekuest_provider)`
 with `from rekuest.arkitekt import rekuest_provider`.
 
 ## Calling actions
 
-From a script, name the rekuest service and call an action by its id (or pass an
+From a script, name the rekuest client and call an action by its id (or pass an
 `Action`/`Implementation` you looked up). The call is a *root* task:
 
 ```python
-from arkitekt import easy
-from rekuest.arkitekt import rekuest_service
+from arkitekt import connect
+from rekuest.client.client import Rekuest
 
-with easy("my-script", rekuest_service) as rekuest:
+with connect(Rekuest) as rekuest:
     result = rekuest.call("<action-id>", x=21)
 ```
+
+The action is found at run time, so the call is untyped: a structure comes back as a
+`rekuest.Ref` (its identifier and id), a model as a dict, an enum as its value. Say what you
+expect and it is fetched:
+
+```python
+from rekuest import to
+
+blurred = rekuest.call(blur, image).to(Image)  # a Ref, expanded as an Image
+masks = to(rekuest.call(segment, image), list[Mask])
+```
+
+`Ref.to` expands through the clients of the app the call was made in, or the ones you
+pass (`ref.to(Image, mikro)`). An argument can be an id, a `Ref` or the object itself.
 
 Only a **workflow** may call other actions. A call made inside one is a *child* of the
 task it runs in, so it goes through the task: resolve the target with the client, then
@@ -79,10 +93,9 @@ call it on the task. A plain `@app.action` that calls raises `NotAWorkflowError`
 
 ```python
 from arkitekt import App, Task
-from rekuest.arkitekt import rekuest_service
 from rekuest.client.client import Rekuest
 
-app = App("orchestrate", "0.1.0", services=[rekuest_service])
+app = App("orchestrate", "0.1.0")
 
 
 @app.workflow
@@ -93,13 +106,15 @@ async def double_twice(x: int, action_id: str, task: Task, rekuest: Rekuest) -> 
     return await task.acall(action, x=once)
 ```
 
-Usually a workflow names what it needs of another app as a protocol instead
-(`@app.declare`, see [Agent dependencies](docs/agent-dependencies.md)) and calls its
-methods; a method annotated as a generator streams the other action's yields.
+`task.call` returns references the same way. Usually a workflow names what it needs of
+another app as a protocol instead (`@app.declare`, see
+[Agent dependencies](docs/agent-dependencies.md)) and calls its methods: those calls are
+typed, and return the objects the protocol declares. A method annotated as a generator
+streams the other action's yields.
 
 Actions, implementations, shortcuts, test cases, test results and task events travel
 between actions by id (`@rekuest/action`, `@rekuest/implementation`, …), so an action
-can take and return them directly.
+can take and return them directly (an untyped call returns them as `Ref`s).
 
 ## When an agent dies
 
@@ -122,7 +137,8 @@ See [Workflows](docs/workflows.md).
 
 | Module | What it is |
 | --- | --- |
-| `rekuest.arkitekt` | The service (`rekuest_service`), the agent provider (`rekuest_provider`) and the `@rekuest/*` structures |
+| `rekuest.arkitekt` | The agent provider (`rekuest_provider`) |
+| `rekuest.structures` | The `@rekuest/*` structures |
 | `rekuest.agents` | The agent, its websocket transport, control channel and caller |
 | `rekuest.client` | `Rekuest`, the GraphQL client, and its postman |
 | `rekuest.api.schema` | The generated GraphQL operations and types |

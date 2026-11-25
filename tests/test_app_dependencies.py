@@ -101,8 +101,8 @@ async def test_workflow_calls_single_dependency(deployment: Deployment) -> None:
         workflow_task = asyncio.create_task(workflow_app.aloop())
 
         # There is no ambient client, so a call is addressed by the app it is
-        # made on: `workflow_app.acall` uses the workflow app's own postman and
-        # registry. With two apps entered, that is the whole of the addressing.
+        # made on: `workflow_app.acall` uses the workflow app's own postman.
+        # With two apps entered, that is the whole of the addressing.
         impl = await workflow_app.amy_implementation_at(
             "single_workflow",
         )
@@ -187,7 +187,7 @@ async def test_workflow_calls_two_separate_apps(deployment: Deployment) -> None:
         workflow_task = asyncio.create_task(workflow_app.aloop())
 
         # Addressed by the app the call is made on -- there is no ambient
-        # client, and `acall` takes its postman and registry from `self`.
+        # client, and `acall` takes its postman from `self`.
         impl = await workflow_app.amy_implementation_at(
             "two_app_workflow",
         )
@@ -411,7 +411,7 @@ async def test_workflow_calls_two_separate_apps_async(deployment: Deployment) ->
         workflow_task = asyncio.create_task(workflow_app.aloop())
 
         # Addressed by the app the call is made on -- there is no ambient
-        # client, and `acall` takes its postman and registry from `self`.
+        # client, and `acall` takes its postman from `self`.
         impl = await workflow_app.amy_implementation_at(
             "two_app_workflow",
         )

@@ -1,9 +1,8 @@
 """A per-app registry: it holds exactly what its own app declared.
 
-There is no registry above it, and nothing arrives by itself. What a service
-brings goes in when the app takes the service (``register_service``), anything
-else has to be registered here by hand, and a structure of a service the app
-does not have is refused where it is named.
+There is no registry above it, and nothing arrives by itself: a structure a client
+owns goes in when the app uses that client, anything else has to be registered
+here by hand.
 """
 
 from enum import Enum
@@ -11,26 +10,12 @@ from enum import Enum
 import pytest
 from arkitekt_spec.actions import PortKind
 from arkitekt_spec.declare.app import AppRegistry
+from arkitekt_spec.declare.assemble import assemble
+from arkitekt_spec.declare.bundle import Bundle
 from arkitekt_spec.declare.definition.errors import DefinitionError
 from arkitekt_spec.declare.structures.errors import StructureRegistryError
-from arkitekt_spec.declare.structures.types import service_from_identifier
-from arkitekt_spec.declare.structures.utils import id_shrink
 
 from rekuest.api.schema import Implementation
-from rekuest.arkitekt import rekuest_service
-
-from .service_helpers import with_client
-
-
-class LibraryThing:
-    """Stands in for an SDK model such as mikro's ArrayDataset."""
-
-    def __init__(self, id: str) -> None:
-        self.id = id
-
-
-class LibraryClient:
-    """The client the lib service returns; its structures are fetched through it."""
 
 
 class AppLocalThing:
@@ -42,72 +27,13 @@ class Colour(Enum):
     BLUE = "blue"
 
 
-def lib_registry() -> AppRegistry:
-    """What the lib package ships: its service, then the structure it can fetch."""
-    registry = AppRegistry()
-    with_client(registry, LibraryClient, "lib")
-
-    @registry.structure("@lib/thing")
-    async def expand_thing(id: str, lib: LibraryClient) -> LibraryThing:
-        """A thing, by id."""
-        return LibraryThing(id)
-
-    return registry
-
-
-def app_with_lib() -> AppRegistry:
-    """An app that takes the lib service, as ``App(services=[lib_service])`` does."""
-    registry = AppRegistry()
-    registry.register_service(lib_registry().services["lib"])
-    return registry
-
-
 # --------------------------------------------------------------------------- #
 # What an app's registry holds
 # --------------------------------------------------------------------------- #
 
 
-def test_a_declared_structure_is_a_structure_not_a_memory_one() -> None:
-    app = app_with_lib()
-
-    port = app.structure_registry.get_argport_for_cls(LibraryThing, "x")
-
-    assert port.kind == PortKind.STRUCTURE
-    assert port.identifier == "@lib/thing"
-    structure = app.structure_registry.get_fullfilled_structure("@lib/thing")
-    assert structure.service == "lib" and structure.declared
-
-
-def test_without_the_service_the_class_does_not_become_that_structure() -> None:
-    """It used to be inherited from a process-wide registry. There is none now.
-
-    ``LibraryThing`` cannot fetch itself, so with no service to declare it there
-    is nothing this app could do with it -- and rather than quietly shelving it,
-    which would put it on the wire as anything but ``@lib/thing``, it refuses.
-    """
-    app = AppRegistry()
-
-    with pytest.raises(StructureRegistryError, match="not registered"):
-        app.structure_registry.get_argport_for_cls(LibraryThing, "x")
-
-    # Kept on this agent only if that is actually what was meant.
-    app.register_memory_structure(LibraryThing)
-    port = app.structure_registry.get_argport_for_cls(LibraryThing, "x")
-    assert port.kind == PortKind.MEMORY_STRUCTURE
-    assert port.identifier != "@lib/thing"
-
-
-def test_two_apps_do_not_see_each_others_structures() -> None:
-    a, b = app_with_lib(), AppRegistry()
-
-    assert a.structure_registry.get_fullfilled_structure("@lib/thing")
-    with pytest.raises(KeyError):
-        b.structure_registry.get_fullfilled_structure("@lib/thing")
-    assert "lib" not in b.services
-
-
 def test_locally_registered_types_stay_in_the_app_that_holds_them() -> None:
-    a, b = app_with_lib(), app_with_lib()
+    a, b = AppRegistry(), AppRegistry()
 
     a.register_memory_structure(AppLocalThing)
     a.structure_registry.get_argport_for_cls(AppLocalThing, "x")
@@ -120,30 +46,41 @@ def test_locally_registered_types_stay_in_the_app_that_holds_them() -> None:
     assert b.structure_registry.find_for_cls(Colour) is None
 
 
-def test_a_function_naming_a_missing_services_structure_fails_at_registration() -> None:
-    """A generated, fetchable class with no service to name it."""
+def test_a_function_naming_a_structure_of_an_unused_client_fails_at_registration() -> (
+    None
+):
+    """A generated, fetchable class, but this registry uses no client owning it."""
     app = AppRegistry()
 
     with pytest.raises(DefinitionError) as raised:
 
         @app.register
         def needs_rekuest(implementation: Implementation) -> None:
-            """Takes a structure no service of this app declared."""
+            """Takes a structure no client of this app owns."""
 
     assert "rekuest" in str(raised.value)
     assert app.is_empty()
 
 
-def test_once_the_app_takes_the_service_the_function_registers() -> None:
-    app = AppRegistry()
-    app.register_service(rekuest_service)
+def test_an_action_taking_a_rekuest_type_brings_the_rekuest_client() -> None:
+    app = Bundle()
 
-    @app.register
     def takes_implementation(implementation: Implementation) -> None:
-        """Takes a structure this app's rekuest service brought."""
+        """Takes a structure the rekuest client owns."""
 
-    assert "takes_implementation" in app.implementations
-    assert list(app.services) == ["rekuest"]
+    app.register_action(takes_implementation)
+    registry = assemble(app)
+
+    assert "takes_implementation" in registry.implementations
+    assert "rekuest" in registry.clients
+    structure = registry.structure_registry.get_fullfilled_structure(
+        "@rekuest/implementation"
+    )
+    assert structure.client == "rekuest"
+    assert structure.cls is Implementation
+    port = registry.structure_registry.get_argport_for_cls(Implementation, "x")
+    assert port.kind == PortKind.STRUCTURE
+    assert port.identifier == "@rekuest/implementation"
 
 
 # --------------------------------------------------------------------------- #
@@ -160,47 +97,6 @@ def test_is_empty_tracks_every_kind_of_registration() -> None:
         """Boot."""
 
     assert not registry.is_empty()
-
-
-def test_service_is_derived_from_the_identifier() -> None:
-    assert service_from_identifier("@mikro/arraydataset") == "mikro"
-    assert service_from_identifier("@rekuest/action") == "rekuest"
-    assert service_from_identifier("plain") is None
-    assert service_from_identifier("@nothing") is None
-
-
-def test_a_hand_registered_structure_never_asks_for_a_service() -> None:
-    """Its service is guessed from the identifier, and `@myapp/handmade` names none."""
-
-    class HandMade:
-        """A structure registered directly on an app's registry."""
-
-    async def aget(id: str) -> HandMade:
-        return HandMade()
-
-    app = AppRegistry()
-    structure = app.structure_registry.register_as_structure(
-        HandMade, "@myapp/handmade", aexpand=aget, ashrink=id_shrink
-    )
-    assert structure.service == "myapp" and not structure.declared
-
-    @app.register
-    def uses_my_own(thing: HandMade) -> None:
-        """Takes a structure registered by hand."""
-
-    assert app.required_services() == {}
-
-
-def test_a_structure_a_service_brought_is_asked_for() -> None:
-    """The control: this is what the missing-service warning is for."""
-    app = AppRegistry()
-    app.register_service(rekuest_service)
-
-    @app.register
-    def uses_rekuest(implementation: Implementation) -> None:
-        """Takes a structure the rekuest service brought."""
-
-    assert app.required_services() == {"rekuest": {"uses_rekuest"}}
 
 
 # --------------------------------------------------------------------------- #
@@ -238,7 +134,7 @@ def test_validate_catches_a_port_naming_a_structure_the_registry_lost() -> None:
         return 1
 
     # As if the structure had been declared into a different registry, or its
-    # service had been dropped from `services=[...]` after the fact.
+    # client had been dropped from the app after the fact.
     app.structure_registry.identifier_memory_structure_map.clear()
 
     with pytest.raises(StructureRegistryError) as raised:

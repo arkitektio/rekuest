@@ -20,7 +20,7 @@ from arkitekt_spec.declare.structures.registry import StructureRegistry
 from rekuest.api.schema import Action
 
 from .agent_helpers import run_assignment
-from .service_helpers import with_client
+from .client_helpers import use
 from .test_service_client_injection import FakeApp, FakeClient, assign, build_agent
 
 ACTION = Action.model_construct(id="action-1")
@@ -82,18 +82,16 @@ async def test_a_call_inside_a_task_goes_through_the_task(
     """A child call is the task's, so the task is what makes it.
 
     It supplies all three things a child needs -- the agent's socket, its own assignment
-    as the parent, and the actor's registry -- and none of them is looked up from context.
+    as the parent, and the run its references expand through -- and none of them is
+    looked up from context.
     """
     from rekuest.client.client import Rekuest
 
     app = FakeApp("A")
     agent = build_agent(app)
-    # `rekuest: Rekuest` is a client of this registry because a service on it returns one.
-    with_client(agent.app_registry, Rekuest, "rekuest")
-    rekuest = Rekuest.model_construct(
-        structure_registry=agent.app_registry.structure_registry,
-    )
-    app.services["rekuest"] = rekuest
+    use(agent.app_registry, Rekuest)
+    rekuest = Rekuest.model_construct()
+    app.clients["rekuest"] = rekuest
     seen: dict[str, Any] = {}
 
     async def fake_acall(target: Any, *args: Any, **kwargs: Any) -> str:  # noqa: ANN401
@@ -117,7 +115,7 @@ async def test_a_call_inside_a_task_goes_through_the_task(
     }
     assert seen["parent"].task == "task-parent-None"
     assert seen["postman"] is agent.caller_postman
-    assert seen["structure_registry"] is agent.app_registry.structure_registry
+    assert seen["origin"] is app
     assert (seen["target"], seen["args"], seen["reference"]) == (ACTION, (1,), "r")
     assert "parent" not in Rekuest.model_fields, "the client carries no task state"
 
@@ -135,12 +133,9 @@ async def test_the_client_refuses_to_make_a_root_call_inside_a_task(
 
     app = FakeApp("A")
     agent = build_agent(app)
-    with_client(agent.app_registry, RekuestCaller, "rekuest")
-    rekuest = RekuestCaller.model_construct(
-        postman="graphql-postman",
-        structure_registry=agent.app_registry.structure_registry,
-    )
-    app.services["rekuest"] = rekuest
+    use(agent.app_registry, RekuestCaller)
+    rekuest = RekuestCaller.model_construct(postman="graphql-postman")
+    app.clients["rekuest"] = rekuest
     seen: dict[str, Any] = {}
 
     async def parent(rekuest: RekuestCaller, task: Task) -> str:
@@ -171,11 +166,9 @@ async def test_a_lookup_inside_a_task_is_not_refused(
 
     app = FakeApp("A")
     agent = build_agent(app)
-    with_client(agent.app_registry, Rekuest, "rekuest")
-    rekuest = Rekuest.model_construct(
-        structure_registry=agent.app_registry.structure_registry,
-    )
-    app.services["rekuest"] = rekuest
+    use(agent.app_registry, Rekuest)
+    rekuest = Rekuest.model_construct()
+    app.clients["rekuest"] = rekuest
     seen: dict[str, Any] = {}
 
     async def parent(rekuest: Rekuest, task: Task) -> str:
@@ -196,11 +189,9 @@ async def test_outside_a_task_the_rekuest_client_calls_over_its_own_postman(
 ) -> None:
     from rekuest.client.client import RekuestCaller
 
-    agent = build_agent(FakeApp("A"))
-    rekuest = RekuestCaller.model_construct(
-        postman="graphql-postman",
-        structure_registry=agent.app_registry.structure_registry,
-    )
+    run = FakeApp("A")
+    rekuest = RekuestCaller.model_construct(postman="graphql-postman")
+    rekuest.attach(run)
     seen: dict[str, Any] = {}
 
     async def fake_acall(target: Any, *args: Any, **kwargs: Any) -> str:  # noqa: ANN401
@@ -210,6 +201,7 @@ async def test_outside_a_task_the_rekuest_client_calls_over_its_own_postman(
     monkeypatch.setattr("arkitekt_runtime.invoke._acall", fake_acall)
     assert await rekuest.acall(ACTION) == "ok"
     assert seen["postman"] == "graphql-postman" and "parent" not in seen
+    assert seen["origin"] is run
 
     # A local task runs under no agent, so a call under one is still a root -- which is
     # why the client's refusal tests for an *agent-run* task rather than any ambient task.

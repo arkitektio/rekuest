@@ -174,7 +174,6 @@ def mock_rekuest(mock_agent: RekuestAgent) -> Rekuest:
     return RekuestCaller(
         rath=rath,
         postman=GraphQLPostman(rath=rath),
-        structure_registry=mock_agent.app_registry.structure_registry,
     )
 
 
@@ -366,7 +365,6 @@ def deployed_app(
                 postman=SessionPostman(
                     session=CallerSession(session_url, token_loader)
                 ),
-                structure_registry=agent.app_registry.structure_registry,
             ),
             agent=agent,
         )
@@ -571,7 +569,6 @@ def build_rekuest_at(
             postman=SessionPostman(
                 session=CallerSession(f"ws://localhost:{port}/session", loader)
             ),
-            structure_registry=agent.app_registry.structure_registry,
         ),
         agent=agent,
     )

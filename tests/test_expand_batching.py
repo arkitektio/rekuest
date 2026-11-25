@@ -5,20 +5,21 @@ ids at once gets them in one, and everything else behaves as it did.
 """
 
 from collections.abc import Awaitable, Callable, Sequence
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from arkitekt_runtime.actors.types import Shelver
 from arkitekt_runtime.structures.serialization.actor import expand_inputs
 from arkitekt_runtime.structures.serialization.expand import aexpand_returns
 from arkitekt_spec.declare.app import AppRegistry
+from arkitekt_spec.declare.client import client
 from arkitekt_spec.declare.definition.define import prepare_definition
 from arkitekt_spec.declare.structures.errors import ExpandingError
 from arkitekt_spec.declare.structures.registry import StructureRegistry
 from rath.expansion import ExpandsStructures
 from rath.scalars import ID
 
-from .service_helpers import with_client
+from .client_helpers import use
 
 
 class Image:
@@ -59,6 +60,7 @@ class Fetches:
         return [None if id in self.missing else self.cls(id) for id in ids]
 
 
+@client(name="images", requires={})
 class Client(ExpandsStructures):
     """The images service's client: the structures below are expanded through one.
 
@@ -90,11 +92,9 @@ def client_for(
 
 
 def declared_registry(*declared: tuple[type, str, Fetches]) -> StructureRegistry:
-    """Declared the way the images package does: its service, then each structure,
-    whose expander asks for the ``Client`` the service returns and fetches through
-    it. Unbound: no run has handed the expanders a client yet."""
-    app = AppRegistry()
-    with_client(app, Client, "images")
+    """An app using the images ``Client``: each structure's expander asks for one
+    and fetches through it. Unbound: no run has handed the expanders a client yet."""
+    app = use(AppRegistry(), Client)
 
     def expander(fetches: Fetches) -> Callable[[str, Client], Awaitable[object]]:
         # Any, not object: the registry reads this annotation and holds it to the
@@ -105,7 +105,9 @@ def declared_registry(*declared: tuple[type, str, Fetches]) -> StructureRegistry
         return expand
 
     for cls, identifier, fetches in declared:
-        app.structure(identifier, cls=cls)(expander(fetches))
+        app.structure_registry.register_as_structure(
+            cls, identifier, aexpand=cast(Any, expander(fetches))
+        )
     return app.structure_registry
 
 
@@ -403,6 +405,7 @@ async def test_a_list_of_federated_structures_is_one_entities_request(
 
     via_entities = federated(Flow)
 
+    @client(requires={})
     class Fluss(ExpandsStructures):
         EXPANDERS = {"@fluss/flow": via_entities["aexpand"]}
 
@@ -415,14 +418,15 @@ async def test_a_list_of_federated_structures_is_one_entities_request(
             return await via_entities["aexpand_many"](self, ids)
 
     app = Fluss()
-    package = AppRegistry()
-    with_client(package, Fluss, "fluss")
+    package = use(AppRegistry(), Fluss)
 
-    @package.structure("@fluss/flow")
     async def expand_flow(id: str, fluss: Fluss) -> Flow:
         """A flow, fetched through the fluss client."""
         return await via_entities["aexpand"](fluss, id)
 
+    package.structure_registry.register_as_structure(
+        Flow, "@fluss/flow", aexpand=cast(Any, expand_flow)
+    )
     registry = package.structure_registry.bound({"fluss": app})
     definition = prepare_definition(run, structure_registry=registry)
 

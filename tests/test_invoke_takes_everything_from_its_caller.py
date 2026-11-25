@@ -1,11 +1,13 @@
 """The call engine takes everything it uses from its caller.
 
-There is no current client, postman or registry to fall back to. A ``Rekuest`` passes its
-own and makes a root; a ``Task`` passes its agent's and makes a child. Both are required
-arguments, so omitting one is a ``TypeError`` at the call, not a ``ValueError`` deep inside.
+There is no current client or postman to fall back to. A ``Rekuest`` passes its own and
+makes a root; a ``Task`` passes its agent's and makes a child. The postman is required, so
+omitting it is a ``TypeError`` at the call. The target is found at run time, so it is
+called by reference: no registry, and results expand through the caller's run (``origin``).
 """
 
 import inspect
+from typing import Any, cast
 
 import arkitekt_runtime.invoke as invoke
 import pytest
@@ -14,7 +16,7 @@ from rekuest.api.schema import Action
 
 
 def _patch(monkeypatch: pytest.MonkeyPatch, seen: list) -> None:
-    async def fake_ashrink_args(action_obj, args, kwargs, structure_registry=None):  # noqa: ANN001, ANN202
+    async def fake_ashrink_args(action_obj, args, kwargs, structure_registry):  # noqa: ANN001, ANN202
         seen.append(("shrink", structure_registry))
         return {"value": 1}
 
@@ -26,9 +28,14 @@ def _patch(monkeypatch: pytest.MonkeyPatch, seen: list) -> None:
         seen.append(("postman", kwargs["postman"]))
         yield ("raw",)
 
-    async def fake_aexpand_returns(action_obj, returns, structure_registry=None):  # noqa: ANN001, ANN202
+    async def fake_aexpand_returns(  # noqa: ANN202
+        action_obj: object,
+        returns: object,
+        structure_registry: object,
+        origin: object = None,
+    ):
         assert returns == ("raw",)
-        seen.append(("expand", structure_registry))
+        seen.append(("expand", structure_registry, origin))
         return ("expanded",)
 
     monkeypatch.setattr(invoke, "ashrink_args", fake_ashrink_args)
@@ -38,22 +45,20 @@ def _patch(monkeypatch: pytest.MonkeyPatch, seen: list) -> None:
 
 
 @pytest.mark.asyncio
-async def test_a_call_serializes_with_the_registry_it_was_given(
+async def test_a_call_is_made_by_reference_through_the_callers_run(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Both halves of the round trip use the caller's registry, and nothing else."""
+    """No registry on either half; the results expand through the caller's run."""
     seen: list = []
     _patch(monkeypatch, seen)
-    registry, postman = object(), object()
+    run, postman = object(), cast(Any, object())
 
     result = await invoke._acall(
-        Action.model_construct(id="action-1"),
-        postman=postman,
-        structure_registry=registry,
+        Action.model_construct(id="action-1"), postman=postman, origin=run
     )
 
     assert result == "expanded"
-    assert seen == [("shrink", registry), ("postman", postman), ("expand", registry)]
+    assert seen == [("shrink", None), ("postman", postman), ("expand", None, run)]
 
 
 @pytest.mark.asyncio
@@ -62,19 +67,17 @@ async def test_a_stream_expands_every_raw_yield(
 ) -> None:
     seen: list = []
     _patch(monkeypatch, seen)
-    registry, postman = object(), object()
+    run, postman = object(), cast(Any, object())
 
     results = [
         item
         async for item in invoke._aiterate(
-            Action.model_construct(id="action-1"),
-            postman=postman,
-            structure_registry=registry,
+            Action.model_construct(id="action-1"), postman=postman, origin=run
         )
     ]
 
     assert results == ["expanded"]
-    assert seen == [("shrink", registry), ("postman", postman), ("expand", registry)]
+    assert seen == [("shrink", None), ("postman", postman), ("expand", None, run)]
 
 
 # --------------------------------------------------------------------------- #
@@ -89,18 +92,16 @@ def test_a_postman_is_not_optional() -> None:
     which is the entire point, so assert it rather than deleting the old test.
     """
     with pytest.raises(TypeError, match="postman"):
-        invoke._acall(Action.model_construct(id="a"), structure_registry=object())  # type: ignore[call-arg]
+        invoke._acall(Action.model_construct(id="a"))  # type: ignore[call-arg]
 
 
-def test_a_structure_registry_is_not_optional() -> None:
-    with pytest.raises(TypeError, match="structure_registry"):
-        invoke._acall(Action.model_construct(id="a"), postman=object())  # type: ignore[call-arg]
-
-
-@pytest.mark.parametrize("dead", ["cached", "log", "options", "task"])
+@pytest.mark.parametrize(
+    "dead", ["cached", "log", "options", "task", "structure_registry"]
+)
 def test_the_dead_options_are_gone(dead: str) -> None:
     """``cached`` and ``log`` were accepted and then ``del``'d on the first line of four
-    bodies; ``options``/``task`` were the merge layer that made the resolvers necessary.
+    bodies; ``options``/``task`` were the merge layer that made the resolvers necessary;
+    an untyped call has no registry.
     """
     for fn in (
         invoke._acall,

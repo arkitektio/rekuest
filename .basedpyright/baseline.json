@@ -148,16 +148,6 @@
                 }
             }
         ],
-        "./rekuest/arkitekt.py": [
-            {
-                "code": "reportGeneralTypeIssues",
-                "range": {
-                    "startColumn": 30,
-                    "endColumn": 42,
-                    "lineCount": 1
-                }
-            }
-        ],
         "./rekuest/client/client.py": [
             {
                 "code": "reportAttributeAccessIssue",
@@ -1846,16 +1836,6 @@
                 }
             }
         ],
-        "./tests/test_client_isolation.py": [
-            {
-                "code": "reportArgumentType",
-                "range": {
-                    "startColumn": 16,
-                    "endColumn": 41,
-                    "lineCount": 1
-                }
-            }
-        ],
         "./tests/test_create_blok_input.py": [
             {
                 "code": "reportAssignmentType",
@@ -2033,38 +2013,6 @@
             }
         ],
         "./tests/test_invoke_takes_everything_from_its_caller.py": [
-            {
-                "code": "reportArgumentType",
-                "range": {
-                    "startColumn": 16,
-                    "endColumn": 23,
-                    "lineCount": 1
-                }
-            },
-            {
-                "code": "reportArgumentType",
-                "range": {
-                    "startColumn": 27,
-                    "endColumn": 35,
-                    "lineCount": 1
-                }
-            },
-            {
-                "code": "reportArgumentType",
-                "range": {
-                    "startColumn": 20,
-                    "endColumn": 27,
-                    "lineCount": 1
-                }
-            },
-            {
-                "code": "reportArgumentType",
-                "range": {
-                    "startColumn": 31,
-                    "endColumn": 39,
-                    "lineCount": 1
-                }
-            },
             {
                 "code": "reportMissingImports",
                 "range": {
@@ -2294,22 +2242,6 @@
                     "endColumn": 44,
                     "lineCount": 1
                 }
-            },
-            {
-                "code": "reportAttributeAccessIssue",
-                "range": {
-                    "startColumn": 27,
-                    "endColumn": 35,
-                    "lineCount": 1
-                }
-            },
-            {
-                "code": "reportAttributeAccessIssue",
-                "range": {
-                    "startColumn": 52,
-                    "endColumn": 60,
-                    "lineCount": 1
-                }
             }
         ],
         "./tests/test_resume_from_retained.py": [
@@ -2384,24 +2316,6 @@
                 "range": {
                     "startColumn": 31,
                     "endColumn": 40,
-                    "lineCount": 1
-                }
-            }
-        ],
-        "./tests/test_service.py": [
-            {
-                "code": "reportPrivateImportUsage",
-                "range": {
-                    "startColumn": 29,
-                    "endColumn": 40,
-                    "lineCount": 1
-                }
-            },
-            {
-                "code": "reportOptionalMemberAccess",
-                "range": {
-                    "startColumn": 32,
-                    "endColumn": 38,
                     "lineCount": 1
                 }
             }

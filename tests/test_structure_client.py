@@ -1,10 +1,10 @@
-"""rekuest's side of structure clients: a declared structure's expander asks for
-the client of the service that declared it, binding hands it that client, and
-fetching many goes through the client when it can.
+"""rekuest's side of structure clients: a structure's expander asks for the client
+that owns it, binding hands it that client, and fetching many goes through the
+client when it can.
 
 The client mixin itself (``rath.expansion.ExpandsStructures``: dispatch by
 identifier, the gather default, ``obj.id``) is tested in rath. Here the clients
-use it only as a real service client would.
+use it only as a real generated client would.
 """
 
 from collections.abc import Sequence
@@ -12,6 +12,7 @@ from typing import Any, cast
 
 import pytest
 from arkitekt_spec.declare.app import AppRegistry
+from arkitekt_spec.declare.client import client
 from arkitekt_spec.declare.structures.errors import (
     StructureClientError,
     StructureDefinitionError,
@@ -20,7 +21,7 @@ from arkitekt_spec.declare.structures.registry import StructureRegistry
 from arkitekt_spec.declare.structures.types import FullFilledStructure
 from rath.expansion import ExpandsStructures, UnknownStructureError
 
-from .service_helpers import with_client
+from .client_helpers import use
 
 
 class Thing:
@@ -34,6 +35,7 @@ class Other:
         self.id = id
 
 
+@client(name="things", requires={})
 class ThingsClient(ExpandsStructures):
     """Two structures, one expander each; records what it is asked."""
 
@@ -72,12 +74,10 @@ class BatchingClient(ThingsClient):
         return f"shrunk-{obj.id}"
 
 
-def declared(*classes: tuple[type, str], service: str = "things") -> StructureRegistry:
-    """Declared as the things package does: its service returns ``ThingsClient``,
-    and each structure's expander (and shrinker) asks for one and goes through it
-    by identifier."""
-    app = AppRegistry()
-    with_client(app, ThingsClient, service)
+def declared(*classes: tuple[type, str]) -> StructureRegistry:
+    """An app using ``ThingsClient``: each structure's expander (and shrinker) asks
+    for one and goes through it by identifier."""
+    app = use(AppRegistry(), ThingsClient)
 
     def functions(identifier: str) -> tuple[Any, Any]:
         async def expand(id: str, things: ThingsClient) -> Any:  # noqa: ANN401
@@ -90,7 +90,9 @@ def declared(*classes: tuple[type, str], service: str = "things") -> StructureRe
 
     for cls, identifier in classes:
         expand, shrink = functions(identifier)
-        app.structure(identifier, cls=cls, shrink=shrink)(expand)
+        app.structure_registry.register_as_structure(
+            cls, identifier, aexpand=expand, ashrink=shrink
+        )
     return app.structure_registry
 
 
@@ -121,7 +123,7 @@ async def test_expand_asks_the_client_by_the_structures_identifier() -> None:
 
 @pytest.mark.asyncio
 async def test_a_client_that_names_no_expander_fails_the_expansion() -> None:
-    """Declared by a service whose client does not know the identifier."""
+    """Owned by a client that does not know the identifier."""
 
     class Partial(ThingsClient):
         EXPANDERS = {"@things/other": ThingsClient.aget_other}
@@ -193,7 +195,7 @@ def test_binding_without_a_client_of_the_wanted_class_names_the_structure() -> N
     """The expander asks for a ``ThingsClient`` by class; a run without one cannot bind."""
 
     class Elsewhere:
-        """A client of some other service."""
+        """Some other client."""
 
     registry = declared((Thing, "@things/thing"))
 
@@ -228,13 +230,13 @@ async def test_a_declared_structure_of_an_unbound_registry_cannot_expand() -> No
         "@things/thing"
     )
 
-    for use in (
+    for call in (
         lambda: structure.expand("1"),
         lambda: structure.expand_many(["1"]),
         lambda: structure.shrink(Thing("1")),
     ):
         with pytest.raises(TypeError, match="things"):
-            await use()
+            await call()
 
 
 # --------------------------------------------------------------------------- #
@@ -257,10 +259,10 @@ async def test_a_hand_registered_structure_uses_its_own_expand_and_shrink() -> N
     registry.register_as_structure(
         Thing, "@things/thing", aexpand=aexpand, ashrink=ashrink
     )
-    # Binding skips it: it has no service client, and asks for none.
+    # Binding skips it: it has no client, and asks for none.
     structure = registry.bound({}).get_fullfilled_structure("@things/thing")
 
-    assert not structure.declared
+    assert structure.client is None
     assert structure.aexpand_many is None
     assert cast(Thing, await structure.expand("1")).by == "by-hand"
     assert [t.id for t in await structure.expand_many(["2", "3"])] == ["2", "3"]

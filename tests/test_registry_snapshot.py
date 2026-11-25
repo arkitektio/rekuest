@@ -13,21 +13,20 @@ from dataclasses import dataclass
 from typing import Annotated
 
 import pytest
-from arkitekt_runtime.actors.build import actor_builder_for
 from arkitekt_runtime.agents.base import BaseAgent
 from arkitekt_runtime.local import MemoryAgentTransport
 from arkitekt_runtime.task import Task
 from arkitekt_spec.declare.app import AppRegistry
+from arkitekt_spec.declare.client import client
 from arkitekt_spec.declare.errors import RegistryFrozenError
 from arkitekt_spec.declare.state.utils import prepare_injected_variables
 
 from .agent_helpers import run_assignment
-from .service_helpers import with_client
+from .client_helpers import use
 from .test_client_bound_expansion import (
     App,
     Thing,
     ThingClient,
-    declared_things,
     expand_thing,
     ref,
     things_registry,
@@ -36,7 +35,7 @@ from .test_service_client_injection import assign
 
 
 def declaration() -> AppRegistry:
-    registry = declared_things()
+    registry = things_registry()
 
     @registry.register
     def owner(thing: Thing) -> str:
@@ -91,8 +90,8 @@ async def test_two_runs_of_one_declaration_expand_through_their_own_clients() ->
     """The actor builder bakes the registry in; the snapshot must re-point it."""
     registry = declaration()
     app_a, app_b = App(ThingClient("A")), App(ThingClient("B"))
-    agent_a = agent_for(registry.snapshot(app_a.services), app_a, "a")
-    agent_b = agent_for(registry.snapshot(app_b.services), app_b, "b")
+    agent_a = agent_for(registry.snapshot(app_a.clients), app_a, "a")
+    agent_b = agent_for(registry.snapshot(app_b.clients), app_b, "b")
 
     returns = await asyncio.gather(
         run_assignment(agent_a, assign("owner", thing=ref("1"))),
@@ -132,25 +131,24 @@ def test_snapshot_keeps_hooks_and_freezes_them() -> None:
     registry.startup(other)
 
 
-# -- inferring services from an action ------------------------------------- #
+# -- inferring clients from an action -------------------------------------- #
 
 
+@client(requires={})
 class Mikro:
     pass
 
 
+@client(requires={})
 class Fluss:
     pass
 
 
-def two_services() -> AppRegistry:
-    registry = AppRegistry()
-    with_client(registry, Mikro, "mikro")
-    with_client(registry, Fluss, "fluss")
-    return registry
+def two_clients() -> AppRegistry:
+    return use(AppRegistry(), Mikro, Fluss)
 
 
-def test_injected_parameters_are_the_ones_a_declared_service_returns() -> None:
+def test_injected_parameters_are_the_clients_the_app_uses() -> None:
     def segment(
         x: int,
         fluss: Fluss | None,
@@ -160,7 +158,7 @@ def test_injected_parameters_are_the_ones_a_declared_service_returns() -> None:
     ) -> int:
         return x
 
-    injected = prepare_injected_variables(segment, two_services().structure_registry)
+    injected = prepare_injected_variables(segment, two_clients().structure_registry)
     assert injected.service_client_variables == {
         "fluss": Fluss,
         "mikro": Mikro,
@@ -173,7 +171,7 @@ def test_plain_and_unresolvable_annotations_are_not_clients() -> None:
     def plain(x: int, y: "NotDefinedAnywhere") -> int:  # noqa: F821
         return x
 
-    injected = prepare_injected_variables(plain, two_services().structure_registry)
+    injected = prepare_injected_variables(plain, two_clients().structure_registry)
     assert injected.service_client_variables == {}
 
 
@@ -213,7 +211,7 @@ async def test_a_snapshot_can_be_bound_after_its_clients_are_built() -> None:
     registry = declaration()
     snapshot = registry.snapshot()
     app = App(ThingClient("late"))
-    snapshot.structure_registry.bind(app.services)
+    snapshot.structure_registry.bind(app.clients)
 
     agent = agent_for(snapshot, app, "late")
     assert await run_assignment(agent, assign("owner", thing=ref("9"))) == {
@@ -223,61 +221,3 @@ async def test_a_snapshot_can_be_bound_after_its_clients_are_built() -> None:
         registry.structure_registry.get_fullfilled_structure("@things/thing").aexpand
         is expand_thing
     )
-
-
-def package_with_action() -> AppRegistry:
-    """A package registry bringing an action and a state of its own, as fluss brings ``run_flow``.
-
-    Its builder bakes the *package's* structure registry in, which no run ever
-    binds a client into.
-    """
-    package = things_registry()
-
-    @package.register
-    def owner(thing: Thing) -> str:
-        """Who fetched it."""
-        return f"{thing.id}@{thing.owner}"
-
-    @package.state
-    @dataclass
-    class Counter:
-        value: int = 0
-
-    return package
-
-
-def test_snapshot_repoints_what_was_merged_in_from_a_package() -> None:
-    package = package_with_action()
-    registry = AppRegistry()
-    registry.merge(package, service="things")
-
-    snapshot = registry.snapshot()
-
-    # The agent builds actors against the registry it serves: the snapshot's.
-    builder = actor_builder_for(snapshot, "owner")
-    assert builder.builder.keywords["structure_registry"] is snapshot.structure_registry
-    assert all(
-        schema is snapshot.structure_registry
-        for schema in snapshot.state_registry_schemas.values()
-    )
-    # Merging reads the package; building from the package itself uses the package's.
-    assert (
-        actor_builder_for(package, "owner").builder.keywords["structure_registry"]
-        is package.structure_registry
-    )
-
-
-@pytest.mark.asyncio
-async def test_a_packages_action_expands_through_each_runs_own_client() -> None:
-    package = package_with_action()
-    registry = AppRegistry()
-    registry.merge(package, service="things")
-    app_a, app_b = App(ThingClient("A")), App(ThingClient("B"))
-    agent_a = agent_for(registry.snapshot(app_a.services), app_a, "a")
-    agent_b = agent_for(registry.snapshot(app_b.services), app_b, "b")
-
-    returns = await asyncio.gather(
-        run_assignment(agent_a, assign("owner", thing=ref("1"))),
-        run_assignment(agent_b, assign("owner", thing=ref("2"))),
-    )
-    assert returns == [{"return0": "1@A"}, {"return0": "2@B"}]

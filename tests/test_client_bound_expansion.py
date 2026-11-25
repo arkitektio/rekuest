@@ -1,5 +1,5 @@
-"""A declared structure expands through the client its registry was bound to --
-once, at bind time, by service name, never looked up per call. The client names
+"""A structure expands through the client its registry was bound to -- once, at
+bind time, by class, never looked up per call. The client names
 its expanders by identifier (rath's ``ExpandsStructures``).
 
 This replaced resolving the client from an ambient context. It deliberately
@@ -15,12 +15,13 @@ import pytest
 from arkitekt_runtime.agents.base import BaseAgent
 from arkitekt_runtime.local import MemoryAgentTransport
 from arkitekt_spec.declare.app import AppRegistry
+from arkitekt_spec.declare.client import client
 from arkitekt_spec.declare.structures.errors import StructureClientError
 from arkitekt_spec.declare.structures.registry import StructureRegistry
 from rath.expansion import ExpandsStructures
 
 from .agent_helpers import run_assignment
-from .service_helpers import with_client
+from .client_helpers import use
 from .test_service_client_injection import assign
 
 T = TypeVar("T")
@@ -32,6 +33,7 @@ class Thing:
         self.owner = owner
 
 
+@client(name="things", requires={})
 class ThingClient(ExpandsStructures):
     """Its expanders are plain methods, as generated client methods are."""
 
@@ -63,17 +65,11 @@ async def expand_thing(id: str, things: ThingClient) -> Thing:
 
 
 def things_registry() -> AppRegistry:
-    """What the things package brings: a service returning its client, and the thing."""
-    registry = AppRegistry()
-    with_client(registry, ThingClient, "things")
-    registry.structure("@things/thing")(expand_thing)
-    return registry
-
-
-def declared_things() -> AppRegistry:
-    """A registry that took the things package in, so its thing is stamped ``things``."""
-    registry = AppRegistry()
-    registry.merge(things_registry(), service="things")
+    """An app using ``ThingClient``, and the thing its expander fetches."""
+    registry = use(AppRegistry(), ThingClient)
+    registry.structure_registry.register_as_structure(
+        Thing, "@things/thing", aexpand=cast(Any, expand_thing)
+    )
     return registry
 
 
@@ -85,16 +81,14 @@ class App:
     __app_context__ = True
 
     def __init__(self, *clients: Any) -> None:
-        # Keyed by service name: what a registry is bound with.
         self.clients = {"things": clients[-1]} if clients else {}
-        self.services = self.clients
 
     def get(self, key: type[T]) -> T | None:
         return next((c for c in self.clients.values() if isinstance(c, key)), None)
 
 
 def build_agent(client: ThingClient) -> BaseAgent:
-    registry = declared_things()
+    registry = things_registry()
     app = App(client)
     registry.structure_registry.bind(app)
     bound = registry.structure_registry.get_fullfilled_structure("@things/thing")
@@ -148,7 +142,7 @@ async def test_nested_ports_keep_the_bound_client() -> None:
 
 @pytest.mark.asyncio
 async def test_one_declaration_binds_independently_per_run() -> None:
-    library = declared_things().structure_registry
+    library = things_registry().structure_registry
 
     one = library.bound({"things": ThingClient("A")})
     two = library.bound({"things": ThingClient("B")})
@@ -163,7 +157,7 @@ async def test_one_declaration_binds_independently_per_run() -> None:
 
 @pytest.mark.asyncio
 async def test_an_unbound_registry_says_so_at_expansion() -> None:
-    registry = declared_things().structure_registry
+    registry = things_registry().structure_registry
 
     # Unbound, the expander still wants its client: nothing has been applied.
     with pytest.raises(TypeError, match="things"):
@@ -171,16 +165,16 @@ async def test_an_unbound_registry_says_so_at_expansion() -> None:
 
 
 def test_binding_without_the_client_fails_at_bind_time() -> None:
-    registry = declared_things().structure_registry
+    registry = things_registry().structure_registry
 
     with pytest.raises(StructureClientError, match="ThingClient"):
-        registry.bound(App().services)
+        registry.bound(App().clients)
 
 
 @pytest.mark.asyncio
 async def test_hand_registered_structures_are_untouched_by_binding() -> None:
-    """Only a declared structure has a service client; one registered by hand
-    keeps expanding itself, bound or not, and binding does not ask for a client."""
+    """A structure whose expander asks for no client keeps expanding itself, bound
+    or not, and binding does not ask for one."""
 
     async def aexpand(id: str) -> Thing:
         return Thing(id, "self-resolved")

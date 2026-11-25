@@ -5,28 +5,20 @@ An identifier is a wire contract with the rekuest server, which only accepts
 server is involved.
 """
 
-from collections.abc import Sequence
-from typing import Any
-
 import pytest
-from arkitekt_spec.declare.app import AppRegistry
+from arkitekt_spec.declare.client import client_of
+from arkitekt_spec.declare.structures.declare import structure_of
 from arkitekt_spec.declare.structures.errors import (
     StructureDefinitionError,
-    StructureOverwriteError,
     StructureRegistryError,
 )
 from arkitekt_spec.declare.structures.registry import StructureRegistry
-from arkitekt_spec.declare.structures.types import (
-    FullFilledStructure,
-    is_valid_identifier,
-)
+from arkitekt_spec.declare.structures.types import is_valid_identifier
 from arkitekt_spec.declare.structures.utils import id_shrink
-from rath.expansion import ExpandsStructures
-from rath.scalars import ID
 
-from rekuest.arkitekt import registry as rekuest_registry
-
-from .service_helpers import with_client
+from rekuest.api.schema import Agent, DetailMaterializedBlok
+from rekuest.client.client import Rekuest
+from rekuest.structures import SUPERVISOR, expand_agent, expand_materialized_blok
 
 
 async def aget_thing(id: str) -> "Thing":
@@ -36,23 +28,6 @@ async def aget_thing(id: str) -> "Thing":
 class Thing:
     def __init__(self, id: str) -> None:
         self.id = id
-
-
-class OtherThing(Thing):
-    pass
-
-
-class ThingClient(ExpandsStructures):
-    """Expands one id per request; records each."""
-
-    def __init__(self) -> None:
-        self.single: list[str] = []
-
-    async def aget_thing(self, id: str) -> Thing:
-        self.single.append(id)
-        return Thing(id)
-
-    EXPANDERS = {"@things/thing": aget_thing}
 
 
 class GeneratedEntity:
@@ -129,7 +104,7 @@ def test_a_fetchable_type_nobody_declared_is_refused_with_the_cause() -> None:
     message = str(raised.value)
     assert "nothing declared it" in message
     assert "'GeneratedEntity'" in message and "@package/key" in message
-    assert "is 'tests' one of this app's services" in message
+    assert "is 'tests' imported" in message
     assert registry.find_for_cls(GeneratedEntity) is None
 
 
@@ -165,115 +140,21 @@ def test_a_plain_object_is_refused_until_it_is_registered() -> None:
 
 
 # --------------------------------------------------------------------------- #
-# Declaring: the service first, then the structures its client fetches
+# rekuest's own structures
 # --------------------------------------------------------------------------- #
 
 
-def things_registry(
-    cls: type = Thing, identifier: str = "@things/thing", service: str = "things"
-) -> AppRegistry:
-    """What a things package ships: a service returning ``ThingClient``, and a structure."""
-    registry = AppRegistry()
-    with_client(registry, ThingClient, service)
+def test_rekuests_structures_are_owned_by_the_rekuest_client() -> None:
+    owner = client_of(Rekuest)
+    assert owner is not None
 
-    @registry.structure(identifier, cls=cls)
-    async def expand_thing(id: str, things: ThingClient) -> Any:  # noqa: ANN401
-        """A thing, by id."""
-        return await things.aget_thing(id)
-
-    return registry
-
-
-def test_declared_structures_belong_to_the_service_whose_client_fetches_them() -> None:
-    registry = things_registry().structure_registry
-
-    declared = registry.get_fullfilled_structure("@things/thing")
-
-    assert declared.service == "things" and declared.declared
-    assert registry.find_for_cls(Thing) is declared
-
-
-def test_the_service_is_stated_not_guessed_from_the_identifier() -> None:
-    """unlok's structure is '@lok/service': the prefix names no service at all."""
-    registry = things_registry(
-        identifier="@lok/service", service="unlok"
-    ).structure_registry
-
-    assert registry.get_fullfilled_structure("@lok/service").service == "unlok"
-
-
-def test_a_hand_registered_structure_still_guesses_its_service() -> None:
-    registry = StructureRegistry()
-
-    structure = registry.register_as_structure(
-        Thing, "@things/thing", aexpand=aget_thing, ashrink=id_shrink
-    )
-
-    assert structure.service == "things" and not structure.declared
-
-
-def test_a_structure_whose_client_no_service_returns_is_refused() -> None:
-    """The service comes first: it is what makes ``ThingClient`` a client."""
-    registry = AppRegistry()
-
-    with pytest.raises(
-        StructureDefinitionError, match="no registered service returns one"
-    ):
-
-        @registry.structure("@things/thing")
-        async def expand_thing(id: str, things: ThingClient) -> Thing:
-            """Wants a client nothing here returns."""
-            return await things.aget_thing(id)
-
-
-def test_taking_the_same_package_in_twice_is_fine() -> None:
-    app = AppRegistry()
-    package = things_registry()
-
-    app.merge(package)
-    app.merge(package)
-
-    assert [s.identifier for s in app.structure_registry.structures()] == [
-        "@things/thing"
-    ]
-
-
-def test_two_classes_cannot_claim_one_identifier() -> None:
-    app = AppRegistry()
-    app.merge(things_registry())
-
-    with pytest.raises(StructureOverwriteError) as raised:
-        app.merge(things_registry(cls=OtherThing, service="others"))
-
-    message = str(raised.value)
-    assert "'@things/thing' is already registered" in message
-    assert "(service 'things')" in message and "(service 'others')" in message
-    assert app.structure_registry.get_fullfilled_structure("@things/thing").cls is Thing
-
-
-def test_a_reloaded_module_may_register_its_class_again() -> None:
-    """Reloading makes a new class object of the same name; that is not a conflict."""
-    app = AppRegistry()
-    app.merge(things_registry())
-    reloaded = type(
-        "Thing", (), {"__module__": Thing.__module__, "__qualname__": "Thing"}
-    )
-
-    app.structure_registry.merge(things_registry(cls=reloaded).structure_registry)
-
-    assert (
-        app.structure_registry.get_fullfilled_structure("@things/thing").cls is reloaded
-    )
-
-
-def test_rekuests_own_structures_are_declared_the_same_way() -> None:
-    declared = rekuest_registry.structure_registry.structures()
-
-    assert {s.identifier for s in declared} >= {
+    assert {s.identifier for s in owner.structures} >= {
         "@rekuest/implementation",
         "@rekuest/action",
+        "@rekuest/agent",
+        "@rekuest/materialized_blok",
     }
-    assert {(s.service, s.declared) for s in declared} == {("rekuest", True)}
+    assert all(s.owner is owner for s in owner.structures)
 
 
 @pytest.mark.asyncio
@@ -281,13 +162,9 @@ async def test_a_materialized_blok_is_a_structure_under_the_identifier_orkestrat
     None
 ):
     """``@rekuest/materialized_blok``, underscore and all: what a room message attaches."""
-    from rekuest.api.schema import DetailMaterializedBlok
-    from rekuest.arkitekt import expand_materialized_blok
-
-    structure = rekuest_registry.structure_registry.get_fullfilled_structure(
-        "@rekuest/materialized_blok"
-    )
-    assert structure.cls is DetailMaterializedBlok
+    structure = structure_of(DetailMaterializedBlok)
+    assert structure is not None
+    assert structure.identifier == "@rekuest/materialized_blok"
 
     class FakeRekuest:
         def __init__(self) -> None:
@@ -306,13 +183,9 @@ async def test_a_materialized_blok_is_a_structure_under_the_identifier_orkestrat
 @pytest.mark.asyncio
 async def test_an_agent_is_a_structure_described_by_its_supervisor() -> None:
     """``@rekuest/agent``: what a supervisor's actions take, narrowed by ``@rekuest/supervisor``."""
-    from rekuest.api.schema import Agent
-    from rekuest.arkitekt import SUPERVISOR, expand_agent
-
-    structure = rekuest_registry.structure_registry.get_fullfilled_structure(
-        "@rekuest/agent"
-    )
-    assert structure.cls is Agent
+    structure = structure_of(Agent)
+    assert structure is not None
+    assert structure.identifier == "@rekuest/agent"
 
     def agent(supervisor: str | None) -> Agent:
         return Agent.model_validate(
@@ -348,62 +221,3 @@ async def test_an_agent_is_a_structure_described_by_its_supervisor() -> None:
 
     assert await expand_agent("7", client) == "7"  # type: ignore[arg-type]
     assert client.asked == ["7"]
-
-
-# --------------------------------------------------------------------------- #
-# Expanding many -- through the declaring service's client
-# --------------------------------------------------------------------------- #
-
-
-class BatchingThingClient(ThingClient):
-    """Also fetches several ids in one request, ``None`` for a missing one."""
-
-    def __init__(self, answer_short: bool = False) -> None:
-        super().__init__()
-        self.answer_short = answer_short
-        self.calls: list[list[str]] = []
-
-    async def aexpand_many(
-        self, identifier: str, ids: Sequence[ID]
-    ) -> list[Thing | None]:
-        self.calls.append(list(ids))
-        if self.answer_short:
-            return []
-        return [None if id == "missing" else Thing(id) for id in ids]
-
-
-def bound_structure(client: ThingClient) -> FullFilledStructure:
-    registry = things_registry().structure_registry
-    return registry.bound({"things": client}).get_fullfilled_structure("@things/thing")
-
-
-@pytest.mark.asyncio
-async def test_expand_many_is_one_call_when_the_client_can() -> None:
-    client = BatchingThingClient()
-    structure = bound_structure(client)
-
-    found = await structure.expand_many(["1", "missing", "2"])
-
-    assert client.calls == [["1", "missing", "2"]]
-    assert client.single == []
-    assert [thing and thing.id for thing in found] == ["1", None, "2"]
-
-
-@pytest.mark.asyncio
-async def test_expand_many_falls_back_to_one_expand_per_id() -> None:
-    """A client that does not override ``aexpand_many`` expands each id on its own."""
-    client = ThingClient()
-    structure = bound_structure(client)
-
-    found = await structure.expand_many(["1", "2"])
-
-    assert [thing.id for thing in found] == ["1", "2"]
-    assert sorted(client.single) == ["1", "2"]
-
-
-@pytest.mark.asyncio
-async def test_expand_many_must_answer_one_per_id() -> None:
-    structure = bound_structure(BatchingThingClient(answer_short=True))
-
-    with pytest.raises(ValueError, match="asked for 2 ids and got 0"):
-        await structure.expand_many(["1", "2"])

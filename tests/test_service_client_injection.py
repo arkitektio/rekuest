@@ -1,33 +1,32 @@
 """A parameter annotated with a client the app builds receives that client.
 
-`def segment(x: int, mikro: Mikro)`: `mikro` is not a port, because a service
-declared on the registry returns a `Mikro`; the agent fills it with its bound
-app's `Mikro` — the one shared instance, not a per-task copy. What makes its
-requests attributable is the ambient task, which the actor sets around the body.
+`def segment(x: int, mikro: Mikro)`: the app uses the `Mikro` client, so the agent
+fills `mikro` with its bound app's `Mikro` — the one shared instance, not a per-task
+copy. What makes its requests attributable is the ambient task, which the actor
+sets around the body.
 """
 
 import asyncio
-from typing import Annotated, Any, Optional, Protocol, TypeVar
+from typing import Any, TypeVar
 
 import pytest
 from arkitekt_runtime import messages
 from arkitekt_runtime.agents.base import BaseAgent
 from arkitekt_runtime.local import MemoryAgentTransport
-from arkitekt_spec.actions import PortKind
 from arkitekt_spec.declare.agents.errors import StateRequirementsNotMet
 from arkitekt_spec.declare.app import AppRegistry
-from arkitekt_spec.declare.definition.define import prepare_definition
-from arkitekt_spec.declare.structures.registry import StructureRegistry
+from arkitekt_spec.declare.client import client
 from rath.task import current_task, token_of
 
 from rekuest.agents.agent import RekuestAgent
 
 from .agent_helpers import run_assignment
-from .service_helpers import with_client
+from .client_helpers import use
 
 T = TypeVar("T")
 
 
+@client(name="fake", requires={})
 class FakeClient:
     """Stands in for a generated client class such as Mikro."""
 
@@ -40,16 +39,9 @@ class FakeClient:
         return token_of(None)
 
 
+@client(name="other", requires={})
 class OtherClient:
     pass
-
-
-class Lab(Protocol):
-    """A dependency protocol: not ``runtime_checkable``, so not an ``issubclass`` target."""
-
-    def measure(self, x: int) -> int:
-        """Measure."""
-        ...
 
 
 class FakeApp:
@@ -58,18 +50,14 @@ class FakeApp:
     def __init__(self, name: str, *clients: Any) -> None:
         self.name = name
         self.clients = {type(c).__name__: c for c in clients}
-        self.services = self.clients
 
     def get(self, key: type[T]) -> T | None:
-        return next((s for s in self.services.values() if isinstance(s, key)), None)
+        return next((c for c in self.clients.values() if isinstance(c, key)), None)
 
 
 def registry_with_clients() -> AppRegistry:
-    """A registry on which services return both fake clients, so they are clients."""
-    registry = AppRegistry()
-    with_client(registry, FakeClient, "fake")
-    with_client(registry, OtherClient, "other")
-    return registry
+    """A registry using both fake clients."""
+    return use(AppRegistry(), FakeClient, OtherClient)
 
 
 def build_agent(app: FakeApp | None) -> BaseAgent:
@@ -93,41 +81,6 @@ def assign(interface: str, token: str | None = None, **args: Any) -> messages.As
         org="org-1",
         token=token,
     )
-
-
-def test_a_client_is_what_a_declared_service_returns_seen_through_optional_and_annotated() -> (
-    None
-):
-    structures = registry_with_clients().structure_registry
-    assert structures.is_client(FakeClient)
-    assert structures.is_client(Optional[FakeClient])  # noqa: UP045 -- the Optional spelling is what is tested
-    assert structures.is_client(FakeClient | None)
-    assert structures.is_client(Annotated[FakeClient, "doc"])
-    assert not structures.is_client(FakeClient | OtherClient)
-    assert not structures.is_client(FakeClient("x"))
-    assert not structures.is_client(int)
-    assert not structures.is_client(Lab), (
-        "a declared protocol is a dependency, not a client"
-    )
-    assert not StructureRegistry().is_client(FakeClient), "no service, no client"
-
-
-@pytest.mark.parametrize(
-    "annotation",
-    [FakeClient, Optional[FakeClient], Annotated[FakeClient, "doc"]],  # noqa: UP045 -- the Optional spelling is what is tested
-)
-def test_client_parameter_is_not_a_port(annotation: object) -> None:
-    def takes_client(x: int, client) -> int:  # noqa: ANN001
-        """Takes a client."""
-        return x
-
-    takes_client.__annotations__["client"] = annotation
-    definition = prepare_definition(
-        takes_client, structure_registry=registry_with_clients().structure_registry
-    )
-
-    assert [port.key for port in definition.args] == ["x"]
-    assert definition.args[0].kind == PortKind.INT
 
 
 @pytest.mark.asyncio

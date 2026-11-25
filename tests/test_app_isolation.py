@@ -6,7 +6,7 @@ nothing another agent's app does can reach them.
 """
 
 import asyncio
-from typing import Any, TypeVar
+from typing import Any, TypeVar, cast
 
 import pytest
 from arkitekt_runtime import messages
@@ -14,10 +14,11 @@ from arkitekt_runtime.agents.base import BaseAgent
 from arkitekt_runtime.local import MemoryAgentTransport
 from arkitekt_spec.declare.agents.errors import StateRequirementsNotMet
 from arkitekt_spec.declare.app import AppRegistry
+from arkitekt_spec.declare.client import client
 from rath.expansion import ExpandsStructures
 
 from .agent_helpers import run_assignment
-from .service_helpers import with_client
+from .client_helpers import use
 
 T = TypeVar("T")
 
@@ -28,6 +29,7 @@ class Thing:
         self.owner = owner
 
 
+@client(name="fake", requires={})
 class FakeService(ExpandsStructures):
     def __init__(self, owner: str) -> None:
         self.owner = owner
@@ -43,34 +45,32 @@ class FakeApp:
 
     def __init__(self, name: str, *clients: Any) -> None:
         self.name = name
-        # Keyed by service name, as the agent's missing-service check reads it.
         self.clients = (
             {"fake": FakeService(name)}
             if not clients
             else {type(c).__name__.lower(): c for c in clients}
         )
-        self.services = self.clients
 
     def get(self, key: type[T]) -> T | None:
         return next((s for s in self.clients.values() if isinstance(s, key)), None)
 
 
-def fake_package() -> AppRegistry:
-    """What the fake client package brings: its service, and the thing it expands."""
-    registry = AppRegistry()
-    with_client(registry, FakeService, "fake")
+async def expand_thing(id: str, service: FakeService) -> Thing:
+    return await service.aget_thing(id)
 
-    @registry.structure("@fake/thing")
-    async def expand_thing(id: str, service: FakeService) -> Thing:
-        return await service.aget_thing(id)
 
+def fake_app_registry() -> AppRegistry:
+    """An app using ``FakeService``, and the thing it expands."""
+    registry = use(AppRegistry(), FakeService)
+    registry.structure_registry.register_as_structure(
+        Thing, "@fake/thing", aexpand=cast(Any, expand_thing)
+    )
     return registry
 
 
 def build_agent(name: str) -> BaseAgent:
     app = FakeApp(name)
-    registry = AppRegistry()
-    registry.merge(fake_package(), service="fake")
+    registry = fake_app_registry()
     # Bound in place: this registry is this one agent's.
     registry.structure_registry.bind(app)
     return BaseAgent(
@@ -211,11 +211,11 @@ async def test_a_shutdown_hook_gets_its_own_apps_client() -> None:
 def test_a_hook_asking_for_a_client_its_app_lacks_names_the_cause() -> None:
     from arkitekt_runtime.agents.hooks.background import WrappedBackgroundTask
 
+    @client(requires={})
     class Other:
         pass
 
-    registry = AppRegistry()
-    with_client(registry, Other, "other")
+    registry = use(AppRegistry(), Other)
 
     async def worker(other: Other) -> None:
         """Needs a client the app does not have."""
@@ -235,55 +235,3 @@ def test_a_hook_cannot_ask_for_a_task() -> None:
 
     with pytest.raises(ValueError, match="runs for no task"):
         WrappedBackgroundTask(worker)
-
-
-# --------------------------------------------------------------------------- #
-# Missing services
-# --------------------------------------------------------------------------- #
-
-
-class AppWithoutFake(FakeApp):
-    def __init__(self) -> None:
-        self.name = "without"
-        self.clients = {}
-        self.services = self.clients
-
-
-def test_a_structure_of_a_service_the_app_lacks_is_reported_at_collection() -> None:
-    from arkitekt_spec.declare.agents.errors import MissingServiceWarning
-
-    registry = AppRegistry()
-    registry.merge(fake_package(), service="fake")
-    agent = BaseAgent(
-        name="A",
-        transport=MemoryAgentTransport(),
-        app_registry=registry,
-        bound_app=AppWithoutFake(),
-    )
-
-    def uses_fake(thing: Thing) -> str:
-        """Uses a structure of the fake service."""
-        return thing.id
-
-    agent.app_registry.register(uses_fake)
-
-    assert agent.app_registry.required_services() == {"fake": {"uses_fake"}}
-    with pytest.warns(MissingServiceWarning, match="uses_fake.*'fake' service"):
-        agent.collect_from_registry()
-
-
-def test_no_warning_when_the_app_has_the_service(
-    recwarn: pytest.WarningsRecorder,
-) -> None:
-    from arkitekt_spec.declare.agents.errors import MissingServiceWarning
-
-    agent = build_agent("A")
-
-    def uses_fake(thing: Thing) -> str:
-        """Uses a structure of the fake service."""
-        return thing.id
-
-    agent.app_registry.register(uses_fake)
-    agent.collect_from_registry()
-
-    assert not [w for w in recwarn if issubclass(w.category, MissingServiceWarning)]

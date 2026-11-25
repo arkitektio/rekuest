@@ -1,23 +1,28 @@
 """The base client for rekuest"""
 
+import os
 from collections.abc import AsyncGenerator, Generator
 from typing import (
+    Annotated,
     Any,
     ClassVar,
+    Self,
     TypeVar,
 )
 
 from arkitekt_runtime.invoke import AgentTarget
 from arkitekt_runtime.postmans.types import Postman
 from arkitekt_runtime.types import TaskPolicy
+from arkitekt_spec.declare.client import client
 from arkitekt_spec.declare.errors import RootOnlyCallError
 from arkitekt_spec.declare.protocol.types import AnyFunction
 from arkitekt_spec.declare.register import WrappedFunction
-from arkitekt_spec.declare.structures.registry import StructureRegistry
 from arkitekt_spec.declare.task import HookInput, StateRequirement
+from arkitekt_spec.declare.tested import tested_against
+from arkitekt_spec.declare.wiring import Alias, Require, TokenLoader
 from koil import unkoil, unkoil_gen
 from koil.composition import Composition
-from pydantic import Field
+from pydantic import PrivateAttr
 from rath.origin import origin_context
 from rath.scalars import ID
 from rath.task import current_task
@@ -39,22 +44,57 @@ CallTarget = Action | Implementation | WrappedFunction[Any, Any] | ID | str
 
 T = TypeVar("T", bound=AnyFunction)
 
+TESTED = tested_against("rekuest")
+"""The rekuest server this release wants: the one its release job tested it against."""
 
+_API = os.path.join(os.path.dirname(os.path.dirname(__file__)), "api")
+REKUEST = Require(
+    "live.arkitekt.rekuest",
+    "Where this app's actions are offered and assigned",
+    version=TESTED,
+)
+S3 = Require("live.arkitekt.s3", "Where this app's uploads are stored")
+
+
+@client(
+    schema=os.path.join(_API, "schema.graphql"),
+    turms=os.path.join(_API, "project.json"),
+    # The server this release is written against: what a hub made for an app's
+    # tests runs. Moves with the server's major, not with this package's.
+    image="jhnnsrs/rekuest:23",
+)
 class Rekuest(Composition, RekuestApi):
     """The rekuest client: every rekuest operation but those that start or steer a task is
     a method of it -- lookups, queries, blok and asset mutations.
 
-    A service builds it; it knows nothing about any agent. An action asks for it by
+    A run builds it; it knows nothing about any agent. An action asks for it by
     annotation (``rekuest: Rekuest``) and is handed this one shared instance. It starts
     no task: an action calls through its declared dependencies, or (``dynamic_calls``)
     through its task, ``await task.acall(await rekuest.aresolve(target), ...)``. An app
-    that starts tasks of its own takes in :class:`RekuestCaller` instead
-    (``rekuest_caller_service``), whose scope it then asks for.
+    that starts tasks of its own uses :class:`RekuestCaller` instead, whose scope it
+    then asks for.
     """
 
     rath: RekuestRath
-    structure_registry: StructureRegistry = Field(exclude=True)
-    """The registry of the run this client belongs to: what its calls (de)serialize with."""
+    # Private: a Composition enters its fields, and the run is not this client's to enter.
+    _origin: Any = PrivateAttr(default=None)
+    """The run this client belongs to: what the references its calls return expand through."""
+
+    def attach(self, app: Any, /) -> None:  # noqa: ANN401 -- a BoundApp
+        """Belong to ``app``, so the references a call returns expand through its clients."""
+        self._origin = app
+
+    @classmethod
+    def from_fakts(
+        cls,
+        rekuest: Annotated[Alias, REKUEST],
+        s3: Annotated[Alias, S3],
+        tokens: TokenLoader,
+    ) -> Self:
+        """Built by a run: talks to the resolved rekuest."""
+        from rekuest.client.connect import rekuest_rath
+
+        return cls(rath=rekuest_rath(rekuest, s3, tokens))
 
     def _serialize(
         self, operation: type[TOperation], variables: dict[str, Any]
@@ -112,14 +152,19 @@ class Rekuest(Composition, RekuestApi):
         )
 
 
+@client(
+    schema=os.path.join(_API, "schema.graphql"),
+    turms=os.path.join(_API, "project.json"),
+    image="jhnnsrs/rekuest:23",
+)
 class RekuestCaller(Rekuest, RekuestCallerApi):
     """The rekuest client that also starts and steers tasks at the top level: calls
     actions (``rekuest.call(...)``), assigns, cancels, pauses, resumes, interrupts and
     decides.
 
-    An app has it only by taking in ``rekuest_caller_service``, and so asks for
-    ``rekuest_root_call`` at login: an app that does not take it in can start no task of
-    its own, only call what its actions declare.
+    An app has it only by using it (``App(clients=[RekuestCaller])``), and so asks for
+    ``rekuest_root_call`` at login: an app that does not can start no task of its own,
+    only call what its actions declare.
 
     **Its calls are roots.** A call through this client goes over its own postman with no
     parent, so inside a running task it refuses -- a call made then is that task's child,
@@ -135,6 +180,21 @@ class RekuestCaller(Rekuest, RekuestCallerApi):
         sorted({*RekuestApi.__scopes__, *RekuestCallerApi.__scopes__})
     )
     """What its operations need: the plain client's, and starting tasks at the top level."""
+
+    @classmethod
+    def from_fakts(
+        cls,
+        rekuest: Annotated[Alias, REKUEST],
+        s3: Annotated[Alias, S3],
+        tokens: TokenLoader,
+    ) -> Self:
+        """Built by a run: the plain client's connection, and a caller session for its calls."""
+        from rekuest.client.connect import caller_postman, rekuest_rath
+
+        return cls(
+            rath=rekuest_rath(rekuest, s3, tokens),
+            postman=caller_postman(rekuest, tokens),
+        )
 
     async def aexecute(
         self, operation: type[TOperation], variables: dict[str, Any]
@@ -212,7 +272,7 @@ class RekuestCaller(Rekuest, RekuestCallerApi):
             await self.aresolve(target),
             *args,
             postman=self.postman,
-            structure_registry=self.structure_registry,
+            origin=self._origin,
             reference=reference,
             hooks=hooks,
             capture=capture,
@@ -347,7 +407,7 @@ class RekuestCaller(Rekuest, RekuestCallerApi):
             await self.aresolve(target),
             *args,
             postman=self.postman,
-            structure_registry=self.structure_registry,
+            origin=self._origin,
             reference=reference,
             hooks=hooks,
             capture=capture,
